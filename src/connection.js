@@ -4,8 +4,12 @@ const logger = require('./utils/logger');
 const { sessionManager } = require('./utils/sessionManager');
 const config = require('./config/config');
 
-let connectionQueue = [];
+// Connection pool and state management
+let connectionPool = [];
 let isReconnecting = false;
+let activeConnection = null;
+const MAX_POOL_SIZE = 2;
+const CONNECTION_CHECK_INTERVAL = 10000; // 10 seconds
 
 async function startConnection(retryCount = 0) {
     try {
@@ -33,84 +37,86 @@ async function startConnection(retryCount = 0) {
             markOnlineOnConnect: true
         });
 
-        // WebSocket heartbeat mechanism
-        const heartbeat = {
-            interval: null,
-            missedBeats: 0,
-            maxMissed: 3
+        // Connection state monitoring
+        const connectionState = {
+            isActive: false,
+            lastPing: Date.now(),
+            missedPings: 0,
+            maxMissedPings: 3
         };
 
-        function startHeartbeat() {
-            if (heartbeat.interval) clearInterval(heartbeat.interval);
-            heartbeat.missedBeats = 0;
-
-            heartbeat.interval = setInterval(async () => {
+        // Heartbeat mechanism
+        const startHeartbeat = () => {
+            const interval = setInterval(async () => {
                 try {
                     if (sock.ws?.readyState === sock.ws?.OPEN) {
                         await sock.sendPresenceUpdate('available');
-                        heartbeat.missedBeats = 0;
+                        connectionState.lastPing = Date.now();
+                        connectionState.missedPings = 0;
                     } else {
-                        heartbeat.missedBeats++;
-                        logger.warn(`Missed heartbeat: ${heartbeat.missedBeats}/${heartbeat.maxMissed}`);
+                        connectionState.missedPings++;
+                        logger.warn(`Missed ping: ${connectionState.missedPings}/${connectionState.maxMissedPings}`);
 
-                        if (heartbeat.missedBeats >= heartbeat.maxMissed) {
-                            logger.error('Connection appears dead, initiating recovery...');
-                            await handleConnectionRecovery();
+                        if (connectionState.missedPings >= connectionState.maxMissedPings) {
+                            logger.error('Connection dead, initiating recovery');
+                            clearInterval(interval);
+                            await handleConnectionFailure(sock);
                         }
                     }
                 } catch (err) {
                     logger.error('Heartbeat error:', err);
-                    heartbeat.missedBeats++;
+                    connectionState.missedPings++;
                 }
-            }, 15000); // 15 second intervals
-        }
+            }, CONNECTION_CHECK_INTERVAL);
 
-        async function handleConnectionRecovery() {
+            return interval;
+        };
+
+        // Connection failure handler
+        async function handleConnectionFailure(failedSocket) {
             if (isReconnecting) return;
             isReconnecting = true;
 
             try {
-                logger.info('Starting connection recovery...');
-                clearInterval(heartbeat.interval);
+                // Remove failed connection from pool
+                connectionPool = connectionPool.filter(conn => conn !== failedSocket);
 
-                await sock.ws?.close();
-                await sock.logout();
-                await sock.end();
+                // Clean up failed connection
+                try {
+                    await failedSocket.logout();
+                    await failedSocket.end();
+                    failedSocket.ev.removeAllListeners();
+                } catch (err) {
+                    logger.error('Error cleaning up failed connection:', err);
+                }
 
-                // Queue reconnection attempt
-                connectionQueue.push({
-                    timestamp: Date.now(),
-                    retryCount: retryCount + 1
-                });
-
-                // Process queue with exponential backoff
-                while (connectionQueue.length > 0) {
-                    const attempt = connectionQueue.shift();
-                    const delay = Math.min(1000 * Math.pow(2, attempt.retryCount), 300000);
-
-                    await new Promise(resolve => setTimeout(resolve, delay));
-
-                    try {
-                        await startConnection(attempt.retryCount);
-                        break;
-                    } catch (err) {
-                        logger.error('Reconnection attempt failed:', err);
-                        if (attempt.retryCount < config.settings.maxRetries) {
-                            connectionQueue.push({
-                                timestamp: Date.now(),
-                                retryCount: attempt.retryCount + 1
-                            });
-                        }
+                // If no backup connections available, create new one
+                if (connectionPool.length < MAX_POOL_SIZE) {
+                    logger.info('Creating new connection for pool');
+                    const newConnection = await startConnection(retryCount + 1);
+                    if (newConnection) {
+                        connectionPool.push(newConnection);
                     }
                 }
+
+                // Switch to backup connection if available
+                const backupConnection = connectionPool.find(conn => 
+                    conn.ws?.readyState === conn.ws?.OPEN && conn !== failedSocket
+                );
+
+                if (backupConnection) {
+                    logger.info('Switching to backup connection');
+                    activeConnection = backupConnection;
+                }
+
             } catch (err) {
-                logger.error('Recovery failed:', err);
+                logger.error('Connection recovery failed:', err);
             } finally {
                 isReconnecting = false;
             }
         }
 
-        // Enhanced connection update handler
+        // Connection update handler
         sock.ev.on('connection.update', async (update) => {
             const { qr, connection, lastDisconnect } = update;
 
@@ -120,10 +126,17 @@ async function startConnection(retryCount = 0) {
             }
 
             if (connection === 'open') {
-                logger.info('Connected successfully!');
+                logger.info('Connection established successfully');
+                connectionState.isActive = true;
+                connectionState.missedPings = 0;
+
+                // Add to connection pool if not full
+                if (connectionPool.length < MAX_POOL_SIZE) {
+                    connectionPool.push(sock);
+                }
+
+                activeConnection = sock;
                 startHeartbeat();
-                isReconnecting = false;
-                connectionQueue = [];
 
                 try {
                     const ownerJid = `${config.owner.number}@s.whatsapp.net`;
@@ -136,17 +149,16 @@ async function startConnection(retryCount = 0) {
             }
 
             if (connection === 'close') {
+                connectionState.isActive = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
                                      statusCode !== DisconnectReason.forbidden &&
                                      statusCode !== DisconnectReason.timedOut;
 
-                clearInterval(heartbeat.interval);
-
                 if (shouldReconnect && !isReconnecting) {
-                    await handleConnectionRecovery();
+                    await handleConnectionFailure(sock);
                 } else {
-                    logger.error('Connection terminated permanently');
+                    logger.error('Connection terminated permanently, shutting down');
                     process.exit(1);
                 }
             }
@@ -169,29 +181,33 @@ async function startConnection(retryCount = 0) {
 
         // Cleanup handler
         const cleanup = async () => {
-            logger.info('Cleaning up connection...');
-            clearInterval(heartbeat.interval);
+            logger.info('Cleaning up connections...');
 
-            try {
-                sock.ev.removeAllListeners();
-                await saveCreds();
-                await sock.logout();
-                await sock.end();
-            } catch (err) {
-                logger.error('Cleanup error:', err);
+            for (const connection of connectionPool) {
+                try {
+                    connection.ev.removeAllListeners();
+                    await connection.logout();
+                    await connection.end();
+                } catch (err) {
+                    logger.error('Error cleaning up connection:', err);
+                }
             }
+
+            connectionPool = [];
+            activeConnection = null;
         };
 
         // Register cleanup handlers
-        process.on('SIGTERM', async () => {
+        process.once('SIGTERM', async () => {
             await cleanup();
             process.exit(0);
         });
 
-        process.on('SIGINT', async () => {
+        process.once('SIGINT', async () => {
             await cleanup();
             process.exit(0);
         });
+
         process.on('uncaughtException', async (err) => {
             logger.error('Uncaught Exception:', err);
             try {
@@ -208,7 +224,7 @@ async function startConnection(retryCount = 0) {
         logger.error('Fatal connection error:', err);
 
         if (!isReconnecting && retryCount < config.settings.maxRetries) {
-            await handleConnectionRecovery();
+            return await handleConnectionFailure(null);
         }
 
         throw err;
