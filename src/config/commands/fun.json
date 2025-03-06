@@ -1,0 +1,40 @@
+{
+  "category": "fun",
+  "commands": [
+    {
+      "name": "quote",
+      "description": "Get a random quote",
+      "usage": "!quote",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "joke",
+      "description": "Get a random joke",
+      "usage": "!joke",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "meme",
+      "description": "Get a random meme",
+      "usage": "!meme",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "tictactoe",
+      "description": "Play Tic-tac-toe",
+      "usage": "!tictactoe <start|move> [position]",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "hangman",
+      "description": "Play Hangman",
+      "usage": "!hangman <start|guess> [letter]",
+      "cooldown": 3,
+      "permissions": ["user"]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "category": "educational",
+  "commands": [
+    {
+      "name": "define",
+      "description": "Get word definition",
+      "usage": "!define [word]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "calculate",
+      "description": "Calculate mathematical expression",
+      "usage": "!calculate [expression]",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "translate",
+      "description": "Translate text to another language",
+      "usage": "!translate [target_language] [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wiki",
+      "description": "Search Wikipedia",
+      "usage": "!wiki [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    }
+  ]
+}

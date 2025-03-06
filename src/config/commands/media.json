@@ -1,0 +1,33 @@
+{
+  "category": "media",
+  "commands": [
+    {
+      "name": "sticker",
+      "description": "Create sticker from image",
+      "usage": "!sticker [caption]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "image",
+      "description": "Search and send an image",
+      "usage": "!image [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "video",
+      "description": "Search and send a video",
+      "usage": "!video [query]",
+      "cooldown": 15,
+      "permissions": ["user"]
+    },
+    {
+      "name": "ytmp3",
+      "description": "Download YouTube video as MP3",
+      "usage": "!ytmp3 [url]",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "category": "utility",
+  "commands": [
+    {
+      "name": "weather",
+      "description": "Get weather information",
+      "usage": "!weather [city]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "reminder",
+      "description": "Set a reminder",
+      "usage": "!reminder [time] [message]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "poll",
+      "description": "Create a poll",
+      "usage": "!poll [question] [option1] [option2] ...",
+      "cooldown": 60,
+      "permissions": ["user"]
+    },
+    {
+      "name": "stats",
+      "description": "Show bot statistics",
+      "usage": "!stats",
+      "cooldown": 30,
+      "permissions": ["user"]
+    }
+  ]
+}

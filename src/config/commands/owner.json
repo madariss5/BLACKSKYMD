@@ -1,0 +1,40 @@
+{
+  "category": "owner",
+  "commands": [
+    {
+      "name": "ban",
+      "description": "Ban a user from using the bot",
+      "usage": "!ban @user",
+      "cooldown": 10,
+      "permissions": ["owner"]
+    },
+    {
+      "name": "unban",
+      "description": "Unban a user",
+      "usage": "!unban @user",
+      "cooldown": 10,
+      "permissions": ["owner"]
+    },
+    {
+      "name": "broadcast",
+      "description": "Send a message to all groups",
+      "usage": "!broadcast [message]",
+      "cooldown": 300,
+      "permissions": ["owner"]
+    },
+    {
+      "name": "eval",
+      "description": "Evaluate JavaScript code",
+      "usage": "!eval [code]",
+      "cooldown": 5,
+      "permissions": ["owner"]
+    },
+    {
+      "name": "setname",
+      "description": "Change bot's display name",
+      "usage": "!setname [name]",
+      "cooldown": 60,
+      "permissions": ["owner"]
+    }
+  ]
+}

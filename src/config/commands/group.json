@@ -1,0 +1,40 @@
+{
+  "category": "group",
+  "commands": [
+    {
+      "name": "kick",
+      "description": "Kick a member from the group",
+      "usage": "!kick @user",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "add",
+      "description": "Add a user to the group",
+      "usage": "!add [number]",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "promote",
+      "description": "Promote user to admin",
+      "usage": "!promote @user",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "demote",
+      "description": "Demote user from admin",
+      "usage": "!demote @user",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "groupinfo",
+      "description": "Show group information",
+      "usage": "!groupinfo",
+      "cooldown": 10,
+      "permissions": ["user"]
+    }
+  ]
+}
