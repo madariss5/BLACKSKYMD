@@ -6,14 +6,24 @@ const logger = pino({
         target: 'pino-pretty',
         options: {
             colorize: true,
-            timestamp: true,
-            ignore: 'pid,hostname',
             translateTime: 'SYS:standard',
-            messageFormat: '{msg} {context}',
-            levelFirst: true,
-        },
+            ignore: 'pid,hostname',
+            messageFormat: '[{time}] {msg} {context}',
+            levelFirst: true
+        }
     },
-    base: null,
+    formatters: {
+        level: (label) => {
+            return { level: label.toUpperCase() };
+        }
+    },
+    redact: {
+        paths: ['*.password', '*.secret', '*.token'],
+        remove: true
+    }
 });
+
+// Prevent pino from throwing unnecessary warnings
+process.removeAllListeners('warning');
 
 module.exports = logger;
