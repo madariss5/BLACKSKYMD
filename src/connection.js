@@ -27,6 +27,12 @@ async function startConnection() {
         if (connection === 'open') {
             logger.info(`Connected to WhatsApp as ${config.owner.name}!`);
 
+            // Send startup message
+            const startupMessage = '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 successfully connected';
+            await sock.sendMessage(config.owner.number, { 
+                text: startupMessage 
+            }).catch(err => logger.error('Failed to send startup message:', err));
+
             // Start credential backup scheduling
             await sessionManager.createBackupSchedule(sock);
 
