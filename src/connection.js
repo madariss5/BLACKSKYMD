@@ -33,22 +33,13 @@ async function cleanAuthState() {
     try {
         await fs.rm(AUTH_DIR, { recursive: true, force: true });
         await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
-    } catch (err) {
-        logger.error('Auth cleanup failed');
-    }
+    } catch (err) {}
 }
 
 async function startConnection() {
     try {
-        // Load commands first
-        console.log('Initializing command system...');
-        const commandsLoaded = await commandLoader.loadCommandHandlers();
-        if (!commandsLoaded) {
-            console.error('Failed to load commands. Bot may not function properly.');
-        } else {
-            console.log('Commands loaded successfully!');
-        }
-
+        // Silently load commands
+        await commandLoader.loadCommandHandlers();
         await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
 
         const { version } = await fetchLatestBaileysVersion();
@@ -90,7 +81,7 @@ async function startConnection() {
             if (qr) {
                 console.clear();
                 qrcode.generate(qr, { small: true });
-                console.log('\nScan this QR code with WhatsApp to start the bot\n');
+                console.log('\nScan the QR code above with WhatsApp to start the bot\n');
             }
 
             if (connection === 'open' && !isConnected) {
@@ -105,10 +96,7 @@ async function startConnection() {
                         }
                         ownerNumber = `${ownerNumber}@s.whatsapp.net`;
                     }
-
-                    await sock.sendMessage(ownerNumber, {
-                        text: '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 Bot is now connected!'
-                    });
+                    await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
                 } catch (err) {}
             }
 
@@ -116,7 +104,7 @@ async function startConnection() {
                 isConnected = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
-                                     statusCode !== DisconnectReason.forbidden;
+                                   statusCode !== DisconnectReason.forbidden;
 
                 if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
@@ -146,9 +134,7 @@ async function startConnection() {
                 const message = messages[0];
                 if (!message?.message) return;
                 await messageHandler(sock, message);
-            } catch (err) {
-                console.error('Message processing failed:', err);
-            }
+            } catch (err) {}
         });
 
         sock.ev.on('creds.update', saveCreds);
@@ -166,7 +152,6 @@ async function startConnection() {
 
         process.on('SIGTERM', () => cleanup('SIGTERM'));
         process.on('SIGINT', () => cleanup('SIGINT'));
-        process.on('uncaughtException', (err) => cleanup('UNCAUGHT_EXCEPTION'));
 
         return sock;
     } catch (err) {
