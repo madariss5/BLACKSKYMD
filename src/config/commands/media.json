@@ -2,16 +2,58 @@
   "category": "media",
   "commands": [
     {
+      "name": "play",
+      "description": "Play audio from file or URL",
+      "usage": ".play [url] or reply to audio",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "pause",
+      "description": "Pause current audio playback",
+      "usage": ".pause",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "resume",
+      "description": "Resume paused audio playback",
+      "usage": ".resume",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "stop",
+      "description": "Stop current audio playback",
+      "usage": ".stop",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "queue",
+      "description": "Manage audio playlist",
+      "usage": ".queue <add|remove|clear> [url/number]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "volume",
+      "description": "Adjust audio volume",
+      "usage": ".volume [0-200]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
       "name": "sticker",
       "description": "Create sticker from image/video",
-      "usage": "!sticker (reply to media)",
+      "usage": ".sticker (reply to media)",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "toimg",
       "description": "Convert sticker to image",
-      "usage": "!toimg (reply to sticker)",
+      "usage": ".toimg (reply to sticker)",
       "cooldown": 10,
       "permissions": ["user"]
     },
@@ -25,42 +67,42 @@
     {
       "name": "brightness",
       "description": "Adjust image brightness",
-      "usage": "!brightness [0-200]",
+      "usage": ".brightness [0-200]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "contrast",
       "description": "Adjust image contrast",
-      "usage": "!contrast [0-200]",
+      "usage": ".contrast [0-200]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "saturate",
       "description": "Adjust image saturation",
-      "usage": "!saturate [0-200]",
+      "usage": ".saturate [0-200]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "hue",
       "description": "Rotate image hue",
-      "usage": "!hue [degrees]",
+      "usage": ".hue [degrees]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "blur",
       "description": "Apply blur effect",
-      "usage": "!blur [level]",
+      "usage": ".blur [level]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "pixelate",
       "description": "Pixelate image",
-      "usage": "!pixelate [level]",
+      "usage": ".pixelate [level]",
       "cooldown": 10,
       "permissions": ["user"]
     },
@@ -88,49 +130,49 @@
     {
       "name": "resize",
       "description": "Resize image",
-      "usage": "!resize [width] [height]",
+      "usage": ".resize [width] [height]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "crop",
       "description": "Crop image",
-      "usage": "!crop [x] [y] [width] [height]",
+      "usage": ".crop [x] [y] [width] [height]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "rotate",
       "description": "Rotate image",
-      "usage": "!rotate [degrees]",
+      "usage": ".rotate [degrees]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "flip",
       "description": "Flip image",
-      "usage": "!flip <horizontal|vertical>",
+      "usage": ".flip <horizontal|vertical>",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "slow",
       "description": "Slow down video",
-      "usage": "!slow [factor]",
+      "usage": ".slow [factor]",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "fast",
       "description": "Speed up video",
-      "usage": "!fast [factor]",
+      "usage": ".fast [factor]",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "reverse",
       "description": "Reverse video",
-      "usage": "!reverse",
+      "usage": ".reverse",
       "cooldown": 30,
       "permissions": ["user"]
     },
@@ -448,6 +490,13 @@
       "usage": "!artstyle [style]",
       "cooldown": 30,
       "permissions": ["premium"]
+    },
+    {
+      "name": "trim",
+      "description": "Trim video duration",
+      "usage": ".trim [start_time] [end_time]",
+      "cooldown": 30,
+      "permissions": ["user"]
     }
   ]
 }
