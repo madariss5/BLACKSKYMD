@@ -45,10 +45,57 @@
       "permissions": ["user"]
     },
     {
+      "name": "brightness",
+      "description": "Adjust image brightness",
+      "usage": ".brightness [level]",
+      "example": ".brightness 1.5",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "contrast",
+      "description": "Adjust image contrast",
+      "usage": ".contrast [level]",
+      "example": ".contrast 1.5",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "blur",
+      "description": "Apply blur effect to image",
+      "usage": ".blur [sigma]",
+      "example": ".blur 5",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "grayscale",
+      "description": "Convert image to grayscale",
+      "usage": ".grayscale",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
       "name": "reverse",
       "description": "Reverse video playback",
       "usage": ".reverse (reply to video)",
       "example": ".reverse",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "trim",
+      "description": "Trim video duration",
+      "usage": ".trim [start_time] [end_time]",
+      "example": ".trim 0:10 0:30",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "speed",
+      "description": "Adjust video playback speed",
+      "usage": ".speed [factor]",
+      "example": ".speed 2",
       "cooldown": 30,
       "permissions": ["user"]
     },
@@ -98,6 +145,37 @@
       "usage": ".attp [text]",
       "example": ".attp Hello World",
       "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "rotate",
+      "description": "Rotate image by specified degrees",
+      "usage": ".rotate [degrees]",
+      "example": ".rotate 90",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "flip",
+      "description": "Flip image horizontally or vertically",
+      "usage": ".flip [horizontal|vertical]",
+      "example": ".flip horizontal",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "tint",
+      "description": "Apply color tint to image",
+      "usage": ".tint [red] [green] [blue]",
+      "example": ".tint 255 0 0",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "negate",
+      "description": "Invert image colors",
+      "usage": ".negate",
+      "cooldown": 10,
       "permissions": ["user"]
     }
   ]

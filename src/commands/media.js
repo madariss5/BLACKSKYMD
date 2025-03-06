@@ -515,7 +515,481 @@ const mediaCommands = {
             logger.error('Error in emojimix command:', err);
             await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to mix emojis' });
         }
+    },
+
+    async tovideo(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.stickerMessage || !message.message.stickerMessage.isAnimated) {
+                await sock.sendMessage(remoteJid, { text: '*📝 Usage:* Reply to an animated sticker with .tovideo' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Converting sticker to video...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const inputPath = path.join(tempDir, `input_${Date.now()}.webp`);
+            const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
+
+            await fs.writeFile(inputPath, buffer);
+
+            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+            ffmpeg.setFfmpegPath(ffmpegPath);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .toFormat('mp4')
+                    .videoCodec('libx264')
+                    .save(outputPath)
+                    .on('end', resolve)
+                    .on('error', reject);
+            });
+
+            await sock.sendMessage(remoteJid, {
+                video: { url: outputPath }
+            });
+
+            // Cleanup
+            await fs.unlink(inputPath);
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in tovideo command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to convert sticker to video' });
+        }
+    },
+
+    async trim(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.videoMessage || args.length !== 2) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to a video with .trim [start_time] [end_time]\nExample: .trim 0:10 0:30' 
+                });
+                return;
+            }
+
+            const [startTime, endTime] = args;
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Trimming video...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
+            const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
+
+            await fs.writeFile(inputPath, buffer);
+
+            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+            ffmpeg.setFfmpegPath(ffmpegPath);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .setStartTime(startTime)
+                    .setDuration(endTime)
+                    .output(outputPath)
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .run();
+            });
+
+            await sock.sendMessage(remoteJid, {
+                video: { url: outputPath },
+                caption: '✅ Here\'s your trimmed video!'
+            });
+
+            // Cleanup
+            await fs.unlink(inputPath);
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in trim command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to trim video' });
+        }
+    },
+
+    async speed(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.videoMessage || !args[0]) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to a video with .speed [factor]\nExample: .speed 2 (2x faster) or .speed 0.5 (2x slower)' 
+                });
+                return;
+            }
+
+            const speed = parseFloat(args[0]);
+            if (isNaN(speed) || speed <= 0 || speed > 4) {
+                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Speed factor must be between 0.1 and 4' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Adjusting video speed...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
+            const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
+
+            await fs.writeFile(inputPath, buffer);
+
+            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+            ffmpeg.setFfmpegPath(ffmpegPath);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .videoFilters(`setpts=${1/speed}*PTS`)
+                    .audioFilters(`atempo=${speed}`)
+                    .output(outputPath)
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .run();
+            });
+
+            await sock.sendMessage(remoteJid, {
+                video: { url: outputPath },
+                caption: `✅ Video speed adjusted to ${speed}x`
+            });
+
+            // Cleanup
+            await fs.unlink(inputPath);
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in speed command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to adjust video speed' });
+        }
+    },
+    async brightness(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage || !args[0]) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to an image with .brightness [level]\nExample: .brightness 1.5' 
+                });
+                return;
+            }
+
+            const level = parseFloat(args[0]);
+            if (isNaN(level) || level < 0.1 || level > 2.0) {
+                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Brightness level must be between 0.1 and 2.0' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Adjusting image brightness...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .modulate({
+                    brightness: level
+                })
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: `✅ Image brightness adjusted to ${level}x`
+            });
+
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in brightness command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to adjust brightness' });
+        }
+    },
+
+    async contrast(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage || !args[0]) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to an image with .contrast [level]\nExample: .contrast 1.5' 
+                });
+                return;
+            }
+
+            const level = parseFloat(args[0]);
+            if (isNaN(level) || level < 0.1 || level > 2.0) {
+                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Contrast level must be between 0.1 and 2.0' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Adjusting image contrast...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .modulate({
+                    contrast: level
+                })
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: `✅ Image contrast adjusted to ${level}x`
+            });
+
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in contrast command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to adjust contrast' });
+        }
+    },
+
+    async blur(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage || !args[0]) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to an image with .blur [sigma]\nExample: .blur 5' 
+                });
+                return;
+            }
+
+            const sigma = parseFloat(args[0]);
+            if (isNaN(sigma) || sigma < 0.3 || sigma > 20) {
+                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Blur sigma must be between 0.3 and 20' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Applying blur effect...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .blur(sigma)
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: `✅ Applied blur effect (sigma: ${sigma})`
+            });
+
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in blur command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to apply blur effect' });
+        }
+    },
+
+    async rotate(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage || !args[0]) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to an image with .rotate [degrees]\nExample: .rotate 90' 
+                });
+                return;
+            }
+
+            const angle = parseInt(args[0]);
+            if (isNaN(angle) || angle < -360 || angle > 360) {
+                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Rotation angle must be between -360 and 360 degrees' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Rotating image...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .rotate(angle)
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: `✅ Image rotated by ${angle} degrees`
+            });
+
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in rotate command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to rotate image' });
+        }
+    },
+
+    async flip(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage || !args[0]) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to an image with .flip [horizontal|vertical]\nExample: .flip horizontal' 
+                });
+                return;
+            }
+
+            const direction = args[0].toLowerCase();
+            if (!['horizontal', 'vertical'].includes(direction)) {
+                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Direction must be either "horizontal" or "vertical"' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Flipping image...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .flip(direction === 'vertical')
+                .flop(direction === 'horizontal')
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url:outputPath },
+                caption: `✅ Image flipped ${direction}ly`
+            });
+
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in flip command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to flip image' });
+        }
+    },
+
+    async tint(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage || args.length !== 3) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to an image with .tint [red] [green] [blue]\nExample: .tint 255 0 0 for red tint' 
+                });
+                return;
+            }
+
+            const [r, g, b] = args.map(n => parseInt(n));
+            if ([r, g, b].some(n => isNaN(n) || n < 0 || n > 255)) {
+                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Color values must be between 0 and 255' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Applying color tint...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .tint({ r, g, b })
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: `✅ Applied color tint (R:${r}, G:${g}, B:${b})`
+            });
+
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in tint command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to apply color tint' });
+        }
+    },
+
+    async negate(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to an image with .negate' 
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Inverting image colors...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .negate()
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: '✅ Image colors inverted'
+            });
+
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in negate command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to invert image colors' });
+        }
+    },
+
+    async grayscale(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* Reply to an image with .grayscale' 
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Converting to grayscale...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .grayscale()
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: '✅ Image converted to grayscale'
+            });
+
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in grayscale command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to convert to grayscale' });
+        }
     }
+
 };
 
 module.exports = mediaCommands;
