@@ -11,15 +11,19 @@ async function startConnection(retryCount = 0) {
         // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(config.session.authDir);
 
-        // Create socket with minimal configuration
+        // Create socket with enhanced configuration
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
             logger: logger,
-            browser: ['WhatsApp-MD', 'Safari', '1.0.0']
+            browser: ['WhatsApp-MD', 'Safari', '1.0.0'],
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000,
+            keepAliveIntervalMs: 25000,
+            retryRequestDelayMs: 2000
         });
 
-        // Handle connection updates
+        // Handle connection updates with enhanced error handling
         sock.ev.on('connection.update', async (update) => {
             const { qr, connection, lastDisconnect } = update;
 
@@ -40,7 +44,7 @@ async function startConnection(retryCount = 0) {
             if (connection === 'open') {
                 logger.info('Connected successfully!');
 
-                // Send startup message
+                // Send startup message with error handling
                 const ownerJid = `${config.owner.number}@s.whatsapp.net`;
                 try {
                     await sock.sendMessage(ownerJid, { 
@@ -53,7 +57,8 @@ async function startConnection(retryCount = 0) {
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
+                                      statusCode !== DisconnectReason.forbidden;
 
                 logger.info('Connection closed:', {
                     shouldReconnect,
@@ -63,34 +68,53 @@ async function startConnection(retryCount = 0) {
                 });
 
                 if (shouldReconnect && retryCount < config.settings.maxRetries) {
-                    // Clean up listeners before reconnecting
-                    sock.ev.removeAllListeners();
-                    await sock.end();
+                    // Clean up listeners and end connection properly
+                    try {
+                        sock.ev.removeAllListeners();
+                        await sock.end();
+                    } catch (err) {
+                        logger.error('Error during connection cleanup:', err);
+                    }
 
+                    // Implement exponential backoff for reconnection
                     const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
                     logger.info(`Reconnecting in ${delay/1000}s... (Attempt ${retryCount + 1}/${config.settings.maxRetries})`);
 
                     setTimeout(async () => {
-                        await startConnection(retryCount + 1);
+                        try {
+                            await startConnection(retryCount + 1);
+                        } catch (err) {
+                            logger.error('Reconnection attempt failed:', err);
+                        }
                     }, delay);
                 } else {
-                    logger.error('Connection terminated. Please restart the bot.');
+                    logger.error('Connection terminated permanently. Please restart the bot.');
                     process.exit(1);
                 }
             }
+
+            if (connection === 'connecting') {
+                logger.info('Connecting to WhatsApp...');
+            }
         });
 
-        // Handle credentials update
-        sock.ev.on('creds.update', saveCreds);
+        // Handle credentials update with error handling
+        sock.ev.on('creds.update', async () => {
+            try {
+                await saveCreds();
+            } catch (err) {
+                logger.error('Failed to save credentials:', err);
+            }
+        });
 
-        // Cleanup handler
+        // Enhanced cleanup handler
         const cleanup = async () => {
             logger.info('Cleaning up connection...');
             try {
                 sock.ev.removeAllListeners();
                 await sock.logout();
             } catch (err) {
-                logger.error('Error during cleanup:', err.message);
+                logger.error('Error during cleanup:', err);
             }
         };
 

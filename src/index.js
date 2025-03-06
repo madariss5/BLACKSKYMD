@@ -31,6 +31,7 @@ async function findAvailablePort(startPort, maxAttempts = 10) {
 
 async function startBot() {
     let server = null;
+    let sock = null;
 
     try {
         logger.info('Starting WhatsApp Bot...');
@@ -47,28 +48,34 @@ async function startBot() {
         await languageManager.loadTranslations();
         logger.info('Translations loaded successfully');
 
-        // Load commands
+        // Load commands with error handling
         logger.info('Loading command configurations...');
-        await commandLoader.loadCommandConfigs();
-        await commandLoader.loadCommandHandlers();
-        logger.info(`Loaded ${commandLoader.getAllCommands().length} commands successfully`);
-
-        // Start WhatsApp connection
-        logger.info('Initializing WhatsApp connection...');
-        const sock = await startConnection().catch(err => {
-            logger.error('Failed to establish WhatsApp connection:', err);
+        try {
+            await commandLoader.loadCommandConfigs();
+            await commandLoader.loadCommandHandlers();
+            logger.info(`Loaded ${commandLoader.getAllCommands().length} commands successfully`);
+        } catch (err) {
+            logger.error('Error loading commands:', err);
             throw err;
-        });
-        logger.info('WhatsApp connection initialized');
+        }
 
-        // Setup Express server
+        // Start WhatsApp connection with enhanced error handling
+        logger.info('Initializing WhatsApp connection...');
+        try {
+            sock = await startConnection();
+        } catch (err) {
+            logger.error('Fatal error establishing WhatsApp connection:', err);
+            throw err;
+        }
+
+        // Setup Express server with better error handling
         const app = express();
         app.use(express.json());
 
         // Health check endpoint
         app.get('/', (req, res) => {
             res.json({
-                status: 'running',
+                status: sock ? 'connected' : 'disconnected',
                 message: languageManager.getText('system.bot_active'),
                 commands: commandLoader.getAllCommands().length,
                 language: config.bot.language,
@@ -90,7 +97,7 @@ async function startBot() {
                 logger.info(`Server is running on http://0.0.0.0:${PORT}`);
             });
 
-        // Listen for messages
+        // Listen for messages with enhanced error handling
         sock.ev.on('messages.upsert', async ({ messages }) => {
             const m = messages[0];
             if (!m.message) return;
@@ -107,26 +114,9 @@ async function startBot() {
             }
         });
 
-        // Listen for connection updates
-        sock.ev.on('connection.update', (update) => {
-            const { connection, lastDisconnect } = update;
-            if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                if (shouldReconnect) {
-                    logger.info('Connection closed, attempting to reconnect...');
-                    startBot();
-                } else {
-                    logger.error('Connection closed permanently. Please restart the bot.');
-                    process.exit(1);
-                }
-            } else if (connection === 'connecting') {
-                logger.info('Connecting to WhatsApp...');
-            }
-        });
-
-        // Graceful shutdown
-        const cleanup = async () => {
-            logger.info('Received shutdown signal. Cleaning up...');
+        // Enhanced graceful shutdown
+        const cleanup = async (signal) => {
+            logger.info(`Received ${signal} signal. Cleaning up...`);
 
             // Close server first
             if (server) {
@@ -138,18 +128,21 @@ async function startBot() {
                 });
             }
 
-            try {
-                await sock.logout();
-                logger.info('WhatsApp logout successful');
-            } catch (err) {
-                logger.error('Error during WhatsApp logout:', err);
+            // Cleanup WhatsApp connection
+            if (sock) {
+                try {
+                    await sock.logout();
+                    logger.info('WhatsApp logout successful');
+                } catch (err) {
+                    logger.error('Error during WhatsApp logout:', err);
+                }
             }
 
             process.exit(0);
         };
 
-        process.on('SIGTERM', cleanup);
-        process.on('SIGINT', cleanup);
+        process.on('SIGTERM', () => cleanup('SIGTERM'));
+        process.on('SIGINT', () => cleanup('SIGINT'));
 
     } catch (err) {
         logger.error('Fatal error starting bot:', {
