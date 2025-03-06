@@ -91,10 +91,10 @@ async function startConnection() {
             logger: logger,
             browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
-            qrTimeout: 60000,
-            defaultQueryTimeoutMs: 30000,
-            keepAliveIntervalMs: 10000,
-            retryRequestDelayMs: 2000,
+            qrTimeout: 40000,
+            defaultQueryTimeoutMs: 20000,
+            keepAliveIntervalMs: 30000, // Increased keep-alive interval
+            retryRequestDelayMs: 3000,
             emitOwnEvents: true,
             maxRetries: 5,
             markOnlineOnConnect: true,
@@ -107,10 +107,20 @@ async function startConnection() {
             },
             patchMessageBeforeSending: (message) => {
                 return message;
+            },
+            // Added connection recovery options
+            options: {
+                timeout: 30000,
+                noAckTimeout: 60000,
+                retryOnNetworkError: true,
+                retryOnStreamError: true,
+                maxRetryAttempts: 5
             }
         });
 
+        // Handle connection events using process
         sock.ev.process(async (events) => {
+            // Handle connection updates
             if (events['connection.update']) {
                 const update = events['connection.update'];
                 const { connection, lastDisconnect, qr } = update;
@@ -118,14 +128,12 @@ async function startConnection() {
                 if (qr && !qrDisplayed) {
                     qrDisplayed = true;
                     process.stdout.write('\x1Bc');
-
                     qrcode.generate(qr, {
                         small: true,
                         scale: 1
                     }, (qrcode) => {
                         console.log(qrcode);
                     });
-
                     console.log('📱 Scan the QR code above with WhatsApp to start the bot');
                     console.log('⏳ QR code will refresh in 60 seconds if not scanned\n');
                 }
@@ -167,6 +175,10 @@ async function startConnection() {
                     const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
                         statusCode !== DisconnectReason.forbidden;
 
+                    // Log detailed disconnect information
+                    logger.info(`Connection closed. Status code: ${statusCode}`);
+                    logger.info(`Last disconnect reason: ${JSON.stringify(lastDisconnect?.error || {})}`);
+
                     if (shouldReconnect && retryCount < MAX_RETRIES) {
                         retryCount++;
                         const delay = Math.min(RETRY_INTERVAL * Math.pow(1.5, retryCount - 1), 300000);
@@ -194,23 +206,28 @@ async function startConnection() {
                 }
             }
 
+            // Handle credential updates
             if (events['creds.update']) {
                 await saveCreds();
             }
 
+            // Handle messages with improved error handling
             if (events['messages.upsert']) {
                 const upsert = events['messages.upsert'];
                 if (upsert.type === 'notify') {
                     for (const msg of upsert.messages) {
                         if (!msg.message) continue;
-                        await messageHandler(sock, msg).catch(err => {
+                        try {
+                            await messageHandler(sock, msg);
+                        } catch (err) {
                             logger.error('Message handling error:', err);
-                        });
+                        }
                     }
                 }
             }
         });
 
+        // Cleanup function with improved error handling
         const cleanup = async (signal) => {
             if (sock) {
                 try {
@@ -226,6 +243,7 @@ async function startConnection() {
             process.exit(0);
         };
 
+        // Handle process termination
         process.on('SIGTERM', () => cleanup('SIGTERM'));
         process.on('SIGINT', () => cleanup('SIGINT'));
 
