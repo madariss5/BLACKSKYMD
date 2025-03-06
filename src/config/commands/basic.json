@@ -21,6 +21,90 @@
       "usage": "!info",
       "cooldown": 5,
       "permissions": ["user"]
+    },
+    {
+      "name": "botinfo",
+      "description": "Show detailed bot statistics",
+      "usage": "!botinfo",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "dashboard",
+      "description": "View bot dashboard",
+      "usage": "!dashboard",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "rules",
+      "description": "Show bot usage rules",
+      "usage": "!rules",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "faq",
+      "description": "Show frequently asked questions",
+      "usage": "!faq",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "status",
+      "description": "Check bot and server status",
+      "usage": "!status",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "changelog",
+      "description": "Show recent bot updates",
+      "usage": "!changelog",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "about",
+      "description": "Show bot information and credits",
+      "usage": "!about",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "privacy",
+      "description": "Show privacy policy",
+      "usage": "!privacy",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "terms",
+      "description": "Show terms of service",
+      "usage": "!terms",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "uptime",
+      "description": "Show bot uptime",
+      "usage": "!uptime",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "stats",
+      "description": "Show bot usage statistics",
+      "usage": "!stats",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "speed",
+      "description": "Test bot response speed",
+      "usage": "!speed",
+      "cooldown": 10,
+      "permissions": ["user"]
     }
   ]
 }
