@@ -5,122 +5,41 @@ const logger = require('./logger');
 class CommandLoader {
     constructor() {
         this.commands = new Map();
-        this.commandConfigs = new Map();
-        this.configPath = path.join(__dirname, '../config/commands');
-        this.commandCache = new Map(); // Cache for frequently used commands
-    }
-
-    async loadCommandConfigs() {
-        try {
-            const startTime = Date.now();
-            const files = await fs.readdir(this.configPath);
-            let totalCommands = 0;
-            let categoryStats = {};
-
-            logger.info('Starting command configuration loading...');
-
-            for (const file of files) {
-                if (file.endsWith('.json')) {
-                    const category = file.replace('.json', '');
-                    logger.info(`Loading command configuration for category: ${category}`);
-
-                    try {
-                        const configContent = await fs.readFile(path.join(this.configPath, file), 'utf8');
-                        const config = JSON.parse(configContent);
-
-                        // Validate category structure
-                        if (!config.category || !Array.isArray(config.commands)) {
-                            logger.error(`Invalid config structure in ${file}`);
-                            continue;
-                        }
-
-                        this.commandConfigs.set(config.category, config.commands);
-
-                        // Track statistics
-                        totalCommands += config.commands.length;
-                        categoryStats[category] = config.commands.length;
-
-                        logger.info(`Loaded ${config.commands.length} command configs for ${category}`);
-
-                        // Validate command structure
-                        this.validateCommandConfigs(config.commands, category);
-                    } catch (err) {
-                        logger.error(`Error loading config file ${file}:`, err);
-                        continue; // Skip this file but continue loading others
-                    }
-                }
-            }
-
-            const loadTime = Date.now() - startTime;
-            logger.info('Command configuration loading completed:');
-            logger.info(`Total commands loaded: ${totalCommands}`);
-            logger.info(`Loading time: ${loadTime}ms`);
-            logger.info('Commands per category:', categoryStats);
-
-            return true;
-        } catch (err) {
-            logger.error('Critical error in loadCommandConfigs:', err);
-            return false;
-        }
-    }
-
-    validateCommandConfigs(commands, category) {
-        for (const cmd of commands) {
-            try {
-                if (!cmd.name || !cmd.description || !cmd.usage || !cmd.permissions) {
-                    logger.warn(`Invalid command config in ${category}: ${cmd.name || 'unnamed'}`);
-                    continue;
-                }
-                if (!Array.isArray(cmd.permissions)) {
-                    logger.warn(`Invalid permissions format in ${category}:${cmd.name}`);
-                    cmd.permissions = ['user']; // Set default permission
-                }
-            } catch (err) {
-                logger.error(`Error validating command in ${category}:`, err);
-            }
-        }
+        this.commandCache = new Map();
     }
 
     async loadCommandHandlers() {
         try {
-            const startTime = Date.now();
             const commandsPath = path.join(__dirname, '../commands');
             const files = await fs.readdir(commandsPath);
-            let totalCommands = 0;
             let loadedHandlers = {};
 
-            logger.info('Starting command handler loading...');
+            console.log('\nLoading command handlers...');
 
             for (const file of files) {
                 if (file.endsWith('.js') && file !== 'index.js') {
                     const category = file.replace('.js', '');
-                    logger.info(`Loading command handlers for category: ${category}`);
-
                     try {
+                        console.log(`Loading commands from ${file}...`);
                         const handlers = require(path.join(commandsPath, file));
-                        const config = this.commandConfigs.get(category) || [];
-
-                        // Track loaded handlers
-                        loadedHandlers[category] = 0;
 
                         // Register each command with its configuration
                         for (const [name, handler] of Object.entries(handlers)) {
+                            // Skip if not a function
                             if (typeof handler !== 'function') {
-                                logger.warn(`Invalid handler type for command ${name} in ${category}`);
+                                console.log(`Skipping ${name} in ${file} - not a function`);
                                 continue;
                             }
 
-                            const cmdConfig = config.find(cmd => cmd.name === name) || {
-                                name,
-                                description: 'No description available',
-                                usage: `.${name}`,
-                                cooldown: 3,
-                                permissions: ['user']
-                            };
-
                             this.commands.set(name, {
-                                handler,
-                                config: cmdConfig,
+                                execute: handler,
+                                config: handler.config || {
+                                    name,
+                                    description: 'No description available',
+                                    usage: `.${name}`,
+                                    cooldown: 3,
+                                    permissions: ['user']
+                                },
                                 category
                             });
 
@@ -130,115 +49,77 @@ class CommandLoader {
                                 usageCount: 0
                             });
 
-                            logger.debug(`Registered command: ${name} (${category})`);
-                            totalCommands++;
-                            loadedHandlers[category]++;
+                            loadedHandlers[category] = (loadedHandlers[category] || 0) + 1;
+                            console.log(`Registered command: ${name} from ${category}`);
                         }
-
-                        logger.info(`Loaded ${loadedHandlers[category]} handlers from ${category}`);
                     } catch (err) {
-                        logger.error(`Error loading handlers from ${file}:`, err);
-                        // Continue loading other files
+                        console.error(`Error loading handlers from ${file}:`, err);
                         continue;
                     }
                 }
             }
 
-            const loadTime = Date.now() - startTime;
-            logger.info('Command handler loading completed:');
-            logger.info(`Total handlers loaded: ${totalCommands}`);
-            logger.info(`Loading time: ${loadTime}ms`);
-            logger.info('Handlers per category:', loadedHandlers);
+            console.log('\nCommand loading summary:');
+            for (const [category, count] of Object.entries(loadedHandlers)) {
+                console.log(`${category}: ${count} commands`);
+            }
+            console.log('Total commands:', this.commands.size);
 
-            return totalCommands > 0;
+            return Object.keys(loadedHandlers).length > 0;
         } catch (err) {
-            logger.error('Critical error in loadCommandHandlers:', err);
+            console.error('Critical error in loadCommandHandlers:', err);
             return false;
         }
     }
 
     getCommand(name) {
-        try {
-            const command = this.commands.get(name);
-            if (command) {
-                // Update cache statistics
-                const cacheInfo = this.commandCache.get(name);
-                if (cacheInfo) {
-                    cacheInfo.lastUsed = Date.now();
-                    cacheInfo.usageCount++;
-                    this.commandCache.set(name, cacheInfo);
-                }
-                logger.debug(`Command found: ${name} (${command.category})`);
-            } else {
-                logger.debug(`Command not found: ${name}`);
+        const command = this.commands.get(name);
+        if (command) {
+            console.log(`Command '${name}' found in category '${command.category}'`);
+            const cacheInfo = this.commandCache.get(name);
+            if (cacheInfo) {
+                cacheInfo.lastUsed = Date.now();
+                cacheInfo.usageCount++;
+                this.commandCache.set(name, cacheInfo);
             }
-            return command;
-        } catch (err) {
-            logger.error(`Error getting command ${name}:`, err);
-            return null;
+        } else {
+            console.log(`Command '${name}' not found`);
         }
+        return command;
+    }
+
+    hasPermission(sender, requiredPermissions) {
+        // For now, allow all users
+        return true;
+    }
+
+    getCommandStats() {
+        const stats = {
+            totalCommands: this.commands.size,
+            commandsByCategory: {},
+            mostUsedCommands: []
+        };
+
+        for (const [name, cmd] of this.commands) {
+            const category = cmd.category;
+            stats.commandsByCategory[category] = (stats.commandsByCategory[category] || 0) + 1;
+        }
+
+        const usageStats = Array.from(this.commandCache.entries())
+            .map(([name, info]) => ({
+                name,
+                usageCount: info.usageCount,
+                lastUsed: info.lastUsed
+            }))
+            .sort((a, b) => b.usageCount - a.usageCount)
+            .slice(0, 10);
+
+        stats.mostUsedCommands = usageStats;
+        return stats;
     }
 
     getAllCommands() {
         return Array.from(this.commands.values());
-    }
-
-    getCommandsByCategory(category) {
-        return Array.from(this.commands.values())
-            .filter(cmd => cmd.category === category);
-    }
-
-    hasPermission(command, userRole) {
-        try {
-            const cmd = this.commands.get(command);
-            if (!cmd) {
-                logger.debug(`Permission check failed: command ${command} not found`);
-                return false;
-            }
-            const hasPermission = cmd.config.permissions.includes(userRole);
-            logger.debug(`Permission check for ${command}: ${userRole} -> ${hasPermission}`);
-            return hasPermission;
-        } catch (err) {
-            logger.error(`Error checking permission for ${command}:`, err);
-            return false;
-        }
-    }
-
-    getCommandStats() {
-        try {
-            const stats = {
-                totalCommands: this.commands.size,
-                commandsByCategory: {},
-                mostUsedCommands: []
-            };
-
-            // Gather category statistics
-            for (const [name, cmd] of this.commands) {
-                const category = cmd.category;
-                stats.commandsByCategory[category] = (stats.commandsByCategory[category] || 0) + 1;
-            }
-
-            // Get most used commands from cache
-            const usageStats = Array.from(this.commandCache.entries())
-                .map(([name, info]) => ({
-                    name,
-                    usageCount: info.usageCount,
-                    lastUsed: info.lastUsed
-                }))
-                .sort((a, b) => b.usageCount - a.usageCount)
-                .slice(0, 10);
-
-            stats.mostUsedCommands = usageStats;
-
-            return stats;
-        } catch (err) {
-            logger.error('Error getting command stats:', err);
-            return {
-                totalCommands: 0,
-                commandsByCategory: {},
-                mostUsedCommands: []
-            };
-        }
     }
 }
 

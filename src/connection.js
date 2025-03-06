@@ -10,6 +10,7 @@ let retryCount = 0;
 const MAX_RETRIES = 10;
 const RETRY_INTERVAL = 10000;
 const AUTH_DIR = path.join(process.cwd(), 'auth_info');
+let isConnected = false;
 
 async function validateSession() {
     try {
@@ -82,7 +83,8 @@ async function startConnection() {
                 console.log('\nScan this QR code with WhatsApp to start the bot\n');
             }
 
-            if (connection === 'open') {
+            if (connection === 'open' && !isConnected) {
+                isConnected = true;
                 retryCount = 0;
                 try {
                     let ownerNumber = process.env.OWNER_NUMBER;
@@ -101,6 +103,7 @@ async function startConnection() {
             }
 
             if (connection === 'close') {
+                isConnected = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
                                      statusCode !== DisconnectReason.forbidden;

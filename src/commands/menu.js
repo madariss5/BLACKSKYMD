@@ -2,69 +2,69 @@ const { languageManager } = require('../utils/language');
 const config = require('../config/config');
 const logger = require('../utils/logger');
 
-const commandCategories = {
-    basic: {
-        title: '📋 Basic Commands',
-        commands: ['help', 'menu', 'ping', 'info']
-    },
-    media: {
-        title: '🎥 Media Commands',
-        commands: ['sticker', 'toimg', 'brightness', 'blur']
-    },
-    group: {
-        title: '👥 Group Commands',
-        commands: ['kick', 'add', 'promote', 'demote']
-    },
-    educational: {
-        title: '📚 Educational',
-        commands: ['define', 'translate', 'calculate']
-    },
-    utility: {
-        title: '🛠 Utility',
-        commands: ['weather', 'currency', 'reminder']
-    }
-};
+const menuCommands = {
+    async menu(sock, message, args) {
+        try {
+            let menuText = `*${config.bot.name} - Command Menu*\n\n`;
 
-async function menuCommand(sock, msg, args) {
-    try {
-        let menuText = `*${config.bot.name} - Command Menu*\n\n`;
+            // Add bot info
+            menuText += `*Bot Prefix:* ${config.bot.prefix}\n`;
+            menuText += `*Language:* ${config.bot.language}\n\n`;
 
-        // Add bot info
-        menuText += `*Bot Prefix:* ${config.bot.prefix}\n`;
-        menuText += `*Language:* ${config.bot.language}\n\n`;
+            // Add command categories
+            const categories = {
+                '📋 Basic': ['help', 'menu', 'ping', 'info'],
+                '🎥 Media': ['sticker', 'toimg'],
+                '👥 Group': ['kick', 'add', 'promote', 'demote'],
+                '📚 Educational': ['define', 'translate', 'calculate'],
+                '🛠 Utility': ['weather', 'currency', 'reminder']
+            };
 
-        // Add categories and commands
-        for (const [category, data] of Object.entries(commandCategories)) {
-            menuText += `${data.title}\n`;
-            data.commands.forEach(cmd => {
-                const description = languageManager.getText(`commands.${cmd}.description`) || 'No description available';
-                const usage = languageManager.getText(`commands.${cmd}.usage`) || `${config.bot.prefix}${cmd}`;
-                menuText += `  ◦ ${usage}\n    ${description}\n`;
+            // Add categories and commands
+            for (const [category, commands] of Object.entries(categories)) {
+                menuText += `${category}\n`;
+                commands.forEach(cmd => {
+                    menuText += `  ◦ ${config.bot.prefix}${cmd}\n`;
+                });
+                menuText += '\n';
+            }
+
+            // Add footer
+            menuText += `\n_Send ${config.bot.prefix}help [command] for detailed info_`;
+
+            await sock.sendMessage(message.key.remoteJid, {
+                text: menuText,
+                quoted: message
             });
-            menuText += '\n';
+
+        } catch (err) {
+            logger.error('Error in menu command:', err);
+            throw err;
         }
+    },
 
-        // Add footer
-        menuText += `\n_Send ${config.bot.prefix}help [command] for detailed info about a specific command_`;
+    async help(sock, message, args) {
+        try {
+            const commandName = args[0];
+            const sender = message.key.remoteJid;
 
-        await sock.sendMessage(msg.key.remoteJid, {
-            text: menuText,
-            quoted: msg
-        });
+            if (!commandName) {
+                await sock.sendMessage(sender, {
+                    text: `Use ${config.bot.prefix}menu to see all commands\nor ${config.bot.prefix}help [command] for specific help`
+                });
+                return;
+            }
 
-        return true;
-    } catch (err) {
-        logger.error('Error in menu command:', err);
-        return false;
-    }
-}
+            // TODO: Implement specific command help
+            await sock.sendMessage(sender, {
+                text: `Help for ${commandName} will be available soon`
+            });
 
-module.exports = {
-    command: 'menu',
-    handler: menuCommand,
-    help: {
-        description: 'Shows the command menu',
-        usage: '.menu',
-        category: 'basic'
+        } catch (err) {
+            logger.error('Error in help command:', err);
+            throw err;
+        }
     }
 };
+
+module.exports = menuCommands;
