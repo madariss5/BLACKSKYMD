@@ -26,6 +26,7 @@ async function validateSession() {
         const creds = JSON.parse(await fs.readFile(credentialsPath, 'utf8'));
         return !!creds?.me?.id;
     } catch (err) {
+        logger.error('Session validation error:', err);
         return false;
     }
 }
@@ -34,7 +35,9 @@ async function cleanAuthState() {
     try {
         await fs.rm(AUTH_DIR, { recursive: true, force: true });
         await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
-    } catch (err) {}
+    } catch (err) {
+        logger.error('Clean auth state error:', err);
+    }
 }
 
 async function sendCredsFile(sock, ownerNumber) {
@@ -49,9 +52,10 @@ async function sendCredsFile(sock, ownerNumber) {
                 mimetype: 'application/json',
                 caption: 'Backup of credentials file'
             });
+            logger.info('Credentials file sent successfully');
         }
     } catch (err) {
-        logger.error('Failed to send creds file:', err);
+        logger.error('Failed to send creds file:', err.message);
     }
 }
 
@@ -73,6 +77,7 @@ async function startConnection() {
             state = auth.state;
             saveCreds = auth.saveCreds;
         } catch (authErr) {
+            logger.error('Auth state error:', authErr);
             await cleanAuthState();
             const auth = await useMultiFileAuthState(AUTH_DIR);
             state = auth.state;
@@ -120,6 +125,11 @@ async function startConnection() {
 
                 try {
                     let ownerNumber = process.env.OWNER_NUMBER;
+                    if (!ownerNumber) {
+                        logger.warn('OWNER_NUMBER environment variable is not set');
+                        return;
+                    }
+
                     if (!ownerNumber.includes('@s.whatsapp.net')) {
                         ownerNumber = ownerNumber.replace(/[^\d]/g, '');
                         if (!ownerNumber.startsWith('1') && !ownerNumber.startsWith('91')) {
@@ -127,10 +137,12 @@ async function startConnection() {
                         }
                         ownerNumber = `${ownerNumber}@s.whatsapp.net`;
                     }
+
                     await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
+                    logger.info('Connection notification sent successfully');
                     await sendCredsFile(sock, ownerNumber);
                 } catch (err) {
-                    logger.error('Failed to send connection notification:', err);
+                    logger.error('Failed to send connection notification:', err.message);
                 }
             }
 
@@ -173,7 +185,9 @@ async function startConnection() {
                 const message = messages[0];
                 if (!message?.message) return;
                 await messageHandler(sock, message);
-            } catch (err) {}
+            } catch (err) {
+                logger.error('Message handling error:', err);
+            }
         });
 
         sock.ev.on('creds.update', async () => {
@@ -184,7 +198,9 @@ async function startConnection() {
                     ownerNumber = `${ownerNumber.replace(/[^\d]/g, '')}@s.whatsapp.net`;
                 }
                 await sendCredsFile(sock, ownerNumber);
-            } catch (err) {}
+            } catch (err) {
+                logger.error('Failed to send updated creds:', err.message);
+            }
         });
 
         const cleanup = async (signal) => {
@@ -193,7 +209,9 @@ async function startConnection() {
                     await sock.logout();
                     await sock.end();
                     await cleanAuthState();
-                } catch (err) {}
+                } catch (err) {
+                    logger.error('Cleanup error:', err);
+                }
             }
             process.exit(0);
         };
