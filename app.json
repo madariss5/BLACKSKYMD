@@ -9,13 +9,23 @@
   ],
   "repository": "",
   "env": {
-    "OWNER_NAME": {
-      "description": "Name of the bot owner",
+    "OWNER_NUMBER": {
+      "description": "WhatsApp number of the bot owner (format: 1234567890)",
       "required": true
     },
-    "OWNER_NUMBER": {
-      "description": "WhatsApp number of the bot owner",
+    "SESSION_ID": {
+      "description": "Unique session ID for multi-device support",
       "required": true
+    },
+    "BOT_PREFIX": {
+      "description": "Command prefix for the bot (default: .)",
+      "required": true,
+      "value": "."
+    },
+    "BOT_NAME": {
+      "description": "Custom name for your bot (default: 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻)",
+      "required": false,
+      "value": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻"
     },
     "NODE_ENV": {
       "description": "Environment mode",
