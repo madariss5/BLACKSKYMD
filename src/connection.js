@@ -13,6 +13,9 @@ const RETRY_INTERVAL = 10000;
 const AUTH_DIR = path.join(process.cwd(), 'auth_info');
 let isConnected = false;
 let qrDisplayed = false;
+let connectionAttempts = 0;
+const MAX_STREAM_ATTEMPTS = 5;
+let streamRetryCount = 0;
 
 async function validateSession() {
     try {
@@ -40,23 +43,30 @@ async function cleanAuthState() {
     }
 }
 
-async function sendCredsFile(sock, ownerNumber) {
-    try {
-        const credsPath = path.join(AUTH_DIR, 'creds.json');
-        const credsExists = await fs.access(credsPath).then(() => true).catch(() => false);
+async function handleStreamError(error, sock) {
+    logger.error('Stream error encountered:', error);
+    streamRetryCount++;
 
-        if (credsExists) {
-            await sock.sendMessage(ownerNumber, {
-                document: { url: credsPath },
-                fileName: 'creds.json',
-                mimetype: 'application/json',
-                caption: 'Backup of credentials file'
-            });
-            logger.info('Credentials file sent successfully');
-        }
-    } catch (err) {
-        logger.error('Failed to send creds file:', err.message);
+    if (streamRetryCount <= MAX_STREAM_ATTEMPTS) {
+        const delay = Math.min(1000 * Math.pow(2, streamRetryCount - 1), 30000);
+        logger.info(`Attempting stream recovery (${streamRetryCount}/${MAX_STREAM_ATTEMPTS}) in ${delay/1000}s`);
+
+        return new Promise((resolve) => {
+            setTimeout(async () => {
+                try {
+                    await sock.ws.close();
+                    await sock.ws.connect();
+                    streamRetryCount = 0;
+                    logger.info('Stream reconnected successfully');
+                    resolve(true);
+                } catch (err) {
+                    logger.error('Stream reconnection failed:', err);
+                    resolve(false);
+                }
+            }, delay);
+        });
     }
+    return false;
 }
 
 async function startConnection() {
@@ -93,8 +103,8 @@ async function startConnection() {
             connectTimeoutMs: 60000,
             qrTimeout: 40000,
             defaultQueryTimeoutMs: 20000,
-            keepAliveIntervalMs: 30000, // Increased keep-alive interval
-            retryRequestDelayMs: 3000,
+            keepAliveIntervalMs: 15000,
+            retryRequestDelayMs: 2000,
             emitOwnEvents: true,
             maxRetries: 5,
             markOnlineOnConnect: true,
@@ -108,19 +118,46 @@ async function startConnection() {
             patchMessageBeforeSending: (message) => {
                 return message;
             },
-            // Added connection recovery options
             options: {
                 timeout: 30000,
                 noAckTimeout: 60000,
                 retryOnNetworkError: true,
                 retryOnStreamError: true,
                 maxRetryAttempts: 5
+            },
+            getMessage: async (key) => {
+                try {
+                    return await sock.store.loadMessage(key.remoteJid, key.id);
+                } catch (err) {
+                    logger.error('Error getting message:', err);
+                    return null;
+                }
             }
         });
 
-        // Handle connection events using process
+        if (sock.ws) {
+            sock.ws.on('error', async (err) => {
+                logger.error('WebSocket error:', err);
+                if (err.code === 515) {
+                    const recovered = await handleStreamError(err, sock);
+                    if (!recovered && isConnected) {
+                        logger.error('Stream recovery failed, attempting full reconnect');
+                        isConnected = false;
+                        startConnection();
+                    }
+                }
+            });
+
+            sock.ws.on('close', () => {
+                logger.info('WebSocket closed');
+                if (isConnected) {
+                    isConnected = false;
+                    startConnection();
+                }
+            });
+        }
+
         sock.ev.process(async (events) => {
-            // Handle connection updates
             if (events['connection.update']) {
                 const update = events['connection.update'];
                 const { connection, lastDisconnect, qr } = update;
@@ -142,6 +179,7 @@ async function startConnection() {
                     isConnected = true;
                     qrDisplayed = false;
                     retryCount = 0;
+                    streamRetryCount = 0;
                     process.stdout.write('\x1Bc');
                     console.log('✅ Successfully connected to WhatsApp!\n');
 
@@ -162,7 +200,6 @@ async function startConnection() {
 
                         await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
                         logger.info('Connection notification sent successfully');
-                        await sendCredsFile(sock, ownerNumber);
                     } catch (err) {
                         logger.error('Failed to send connection notification:', err.message);
                     }
@@ -175,22 +212,12 @@ async function startConnection() {
                     const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
                         statusCode !== DisconnectReason.forbidden;
 
-                    // Log detailed disconnect information
                     logger.info(`Connection closed. Status code: ${statusCode}`);
                     logger.info(`Last disconnect reason: ${JSON.stringify(lastDisconnect?.error || {})}`);
 
                     if (shouldReconnect && retryCount < MAX_RETRIES) {
                         retryCount++;
                         const delay = Math.min(RETRY_INTERVAL * Math.pow(1.5, retryCount - 1), 300000);
-
-                        if (statusCode === DisconnectReason.connectionClosed) {
-                            const isValid = await validateSession();
-                            if (!isValid) {
-                                await cleanAuthState();
-                                console.log('\n❌ Session invalid. A new QR code will be generated.\n');
-                            }
-                        }
-
                         logger.info(`🔄 Reconnecting in ${Math.floor(delay / 1000)} seconds...`);
                         setTimeout(startConnection, delay);
                     } else {
@@ -206,12 +233,10 @@ async function startConnection() {
                 }
             }
 
-            // Handle credential updates
             if (events['creds.update']) {
                 await saveCreds();
             }
 
-            // Handle messages with improved error handling
             if (events['messages.upsert']) {
                 const upsert = events['messages.upsert'];
                 if (upsert.type === 'notify') {
@@ -227,7 +252,6 @@ async function startConnection() {
             }
         });
 
-        // Cleanup function with improved error handling
         const cleanup = async (signal) => {
             if (sock) {
                 try {
@@ -243,7 +267,6 @@ async function startConnection() {
             process.exit(0);
         };
 
-        // Handle process termination
         process.on('SIGTERM', () => cleanup('SIGTERM'));
         process.on('SIGINT', () => cleanup('SIGINT'));
 
