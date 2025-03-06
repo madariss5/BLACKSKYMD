@@ -9,15 +9,33 @@ const { DisconnectReason } = require('@whiskeysockets/baileys');
 
 async function startBot() {
     try {
+        logger.info('Starting WhatsApp Bot...');
+
+        // Check required environment variables
+        const { isValid, missingVars } = config.validateConfig();
+        if (!isValid) {
+            logger.warn(`Missing required environment variables: ${missingVars.join(', ')}`);
+            logger.info('Bot will start but some features may be limited until variables are set');
+        }
+
         // Load translations first
+        logger.info('Loading translations...');
         await languageManager.loadTranslations();
+        logger.info('Translations loaded successfully');
 
         // Load commands
+        logger.info('Loading command configurations...');
         await commandLoader.loadCommandConfigs();
         await commandLoader.loadCommandHandlers();
+        logger.info(`Loaded ${commandLoader.getAllCommands().length} commands successfully`);
 
         // Start WhatsApp connection
-        const sock = await startConnection();
+        logger.info('Initializing WhatsApp connection...');
+        const sock = await startConnection().catch(err => {
+            logger.error('Failed to establish WhatsApp connection:', err);
+            throw err;
+        });
+        logger.info('WhatsApp connection initialized');
 
         // Setup Express server
         const app = express();
@@ -31,13 +49,15 @@ async function startBot() {
                 status: 'running',
                 message: languageManager.getText('system.bot_active'),
                 commands: commandLoader.getAllCommands().length,
-                language: config.bot.language
+                language: config.bot.language,
+                uptime: process.uptime(),
+                missingConfig: missingVars
             });
         });
 
         // ALWAYS serve the app on port 5000
         const server = app.listen(5000, '0.0.0.0', () => {
-            logger.info(`Server is running on http://0.0.0.0:5000`);
+            logger.info('Server is running on http://0.0.0.0:5000');
         }).on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
                 logger.error(`Port ${5000} is already in use. Please ensure no other service is using this port.`);
@@ -56,7 +76,12 @@ async function startBot() {
             try {
                 await messageHandler(sock, m);
             } catch (err) {
-                logger.error('Error handling message:', err);
+                logger.error('Error handling message:', {
+                    error: err.message,
+                    stack: err.stack,
+                    messageId: m.key?.id,
+                    from: m.key?.remoteJid
+                });
             }
         });
 
@@ -68,27 +93,47 @@ async function startBot() {
                 if (shouldReconnect) {
                     logger.info('Connection closed, attempting to reconnect...');
                     startBot();
+                } else {
+                    logger.error('Connection closed permanently. Please restart the bot.');
+                    process.exit(1);
                 }
+            } else if (connection === 'connecting') {
+                logger.info('Connecting to WhatsApp...');
             }
         });
 
         // Graceful shutdown
-        process.on('SIGTERM', () => {
-            logger.info('SIGTERM received. Closing server...');
+        const cleanup = async () => {
+            logger.info('Received shutdown signal. Cleaning up...');
+            try {
+                await sock.logout();
+                logger.info('WhatsApp logout successful');
+            } catch (err) {
+                logger.error('Error during WhatsApp logout:', err);
+            }
             server.close(() => {
-                logger.info('Server closed. Exiting process.');
+                logger.info('HTTP server closed');
                 process.exit(0);
             });
-        });
+        };
+
+        process.on('SIGTERM', cleanup);
+        process.on('SIGINT', cleanup);
 
     } catch (err) {
-        logger.error('Failed to start bot:', err);
+        logger.error('Fatal error starting bot:', {
+            error: err.message,
+            stack: err.stack
+        });
         process.exit(1);
     }
 }
 
-// Start the bot
+// Start the bot with error handling
 startBot().catch(err => {
-    logger.error('Fatal error starting bot:', err);
+    logger.error('Fatal error starting bot:', {
+        error: err.message,
+        stack: err.stack
+    });
     process.exit(1);
 });

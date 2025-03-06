@@ -4,13 +4,13 @@ const config = {
     // Bot Owner Info
     owner: {
         name: process.env.OWNER_NAME || 'Bot Owner',  
-        number: process.env.OWNER_NUMBER || '',  // Format: 1234567890@s.whatsapp.net
+        number: process.env.OWNER_NUMBER, // Will be required for proper functioning
         email: process.env.OWNER_EMAIL || '',
     },
 
     // Session Configuration
     session: {
-        id: process.env.SESSION_ID || 'whatsapp-md-bot',
+        id: process.env.SESSION_ID, // Will be required for proper functioning
         authDir: './auth_info',
         backupDir: './sessions',
     },
@@ -20,7 +20,7 @@ const config = {
         name: process.env.BOT_NAME || '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻',
         version: process.env.BOT_VERSION || '1.0.0',
         prefix: process.env.BOT_PREFIX || '.',
-        language: process.env.BOT_LANGUAGE || 'en', // Set default language back to English
+        language: process.env.BOT_LANGUAGE || 'en',
         debug: process.env.NODE_ENV !== 'production',
     },
 
@@ -41,6 +41,20 @@ const config = {
             clientId: process.env.SPOTIFY_CLIENT_ID,
             clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
         }
+    },
+
+    // Validation function for required environment variables
+    validateConfig: () => {
+        const missingVars = [];
+
+        // Check required variables
+        if (!process.env.OWNER_NUMBER) missingVars.push('OWNER_NUMBER');
+        if (!process.env.SESSION_ID) missingVars.push('SESSION_ID');
+
+        return {
+            isValid: missingVars.length === 0,
+            missingVars
+        };
     },
 
     // Other settings
