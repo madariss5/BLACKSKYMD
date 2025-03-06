@@ -2,24 +2,29 @@ const express = require('express');
 const { startConnection } = require('./connection');
 const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
+const { languageManager } = require('./utils/language');
 const logger = require('./utils/logger');
 
 async function startBot() {
     try {
-        // Load commands first
+        // Load translations first
+        await languageManager.loadTranslations();
+
+        // Load commands
         await commandLoader.loadCommandConfigs();
         await commandLoader.loadCommandHandlers();
 
         // Start WhatsApp connection
         const sock = await startConnection();
 
-        // Setup Express server only after WhatsApp connection
+        // Setup Express server
         const app = express();
         app.get('/', (req, res) => {
             res.json({
                 status: 'running',
-                message: 'WhatsApp bot is active',
-                commands: commandLoader.getAllCommands().length
+                message: languageManager.getText('system.bot_active'),
+                commands: commandLoader.getAllCommands().length,
+                language: config.bot.language // Assuming 'config' is defined elsewhere
             });
         });
 

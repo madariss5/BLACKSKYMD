@@ -1,0 +1,74 @@
+{
+  "system": {
+    "connected": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 erfolgreich verbunden",
+    "bot_active": "WhatsApp-Bot ist aktiv",
+    "command_not_found": "Unbekannter Befehl: %s\nBenutze %shelp um verfügbare Befehle anzuzeigen",
+    "command_disabled": "Dieser Befehl ist derzeit deaktiviert.",
+    "no_permission": "Sie haben keine Berechtigung, diesen Befehl zu verwenden.",
+    "cooldown": "Bitte warten Sie %.1f Sekunden, bevor Sie %s erneut verwenden.",
+    "error": "Fehler beim Verarbeiten des Befehls. Bitte versuchen Sie es später erneut."
+  },
+  "commands": {
+    "help": {
+      "description": "Zeigt Hilfe zu verfügbaren Befehlen",
+      "usage": ".help [Befehl]",
+      "list_title": "Verfügbare Befehle:",
+      "command_info": "Befehl: %s\nBeschreibung: %s\nVerwendung: %s"
+    },
+    "sticker": {
+      "description": "Erstellt einen Sticker aus einem Bild oder Video",
+      "usage": ".sticker [Name]",
+      "no_media": "Bitte senden Sie ein Bild oder Video",
+      "processing": "Erstelle Sticker...",
+      "error": "Fehler beim Erstellen des Stickers"
+    },
+    "play": {
+      "description": "Spielt Musik ab",
+      "usage": ".play [Songname oder URL]",
+      "no_query": "Bitte geben Sie einen Songnamen oder eine URL an",
+      "searching": "Suche nach dem Song...",
+      "not_found": "Song nicht gefunden",
+      "playing": "Spiele jetzt: %s",
+      "error": "Fehler beim Abspielen des Songs"
+    }
+  },
+  "media": {
+    "no_media": "Bitte senden Sie eine Mediendatei",
+    "processing": "Verarbeite Medien...",
+    "success": "Erfolgreich verarbeitet!",
+    "error": "Fehler bei der Medienverarbeitung"
+  },
+  "group": {
+    "admin_required": "Sie müssen Administrator sein, um diesen Befehl zu verwenden",
+    "user_not_found": "Benutzer nicht gefunden",
+    "user_is_admin": "Benutzer ist bereits Administrator",
+    "user_not_admin": "Benutzer ist kein Administrator",
+    "action_success": "Aktion erfolgreich ausgeführt",
+    "action_failed": "Aktion fehlgeschlagen",
+    "kick": {
+      "description": "Entfernt einen Benutzer aus der Gruppe",
+      "usage": ".kick @benutzer",
+      "success": "Benutzer wurde aus der Gruppe entfernt",
+      "error": "Fehler beim Entfernen des Benutzers"
+    },
+    "add": {
+      "description": "Fügt einen Benutzer zur Gruppe hinzu",
+      "usage": ".add [Nummer]",
+      "success": "Benutzer wurde zur Gruppe hinzugefügt",
+      "error": "Fehler beim Hinzufügen des Benutzers"
+    }
+  },
+  "educational": {
+    "define": {
+      "description": "Zeigt die Definition eines Wortes",
+      "usage": ".define [Wort]",
+      "not_found": "Keine Definition gefunden",
+      "searching": "Suche Definition..."
+    },
+    "translate": {
+      "description": "Übersetzt Text in andere Sprachen",
+      "usage": ".translate [Zielsprache] [Text]",
+      "error": "Übersetzung fehlgeschlagen"
+    }
+  }
+}

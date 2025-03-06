@@ -10,11 +10,8 @@ const config = {
 
     // Session Configuration
     session: {
-        // Unique session ID for multi-device support
         id: process.env.SESSION_ID || 'whatsapp-md-bot',
-        // Directory to store auth files
         authDir: './auth_info',
-        // Backup session directory
         backupDir: './sessions',
     },
 
@@ -23,7 +20,7 @@ const config = {
         name: process.env.BOT_NAME || '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻',
         version: process.env.BOT_VERSION || '1.0.0',
         prefix: process.env.BOT_PREFIX || '.',
-        language: process.env.BOT_LANGUAGE || 'en',
+        language: process.env.BOT_LANGUAGE || 'de', // Set default language to German
         debug: process.env.NODE_ENV !== 'production',
     },
 

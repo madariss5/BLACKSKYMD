@@ -3,8 +3,10 @@ const qrcode = require('qrcode-terminal');
 const logger = require('./utils/logger');
 const { sessionManager } = require('./utils/sessionManager');
 const config = require('./config/config');
+const { languageManager } = require('./utils/language');
 
 async function startConnection() {
+    await languageManager.loadTranslations();
     const { state, saveCreds } = await useMultiFileAuthState(config.session.authDir);
 
     const sock = makeWASocket({
@@ -27,8 +29,8 @@ async function startConnection() {
         if (connection === 'open') {
             logger.info(`Connected to WhatsApp as ${config.owner.name}!`);
 
-            // Send startup message
-            const startupMessage = '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 successfully connected';
+            // Send startup message in configured language
+            const startupMessage = languageManager.getText('system.connected');
             await sock.sendMessage(config.owner.number, { 
                 text: startupMessage 
             }).catch(err => logger.error('Failed to send startup message:', err));
