@@ -85,7 +85,8 @@ async function startConnection(retryCount = 0) {
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
-                                      statusCode !== DisconnectReason.forbidden;
+                                      statusCode !== DisconnectReason.forbidden &&
+                                      statusCode !== DisconnectReason.timedOut;
 
                 logger.info('Connection closed:', {
                     shouldReconnect,
@@ -118,7 +119,7 @@ async function startConnection(retryCount = 0) {
                         logger.error('Error during connection cleanup:', err);
                     }
 
-                    // Attempt reconnection
+                    // Attempt reconnection with a queue system
                     setTimeout(async () => {
                         try {
                             await startConnection(retryCount + 1);
@@ -127,6 +128,14 @@ async function startConnection(retryCount = 0) {
                                 error: err.message,
                                 attempt: retryCount + 1
                             });
+                            // If reconnection fails, try again with increased delay
+                            setTimeout(async () => {
+                                try {
+                                    await startConnection(retryCount + 2);
+                                } catch (retryErr) {
+                                    logger.error('Secondary reconnection attempt failed:', retryErr);
+                                }
+                            }, delay * 2);
                         }
                     }, delay);
                 } else {
@@ -140,20 +149,33 @@ async function startConnection(retryCount = 0) {
             }
         });
 
-        // Enhanced credentials update handler
+        // Enhanced credentials update handler with retry mechanism
         sock.ev.on('creds.update', async () => {
-            try {
-                await saveCreds();
-                logger.info('Credentials updated and saved successfully');
-            } catch (err) {
-                logger.error('Failed to save credentials:', err);
-                // Attempt emergency creds save
+            const maxRetries = 3;
+            let retries = 0;
+
+            const attemptSave = async () => {
                 try {
-                    await sessionManager.emergencyCredsSave(state);
-                } catch (backupErr) {
-                    logger.error('Emergency credentials save failed:', backupErr);
+                    await saveCreds();
+                    logger.info('Credentials updated and saved successfully');
+                } catch (err) {
+                    logger.error('Failed to save credentials:', err);
+                    if (retries < maxRetries) {
+                        retries++;
+                        logger.info(`Retrying credentials save (${retries}/${maxRetries})...`);
+                        setTimeout(attemptSave, 1000 * retries);
+                    } else {
+                        // Emergency backup
+                        try {
+                            await sessionManager.emergencyCredsSave(state);
+                        } catch (backupErr) {
+                            logger.error('Emergency credentials save failed:', backupErr);
+                        }
+                    }
                 }
-            }
+            };
+
+            await attemptSave();
         });
 
         // Comprehensive cleanup handler
@@ -165,12 +187,13 @@ async function startConnection(retryCount = 0) {
                 // Remove all event listeners
                 sock.ev.removeAllListeners();
 
-                // Close WebSocket connection
+                // Close WebSocket connection gracefully
                 if (sock.ws) {
                     sock.ws.close();
                 }
 
-                // Perform logout
+                // Perform logout and save final state
+                await saveCreds();
                 await sock.logout();
 
                 // End the connection
@@ -185,12 +208,35 @@ async function startConnection(retryCount = 0) {
             }
         };
 
-        // Register cleanup handlers
-        process.on('SIGTERM', cleanup);
-        process.on('SIGINT', cleanup);
-        process.on('uncaughtException', (err) => {
+        // Register cleanup handlers with error boundaries
+        process.on('SIGTERM', async () => {
+            try {
+                await cleanup();
+                process.exit(0);
+            } catch (err) {
+                logger.error('Error during SIGTERM cleanup:', err);
+                process.exit(1);
+            }
+        });
+
+        process.on('SIGINT', async () => {
+            try {
+                await cleanup();
+                process.exit(0);
+            } catch (err) {
+                logger.error('Error during SIGINT cleanup:', err);
+                process.exit(1);
+            }
+        });
+
+        process.on('uncaughtException', async (err) => {
             logger.error('Uncaught Exception:', err);
-            cleanup().then(() => process.exit(1));
+            try {
+                await cleanup();
+            } catch (cleanupErr) {
+                logger.error('Error during uncaught exception cleanup:', cleanupErr);
+            }
+            process.exit(1);
         });
 
         return sock;
