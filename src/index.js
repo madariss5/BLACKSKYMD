@@ -7,7 +7,31 @@ const logger = require('./utils/logger');
 const config = require('./config/config');
 const { DisconnectReason } = require('@whiskeysockets/baileys');
 
+async function findAvailablePort(startPort, maxAttempts = 10) {
+    const net = require('net');
+
+    function isPortAvailable(port) {
+        return new Promise((resolve) => {
+            const server = net.createServer();
+            server.once('error', () => resolve(false));
+            server.once('listening', () => {
+                server.close(() => resolve(true));
+            });
+            server.listen(port, '0.0.0.0');
+        });
+    }
+
+    for (let port = startPort; port < startPort + maxAttempts; port++) {
+        if (await isPortAvailable(port)) {
+            return port;
+        }
+    }
+    throw new Error(`No available ports found between ${startPort} and ${startPort + maxAttempts - 1}`);
+}
+
 async function startBot() {
+    let server = null;
+
     try {
         logger.info('Starting WhatsApp Bot...');
 
@@ -53,18 +77,14 @@ async function startBot() {
             });
         });
 
+        // Find available port starting from 5000
+        const PORT = await findAvailablePort(5000);
+
         // Create server with proper error handling
-        const PORT = 5000;
-        const server = app.listen(PORT, '0.0.0.0')
+        server = app.listen(PORT, '0.0.0.0')
             .on('error', (err) => {
-                if (err.code === 'EADDRINUSE') {
-                    logger.error(`Port ${PORT} is already in use`);
-                    // Exit process to allow for restart
-                    process.exit(1);
-                } else {
-                    logger.error('Failed to start HTTP server:', err);
-                    process.exit(1);
-                }
+                logger.error('Failed to start HTTP server:', err);
+                process.exit(1);
             })
             .on('listening', () => {
                 logger.info(`Server is running on http://0.0.0.0:${PORT}`);
@@ -107,16 +127,25 @@ async function startBot() {
         // Graceful shutdown
         const cleanup = async () => {
             logger.info('Received shutdown signal. Cleaning up...');
+
+            // Close server first
+            if (server) {
+                await new Promise((resolve) => {
+                    server.close(() => {
+                        logger.info('HTTP server closed');
+                        resolve();
+                    });
+                });
+            }
+
             try {
                 await sock.logout();
                 logger.info('WhatsApp logout successful');
             } catch (err) {
                 logger.error('Error during WhatsApp logout:', err);
             }
-            server.close(() => {
-                logger.info('HTTP server closed');
-                process.exit(0);
-            });
+
+            process.exit(0);
         };
 
         process.on('SIGTERM', cleanup);
