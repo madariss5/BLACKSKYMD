@@ -112,6 +112,146 @@
       "usage": "!fortune",
       "cooldown": 10,
       "permissions": ["user"]
+    },
+    {
+      "name": "slot",
+      "description": "Play slot machine game",
+      "usage": "!slot [bet]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "rps",
+      "description": "Play rock paper scissors",
+      "usage": "!rps [choice]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "chess",
+      "description": "Play chess with other users",
+      "usage": "!chess [start|move] [position]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wordle",
+      "description": "Play Wordle game",
+      "usage": "!wordle [guess]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "trivia",
+      "description": "Start a trivia game",
+      "usage": "!trivia [category]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "truth",
+      "description": "Get a truth question",
+      "usage": "!truth",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "dare",
+      "description": "Get a dare challenge",
+      "usage": "!dare",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "ship",
+      "description": "Ship two users together",
+      "usage": "!ship @user1 @user2",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "pet",
+      "description": "Virtual pet system",
+      "usage": "!pet [action]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "fish",
+      "description": "Go fishing for virtual items",
+      "usage": "!fish",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "hunt",
+      "description": "Go hunting for virtual items",
+      "usage": "!hunt",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "mine",
+      "description": "Mine for virtual resources",
+      "usage": "!mine",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "collect",
+      "description": "Collect daily rewards",
+      "usage": "!collect",
+      "cooldown": 86400,
+      "permissions": ["user"]
+    },
+    {
+      "name": "inventory",
+      "description": "Check your inventory",
+      "usage": "!inventory",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "shop",
+      "description": "Visit the virtual shop",
+      "usage": "!shop [buy|sell] [item]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "gift",
+      "description": "Gift items to other users",
+      "usage": "!gift @user [item]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "challenge",
+      "description": "Challenge other users",
+      "usage": "!challenge @user [type]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "duel",
+      "description": "Duel other users",
+      "usage": "!duel @user [bet]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "marry",
+      "description": "Virtual marriage system",
+      "usage": "!marry @user",
+      "cooldown": 86400,
+      "permissions": ["user"]
+    },
+    {
+      "name": "divorce",
+      "description": "End virtual marriage",
+      "usage": "!divorce",
+      "cooldown": 86400,
+      "permissions": ["user"]
     }
   ]
 }
