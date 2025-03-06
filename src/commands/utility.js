@@ -1,4 +1,6 @@
 const logger = require('../utils/logger');
+const config = require('../config/config');
+const { languageManager } = require('../utils/language');
 
 const utilityCommands = {
     async weather(sock, sender, args) {
@@ -384,29 +386,41 @@ const utilityCommands = {
     async language(sock, sender, args) {
         try {
             const newLang = args[0]?.toLowerCase();
+
+            // If no language specified, show available languages
             if (!newLang) {
                 const availableLangs = languageManager.getAvailableLanguages();
+                const currentLang = config.bot.language || languageManager.defaultLanguage;
+
                 await sock.sendMessage(sender, { 
-                    text: `Available languages: ${availableLangs.join(', ')}\nCurrent language: ${config.bot.language}`
+                    text: languageManager.getText('commands.language.available', null, 
+                          availableLangs.join(', '), currentLang)
                 });
                 return;
             }
 
+            // Check if language is supported
             if (!languageManager.isLanguageSupported(newLang)) {
                 await sock.sendMessage(sender, {
-                    text: `Language "${newLang}" is not supported. Available languages: ${languageManager.getAvailableLanguages().join(', ')}`
+                    text: languageManager.getText('commands.language.not_supported', null, 
+                          newLang, languageManager.getAvailableLanguages().join(', '))
                 });
                 return;
             }
 
+            // Update language
             config.bot.language = newLang;
+
+            // Send confirmation in new language
             await sock.sendMessage(sender, {
                 text: languageManager.getText('system.language_changed', newLang)
             });
 
         } catch (err) {
             logger.error('Error in language command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to change language.' });
+            await sock.sendMessage(sender, { 
+                text: languageManager.getText('commands.language.error') 
+            });
         }
     },
 };

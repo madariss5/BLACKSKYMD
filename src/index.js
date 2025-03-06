@@ -4,7 +4,7 @@ const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
 const { languageManager } = require('./utils/language');
 const logger = require('./utils/logger');
-const config = require('./config/config'); // Added missing config import
+const config = require('./config/config');
 
 async function startBot() {
     try {
@@ -30,8 +30,8 @@ async function startBot() {
         });
 
         // Start HTTP server with proper error handling
-        const server = app.listen(process.env.PORT || 5000, '0.0.0.0', () => {
-            logger.info(`HTTP server listening on port ${process.env.PORT || 5000}`);
+        const server = app.listen(config.server.port, config.server.host, () => {
+            logger.info(`HTTP server listening on port ${config.server.port}`);
         }).on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
                 logger.error('Port is already in use. Make sure no other instance is running.');

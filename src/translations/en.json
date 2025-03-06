@@ -35,6 +35,8 @@
     "language": {
       "description": "Changes the bot's language",
       "usage": ".language [en|de]",
+      "available": "Available languages: %s\nCurrent language: %s",
+      "not_supported": "Language '%s' is not supported. Available languages: %s",
       "success": "Language changed successfully",
       "error": "Failed to change language"
     }

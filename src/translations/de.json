@@ -34,7 +34,9 @@
     },
     "language": {
       "description": "Ändert die Sprache des Bots",
-      "usage": ".language [de|en]",
+      "usage": ".language [en|de]",
+      "available": "Verfügbare Sprachen: %s\nAktuelle Sprache: %s",
+      "not_supported": "Sprache '%s' wird nicht unterstützt. Verfügbare Sprachen: %s",
       "success": "Sprache erfolgreich geändert",
       "error": "Fehler beim Ändern der Sprache"
     }
