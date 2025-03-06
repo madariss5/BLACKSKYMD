@@ -68,6 +68,7 @@
       "name": "brightness",
       "description": "Adjust image brightness",
       "usage": ".brightness [0-200]",
+      "example": ".brightness 150",
       "cooldown": 10,
       "permissions": ["user"]
     },
@@ -75,6 +76,7 @@
       "name": "contrast",
       "description": "Adjust image contrast",
       "usage": ".contrast [0-200]",
+      "example": ".contrast 150",
       "cooldown": 10,
       "permissions": ["user"]
     },
@@ -94,120 +96,137 @@
     },
     {
       "name": "blur",
-      "description": "Apply blur effect",
-      "usage": ".blur [level]",
+      "description": "Apply blur effect to image",
+      "usage": ".blur [0.3-20]",
+      "example": ".blur 5",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "pixelate",
       "description": "Pixelate image",
-      "usage": ".pixelate [level]",
+      "usage": ".pixelate [2-100]",
+      "example": ".pixelate 8",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "cartoon",
-      "description": "Apply cartoon effect",
-      "usage": "!cartoon",
+      "description": "Apply cartoon effect to image",
+      "usage": ".cartoon (reply to image)",
+      "example": ".cartoon",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "painting",
-      "description": "Create painting effect",
-      "usage": "!painting [style]",
+      "description": "Convert image to painting style",
+      "usage": ".painting [oil|watercolor]",
+      "example": ".painting oil",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "sketch",
-      "description": "Create sketch effect",
-      "usage": "!sketch [type]",
+      "description": "Convert image to sketch style",
+      "usage": ".sketch [pencil|charcoal]",
+      "example": ".sketch pencil",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "resize",
-      "description": "Resize image",
+      "description": "Resize image to specific dimensions",
       "usage": ".resize [width] [height]",
+      "example": ".resize 800 600",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "crop",
-      "description": "Crop image",
+      "description": "Crop image to specific dimensions",
       "usage": ".crop [x] [y] [width] [height]",
+      "example": ".crop 100 100 500 500",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "rotate",
-      "description": "Rotate image",
+      "description": "Rotate image by degrees",
       "usage": ".rotate [degrees]",
+      "example": ".rotate 90",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "flip",
-      "description": "Flip image",
-      "usage": ".flip <horizontal|vertical>",
+      "description": "Flip image horizontally or vertically",
+      "usage": ".flip [horizontal|vertical]",
+      "example": ".flip horizontal",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "slow",
-      "description": "Slow down video",
-      "usage": ".slow [factor]",
+      "description": "Slow down video playback",
+      "usage": ".slow [0.1-1.0]",
+      "example": ".slow 0.5",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "fast",
-      "description": "Speed up video",
-      "usage": ".fast [factor]",
+      "description": "Speed up video playback",
+      "usage": ".fast [1-4]",
+      "example": ".fast 2",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "reverse",
-      "description": "Reverse video",
-      "usage": ".reverse",
+      "description": "Reverse video playback",
+      "usage": ".reverse (reply to video)",
+      "example": ".reverse",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "boomerang",
-      "description": "Create boomerang effect",
-      "usage": "!boomerang",
+      "description": "Create boomerang effect from video",
+      "usage": ".boomerang (reply to video)",
+      "example": ".boomerang",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "pitch",
       "description": "Adjust audio pitch",
-      "usage": "!pitch [level]",
+      "usage": ".pitch [level]",
+      "example": ".pitch 1.5",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "tempo",
       "description": "Adjust audio tempo",
-      "usage": "!tempo [speed]",
+      "usage": ".tempo [speed]",
+      "example": ".tempo 1.5",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "echo",
       "description": "Add echo effect",
-      "usage": "!echo [delay]",
+      "usage": ".echo [delay] [decay]",
+      "example": ".echo 0.5 0.5",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "bass",
       "description": "Boost bass",
-      "usage": "!bass [level]",
+      "usage": ".bass [level]",
+      "example": ".bass 10",
       "cooldown": 10,
       "permissions": ["user"]
     },

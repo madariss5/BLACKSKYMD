@@ -5,6 +5,28 @@ const sharp = require('sharp');
 const fs = require('fs').promises;
 const path = require('path');
 const { writeExifToWebp } = require('../utils/stickerMetadata');
+const axios = require('axios');
+const audioQueue = new Map();
+
+const playNextInQueue = async (sock, sender) => {
+    const queue = audioQueue.get(sender);
+    if (queue.length > 0) {
+        const audioBuffer = queue.shift();
+        try {
+            await sock.sendMessage(sender, { audio: { url: audioBuffer } });
+            if(queue.length > 0) {
+                setTimeout(() => playNextInQueue(sock, sender), 1000); // Short delay to simulate smooth playback
+            } else {
+                audioQueue.delete(sender);
+            }
+        } catch (err) {
+            logger.error('Error playing audio:', err);
+            await sock.sendMessage(sender, { text: 'Error playing audio. Try again.' });
+        }
+    }
+};
+
+
 
 const mediaCommands = {
     async sticker(sock, message, args) {
@@ -883,7 +905,7 @@ const mediaCommands = {
             });
         }
     },
-    async boomerang(sock, message) {
+    async boomerang2(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
             if (!message.message?.videoMessage) {
@@ -904,7 +926,7 @@ const mediaCommands = {
             await fs.writeFile(inputPath, buffer);
 
             // Get video duration
-            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpeg = require('fluent-ffmpeg);
             const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
             ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -947,28 +969,253 @@ const mediaCommands = {
         }
     },
     async pitch(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const level = parseFloat(args[0]) || 1.0;
-        // TODO: Implement pitch adjustment
-        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.audioMessage && !message.message?.videoMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please send an audio file with caption .pitch [level]\nLevel range: 0.5 to 2.0'
+                });
+                return;
+            }
+
+            const level = parseFloat(args[0]) || 1.0;
+            if (level < 0.5 || level > 2.0) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Pitch level must be between 0.5 and 2.0'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const inputPath = path.join(tempDir, `input_${Date.now()}.mp3`);
+            const outputPath = path.join(tempDir, `output_${Date.now()}.mp3`);
+
+            await fs.writeFile(inputPath, buffer);
+
+            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+            ffmpeg.setFfmpegPath(ffmpegPath);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .audioFilters(`asetrate=44100*${level},aresample=44100`)
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .save(outputPath);
+            });
+
+            await sock.sendMessage(remoteJid, {
+                audio: { url: outputPath },
+                mimetype: 'audio/mp4',
+                caption: `Audio pitch adjusted by ${level}x`
+            });
+
+            // Cleanup
+            await fs.unlink(inputPath);
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in pitch command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: 'Failed to adjust audio pitch. Please try again.'
+            });
+        }
     },
+
     async tempo(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const speed = parseFloat(args[0]) || 1.0;
-        // TODO: Implement tempo adjustment
-        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.audioMessage && !message.message?.videoMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please send an audio file with caption .tempo [speed]\nSpeed range: 0.5 to 2.0'
+                });
+                return;
+            }
+
+            const speed = parseFloat(args[0]) || 1.0;
+            if (speed < 0.5 || speed > 2.0) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Tempo speed must be between 0.5 and 2.0'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const inputPath = path.join(tempDir, `input_${Date.now()}.mp3`);
+            const outputPath = path.join(tempDir, `output_${Date.now()}.mp3`);
+
+            await fs.writeFile(inputPath, buffer);
+
+            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+            ffmpeg.setFfmpegPath(ffmpegPath);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .audioFilters(`atempo=${speed}`)
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .save(outputPath);
+            });
+
+            await sock.sendMessage(remoteJid, {
+                audio: { url: outputPath },
+                mimetype: 'audio/mp4',
+                caption: `Audio tempo adjusted to ${speed}x`
+            });
+
+            // Cleanup
+            await fs.unlink(inputPath);
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in tempo command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: 'Failed to adjust audio tempo. Please try again.'
+            });
+        }
     },
+
     async echo(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const delay = parseInt(args[0]) || 100;
-        // TODO: Implement echo effect
-        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.audioMessage && !message.message?.videoMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please send an audio file with caption .echo [delay] [decay]\nDelay: 0.1-2.0, Decay: 0.1-0.9'
+                });
+                return;
+            }
+
+            const delay = parseFloat(args[0]) || 0.5;
+            const decay = parseFloat(args[1]) || 0.5;
+
+            if (delay < 0.1 || delay > 2.0 || decay < 0.1 || decay > 0.9) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Invalid parameters. Use:\nDelay: 0.1-2.0\nDecay: 0.1-0.9'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const inputPath = path.join(tempDir, `input_${Date.now()}.mp3`);
+            const outputPath = path.join(tempDir, `output_${Date.now()}.mp3`);
+
+            await fs.writeFile(inputPath, buffer);
+
+            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+            ffmpeg.setFfmpegPath(ffmpegPath);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .audioFilters([
+                        {
+                            filter: 'aecho',
+                            options: {
+                                'in_gain': 0.8,
+                                'out_gain': decay,
+                                'delays': delay * 1000,
+                                'decays': decay
+                            }
+                        }
+                    ])
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .save(outputPath);
+            });
+
+            await sock.sendMessage(remoteJid, {
+                audio: { url: outputPath },
+                mimetype: 'audio/mp4',
+                caption: `Echo effect added (Delay: ${delay}s, Decay: ${decay})`
+            });
+
+            // Cleanup
+            await fs.unlink(inputPath);
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in echo command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: 'Failed to add echo effect. Please try again.'
+            });
+        }
     },
+
     async bass(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const level = parseInt(args[0]) || 5;
-        // TODO: Implement bass boost
-        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.audioMessage && !message.message?.videoMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please send an audio file with caption .bass [level]\nLevel range: 1-20'
+                });
+                return;
+            }
+
+            const level = parseInt(args[0]) || 5;
+            if (level < 1 || level > 20) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Bass level must be between 1 and 20'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const inputPath = path.join(tempDir, `input_${Date.now()}.mp3`);
+            const outputPath = path.join(tempDir, `output_${Date.now()}.mp3`);
+
+            await fs.writeFile(inputPath, buffer);
+
+            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+            ffmpeg.setFfmpegPath(ffmpegPath);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .audioFilters([
+                        {
+                            filter: 'bass',
+                            options: {
+                                'gain': level,
+                                'frequency': 100,
+                                'width_type': 'h',
+                                'width': 100
+                            }
+                        }
+                    ])
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .save(outputPath);
+            });
+
+            await sock.sendMessage(remoteJid, {
+                audio: { url: outputPath },
+                mimetype: 'audio/mp4',
+                caption: `Bass boosted by ${level}x`
+            });
+
+            // Cleanup
+            await fs.unlink(inputPath);
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in bass command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: 'Failed to boost bass. Please try again.'
+            });
+        }
     },
     async tiktok(sock, message, args) {
         try {

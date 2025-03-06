@@ -45,13 +45,68 @@
       "not_supported": "Language '%s' is not supported. Available languages: %s",
       "success": "Language changed successfully",
       "error": "Failed to change language"
+    },
+    "media": {
+      "no_media": "Please send a media file to use this command",
+      "processing": "Processing your media...",
+      "success": "Here's your processed media!",
+      "error": "Failed to process media. Please try again.",
+      "invalid_format": "Invalid media format. Please try again with the correct format.",
+      "cartoon": {
+        "description": "Convert image to cartoon style",
+        "processing": "Creating cartoon effect...",
+        "success": "Here's your cartoon effect!",
+        "error": "Failed to create cartoon effect"
+      },
+      "painting": {
+        "description": "Convert image to painting style",
+        "invalid_style": "Invalid style. Available styles: oil, watercolor",
+        "processing": "Creating painting effect...",
+        "success": "Here's your %s painting effect!",
+        "error": "Failed to create painting effect"
+      },
+      "sketch": {
+        "description": "Convert image to sketch style",
+        "invalid_type": "Invalid type. Available types: pencil, charcoal",
+        "processing": "Creating sketch effect...",
+        "success": "Here's your %s sketch!",
+        "error": "Failed to create sketch effect"
+      },
+      "boomerang": {
+        "description": "Create boomerang effect from video",
+        "processing": "Creating boomerang effect...",
+        "success": "Here's your boomerang video!",
+        "error": "Failed to create boomerang effect"
+      },
+      "pitch": {
+        "description": "Adjust audio pitch",
+        "invalid_level": "Pitch level must be between 0.5 and 2.0",
+        "processing": "Adjusting audio pitch...",
+        "success": "Audio pitch adjusted by %sx",
+        "error": "Failed to adjust audio pitch"
+      },
+      "tempo": {
+        "description": "Adjust audio tempo",
+        "invalid_speed": "Tempo speed must be between 0.5 and 2.0",
+        "processing": "Adjusting audio tempo...",
+        "success": "Audio tempo adjusted to %sx",
+        "error": "Failed to adjust audio tempo"
+      },
+      "echo": {
+        "description": "Add echo effect to audio",
+        "invalid_params": "Invalid parameters. Use:\nDelay: 0.1-2.0\nDecay: 0.1-0.9",
+        "processing": "Adding echo effect...",
+        "success": "Echo effect added (Delay: %ss, Decay: %s)",
+        "error": "Failed to add echo effect"
+      },
+      "bass": {
+        "description": "Boost audio bass",
+        "invalid_level": "Bass level must be between 1 and 20",
+        "processing": "Boosting bass...",
+        "success": "Bass boosted by %sx",
+        "error": "Failed to boost bass"
+      }
     }
-  },
-  "media": {
-    "no_media": "Please send a media file",
-    "processing": "Processing media...",
-    "success": "Successfully processed!",
-    "error": "Error processing media"
   },
   "group": {
     "admin_required": "You must be an admin to use this command",
