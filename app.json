@@ -7,6 +7,7 @@
     "baileys",
     "multi-device"
   ],
+  "repository": "https://github.com/yourusername/whatsapp-bot",
   "success_url": "/",
   "env": {
     "OWNER_NUMBER": {
@@ -24,9 +25,9 @@
       "value": "."
     },
     "BOT_NAME": {
-      "description": "Custom name for your bot (default: 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻)",
+      "description": "Custom name for your bot (default: WhatsApp-MD)",
       "required": false,
-      "value": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻"
+      "value": "WhatsApp-MD"
     },
     "NODE_ENV": {
       "description": "Environment mode",
@@ -47,6 +48,11 @@
     "NEWS_API_KEY": {
       "description": "API key for news commands",
       "required": false
+    },
+    "LOG_LEVEL": {
+      "description": "Logging level (error, warn, info, debug)",
+      "required": false,
+      "value": "info"
     }
   },
   "formation": {
@@ -58,6 +64,9 @@
   "buildpacks": [
     {
       "url": "heroku/nodejs"
+    },
+    {
+      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
     }
   ],
   "stack": "heroku-22"

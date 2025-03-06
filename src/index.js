@@ -19,14 +19,15 @@ async function startServer(sock) {
         });
     });
 
-    // Always serve on port 5000 
-    const server = app.listen(5000, '0.0.0.0')
+    // Always serve on port 5000 for Replit compatibility
+    const PORT = 5000;
+    const server = app.listen(PORT, '0.0.0.0')
         .on('error', (err) => {
             console.error('Failed to start HTTP server:', err);
             process.exit(1);
         })
         .on('listening', () => {
-            console.log('Server is running on port 5000');
+            console.log(`Server is running on port ${PORT}`);
         });
 
     return server;
