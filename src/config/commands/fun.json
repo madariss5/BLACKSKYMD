@@ -539,6 +539,48 @@
       "usage": "!roast @user",
       "cooldown": 5,
       "permissions": ["user"]
+    },
+    {
+      "name": "animegif",
+      "description": "Get a random anime GIF",
+      "usage": "!animegif [category]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "waifu",
+      "description": "Get a random waifu image",
+      "usage": "!waifu <sfw|nsfw>",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "neko",
+      "description": "Get a random neko image",
+      "usage": "!neko <sfw|nsfw>",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "animeface",
+      "description": "Generate a random anime face",
+      "usage": "!animeface",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "animequote",
+      "description": "Get a random anime quote",
+      "usage": "!animequote",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "animetrivia",
+      "description": "Get an anime trivia question",
+      "usage": "!animetrivia",
+      "cooldown": 10,
+      "permissions": ["user"]
     }
   ]
 }

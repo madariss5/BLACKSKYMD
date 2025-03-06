@@ -1,0 +1,166 @@
+{
+  "category": "reactions",
+  "commands": [
+    {
+      "name": "hug",
+      "description": "Send a warm anime hug",
+      "usage": "!hug @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "pat",
+      "description": "Pat someone gently",
+      "usage": "!pat @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "kiss",
+      "description": "Give someone a kiss",
+      "usage": "!kiss @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "cuddle",
+      "description": "Cuddle with someone",
+      "usage": "!cuddle @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "poke",
+      "description": "Poke someone playfully",
+      "usage": "!poke @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "tickle",
+      "description": "Tickle someone",
+      "usage": "!tickle @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "boop",
+      "description": "Boop someone's nose",
+      "usage": "!boop @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "blush",
+      "description": "Show that you're blushing",
+      "usage": "!blush",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "cry",
+      "description": "Show that you're crying",
+      "usage": "!cry",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "dance",
+      "description": "Show your dance moves",
+      "usage": "!dance",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "laugh",
+      "description": "Show that you're laughing",
+      "usage": "!laugh",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "slap",
+      "description": "Slap someone (playfully)",
+      "usage": "!slap @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "punch",
+      "description": "Punch someone (playfully)",
+      "usage": "!punch @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "bonk",
+      "description": "Bonk someone",
+      "usage": "!bonk @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "pout",
+      "description": "Show that you're pouting",
+      "usage": "!pout",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "smug",
+      "description": "Show a smug expression",
+      "usage": "!smug",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wink",
+      "description": "Wink at someone",
+      "usage": "!wink @user",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "grouphug",
+      "description": "Hug everyone in the group",
+      "usage": "!grouphug",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wave",
+      "description": "Wave at everyone",
+      "usage": "!wave",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "run",
+      "description": "Show that you're running",
+      "usage": "!run",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "sleep",
+      "description": "Show that you're sleeping",
+      "usage": "!sleep",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "panic",
+      "description": "Show that you're panicking",
+      "usage": "!panic",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "facepalm",
+      "description": "Show a facepalm reaction",
+      "usage": "!facepalm",
+      "cooldown": 5,
+      "permissions": ["user"]
+    }
+  ]
+}

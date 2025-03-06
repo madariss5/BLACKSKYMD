@@ -30,8 +30,8 @@ const funCommands = {
     // Games
     async tictactoe(sock, sender, args) {
         if (!args[0]) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !tictactoe <start|move> [position]' 
+            await sock.sendMessage(sender, {
+                text: 'Usage: !tictactoe <start|move> [position]'
             });
             return;
         }
@@ -41,8 +41,8 @@ const funCommands = {
 
     async hangman(sock, sender, args) {
         if (!args[0]) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !hangman <start|guess> [letter]' 
+            await sock.sendMessage(sender, {
+                text: 'Usage: !hangman <start|guess> [letter]'
             });
             return;
         }
@@ -62,7 +62,7 @@ const funCommands = {
             await sock.sendMessage(sender, { text: 'Please provide text to mock' });
             return;
         }
-        const mockedText = text.split('').map((char, i) => 
+        const mockedText = text.split('').map((char, i) =>
             i % 2 ? char.toUpperCase() : char.toLowerCase()
         ).join('');
         await sock.sendMessage(sender, { text: mockedText });
@@ -102,8 +102,8 @@ const funCommands = {
 
     async choose(sock, sender, args) {
         if (args.length < 2) {
-            await sock.sendMessage(sender, { 
-                text: 'Please provide at least 2 options to choose from' 
+            await sock.sendMessage(sender, {
+                text: 'Please provide at least 2 options to choose from'
             });
             return;
         }
@@ -134,11 +134,11 @@ const funCommands = {
 
     // Horoscope and Fortune
     async horoscope(sock, sender, args) {
-        const signs = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 
-                      'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
+        const signs = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+            'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
         if (!args[0] || !signs.includes(args[0].toLowerCase())) {
-            await sock.sendMessage(sender, { 
-                text: `⭐ Available signs: ${signs.join(', ')}` 
+            await sock.sendMessage(sender, {
+                text: `⭐ Available signs: ${signs.join(', ')}`
             });
             return;
         }
@@ -192,15 +192,15 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
             result = 'Bot wins!';
         }
 
-        await sock.sendMessage(sender, { 
-            text: `You: ${userChoice}\nBot: ${botChoice}\n${result}` 
+        await sock.sendMessage(sender, {
+            text: `You: ${userChoice}\nBot: ${botChoice}\n${result}`
         });
     },
 
     async chess(sock, sender, args) {
         if (!args[0]) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !chess [start|move] [position]' 
+            await sock.sendMessage(sender, {
+                text: 'Usage: !chess [start|move] [position]'
             });
             return;
         }
@@ -220,8 +220,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     async trivia(sock, sender, args) {
         const categories = ['general', 'science', 'history', 'movies', 'games'];
         if (!args[0] || !categories.includes(args[0].toLowerCase())) {
-            await sock.sendMessage(sender, { 
-                text: `📚 Available categories: ${categories.join(', ')}` 
+            await sock.sendMessage(sender, {
+                text: `📚 Available categories: ${categories.join(', ')}`
             });
             return;
         }
@@ -236,8 +236,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
             "What's your most embarrassing moment?",
             "What's your biggest secret?"
         ];
-        await sock.sendMessage(sender, { 
-            text: `🤔 Truth: ${questions[Math.floor(Math.random() * questions.length)]}` 
+        await sock.sendMessage(sender, {
+            text: `🤔 Truth: ${questions[Math.floor(Math.random() * questions.length)]}`
         });
     },
 
@@ -247,8 +247,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
             "Do 10 push-ups",
             "Tell a joke in voice message"
         ];
-        await sock.sendMessage(sender, { 
-            text: `😈 Dare: ${dares[Math.floor(Math.random() * dares.length)]}` 
+        await sock.sendMessage(sender, {
+            text: `😈 Dare: ${dares[Math.floor(Math.random() * dares.length)]}`
         });
     },
 
@@ -258,8 +258,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
             return;
         }
         const compatibility = Math.floor(Math.random() * 101);
-        await sock.sendMessage(sender, { 
-            text: `💘 Love Calculator\n${args[0]} x ${args[1]}\nCompatibility: ${compatibility}%` 
+        await sock.sendMessage(sender, {
+            text: `💘 Love Calculator\n${args[0]} x ${args[1]}\nCompatibility: ${compatibility}%`
         });
     },
 
@@ -267,8 +267,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     async pet(sock, sender, args) {
         const actions = ['feed', 'play', 'sleep', 'train'];
         if (!args[0] || !actions.includes(args[0].toLowerCase())) {
-            await sock.sendMessage(sender, { 
-                text: `🐾 Available actions: ${actions.join(', ')}` 
+            await sock.sendMessage(sender, {
+                text: `🐾 Available actions: ${actions.join(', ')}`
             });
             return;
         }
@@ -307,8 +307,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
 
     async shop(sock, sender, args) {
         if (!args[0]) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !shop [buy|sell] [item]' 
+            await sock.sendMessage(sender, {
+                text: 'Usage: !shop [buy|sell] [item]'
             });
             return;
         }
@@ -318,8 +318,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
 
     async gift(sock, sender, args) {
         if (args.length < 2) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !gift @user [item]' 
+            await sock.sendMessage(sender, {
+                text: 'Usage: !gift @user [item]'
             });
             return;
         }
@@ -330,8 +330,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     // Challenge System
     async challenge(sock, sender, args) {
         if (args.length < 2) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !challenge @user [type]' 
+            await sock.sendMessage(sender, {
+                text: 'Usage: !challenge @user [type]'
             });
             return;
         }
@@ -341,8 +341,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
 
     async duel(sock, sender, args) {
         if (args.length < 2) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !duel @user [bet]' 
+            await sock.sendMessage(sender, {
+                text: 'Usage: !duel @user [bet]'
             });
             return;
         }
@@ -369,8 +369,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     async adventure(sock, sender, args) {
         const locations = ['forest', 'cave', 'mountain', 'desert', 'dungeon'];
         if (!args[0] || !locations.includes(args[0].toLowerCase())) {
-            await sock.sendMessage(sender, { 
-                text: `🗺️ Available locations: ${locations.join(', ')}` 
+            await sock.sendMessage(sender, {
+                text: `🗺️ Available locations: ${locations.join(', ')}`
             });
             return;
         }
@@ -607,14 +607,14 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
         const pet = args[0]?.toLowerCase();
 
         if (!pet || !pets.includes(pet)) {
-            await sock.sendMessage(sender, { 
-                text: `Available pets to adopt: ${pets.join(', ')}` 
+            await sock.sendMessage(sender, {
+                text: `Available pets to adopt: ${pets.join(', ')}`
             });
             return;
         }
 
-        await sock.sendMessage(sender, { 
-            text: `🐾 Congratulations! You've adopted a ${pet}!` 
+        await sock.sendMessage(sender, {
+            text: `🐾 Congratulations! You've adopted a ${pet}!`
         });
     },
 
@@ -623,14 +623,14 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
         const action = args[0]?.toLowerCase();
 
         if (!action || !actions.includes(action)) {
-            await sock.sendMessage(sender, { 
-                text: `Available pet care actions: ${actions.join(', ')}` 
+            await sock.sendMessage(sender, {
+                text: `Available pet care actions: ${actions.join(', ')}`
             });
             return;
         }
 
-        await sock.sendMessage(sender, { 
-            text: `🐾 You ${action} your pet! They look happy!` 
+        await sock.sendMessage(sender, {
+            text: `🐾 You ${action} your pet! They look happy!`
         });
     },
 
@@ -645,8 +645,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     // Additional Fun Commands
     async emojimix(sock, sender, args) {
         if (args.length !== 2) {
-            return await sock.sendMessage(sender, { 
-                text: '⚠️ Please provide two emojis to mix!' 
+            return await sock.sendMessage(sender, {
+                text: '⚠️ Please provide two emojis to mix!'
             });
         }
         // TODO: Implement emoji mixing using external API
@@ -738,8 +738,8 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
             "How vexingly quick daft zebras jump"
         ];
         const challenge = words[Math.floor(Math.random() * words.length)];
-        await sock.sendMessage(sender, { 
-            text: `⌨️ Typing Race:\nType this as fast as you can:\n${challenge}` 
+        await sock.sendMessage(sender, {
+            text: `⌨️ Typing Race:\nType this as fast as you can:\n${challenge}`
         });
     },
 
@@ -749,20 +749,20 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
         const num1 = Math.floor(Math.random() * 10) + 1;
         const num2 = Math.floor(Math.random() * 10) + 1;
 
-        await sock.sendMessage(sender, { 
-            text: `🔢 Math Quiz:\nWhat is ${num1} ${operator} ${num2}?` 
+        await sock.sendMessage(sender, {
+            text: `🔢 Math Quiz:\nWhat is ${num1} ${operator} ${num2}?`
         });
     },
 
     async triviachallenge(sock, sender) {
         const questions = [
-            {q: "What is the capital of France?", a: "Paris"},
-            {q: "Which planet is known as the Red Planet?", a: "Mars"},
-            {q: "What is the largest mammal?", a: "Blue Whale"}
+            { q: "What is the capital of France?", a: "Paris" },
+            { q: "Which planet is known as the Red Planet?", a: "Mars" },
+            { q: "What is the largest mammal?", a: "Blue Whale" }
         ];
         const question = questions[Math.floor(Math.random() * questions.length)];
-        await sock.sendMessage(sender, { 
-            text: `🎯 Trivia Challenge:\n${question.q}` 
+        await sock.sendMessage(sender, {
+            text: `🎯 Trivia Challenge:\n${question.q}`
         });
     },
 
@@ -780,27 +780,27 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     // Social Games
     async confess(sock, sender, args) {
         if (!args.length) {
-            return await sock.sendMessage(sender, { 
-                text: '⚠️ Please provide your confession!' 
+            return await sock.sendMessage(sender, {
+                text: '⚠️ Please provide your confession!'
             });
         }
 
         const confession = args.join(' ');
-        await sock.sendMessage(sender, { 
-            text: `Anonymous Confession:\n${confession}` 
+        await sock.sendMessage(sender, {
+            text: `Anonymous Confession:\n${confession}`
         });
     },
 
     async matchmaking(sock, sender, args) {
         if (args.length < 2) {
-            return await sock.sendMessage(sender, { 
-                text: 'Please mention two users for matchmaking!' 
+            return await sock.sendMessage(sender, {
+                text: 'Please mention two users for matchmaking!'
             });
         }
 
         const compatibility = Math.floor(Math.random() * 101);
-        await sock.sendMessage(sender, { 
-            text: `💘 Matchmaking Results:\n${args[0]} + ${args[1]} = ${compatibility}% compatible!` 
+        await sock.sendMessage(sender, {
+            text: `💘 Matchmaking Results:\n${args[0]} + ${args[1]} = ${compatibility}% compatible!`
         });
     },
 
@@ -970,6 +970,60 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
         await sock.sendMessage(sender, {
             text: `To ${target}:\n${randomRoast}`
         });
+    },
+    async animegif(sock, sender, args) {
+        const category = args[0]?.toLowerCase();
+        const categories = ['action', 'romance', 'comedy', 'drama'];
+
+        if (!category || !categories.includes(category)) {
+            await sock.sendMessage(sender, {
+                text: `🎬 Available categories: ${categories.join(', ')}`
+            });
+            return;
+        }
+        // TODO: Implement anime GIF fetching
+        await sock.sendMessage(sender, { text: `🎭 Getting ${category} anime GIF...` });
+    },
+
+    async waifu(sock, sender, args) {
+        const [type] = args;
+        const types = ['sfw', 'nsfw'];
+        if (!type || !types.includes(type.toLowerCase())) {
+            await sock.sendMessage(sender, {
+                text: `👗 Usage: !waifu <sfw|nsfw>`
+            });
+            return;
+        }
+        // TODO: Implement waifu image fetching
+        await sock.sendMessage(sender, { text: '👘 Getting waifu image...' });
+    },
+
+    async neko(sock, sender, args) {
+        const [type] = args;
+        const types = ['sfw', 'nsfw'];
+        if (!type || !types.includes(type.toLowerCase())) {
+            await sock.sendMessage(sender, {
+                text: `🐱 Usage: !neko <sfw|nsfw>`
+            });
+            return;
+        }
+        // TODO: Implement neko image fetching
+        await sock.sendMessage(sender, { text: '😺 Getting neko image...' });
+    },
+
+    async animeface(sock, sender) {
+        // TODO: Implement anime face generation
+        await sock.sendMessage(sender, { text: '👤 Generating anime face...' });
+    },
+
+    async animequote(sock, sender) {
+        // TODO: Implement anime quote fetching
+        await sock.sendMessage(sender, { text: '💭 Getting anime quote...' });
+    },
+
+    async animetrivia(sock, sender) {
+        // TODO: Implement anime trivia
+        await sock.sendMessage(sender, { text: '❓ Getting anime trivia question...' });
     }
 
 };
