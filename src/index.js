@@ -6,6 +6,7 @@ const { languageManager } = require('./utils/language');
 const logger = require('./utils/logger');
 const config = require('./config/config');
 const { DisconnectReason } = require('@whiskeysockets/baileys');
+const path = require('path');
 
 async function findAvailablePort(startPort, maxAttempts = 10) {
     const net = require('net');
@@ -29,20 +30,42 @@ async function findAvailablePort(startPort, maxAttempts = 10) {
     throw new Error(`No available ports found between ${startPort} and ${startPort + maxAttempts - 1}`);
 }
 
-async function startBot() {
+async function startServer(sock) {
+    const app = express();
+    app.use(express.json());
+
+    // Health check endpoint with enhanced information
+    app.get('/', (req, res) => {
+        res.json({
+            status: sock ? 'connected' : 'disconnected',
+            message: languageManager.getText('system.bot_active'),
+            commands: commandLoader.getAllCommands().length,
+            language: config.bot.language,
+            uptime: process.uptime(),
+            missingConfig: config.validateConfig().missingVars
+        });
+    });
+
+    // Find available port starting from 5000
+    const PORT = await findAvailablePort(5000);
+
+    const server = app.listen(PORT, '0.0.0.0')
+        .on('error', (err) => {
+            logger.error('Failed to start HTTP server:', err);
+            process.exit(1);
+        })
+        .on('listening', () => {
+            logger.info(`Server is running on http://0.0.0.0:${PORT}`);
+        });
+
+    return server;
+}
+
+async function main() {
     let server = null;
     let sock = null;
 
     try {
-        logger.info('Starting WhatsApp Bot...');
-
-        // Check required environment variables
-        const { isValid, missingVars } = config.validateConfig();
-        if (!isValid) {
-            logger.warn(`Missing required environment variables: ${missingVars.join(', ')}`);
-            logger.info('Bot will start but some features may be limited until variables are set');
-        }
-
         // Load translations first
         logger.info('Loading translations...');
         await languageManager.loadTranslations();
@@ -68,34 +91,8 @@ async function startBot() {
             throw err;
         }
 
-        // Setup Express server with better error handling
-        const app = express();
-        app.use(express.json());
-
-        // Health check endpoint
-        app.get('/', (req, res) => {
-            res.json({
-                status: sock ? 'connected' : 'disconnected',
-                message: languageManager.getText('system.bot_active'),
-                commands: commandLoader.getAllCommands().length,
-                language: config.bot.language,
-                uptime: process.uptime(),
-                missingConfig: missingVars
-            });
-        });
-
-        // Find available port starting from 5000
-        const PORT = await findAvailablePort(5000);
-
-        // Create server with proper error handling
-        server = app.listen(PORT, '0.0.0.0')
-            .on('error', (err) => {
-                logger.error('Failed to start HTTP server:', err);
-                process.exit(1);
-            })
-            .on('listening', () => {
-                logger.info(`Server is running on http://0.0.0.0:${PORT}`);
-            });
+        // Start HTTP server
+        server = await startServer(sock);
 
         // Listen for messages with enhanced error handling
         sock.ev.on('messages.upsert', async ({ messages }) => {
@@ -169,7 +166,7 @@ async function startBot() {
 }
 
 // Start the bot with error handling
-startBot().catch(err => {
+main().catch(err => {
     logger.error('Fatal error starting bot:', {
         error: err.message,
         stack: err.stack
