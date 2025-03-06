@@ -18,9 +18,9 @@ const config = {
 
     // Bot Configuration
     bot: {
-        name: process.env.BOT_NAME || 'WhatsApp MD Bot',
+        name: process.env.BOT_NAME || '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻',
         version: process.env.BOT_VERSION || '1.0.0',
-        prefix: process.env.BOT_PREFIX || '!',
+        prefix: process.env.BOT_PREFIX || '.',
         language: process.env.BOT_LANGUAGE || 'en',
     },
 

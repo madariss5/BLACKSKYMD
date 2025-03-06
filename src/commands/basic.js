@@ -1,57 +1,58 @@
 const logger = require('../utils/logger');
 const os = require('os');
 const fs = require('fs').promises;
+const config = require('../config/config');
 
 const basicCommands = {
     async help(sock, sender, args) {
         const helpText = `
 Available Commands:
 1. Basic Commands:
-   !help - Show this help message
-   !ping - Check bot status
-   !info - Get bot information
-   !botinfo - Show detailed statistics
-   !dashboard - View bot dashboard
-   !rules - Show usage rules
-   !faq - Show FAQ
-   !status - Check bot status
-   !changelog - Recent updates
-   !about - Bot info and credits
-   !privacy - Privacy policy
-   !terms - Terms of service
-   !uptime - Show bot uptime
-   !stats - Usage statistics
-   !speed - Test response speed
-   !system - System information
-   !owner - Bot owner information
-   !donate - Support bot development
-   !report - Report bugs
-   !feedback - Provide feedback
-   !source - Bot source information
-   !runtime - Bot runtime details
-   !premium - Premium features
-   !support - Get support
-   !credits - Credits & acknowledgments
+   .help - Show this help message
+   .ping - Check bot status
+   .info - Get bot information
+   .botinfo - Show detailed statistics
+   .dashboard - View bot dashboard
+   .rules - Show usage rules
+   .faq - Show FAQ
+   .status - Check bot status
+   .changelog - Recent updates
+   .about - Bot info and credits
+   .privacy - Privacy policy
+   .terms - Terms of service
+   .uptime - Show bot uptime
+   .stats - Usage statistics
+   .speed - Test response speed
+   .system - System information
+   .owner - Bot owner information
+   .donate - Support bot development
+   .report - Report bugs
+   .feedback - Provide feedback
+   .source - Bot source information
+   .runtime - Bot runtime details
+   .premium - Premium features
+   .support - Get support
+   .credits - Credits & acknowledgments
 
 
 2. Group Commands:
-   !kick @user - Kick user from group
-   !promote @user - Promote user to admin
-   !demote @user - Demote user from admin
-   !everyone - Tag all members
-   !groupinfo - Show group information
+   .kick @user - Kick user from group
+   .promote @user - Promote user to admin
+   .demote @user - Demote user from admin
+   .everyone - Tag all members
+   .groupinfo - Show group information
 
 3. Fun Commands:
-   !quote - Get random quote
-   !joke - Get random joke
-   !meme - Get random meme
+   .quote - Get random quote
+   .joke - Get random joke
+   .meme - Get random meme
 
 4. Utility Commands:
-   !weather [city] - Get weather info
-   !translate [text] - Translate text
-   !calculate [expression] - Calculate expression
+   .weather [city] - Get weather info
+   .translate [text] - Translate text
+   .calculate [expression] - Calculate expression
 
-Type !help [command] for more info about a command
+Type .help [command] for more info about a command
         `.trim();
 
         await sock.sendMessage(sender, { text: helpText });
@@ -138,16 +139,16 @@ Commands: ${Object.keys(basicCommands).length} basic commands
         const faq = `
 ❓ Frequently Asked Questions:
 Q: How do I use the bot?
-A: Start with !help command
+A: Start with .help command
 
 Q: Is the bot free?
 A: Yes, basic features are free
 
 Q: How do I report bugs?
-A: Use !report command
+A: Use .report command
 
 Q: Can I add bot to my group?
-A: Yes, use !invite command
+A: Yes, use .invite command
 
 Q: What's premium access?
 A: Premium gives extra features
@@ -445,11 +446,11 @@ Contact owner to upgrade!
     async support(sock, sender) {
         const supportInfo = `
 🆘 Need Help?
-• Use !help for commands
-• Use !report for bugs
-• Use !feedback for suggestions
+• Use .help for commands
+• Use .report for bugs
+• Use .feedback for suggestions
 • Join support group: ${process.env.SUPPORT_GROUP || 'Not available'}
-• Contact owner: !owner
+• Contact owner: .owner
         `.trim();
 
         await sock.sendMessage(sender, { text: supportInfo });
