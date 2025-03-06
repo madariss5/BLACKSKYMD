@@ -6,37 +6,44 @@ class CommandLoader {
     constructor() {
         this.commands = new Map();
         this.commandCache = new Map();
+        this.initialized = false;
     }
 
     async loadCommandHandlers() {
         try {
+            if (this.initialized) {
+                logger.info('Commands already loaded, skipping initialization');
+                return true;
+            }
+
             const commandsPath = path.join(__dirname, '../commands');
             const files = await fs.readdir(commandsPath);
             let loadedHandlers = {};
 
-            console.log('\nLoading command handlers...');
+            logger.info('\nLoading command handlers...');
 
             for (const file of files) {
                 if (file.endsWith('.js') && file !== 'index.js') {
                     const category = file.replace('.js', '');
                     try {
-                        console.log(`Loading commands from ${file}...`);
+                        logger.info(`Loading commands from ${file}...`);
                         const handlers = require(path.join(commandsPath, file));
 
                         // Register each command with its configuration
                         for (const [name, handler] of Object.entries(handlers)) {
                             // Skip if not a function
                             if (typeof handler !== 'function') {
-                                console.log(`Skipping ${name} in ${file} - not a function`);
+                                logger.info(`Skipping ${name} in ${file} - not a function`);
                                 continue;
                             }
 
+                            // Add command to registry
                             this.commands.set(name, {
                                 execute: handler,
                                 config: handler.config || {
                                     name,
                                     description: 'No description available',
-                                    usage: `.${name}`,
+                                    usage: `${process.env.BOT_PREFIX || '.'}${name}`,
                                     cooldown: 3,
                                     permissions: ['user']
                                 },
@@ -50,46 +57,58 @@ class CommandLoader {
                             });
 
                             loadedHandlers[category] = (loadedHandlers[category] || 0) + 1;
-                            console.log(`Registered command: ${name} from ${category}`);
+                            logger.info(`✅ Registered command: ${name} from ${category}`);
                         }
                     } catch (err) {
-                        console.error(`Error loading handlers from ${file}:`, err);
+                        logger.error(`Error loading handlers from ${file}:`, err);
                         continue;
                     }
                 }
             }
 
-            console.log('\nCommand loading summary:');
+            logger.info('\nCommand loading summary:');
             for (const [category, count] of Object.entries(loadedHandlers)) {
-                console.log(`${category}: ${count} commands`);
+                logger.info(`${category}: ${count} commands`);
             }
-            console.log('Total commands:', this.commands.size);
+            logger.info('Total commands:', this.commands.size);
 
-            return Object.keys(loadedHandlers).length > 0;
+            this.initialized = true;
+            return this.commands.size > 0;
         } catch (err) {
-            console.error('Critical error in loadCommandHandlers:', err);
+            logger.error('Critical error in loadCommandHandlers:', err);
             return false;
         }
     }
 
-    getCommand(name) {
-        const command = this.commands.get(name);
-        if (command) {
-            console.log(`Command '${name}' found in category '${command.category}'`);
-            const cacheInfo = this.commandCache.get(name);
-            if (cacheInfo) {
-                cacheInfo.lastUsed = Date.now();
-                cacheInfo.usageCount++;
-                this.commandCache.set(name, cacheInfo);
+    async getCommand(name) {
+        try {
+            // Ensure commands are loaded
+            if (!this.initialized) {
+                await this.loadCommandHandlers();
             }
-        } else {
-            console.log(`Command '${name}' not found`);
+
+            const command = this.commands.get(name);
+            if (command) {
+                logger.info(`Command '${name}' found in category '${command.category}'`);
+                const cacheInfo = this.commandCache.get(name);
+                if (cacheInfo) {
+                    cacheInfo.lastUsed = Date.now();
+                    cacheInfo.usageCount++;
+                    this.commandCache.set(name, cacheInfo);
+                }
+                return command;
+            } else {
+                logger.warn(`Command '${name}' not found`);
+                return null;
+            }
+        } catch (err) {
+            logger.error('Error getting command:', err);
+            return null;
         }
-        return command;
     }
 
-    hasPermission(sender, requiredPermissions) {
-        // For now, allow all users
+    async hasPermission(sender, requiredPermissions) {
+        // For now, all users have basic permissions
         return true;
     }
 

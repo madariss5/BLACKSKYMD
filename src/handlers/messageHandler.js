@@ -2,6 +2,10 @@ const { processCommand } = require('./commandHandler');
 const logger = require('../utils/logger');
 const config = require('../config/config');
 
+// Cache for help messages to prevent spam
+const helpMessageCache = new Map();
+const HELP_MESSAGE_COOLDOWN = 5 * 60 * 1000; // 5 minutes
+
 async function messageHandler(sock, message) {
     try {
         // Extract message content with support for different message types
@@ -14,21 +18,39 @@ async function messageHandler(sock, message) {
 
         const sender = message.key.remoteJid;
         const isGroup = sender.endsWith('@g.us');
-        const prefix = config.bot.prefix;
+        const prefix = config.bot.prefix || '.';
 
-        // Only process messages that start with the command prefix
+        // Check if message starts with prefix
         if (messageContent.startsWith(prefix)) {
             const commandText = messageContent.slice(prefix.length).trim();
             if (commandText) {
-                await processCommand(sock, message, commandText);
+                logger.info(`Processing command: ${commandText} from ${sender}`);
+                try {
+                    await processCommand(sock, message, commandText);
+                } catch (err) {
+                    logger.error('Error processing command:', err);
+                    await sock.sendMessage(sender, { 
+                        text: '❌ Error processing command. Please try again.' 
+                    });
+                }
             }
-            return;
-        }
+        } else if (!isGroup && !message.key.fromMe) {
+            // Check if we've sent a help message recently
+            const now = Date.now();
+            const lastHelpMessage = helpMessageCache.get(sender);
 
-        // Only respond to private messages on first interaction
-        if (!isGroup && !messageContent.startsWith(prefix)) {
-            const response = `To use the bot, start your message with ${prefix}\nFor example: ${prefix}help`;
-            await sock.sendMessage(sender, { text: response });
+            if (!lastHelpMessage || (now - lastHelpMessage) > HELP_MESSAGE_COOLDOWN) {
+                helpMessageCache.set(sender, now);
+                const response = `Welcome! To use the bot, start your message with ${prefix}\nExample: ${prefix}help`;
+                await sock.sendMessage(sender, { text: response });
+
+                // Clean up old cache entries
+                for (const [key, timestamp] of helpMessageCache.entries()) {
+                    if (now - timestamp > HELP_MESSAGE_COOLDOWN * 2) { //Clean up older entries to prevent memory leaks.
+                        helpMessageCache.delete(key);
+                    }
+                }
+            }
         }
 
     } catch (err) {

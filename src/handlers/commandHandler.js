@@ -9,37 +9,37 @@ async function processCommand(sock, message, commandText) {
         const [commandName, ...args] = commandText.trim().split(' ');
         const sender = message.key.remoteJid;
 
-        console.log(`\nProcessing command: ${commandName} with args:`, args);
+        logger.info(`Processing command: ${commandName} with args:`, args);
 
         if (!commandName) {
-            console.log('Empty command received');
+            logger.warn('Empty command received');
             return;
         }
 
         // Get command from loader
-        const command = commandLoader.getCommand(commandName);
+        const command = await commandLoader.getCommand(commandName);
         if (!command) {
-            console.log(`Command '${commandName}' not found in registry`);
+            logger.warn(`Command '${commandName}' not found`);
             await sock.sendMessage(sender, { 
-                text: `Unknown command: ${commandName}\nUse .help to see available commands.` 
+                text: `❌ Unknown command: ${commandName}\nUse ${process.env.BOT_PREFIX || '.'}help to see available commands.` 
             });
             return;
         }
 
-        console.log(`Executing command '${commandName}' from category '${command.category}'`);
+        logger.info(`Found command '${commandName}' in category '${command.category}'`);
 
         // Check if command is disabled
         if (command.config?.disabled) {
             await sock.sendMessage(sender, {
-                text: `This command is currently disabled.`
+                text: `⚠️ This command is currently disabled.`
             });
             return;
         }
 
         // Check permissions
-        if (!commandLoader.hasPermission(sender, command.config?.permissions || ['user'])) {
+        if (!await commandLoader.hasPermission(sender, command.config?.permissions || ['user'])) {
             await sock.sendMessage(sender, {
-                text: 'You do not have permission to use this command.'
+                text: '⛔ You do not have permission to use this command.'
             });
             return;
         }
@@ -55,7 +55,7 @@ async function processCommand(sock, message, commandText) {
             if (now < expirationTime) {
                 const timeLeft = (expirationTime - now) / 1000;
                 await sock.sendMessage(sender, { 
-                    text: `Please wait ${timeLeft.toFixed(1)} seconds before using ${commandName} again.`
+                    text: `⏳ Please wait ${timeLeft.toFixed(1)} seconds before using ${commandName} again.`
                 });
                 return;
             }
@@ -68,12 +68,12 @@ async function processCommand(sock, message, commandText) {
         }
         cooldowns.get(commandName).set(sender, now);
 
-        console.log('About to execute command...');
+        logger.info('Executing command...');
 
         // Execute command
         await command.execute(sock, message, args);
 
-        console.log('Command executed successfully');
+        logger.info('Command executed successfully');
 
         // Remove cooldown after command execution
         setTimeout(() => {
@@ -87,13 +87,13 @@ async function processCommand(sock, message, commandText) {
         }, cooldownAmount);
 
     } catch (err) {
-        console.error('Error processing command:', err);
+        logger.error('Error processing command:', err);
         try {
             await sock.sendMessage(message.key.remoteJid, { 
-                text: 'Error processing command. Please try again later.' 
+                text: '❌ Error processing command. Please try again.' 
             });
         } catch (sendErr) {
-            console.error('Failed to send error message:', sendErr);
+            logger.error('Failed to send error message:', sendErr);
         }
     }
 }
