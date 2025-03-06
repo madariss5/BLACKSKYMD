@@ -3,6 +3,7 @@ const qrcode = require('qrcode-terminal');
 const logger = require('./utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
+const { messageHandler } = require('./handlers/messageHandler');
 
 let sock = null;
 let retryCount = 0;
@@ -113,10 +114,22 @@ async function startConnection() {
                 retryCount = 0;
 
                 try {
-                    const ownerJid = `${process.env.OWNER_NUMBER}@s.whatsapp.net`;
-                    await sock.sendMessage(ownerJid, {
+                    // Format owner number properly
+                    let ownerNumber = process.env.OWNER_NUMBER;
+                    if (!ownerNumber.includes('@s.whatsapp.net')) {
+                        // Remove any non-numeric characters
+                        ownerNumber = ownerNumber.replace(/[^\d]/g, '');
+                        // Ensure the number starts with the country code
+                        if (!ownerNumber.startsWith('1') && !ownerNumber.startsWith('91')) {
+                            ownerNumber = '1' + ownerNumber; // Default to US format if no country code
+                        }
+                        ownerNumber = `${ownerNumber}@s.whatsapp.net`;
+                    }
+
+                    await sock.sendMessage(ownerNumber, {
                         text: '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 Bot is now connected!'
                     });
+                    logger.info('Startup message sent to owner');
                 } catch (err) {
                     logger.warn('Failed to send owner notification:', err);
                 }
@@ -125,7 +138,7 @@ async function startConnection() {
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
-                                     statusCode !== DisconnectReason.forbidden;
+                                         statusCode !== DisconnectReason.forbidden;
 
                 logger.warn('Connection closed:', {
                     code: statusCode,
@@ -157,6 +170,17 @@ async function startConnection() {
                         process.exit(1);
                     }
                 }
+            }
+        });
+
+        sock.ev.on('messages.upsert', async ({ messages }) => {
+            try {
+                const message = messages[0];
+                if (!message?.message) return; // Skip if no message content
+
+                await messageHandler(sock, message);
+            } catch (err) {
+                logger.error('Error processing message:', err);
             }
         });
 

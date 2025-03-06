@@ -24,7 +24,8 @@ async function messageHandler(sock, message) {
         // Check if message is a command
         if (messageContent.startsWith(prefix)) {
             logger.info(`Processing command: ${messageContent}`);
-            await processCommand(sock, message, messageContent.slice(prefix.length));
+            const commandText = messageContent.slice(prefix.length).trim();
+            await processCommand(sock, message, commandText);
             return;
         }
 
@@ -34,9 +35,13 @@ async function messageHandler(sock, message) {
     } catch (err) {
         logger.error('Error in message handler:', err);
         // Send error message to user
-        await sock.sendMessage(message.key.remoteJid, { 
-            text: 'Sorry, there was an error processing your message. Please try again.' 
-        }).catch(err => logger.error('Failed to send error message:', err));
+        try {
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: 'Sorry, there was an error processing your message. Please try again.' 
+            });
+        } catch (sendErr) {
+            logger.error('Failed to send error message:', sendErr);
+        }
     }
 }
 
