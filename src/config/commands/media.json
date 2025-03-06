@@ -2,6 +2,34 @@
   "category": "media",
   "commands": [
     {
+      "name": "play",
+      "description": "Play audio from file or URL",
+      "usage": ".play [url] or reply to audio",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "sticker",
+      "description": "Create sticker from image/video",
+      "usage": ".sticker (reply to media)",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "toimg",
+      "description": "Convert sticker to image",
+      "usage": ".toimg (reply to sticker)",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "tovideo",
+      "description": "Convert animated sticker to video",
+      "usage": ".tovideo (reply to animated sticker)",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
       "name": "enhance",
       "description": "Enhance image quality",
       "usage": ".enhance",
@@ -22,6 +50,54 @@
       "usage": ".reverse (reply to video)",
       "example": ".reverse",
       "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "ytmp4",
+      "description": "Download YouTube video",
+      "usage": ".ytmp4 [url]",
+      "example": ".ytmp4 https://youtube.com/watch?v=xxx",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "ytmp3",
+      "description": "Download YouTube audio",
+      "usage": ".ytmp3 [url]",
+      "example": ".ytmp3 https://youtube.com/watch?v=xxx",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "video",
+      "description": "Play YouTube video",
+      "usage": ".video [query]",
+      "example": ".video despacito",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "emojimix",
+      "description": "Mix two emojis together",
+      "usage": ".emojimix [emoji1]+[emoji2]",
+      "example": ".emojimix 😀+😭",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "ttp",
+      "description": "Convert text to sticker",
+      "usage": ".ttp [text]",
+      "example": ".ttp Hello World",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "attp",
+      "description": "Convert text to animated sticker",
+      "usage": ".attp [text]",
+      "example": ".attp Hello World",
+      "cooldown": 5,
       "permissions": ["user"]
     }
   ]
