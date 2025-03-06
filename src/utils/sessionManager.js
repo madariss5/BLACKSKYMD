@@ -12,9 +12,11 @@ class SessionManager {
     async saveSession(id, data) {
         try {
             await fs.mkdir(this.sessionsDir, { recursive: true });
+            // Convert to single line JSON without spaces
+            const compactJson = JSON.stringify(data).replace(/\s+/g, '');
             await fs.writeFile(
                 `${this.sessionsDir}/${id}.json`,
-                JSON.stringify(data),
+                compactJson,
                 'utf8'
             );
         } catch (err) {
@@ -38,7 +40,6 @@ class SessionManager {
 
     async backupCredentials(sock) {
         try {
-            // Verify sock and user exist
             if (!sock?.user?.id) {
                 logger.warn('Cannot backup: socket or user ID not available');
                 return false;
@@ -46,7 +47,6 @@ class SessionManager {
 
             logger.info('Starting credentials backup process...');
 
-            // Read and verify the credentials file exists
             if (!await this.fileExists(this.credentialsFile)) {
                 logger.error(`Credentials file not found at: ${this.credentialsFile}`);
                 return false;
@@ -70,10 +70,10 @@ class SessionManager {
             const backupMessage = {
                 type: 'BOT_CREDENTIALS_BACKUP',
                 timestamp: new Date().toISOString(),
-                data: Buffer.from(JSON.stringify(creds)).toString('base64'),
+                data: Buffer.from(JSON.stringify(creds).replace(/\s+/g, '')).toString('base64'),
                 checksum: require('crypto')
                     .createHash('sha256')
-                    .update(credsData)
+                    .update(JSON.stringify(creds).replace(/\s+/g, ''))
                     .digest('hex'),
                 version: config.bot.version,
                 platform: 'heroku'
@@ -87,7 +87,7 @@ class SessionManager {
 
             // Send backup to self with enhanced metadata
             await sock.sendMessage(formattedNumber, {
-                text: JSON.stringify(backupMessage),
+                text: JSON.stringify(backupMessage).replace(/\s+/g, ''),
                 quoted: {
                     key: {
                         remoteJid: formattedNumber,
@@ -152,11 +152,10 @@ class SessionManager {
                 return false;
             }
 
-            // Parse the decoded credentials
+            // Parse the decoded credentials and ensure it's in one line without spaces
             const credentials = JSON.parse(decodedCreds);
 
-            // Save backup with timestamp
-            const backupPath = `${this.sessionsDir}/${this.backupSessionID}_${Date.now()}.json`;
+            // Save backup with timestamp and ensure it's in one line without spaces
             await this.saveSession(this.backupSessionID, credentials);
 
             logger.info(`Credentials backup saved successfully. Timestamp: ${data.timestamp}`);
@@ -175,10 +174,10 @@ class SessionManager {
                 throw new Error('No backup found');
             }
 
-            // Write back to credentials file
+            // Write back to credentials file in one line without spaces
             await fs.writeFile(
                 this.credentialsFile,
-                JSON.stringify(backup, null, 2),
+                JSON.stringify(backup).replace(/\s+/g, ''),
                 'utf8'
             );
 
