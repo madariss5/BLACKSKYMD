@@ -30,11 +30,11 @@ async function startBot() {
         });
 
         // Start HTTP server with proper error handling
-        const server = app.listen(config.server.port, config.server.host, () => {
-            logger.info(`HTTP server listening on port ${config.server.port}`);
+        const server = app.listen(5000, '0.0.0.0', () => {
+            logger.info(`HTTP server listening on port 5000`);
         }).on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
-                logger.error('Port is already in use. Make sure no other instance is running.');
+                logger.error('Port 5000 is already in use. Make sure no other instance is running.');
                 process.exit(1);
             } else {
                 logger.error('Failed to start HTTP server:', err);
