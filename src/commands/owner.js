@@ -80,6 +80,7 @@ const ownerCommands = {
         // Implement profile picture change
         await sock.sendMessage(remoteJid, { text: '🖼️ Updating profile picture...' });
     },
+
     async setstatus(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         const status = args.join(' ');
@@ -90,7 +91,6 @@ const ownerCommands = {
         // Implement status change
         await sock.sendMessage(remoteJid, { text: `✅ Status updated` });
     },
-
 
     // Security Management
     async ban(sock, message, args) {
@@ -142,6 +142,7 @@ const ownerCommands = {
         // Implement blacklist system
         await sock.sendMessage(remoteJid, { text: `✅ Blacklist ${action} completed` });
     },
+
     async globalban(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         const [action, userId, ...reason] = args;
@@ -273,51 +274,6 @@ const ownerCommands = {
         // Implement API key removal
         await sock.sendMessage(remoteJid, { text: `✅ Removed API key for ${service}` });
     },
-
-    async config(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, key, value] = args;
-        if (!action || !['get', 'set', 'list'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !config <get|set|list> [key] [value]' });
-            return;
-        }
-        // Implement configuration management
-        await sock.sendMessage(remoteJid, { text: `✅ Configuration ${action} completed` });
-    },
-
-    async autoresponder(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, trigger, response] = args;
-        if (!action || !['add', 'remove', 'list'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !autoresponder <add|remove|list> [trigger] [response]' });
-            return;
-        }
-        // Implement auto-responder system
-        await sock.sendMessage(remoteJid, { text: `✅ Auto-responder ${action} completed` });
-    },
-
-    async welcome(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, messageText] = args;
-        if (!action || !['set', 'view', 'reset'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !welcome <set|view|reset> [message]' });
-            return;
-        }
-        // Implement welcome message system
-        await sock.sendMessage(remoteJid, { text: `✅ Welcome message ${action} completed` });
-    },
-
-    async goodbye(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, messageText] = args;
-        if (!action || !['set', 'view', 'reset'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !goodbye <set|view|reset> [message]' });
-            return;
-        }
-        // Implement goodbye message system
-        await sock.sendMessage(remoteJid, { text: `✅ Goodbye message ${action} completed` });
-    },
-
     async serverinfo(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         const info = {
