@@ -223,15 +223,162 @@ const utilityCommands = {
         // TODO: Implement WHOIS lookup
         await sock.sendMessage(sender, { text: `Looking up WHOIS for: ${domain}` });
     },
+    async ocr(sock, sender) {
+        // TODO: Implement optical character recognition
+        await sock.sendMessage(sender, { text: 'OCR feature coming soon!' });
+    },
+
+    async qrgen(sock, sender, args) {
+        const text = args.join(' ');
+        if (!text) {
+            await sock.sendMessage(sender, { text: 'Please provide text to generate QR code' });
+            return;
+        }
+        // TODO: Implement QR code generation
+        await sock.sendMessage(sender, { text: 'Generating QR code...' });
+    },
+
+    async screenshot(sock, sender, args) {
+        const url = args[0];
+        if (!url) {
+            await sock.sendMessage(sender, { text: 'Please provide a URL to screenshot' });
+            return;
+        }
+        // TODO: Implement website screenshot
+        await sock.sendMessage(sender, { text: 'Taking screenshot...' });
+    },
+
+    async color(sock, sender, args) {
+        const colorCode = args[0];
+        if (!colorCode) {
+            await sock.sendMessage(sender, { text: 'Please provide a color code (hex/rgb)' });
+            return;
+        }
+        // TODO: Implement color information
+        await sock.sendMessage(sender, { text: 'Getting color information...' });
+    },
+
+    async lyrics(sock, sender, args) {
+        const song = args.join(' ');
+        if (!song) {
+            await sock.sendMessage(sender, { text: 'Please provide a song name' });
+            return;
+        }
+        // TODO: Implement lyrics search
+        await sock.sendMessage(sender, { text: 'Searching lyrics...' });
+    },
+
+    async movie(sock, sender, args) {
+        const title = args.join(' ');
+        if (!title) {
+            await sock.sendMessage(sender, { text: 'Please provide a movie title' });
+            return;
+        }
+        // TODO: Implement movie information search
+        await sock.sendMessage(sender, { text: 'Searching movie info...' });
+    },
+
+    async anime(sock, sender, args) {
+        const title = args.join(' ');
+        if (!title) {
+            await sock.sendMessage(sender, { text: 'Please provide an anime title' });
+            return;
+        }
+        // TODO: Implement anime information search
+        await sock.sendMessage(sender, { text: 'Searching anime info...' });
+    },
+
+    async spotify(sock, sender, args) {
+        const track = args.join(' ');
+        if (!track) {
+            await sock.sendMessage(sender, { text: 'Please provide a track name' });
+            return;
+        }
+        // TODO: Implement Spotify track search
+        await sock.sendMessage(sender, { text: 'Searching Spotify...' });
+    },
+
+    async urban(sock, sender, args) {
+        const term = args.join(' ');
+        if (!term) {
+            await sock.sendMessage(sender, { text: 'Please provide a term to look up' });
+            return;
+        }
+        // TODO: Implement Urban Dictionary lookup
+        await sock.sendMessage(sender, { text: 'Searching Urban Dictionary...' });
+    },
+
+    async crypto(sock, sender, args) {
+        const coin = args[0]?.toLowerCase() || 'bitcoin';
+        // TODO: Implement cryptocurrency price check
+        await sock.sendMessage(sender, { text: `Getting ${coin} price...` });
+    },
+
+    async stocks(sock, sender, args) {
+        const symbol = args[0]?.toUpperCase();
+        if (!symbol) {
+            await sock.sendMessage(sender, { text: 'Please provide a stock symbol' });
+            return;
+        }
+        // TODO: Implement stock price check
+        await sock.sendMessage(sender, { text: `Getting ${symbol} stock price...` });
+    },
+
     async reminder(sock, sender, args) {
         if (args.length < 2) {
             await sock.sendMessage(sender, { 
-                text: 'Usage: !reminder [time] [message]' 
+                text: 'Usage: !reminder [time] [message]\nExample: !reminder 30m Check laundry' 
             });
             return;
         }
         // TODO: Implement reminder system
-        await sock.sendMessage(sender, { text: 'Reminder feature coming soon!' });
+        await sock.sendMessage(sender, { text: 'Setting reminder...' });
+    },
+
+    async countdown(sock, sender, args) {
+        const event = args.join(' ');
+        if (!event) {
+            await sock.sendMessage(sender, { text: 'Please provide an event name and date' });
+            return;
+        }
+        // TODO: Implement countdown timer
+        await sock.sendMessage(sender, { text: 'Starting countdown...' });
+    },
+
+    async poll(sock, sender, args) {
+        const [question, ...options] = args.join(' ').split('|');
+        if (!question || options.length < 2) {
+            await sock.sendMessage(sender, { 
+                text: 'Usage: !poll Question | Option1 | Option2 | ...' 
+            });
+            return;
+        }
+        // TODO: Implement poll creation
+        await sock.sendMessage(sender, { text: 'Creating poll...' });
+    },
+
+    async todo(sock, sender, args) {
+        const [action, ...item] = args;
+        if (!action || !['add', 'remove', 'list'].includes(action)) {
+            await sock.sendMessage(sender, { 
+                text: 'Usage: !todo <add|remove|list> [item]' 
+            });
+            return;
+        }
+        // TODO: Implement todo list
+        await sock.sendMessage(sender, { text: 'Managing todo list...' });
+    },
+
+    async notes(sock, sender, args) {
+        const [action, ...content] = args;
+        if (!action || !['add', 'view', 'delete'].includes(action)) {
+            await sock.sendMessage(sender, { 
+                text: 'Usage: !notes <add|view|delete> [content]' 
+            });
+            return;
+        }
+        // TODO: Implement notes system
+        await sock.sendMessage(sender, { text: 'Managing notes...' });
     }
 };
 

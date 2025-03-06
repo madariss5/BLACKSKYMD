@@ -140,6 +140,118 @@
       "usage": "!whois [domain]",
       "cooldown": 10,
       "permissions": ["user"]
+    },
+    {
+      "name": "ocr",
+      "description": "Extract text from images",
+      "usage": "!ocr (reply to image)",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "qrgen",
+      "description": "Generate QR code",
+      "usage": "!qrgen [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "screenshot",
+      "description": "Take website screenshot",
+      "usage": "!screenshot [url]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "color",
+      "description": "Get color information",
+      "usage": "!color [hex/rgb]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "lyrics",
+      "description": "Search song lyrics",
+      "usage": "!lyrics [song name]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "movie",
+      "description": "Get movie information",
+      "usage": "!movie [title]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "anime",
+      "description": "Get anime information",
+      "usage": "!anime [title]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "spotify",
+      "description": "Search Spotify tracks",
+      "usage": "!spotify [track name]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "urban",
+      "description": "Look up Urban Dictionary",
+      "usage": "!urban [term]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "crypto",
+      "description": "Check cryptocurrency prices",
+      "usage": "!crypto [coin]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "stocks",
+      "description": "Check stock prices",
+      "usage": "!stocks [symbol]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "reminder",
+      "description": "Set a reminder",
+      "usage": "!reminder [time] [message]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "countdown",
+      "description": "Create countdown timer",
+      "usage": "!countdown [event] [date]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "poll",
+      "description": "Create a poll",
+      "usage": "!poll [question] | [option1] | [option2]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "todo",
+      "description": "Manage todo list",
+      "usage": "!todo <add|remove|list> [item]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "notes",
+      "description": "Manage personal notes",
+      "usage": "!notes <add|view|delete> [content]",
+      "cooldown": 5,
+      "permissions": ["user"]
     }
   ]
 }

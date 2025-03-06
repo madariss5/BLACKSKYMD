@@ -1,0 +1,33 @@
+{
+  "category": "nsfw",
+  "commands": [
+    {
+      "name": "togglensfw",
+      "description": "Toggle NSFW content filter for the group",
+      "usage": "!togglensfw <on|off>",
+      "cooldown": 30,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "isnsfw",
+      "description": "Check if content is NSFW",
+      "usage": "!isnsfw [image_url]",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "nsfwsettings",
+      "description": "Configure NSFW filter settings",
+      "usage": "!nsfwsettings [setting] [value]",
+      "cooldown": 30,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "nsfwstats",
+      "description": "View NSFW filter statistics",
+      "usage": "!nsfwstats",
+      "cooldown": 30,
+      "permissions": ["admin"]
+    }
+  ]
+}
