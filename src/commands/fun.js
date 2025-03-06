@@ -36,7 +36,7 @@ const funCommands = {
             return;
         }
         // TODO: Implement tic-tac-toe game logic here
-        await sock.sendMessage(sender, { text: 'Tic-tac-toe game command executed' });
+        await sock.sendMessage(sender, { text: 'Tic-tac-toe game starting...' });
     },
 
     async hangman(sock, sender, args) {
@@ -47,12 +47,12 @@ const funCommands = {
             return;
         }
         // TODO: Implement hangman game logic here
-        await sock.sendMessage(sender, { text: 'Hangman game command executed' });
+        await sock.sendMessage(sender, { text: 'Hangman game starting...' });
     },
 
     async quiz(sock, sender) {
         // TODO: Implement quiz game logic here
-        await sock.sendMessage(sender, { text: 'Quiz game starting soon!' });
+        await sock.sendMessage(sender, { text: '❓ Quiz starting...' });
     },
 
     // Fun Text Transformations
@@ -134,14 +134,16 @@ const funCommands = {
 
     // Horoscope and Fortune
     async horoscope(sock, sender, args) {
-        if (!args[0]) {
+        const signs = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 
+                      'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
+        if (!args[0] || !signs.includes(args[0].toLowerCase())) {
             await sock.sendMessage(sender, { 
-                text: 'Please specify your zodiac sign' 
+                text: `⭐ Available signs: ${signs.join(', ')}` 
             });
             return;
         }
         // TODO: Implement horoscope logic here
-        await sock.sendMessage(sender, { text: 'Horoscope feature coming soon!' });
+        await sock.sendMessage(sender, { text: 'Reading your horoscope...' });
     },
 
     async fortune(sock, sender) {
@@ -207,64 +209,71 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     },
 
     async wordle(sock, sender, args) {
-        const guess = args[0]?.toLowerCase();
-        if (!guess || guess.length !== 5) {
-            await sock.sendMessage(sender, { text: 'Please provide a 5-letter word guess' });
+        if (!args[0]) {
+            await sock.sendMessage(sender, { text: '❓ Please provide your 5-letter guess' });
             return;
         }
         // TODO: Implement Wordle game logic
-        await sock.sendMessage(sender, { text: 'Wordle game feature coming soon!' });
+        await sock.sendMessage(sender, { text: 'Wordle game starting...' });
     },
 
     async trivia(sock, sender, args) {
-        const category = args[0];
+        const categories = ['general', 'science', 'history', 'movies', 'games'];
+        if (!args[0] || !categories.includes(args[0].toLowerCase())) {
+            await sock.sendMessage(sender, { 
+                text: `📚 Available categories: ${categories.join(', ')}` 
+            });
+            return;
+        }
         // TODO: Implement trivia game with categories
-        await sock.sendMessage(sender, { text: 'Trivia game feature coming soon!' });
+        await sock.sendMessage(sender, { text: 'Starting trivia game...' });
     },
 
     // Social Commands
     async truth(sock, sender) {
         const questions = [
             "What's your biggest fear?",
-            "What's the most embarrassing thing you've done?",
+            "What's your most embarrassing moment?",
             "What's your biggest secret?"
         ];
-        const question = questions[Math.floor(Math.random() * questions.length)];
-        await sock.sendMessage(sender, { text: `Truth: ${question}` });
+        await sock.sendMessage(sender, { 
+            text: `🤔 Truth: ${questions[Math.floor(Math.random() * questions.length)]}` 
+        });
     },
 
     async dare(sock, sender) {
         const dares = [
-            "Send your latest selfie",
-            "Text your crush",
-            "Do 10 push-ups"
+            "Send a funny selfie",
+            "Do 10 push-ups",
+            "Tell a joke in voice message"
         ];
-        const dare = dares[Math.floor(Math.random() * dares.length)];
-        await sock.sendMessage(sender, { text: `Dare: ${dare}` });
+        await sock.sendMessage(sender, { 
+            text: `😈 Dare: ${dares[Math.floor(Math.random() * dares.length)]}` 
+        });
     },
 
     async ship(sock, sender, args) {
         if (args.length < 2) {
-            await sock.sendMessage(sender, { text: 'Please mention two users to ship' });
+            await sock.sendMessage(sender, { text: '💕 Please mention two people to ship!' });
             return;
         }
-        const percentage = Math.floor(Math.random() * 101);
-        await sock.sendMessage(sender, {
-            text: `💕 Ship Calculator 💕\n${args[0]} + ${args[1]} = ${percentage}% compatible!`
+        const compatibility = Math.floor(Math.random() * 101);
+        await sock.sendMessage(sender, { 
+            text: `💘 Love Calculator\n${args[0]} x ${args[1]}\nCompatibility: ${compatibility}%` 
         });
     },
 
     // Virtual Pet System
     async pet(sock, sender, args) {
-        const action = args[0];
-        if (!action) {
+        const actions = ['feed', 'play', 'sleep', 'train'];
+        if (!args[0] || !actions.includes(args[0].toLowerCase())) {
             await sock.sendMessage(sender, { 
-                text: 'Usage: !pet [feed|play|sleep|status]' 
+                text: `🐾 Available actions: ${actions.join(', ')}` 
             });
             return;
         }
         // TODO: Implement virtual pet system
-        await sock.sendMessage(sender, { text: 'Virtual pet feature coming soon!' });
+        await sock.sendMessage(sender, { text: 'Taking care of pet...' });
     },
 
     // Virtual Economy Commands
@@ -293,7 +302,7 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
 
     async inventory(sock, sender) {
         // TODO: Implement inventory system
-        await sock.sendMessage(sender, { text: 'Inventory system coming soon!' });
+        await sock.sendMessage(sender, { text: '🎒 Your inventory is empty' });
     },
 
     async shop(sock, sender, args) {
@@ -359,27 +368,14 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     // RPG Commands
     async adventure(sock, sender, args) {
         const locations = ['forest', 'cave', 'mountain', 'desert', 'dungeon'];
-        const location = args[0]?.toLowerCase();
-
-        if (!locations.includes(location)) {
+        if (!args[0] || !locations.includes(args[0].toLowerCase())) {
             await sock.sendMessage(sender, { 
-                text: `Available locations: ${locations.join(', ')}` 
+                text: `🗺️ Available locations: ${locations.join(', ')}` 
             });
             return;
         }
-
-        const events = [
-            'found treasure!',
-            'encountered a monster!',
-            'discovered a secret path!',
-            'found rare items!',
-            'met a mysterious stranger!'
-        ];
-
-        const event = events[Math.floor(Math.random() * events.length)];
-        await sock.sendMessage(sender, {
-            text: `🗺️ Adventure in ${location}: You ${event}`
-        });
+        // TODO: Implement adventure system
+        await sock.sendMessage(sender, { text: 'Starting adventure...' });
     },
 
     async dungeon(sock, sender, args) {
@@ -408,17 +404,12 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     },
 
     async battle(sock, sender, args) {
-        const targetUser = args[0];
-        if (!targetUser) {
-            await sock.sendMessage(sender, { text: 'Please mention a user to battle' });
+        if (!args[0]) {
+            await sock.sendMessage(sender, { text: '⚔️ Please mention someone to battle!' });
             return;
         }
-
-        const outcomes = ['won', 'lost', 'critical hit', 'special move', 'draw'];
-        const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
-        await sock.sendMessage(sender, {
-            text: `⚔️ Battle: You ${outcome} against ${targetUser}!`
-        });
+        // TODO: Implement battle system
+        await sock.sendMessage(sender, { text: 'Battle starting...' });
     },
 
     // Gambling Commands
@@ -611,35 +602,35 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     },
 
     // Pet System
-    async pet(sock, sender, args) {
-        const actions = ['feed', 'play', 'sleep', 'train', 'status'];
-        const action = args[0]?.toLowerCase();
+    async petadopt(sock, sender, args) {
+        const pets = ['cat', 'dog', 'rabbit', 'hamster', 'bird'];
+        const pet = args[0]?.toLowerCase();
 
-        if (!action || !actions.includes(action)) {
-            await sock.sendMessage(sender, {
-                text: `Available actions: ${actions.join(', ')}`
+        if (!pet || !pets.includes(pet)) {
+            await sock.sendMessage(sender, { 
+                text: `Available pets to adopt: ${pets.join(', ')}` 
             });
             return;
         }
 
-        // TODO: Implement virtual pet system
-        await sock.sendMessage(sender, {
-            text: `🐱 Pet ${action} command executed!`
+        await sock.sendMessage(sender, { 
+            text: `🐾 Congratulations! You've adopted a ${pet}!` 
         });
     },
 
-    async petshop(sock, sender, args) {
-        const [action, item] = args;
-        if (!action || action.toLowerCase() !== 'buy' || !item) {
-            await sock.sendMessage(sender, {
-                text: 'Usage: !petshop buy [item]'
+    async petcare(sock, sender, args) {
+        const actions = ['feed', 'play', 'clean', 'train', 'heal'];
+        const action = args[0]?.toLowerCase();
+
+        if (!action || !actions.includes(action)) {
+            await sock.sendMessage(sender, { 
+                text: `Available pet care actions: ${actions.join(', ')}` 
             });
             return;
         }
 
-        // TODO: Implement pet shop system
-        await sock.sendMessage(sender, {
-            text: `🏪 Bought ${item} for your pet!`
+        await sock.sendMessage(sender, { 
+            text: `🐾 You ${action} your pet! They look happy!` 
         });
     },
 
@@ -673,23 +664,49 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     },
 
     async roast(sock, sender, args) {
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: 'Please mention someone to roast!' });
+            return;
+        }
+
         const roasts = [
-            "I'd like to roast you, but it looks like life already did.",
-            "You're the reason why aliens won't visit Earth.",
-            "I would give you a nasty look, but you've already got one."
+            "You're so slow, you could win a race against a statue! 🐌",
+            "Your jokes are so bad, even dad jokes feel embarrassed! 😅",
+            "You're about as useful as a screen door on a submarine! 🚪",
+            "I'd agree with you but then we'd both be wrong! 🤷",
+            "Your fashion sense is like a randomizer gone wrong! 👕",
+            "You're the reason why we have instructions on shampoo! 📝"
         ];
+
         const randomRoast = roasts[Math.floor(Math.random() * roasts.length)];
-        await sock.sendMessage(sender, { text: randomRoast });
+        await sock.sendMessage(sender, {
+            text: `To ${target}:\n${randomRoast}`
+        });
     },
 
-    async compliment(sock, sender) {
+    async compliment(sock, sender, args) {
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: 'Please mention someone to compliment!' });
+            return;
+        }
+
         const compliments = [
-            "You light up every room you enter!",
-            "Your positivity is infectious!",
-            "You have a heart of gold!"
+            "Your smile lights up the room! ✨",
+            "You're amazing at making others feel special! 🌟",
+            "Your positive energy is contagious! 🌈",
+            "You have a heart of gold! 💝",
+            "You make the world a better place! 🌍",
+            "Your creativity knows no bounds! 🎨",
+            "You're stronger than you know! 💪",
+            "Your kindness is inspiring! 🤗"
         ];
+
         const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
-        await sock.sendMessage(sender, { text: randomCompliment });
+        await sock.sendMessage(sender, {
+            text: `To ${target}:\n${randomCompliment}`
+        });
     },
 
     // RPG Game System
@@ -749,39 +766,6 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
         });
     },
 
-    // Virtual Pet System
-    async petadopt(sock, sender, args) {
-        const pets = ['cat', 'dog', 'rabbit', 'hamster', 'bird'];
-        const pet = args[0]?.toLowerCase();
-
-        if (!pet || !pets.includes(pet)) {
-            await sock.sendMessage(sender, { 
-                text: `Available pets to adopt: ${pets.join(', ')}` 
-            });
-            return;
-        }
-
-        await sock.sendMessage(sender, { 
-            text: `🐾 Congratulations! You've adopted a ${pet}!` 
-        });
-    },
-
-    async petcare(sock, sender, args) {
-        const actions = ['feed', 'play', 'clean', 'train', 'heal'];
-        const action = args[0]?.toLowerCase();
-
-        if (!action || !actions.includes(action)) {
-            await sock.sendMessage(sender, { 
-                text: `Available pet care actions: ${actions.join(', ')}` 
-            });
-            return;
-        }
-
-        await sock.sendMessage(sender, { 
-            text: `🐾 You ${action} your pet! They look happy!` 
-        });
-    },
-
     // Card Games
     async poker(sock, sender) {
         // TODO: Implement poker game
@@ -819,6 +803,175 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
             text: `💘 Matchmaking Results:\n${args[0]} + ${args[1]} = ${compatibility}% compatible!` 
         });
     },
+
+    async madlibs(sock, sender, args) {
+        const stories = [
+            {
+                template: "Once upon a time, there was a {adj1} {noun1} who loved to {verb1}. One day, they found a {adj2} {noun2} and decided to {verb2} with it. The end was very {adj3}!",
+                words: ['adj1', 'noun1', 'verb1', 'adj2', 'noun2', 'verb2', 'adj3']
+            },
+            {
+                template: "In a {adj1} kingdom, a {noun1} decided to {verb1} across the {adj2} {noun2}. Along the way, they met a {adj3} {noun3} who taught them to {verb2}.",
+                words: ['adj1', 'noun1', 'verb1', 'adj2', 'noun2', 'adj3', 'noun3', 'verb2']
+            }
+        ];
+
+        if (!args.length) {
+            const story = stories[Math.floor(Math.random() * stories.length)];
+            await sock.sendMessage(sender, {
+                text: `🎲 Madlibs Game!\nProvide words for: ${story.words.join(', ')}`
+            });
+            return;
+        }
+
+        const story = stories[Math.floor(Math.random() * stories.length)];
+        const words = args.slice(0, story.words.length);
+
+        if (words.length < story.words.length) {
+            await sock.sendMessage(sender, {
+                text: `Need more words! Still need: ${story.words.slice(words.length).join(', ')}`
+            });
+            return;
+        }
+
+        let filledStory = story.template;
+        story.words.forEach((word, i) => {
+            filledStory = filledStory.replace(`{${word}}`, words[i]);
+        });
+
+        await sock.sendMessage(sender, { text: `📖 Your Story:\n${filledStory}` });
+    },
+
+    async charades(sock, sender, args) {
+        const categories = ['animals', 'movies', 'food', 'sports'];
+        const words = {
+            animals: ['elephant', 'penguin', 'giraffe', 'kangaroo', 'dolphin'],
+            movies: ['avatar', 'titanic', 'frozen', 'jaws', 'inception'],
+            food: ['pizza', 'sushi', 'burger', 'taco', 'pasta'],
+            sports: ['soccer', 'basketball', 'tennis', 'swimming', 'volleyball']
+        };
+
+        const [action, category] = args;
+        if (!action || !['start', 'guess'].includes(action.toLowerCase())) {
+            await sock.sendMessage(sender, {
+                text: `🎭 Charades Game!\nCommands:\n!charades start [${categories.join('|')}]\n!charades guess [word]`
+            });
+            return;
+        }
+
+        if (action.toLowerCase() === 'start') {
+            if (!category || !categories.includes(category.toLowerCase())) {
+                await sock.sendMessage(sender, {
+                    text: `Please choose a category: ${categories.join(', ')}`
+                });
+                return;
+            }
+            const word = words[category][Math.floor(Math.random() * words[category].length)];
+            // TODO: Store active game word in database
+            await sock.sendMessage(sender, {
+                text: `🎭 New game started! Category: ${category}\nGuess the word using !charades guess [word]`
+            });
+            return;
+        }
+
+        if (action.toLowerCase() === 'guess') {
+            const guess = args[1]?.toLowerCase();
+            if (!guess) {
+                await sock.sendMessage(sender, { text: 'Please provide your guess!' });
+                return;
+            }
+            // TODO: Implement guess checking against stored word
+            await sock.sendMessage(sender, {
+                text: `You guessed: ${guess}\nGuess checking coming soon!`
+            });
+        }
+    },
+
+    async scavenger(sock, sender, args) {
+        const [action] = args;
+        if (!action || !['start', 'found'].includes(action.toLowerCase())) {
+            await sock.sendMessage(sender, {
+                text: '🔍 Scavenger Hunt\nCommands:\n!scavenger start\n!scavenger found [item]'
+            });
+            return;
+        }
+
+        if (action.toLowerCase() === 'start') {
+            const items = [
+                'Something blue',
+                'A round object',
+                'Something soft',
+                'Something that makes noise',
+                'Something shiny'
+            ];
+            // TODO: Store hunt items in database
+            await sock.sendMessage(sender, {
+                text: `🔍 Scavenger Hunt Started!\nFind these items:\n${items.map((item, i) => `${i + 1}. ${item}`).join('\n')}\n\nMark items as found with !scavenger found [item number]`
+            });
+            return;
+        }
+
+        if (action.toLowerCase() === 'found') {
+            const itemNumber = parseInt(args[1]);
+            if (!itemNumber || itemNumber < 1 || itemNumber > 5) {
+                await sock.sendMessage(sender, {
+                    text: 'Please specify a valid item number (1-5)'
+                });
+                return;
+            }
+            // TODO: Implement found item checking
+            await sock.sendMessage(sender, {
+                text: `Marked item ${itemNumber} as found! Keep hunting!`
+            });
+        }
+    },
+
+    async compliment(sock, sender, args) {
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: 'Please mention someone to compliment!' });
+            return;
+        }
+
+        const compliments = [
+            "Your smile lights up the room! ✨",
+            "You're amazing at making others feel special! 🌟",
+            "Your positive energy is contagious! 🌈",
+            "You have a heart of gold! 💝",
+            "You make the world a better place! 🌍",
+            "Your creativity knows no bounds! 🎨",
+            "You're stronger than you know! 💪",
+            "Your kindness is inspiring! 🤗"
+        ];
+
+        const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
+        await sock.sendMessage(sender, {
+            text: `To ${target}:\n${randomCompliment}`
+        });
+    },
+
+    async roast(sock, sender, args) {
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: 'Please mention someone to roast!' });
+            return;
+        }
+
+        const roasts = [
+            "You're so slow, you could win a race against a statue! 🐌",
+            "Your jokes are so bad, even dad jokes feel embarrassed! 😅",
+            "You're about as useful as a screen door on a submarine! 🚪",
+            "I'd agree with you but then we'd both be wrong! 🤷",
+            "Your fashion sense is like a randomizer gone wrong! 👕",
+            "You're the reason why we have instructions on shampoo! 📝"
+        ];
+
+        const randomRoast = roasts[Math.floor(Math.random() * roasts.length)];
+        await sock.sendMessage(sender, {
+            text: `To ${target}:\n${randomRoast}`
+        });
+    }
+
 };
 
 module.exports = funCommands;

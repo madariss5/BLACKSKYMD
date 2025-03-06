@@ -3,29 +3,358 @@
   "commands": [
     {
       "name": "sticker",
-      "description": "Create sticker from image",
-      "usage": "!sticker [caption]",
+      "description": "Create sticker from image/video",
+      "usage": "!sticker (reply to media)",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "toimg",
       "description": "Convert sticker to image",
-      "usage": "!toimg",
+      "usage": "!toimg (reply to sticker)",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "tovideo",
-      "description": "Convert gif sticker to video",
-      "usage": "!tovideo",
+      "description": "Convert animated sticker to video",
+      "usage": "!tovideo (reply to animated sticker)",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "brightness",
+      "description": "Adjust image brightness",
+      "usage": "!brightness [0-200]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "contrast",
+      "description": "Adjust image contrast",
+      "usage": "!contrast [0-200]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "saturate",
+      "description": "Adjust image saturation",
+      "usage": "!saturate [0-200]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "hue",
+      "description": "Rotate image hue",
+      "usage": "!hue [degrees]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "blur",
+      "description": "Apply blur effect",
+      "usage": "!blur [level]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "pixelate",
+      "description": "Pixelate image",
+      "usage": "!pixelate [level]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "cartoon",
+      "description": "Apply cartoon effect",
+      "usage": "!cartoon",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "painting",
+      "description": "Create painting effect",
+      "usage": "!painting [style]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "sketch",
+      "description": "Create sketch effect",
+      "usage": "!sketch [type]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "resize",
+      "description": "Resize image",
+      "usage": "!resize [width] [height]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "crop",
+      "description": "Crop image",
+      "usage": "!crop [x] [y] [width] [height]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "rotate",
+      "description": "Rotate image",
+      "usage": "!rotate [degrees]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "flip",
+      "description": "Flip image",
+      "usage": "!flip <horizontal|vertical>",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "slow",
+      "description": "Slow down video",
+      "usage": "!slow [factor]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "fast",
+      "description": "Speed up video",
+      "usage": "!fast [factor]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "reverse",
+      "description": "Reverse video",
+      "usage": "!reverse",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "boomerang",
+      "description": "Create boomerang effect",
+      "usage": "!boomerang",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "pitch",
+      "description": "Adjust audio pitch",
+      "usage": "!pitch [level]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "tempo",
+      "description": "Adjust audio tempo",
+      "usage": "!tempo [speed]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "echo",
+      "description": "Add echo effect",
+      "usage": "!echo [delay]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "bass",
+      "description": "Boost bass",
+      "usage": "!bass [level]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "tiktok",
+      "description": "Download TikTok video",
+      "usage": "!tiktok [url]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "instagram",
+      "description": "Download Instagram media",
+      "usage": "!instagram [url]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "facebook",
+      "description": "Download Facebook video",
+      "usage": "!facebook [url]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "twitter",
+      "description": "Download Twitter media",
+      "usage": "!twitter [url]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "gimage",
+      "description": "Search Google images",
+      "usage": "!gimage [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "pinterest",
+      "description": "Search Pinterest images",
+      "usage": "!pinterest [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wallpaper",
+      "description": "Search for wallpapers",
+      "usage": "!wallpaper [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "removebg",
+      "description": "Remove image background",
+      "usage": "!removebg",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "deepfry",
+      "description": "Deep fry an image",
+      "usage": "!deepfry",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "caption",
+      "description": "Add caption to image",
+      "usage": "!caption [text]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "meme",
+      "description": "Create a meme",
+      "usage": "!meme [top text] | [bottom text]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "drake",
+      "description": "Create Drake meme",
+      "usage": "!drake [text1] | [text2]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "brain",
+      "description": "Create expanding brain meme",
+      "usage": "!brain [text1] | [text2] | [text3] | [text4]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "stickersearch",
+      "description": "Search for stickers",
+      "usage": "!stickersearch [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "stickerpack",
+      "description": "Download sticker pack",
+      "usage": "!stickerpack [name]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "compress",
+      "description": "Compress media file",
+      "usage": "!compress [quality]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "enhance",
+      "description": "Enhance image quality",
+      "usage": "!enhance",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "invert",
+      "description": "Invert image colors",
+      "usage": "!invert",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "sharpen",
+      "description": "Sharpen image",
+      "usage": "!sharpen [level]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "vintage",
+      "description": "Apply vintage filter",
+      "usage": "!vintage",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "oil",
+      "description": "Apply oil painting effect",
+      "usage": "!oil",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "glitch",
+      "description": "Apply glitch effect",
+      "usage": "!glitch",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "distort",
+      "description": "Apply distortion effect",
+      "usage": "!distort [level]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "textart",
+      "description": "Generate ASCII art",
+      "usage": "!textart [text]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "gradient",
+      "description": "Create gradient text",
+      "usage": "!gradient [text]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "neon",
+      "description": "Create neon text effect",
+      "usage": "!neon [text]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "emojimix",
-      "description": "Mix two emojis into a sticker",
-      "usage": "!emojimix 😎+😂",
+      "description": "Mix two emojis",
+      "usage": "!emojimix [emoji1]+[emoji2]",
       "cooldown": 10,
       "permissions": ["user"]
     },
@@ -41,27 +370,6 @@
       "description": "Animated text to picture",
       "usage": "!attp [text]",
       "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "pinterest",
-      "description": "Search images from Pinterest",
-      "usage": "!pinterest [query]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "wallpaper",
-      "description": "Get random wallpaper",
-      "usage": "!wallpaper [query]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "gimage",
-      "description": "Search Google images",
-      "usage": "!gimage [query]",
-      "cooldown": 10,
       "permissions": ["user"]
     },
     {
@@ -90,202 +398,6 @@
       "description": "Play YouTube video",
       "usage": "!video [query]",
       "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "tiktok",
-      "description": "Download TikTok video",
-      "usage": "!tiktok [url]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "instagram",
-      "description": "Download Instagram media",
-      "usage": "!instagram [url]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "removebg",
-      "description": "Remove background from image",
-      "usage": "!removebg",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "blur",
-      "description": "Apply blur effect to image",
-      "usage": "!blur [level]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "pixelate",
-      "description": "Pixelate an image",
-      "usage": "!pixelate [level]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "deepfry",
-      "description": "Deepfry an image",
-      "usage": "!deepfry",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "caption",
-      "description": "Add caption to image",
-      "usage": "!caption [text]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "meme",
-      "description": "Create a meme",
-      "usage": "!meme [top text] | [bottom text]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "gif",
-      "description": "Search and send GIF",
-      "usage": "!gif [query]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "stickersearch",
-      "description": "Search for stickers",
-      "usage": "!stickersearch [query]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "stickerpack",
-      "description": "Get sticker pack",
-      "usage": "!stickerpack [name]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "customsticker",
-      "description": "Create custom sticker",
-      "usage": "!customsticker [text]",
-      "cooldown": 20,
-      "permissions": ["user"]
-    },
-    {
-      "name": "compress",
-      "description": "Compress media file",
-      "usage": "!compress [quality]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "enhance",
-      "description": "Enhance image quality",
-      "usage": "!enhance",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "resize",
-      "description": "Resize image",
-      "usage": "!resize [width] [height]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "crop",
-      "description": "Crop image",
-      "usage": "!crop [x] [y] [width] [height]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "flip",
-      "description": "Flip image",
-      "usage": "!flip <horizontal|vertical>",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "rotate",
-      "description": "Rotate image",
-      "usage": "!rotate [degrees]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "filter",
-      "description": "Apply filter to image",
-      "usage": "!filter [type]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "merge",
-      "description": "Merge multiple images",
-      "usage": "!merge",
-      "cooldown": 20,
-      "permissions": ["user"]
-    },
-    {
-      "name": "watermark",
-      "description": "Add watermark to image",
-      "usage": "!watermark [text]",
-      "cooldown": 20,
-      "permissions": ["user"]
-    },
-    {
-      "name": "qr",
-      "description": "Generate QR code",
-      "usage": "!qr [text]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "waifu",
-      "description": "Get random waifu image",
-      "usage": "!waifu [category]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "neko",
-      "description": "Get random neko image",
-      "usage": "!neko",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "animesearch",
-      "description": "Search for anime information",
-      "usage": "!animesearch [title]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "mangasearch",
-      "description": "Search for manga information",
-      "usage": "!mangasearch [title]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "facebook",
-      "description": "Download Facebook video",
-      "usage": "!facebook [url]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "twitter",
-      "description": "Download Twitter video/image",
-      "usage": "!twitter [url]",
-      "cooldown": 30,
       "permissions": ["user"]
     },
     {
