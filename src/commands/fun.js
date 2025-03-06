@@ -648,7 +648,177 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
         await sock.sendMessage(sender, {
             text: '🐱 Pet Status:\nHappiness: ❤️❤️❤️\nHunger: 🍖🍖\nEnergy: ⚡⚡⚡'
         });
-    }
+    },
+
+
+    // Additional Fun Commands
+    async emojimix(sock, sender, args) {
+        if (args.length !== 2) {
+            return await sock.sendMessage(sender, { 
+                text: '⚠️ Please provide two emojis to mix!' 
+            });
+        }
+        // TODO: Implement emoji mixing using external API
+        await sock.sendMessage(sender, { text: 'Emoji mixing feature coming soon!' });
+    },
+
+    async trigger(sock, sender) {
+        // TODO: Implement triggered meme generation
+        await sock.sendMessage(sender, { text: 'Triggered meme feature coming soon!' });
+    },
+
+    async wanted(sock, sender) {
+        // TODO: Implement wanted poster generation
+        await sock.sendMessage(sender, { text: 'Wanted poster feature coming soon!' });
+    },
+
+    async roast(sock, sender, args) {
+        const roasts = [
+            "I'd like to roast you, but it looks like life already did.",
+            "You're the reason why aliens won't visit Earth.",
+            "I would give you a nasty look, but you've already got one."
+        ];
+        const randomRoast = roasts[Math.floor(Math.random() * roasts.length)];
+        await sock.sendMessage(sender, { text: randomRoast });
+    },
+
+    async compliment(sock, sender) {
+        const compliments = [
+            "You light up every room you enter!",
+            "Your positivity is infectious!",
+            "You have a heart of gold!"
+        ];
+        const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
+        await sock.sendMessage(sender, { text: randomCompliment });
+    },
+
+    // RPG Game System
+    async rpgstart(sock, sender) {
+        // TODO: Implement RPG game initialization
+        await sock.sendMessage(sender, { text: 'RPG game system coming soon!' });
+    },
+
+    async rpgadventure(sock, sender) {
+        const adventures = [
+            "You found a mysterious cave!",
+            "A dragon appears in your path!",
+            "You discovered an ancient treasure!"
+        ];
+        const adventure = adventures[Math.floor(Math.random() * adventures.length)];
+        await sock.sendMessage(sender, { text: adventure });
+    },
+
+    async rpgbattle(sock, sender) {
+        // TODO: Implement RPG battle system
+        await sock.sendMessage(sender, { text: 'RPG battle system coming soon!' });
+    },
+
+    // Mini Games
+    async typingrace(sock, sender) {
+        const words = [
+            "The quick brown fox jumps over the lazy dog",
+            "Pack my box with five dozen liquor jugs",
+            "How vexingly quick daft zebras jump"
+        ];
+        const challenge = words[Math.floor(Math.random() * words.length)];
+        await sock.sendMessage(sender, { 
+            text: `⌨️ Typing Race:\nType this as fast as you can:\n${challenge}` 
+        });
+    },
+
+    async mathquiz(sock, sender) {
+        const operators = ['+', '-', '*'];
+        const operator = operators[Math.floor(Math.random() * operators.length)];
+        const num1 = Math.floor(Math.random() * 10) + 1;
+        const num2 = Math.floor(Math.random() * 10) + 1;
+
+        await sock.sendMessage(sender, { 
+            text: `🔢 Math Quiz:\nWhat is ${num1} ${operator} ${num2}?` 
+        });
+    },
+
+    async triviachallenge(sock, sender) {
+        const questions = [
+            {q: "What is the capital of France?", a: "Paris"},
+            {q: "Which planet is known as the Red Planet?", a: "Mars"},
+            {q: "What is the largest mammal?", a: "Blue Whale"}
+        ];
+        const question = questions[Math.floor(Math.random() * questions.length)];
+        await sock.sendMessage(sender, { 
+            text: `🎯 Trivia Challenge:\n${question.q}` 
+        });
+    },
+
+    // Virtual Pet System
+    async petadopt(sock, sender, args) {
+        const pets = ['cat', 'dog', 'rabbit', 'hamster', 'bird'];
+        const pet = args[0]?.toLowerCase();
+
+        if (!pet || !pets.includes(pet)) {
+            await sock.sendMessage(sender, { 
+                text: `Available pets to adopt: ${pets.join(', ')}` 
+            });
+            return;
+        }
+
+        await sock.sendMessage(sender, { 
+            text: `🐾 Congratulations! You've adopted a ${pet}!` 
+        });
+    },
+
+    async petcare(sock, sender, args) {
+        const actions = ['feed', 'play', 'clean', 'train', 'heal'];
+        const action = args[0]?.toLowerCase();
+
+        if (!action || !actions.includes(action)) {
+            await sock.sendMessage(sender, { 
+                text: `Available pet care actions: ${actions.join(', ')}` 
+            });
+            return;
+        }
+
+        await sock.sendMessage(sender, { 
+            text: `🐾 You ${action} your pet! They look happy!` 
+        });
+    },
+
+    // Card Games
+    async poker(sock, sender) {
+        // TODO: Implement poker game
+        await sock.sendMessage(sender, { text: 'Poker game coming soon!' });
+    },
+
+    async blackjack(sock, sender) {
+        // TODO: Implement blackjack game
+        await sock.sendMessage(sender, { text: 'Blackjack game coming soon!' });
+    },
+
+    // Social Games
+    async confess(sock, sender, args) {
+        if (!args.length) {
+            return await sock.sendMessage(sender, { 
+                text: '⚠️ Please provide your confession!' 
+            });
+        }
+
+        const confession = args.join(' ');
+        await sock.sendMessage(sender, { 
+            text: `Anonymous Confession:\n${confession}` 
+        });
+    },
+
+    async matchmaking(sock, sender, args) {
+        if (args.length < 2) {
+            return await sock.sendMessage(sender, { 
+                text: 'Please mention two users for matchmaking!' 
+            });
+        }
+
+        const compatibility = Math.floor(Math.random() * 101);
+        await sock.sendMessage(sender, { 
+            text: `💘 Matchmaking Results:\n${args[0]} + ${args[1]} = ${compatibility}% compatible!` 
+        });
+    },
 };
 
 module.exports = funCommands;

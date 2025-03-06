@@ -9,13 +9,6 @@
       "permissions": ["user"]
     },
     {
-      "name": "calculate",
-      "description": "Calculate mathematical expression",
-      "usage": "!calculate [expression]",
-      "cooldown": 3,
-      "permissions": ["user"]
-    },
-    {
       "name": "translate",
       "description": "Translate text to another language",
       "usage": "!translate [target_language] [text]",
@@ -23,10 +16,129 @@
       "permissions": ["user"]
     },
     {
-      "name": "wiki",
-      "description": "Search Wikipedia",
-      "usage": "!wiki [query]",
+      "name": "grammar",
+      "description": "Check text grammar",
+      "usage": "!grammar [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "conjugate",
+      "description": "Conjugate verbs in different languages",
+      "usage": "!conjugate [language] [verb]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "calculate",
+      "description": "Calculate mathematical expression",
+      "usage": "!calculate [expression]",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "algebra",
+      "description": "Solve algebraic equations",
+      "usage": "!algebra [equation]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "geometry",
+      "description": "Calculate geometric properties",
+      "usage": "!geometry [area|perimeter|volume] [shape] [dimensions]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "statistics",
+      "description": "Perform statistical calculations",
+      "usage": "!statistics [numbers...]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "periodic",
+      "description": "Get periodic table information",
+      "usage": "!periodic [element]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "chemical",
+      "description": "Analyze chemical formulas",
+      "usage": "!chemical [formula]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "physics",
+      "description": "Solve physics problems",
+      "usage": "!physics [formula] [values]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "code",
+      "description": "Execute code snippets",
+      "usage": "!code [language] [code]",
       "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "regex",
+      "description": "Test regular expressions",
+      "usage": "!regex [pattern] [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "git",
+      "description": "Learn git commands",
+      "usage": "!git [command]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "flashcards",
+      "description": "Create and review flashcards",
+      "usage": "!flashcards [create|review|list] [subject]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "quiz",
+      "description": "Generate subject-specific quizzes",
+      "usage": "!quiz [subject]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "studytimer",
+      "description": "Set a Pomodoro study timer",
+      "usage": "!studytimer [minutes]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wikipedia",
+      "description": "Search Wikipedia articles",
+      "usage": "!wikipedia [query]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "cite",
+      "description": "Generate citations",
+      "usage": "!cite [style] [source details]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "thesaurus",
+      "description": "Find word synonyms and antonyms",
+      "usage": "!thesaurus [word]",
+      "cooldown": 5,
       "permissions": ["user"]
     }
   ]
