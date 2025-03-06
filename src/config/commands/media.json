@@ -233,28 +233,32 @@
     {
       "name": "tiktok",
       "description": "Download TikTok video",
-      "usage": "!tiktok [url]",
+      "usage": ".tiktok [url]",
+      "example": ".tiktok https://vm.tiktok.com/xxx",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "instagram",
       "description": "Download Instagram media",
-      "usage": "!instagram [url]",
+      "usage": ".instagram [url]",
+      "example": ".instagram https://www.instagram.com/p/xxx",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "facebook",
       "description": "Download Facebook video",
-      "usage": "!facebook [url]",
+      "usage": ".facebook [url]",
+      "example": ".facebook https://www.facebook.com/watch?v=xxx",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "twitter",
       "description": "Download Twitter media",
-      "usage": "!twitter [url]",
+      "usage": ".twitter [url]",
+      "example": ".twitter https://twitter.com/xxx/status/xxx",
       "cooldown": 30,
       "permissions": ["user"]
     },
@@ -346,13 +350,6 @@
       "name": "enhance",
       "description": "Enhance image quality",
       "usage": "!enhance",
-      "cooldown": 30,
-      "permissions": ["premium"]
-    },
-    {
-      "name": "invert",
-      "description": "Invert image colors",
-      "usage": "!invert",
       "cooldown": 10,
       "permissions": ["user"]
     },
@@ -360,6 +357,14 @@
       "name": "sharpen",
       "description": "Sharpen image",
       "usage": "!sharpen [level]",
+      "example": "!sharpen 5",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "invert",
+      "description": "Invert image colors",
+      "usage": "!invert",
       "cooldown": 10,
       "permissions": ["user"]
     },
@@ -414,101 +419,67 @@
     },
     {
       "name": "emojimix",
-      "description": "Mix two emojis",
-      "usage": "!emojimix [emoji1]+[emoji2]",
+      "description": "Mix two emojis together",
+      "usage": ".emojimix [emoji1]+[emoji2]",
+      "example": ".emojimix 😀+😭",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "ttp",
-      "description": "Text to picture",
-      "usage": "!ttp [text]",
+      "description": "Convert text to sticker",
+      "usage": ".ttp [text]",
+      "example": ".ttp Hello World",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "attp",
-      "description": "Animated text to picture",
-      "usage": "!attp [text]",
+      "description": "Convert text to animated sticker",
+      "usage": ".attp [text]",
+      "example": ".attp Hello World",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "ytmp4",
       "description": "Download YouTube video",
-      "usage": "!ytmp4 [url]",
+      "usage": ".ytmp4 [url]",
+      "example": ".ytmp4 https://youtube.com/watch?v=xxx",
       "cooldown": 30,
       "permissions": ["premium"]
     },
     {
       "name": "ytmp3",
       "description": "Download YouTube audio",
-      "usage": "!ytmp3 [url]",
+      "usage": ".ytmp3 [url]",
+      "example": ".ytmp3 https://youtube.com/watch?v=xxx",
       "cooldown": 30,
       "permissions": ["premium"]
     },
     {
       "name": "play",
       "description": "Play YouTube audio",
-      "usage": "!play [query]",
+      "usage": ".play [query]",
+      "example": ".play despacito",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "video",
       "description": "Play YouTube video",
-      "usage": "!video [query]",
+      "usage": ".video [query]",
+      "example": ".video despacito",
       "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "soundcloud",
-      "description": "Download SoundCloud audio",
-      "usage": "!soundcloud [url]",
-      "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "lyrics",
       "description": "Get song lyrics",
-      "usage": "!lyrics [song name]",
+      "usage": ".lyrics [song name]",
+      "example": ".lyrics despacito",
       "cooldown": 10,
       "permissions": ["user"]
-    },
-    {
-      "name": "movie",
-      "description": "Get movie information",
-      "usage": "!movie [title]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "series",
-      "description": "Get TV series information",
-      "usage": "!series [title]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "animestyle",
-      "description": "Convert image to anime style",
-      "usage": "!animestyle",
-      "cooldown": 30,
-      "permissions": ["premium"]
-    },
-    {
-      "name": "cartoonize",
-      "description": "Convert image to cartoon style",
-      "usage": "!cartoonize",
-      "cooldown": 30,
-      "permissions": ["premium"]
-    },
-    {
-      "name": "artstyle",
-      "description": "Apply artistic style to image",
-      "usage": "!artstyle [style]",
-      "cooldown": 30,
-      "permissions": ["premium"]
     },
     {
       "name": "trim",

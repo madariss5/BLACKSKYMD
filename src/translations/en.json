@@ -52,6 +52,45 @@
       "success": "Here's your processed media!",
       "error": "Failed to process media. Please try again.",
       "invalid_format": "Invalid media format. Please try again with the correct format.",
+      "sticker": {
+        "emojimix": {
+          "description": "Mix two emojis together",
+          "invalid_format": "Please provide two emojis separated by +\nExample: 😀+😭",
+          "processing": "Mixing emojis...",
+          "success": "Here's your mixed emoji sticker!",
+          "error": "Failed to mix emojis"
+        },
+        "ttp": {
+          "description": "Convert text to sticker",
+          "no_text": "Please provide text to convert",
+          "processing": "Creating text sticker...",
+          "success": "Here's your text sticker!",
+          "error": "Failed to create text sticker"
+        },
+        "attp": {
+          "description": "Convert text to animated sticker",
+          "no_text": "Please provide text to convert",
+          "processing": "Creating animated text sticker...",
+          "success": "Here's your animated text sticker!",
+          "error": "Failed to create animated text sticker"
+        }
+      },
+      "image": {
+        "caption": {
+          "description": "Add caption to image",
+          "no_text": "Please provide caption text",
+          "processing": "Adding caption...",
+          "success": "Here's your captioned image!",
+          "error": "Failed to add caption"
+        },
+        "meme": {
+          "description": "Create a meme",
+          "invalid_format": "Please provide top and bottom text separated by |\nExample: Top text | Bottom text",
+          "processing": "Creating meme...",
+          "success": "Here's your meme!",
+          "error": "Failed to create meme"
+        }
+      },
       "cartoon": {
         "description": "Convert image to cartoon style",
         "processing": "Creating cartoon effect...",
@@ -105,6 +144,87 @@
         "processing": "Boosting bass...",
         "success": "Bass boosted by %sx",
         "error": "Failed to boost bass"
+      },
+      "tiktok": {
+        "description": "Download TikTok videos",
+        "invalid_url": "Please provide a valid TikTok video URL",
+        "processing": "Downloading TikTok video...",
+        "success": "Here's your TikTok video!",
+        "error": "Failed to download TikTok video"
+      },
+      "instagram": {
+        "description": "Download Instagram media",
+        "invalid_url": "Please provide a valid Instagram post/reel URL",
+        "processing": "Downloading Instagram media...",
+        "success": "Here's your Instagram media!",
+        "error": "Failed to download Instagram media"
+      },
+      "facebook": {
+        "description": "Download Facebook videos",
+        "invalid_url": "Please provide a valid Facebook video URL",
+        "processing": "Downloading Facebook video...",
+        "success": "Here's your Facebook video!",
+        "error": "Failed to download Facebook video"
+      },
+      "twitter": {
+        "description": "Download Twitter media",
+        "invalid_url": "Please provide a valid Twitter post URL",
+        "processing": "Downloading Twitter media...",
+        "success": "Here's your Twitter media!",
+        "error": "Failed to download Twitter media"
+      },
+      "youtube": {
+        "ytmp4": {
+          "description": "Download YouTube video",
+          "invalid_url": "Please provide a valid YouTube video URL",
+          "processing": "Downloading YouTube video...",
+          "success": "Here's your YouTube video!",
+          "error": "Failed to download YouTube video"
+        },
+        "ytmp3": {
+          "description": "Download YouTube audio",
+          "invalid_url": "Please provide a valid YouTube video URL",
+          "processing": "Downloading YouTube audio...",
+          "success": "Here's your YouTube audio!",
+          "error": "Failed to download YouTube audio"
+        },
+        "play": {
+          "description": "Play YouTube audio",
+          "no_query": "Please provide a song name or URL",
+          "searching": "Searching for song...",
+          "not_found": "Song not found",
+          "playing": "Now playing: %s",
+          "error": "Failed to play song"
+        },
+        "video": {
+          "description": "Play YouTube video",
+          "no_query": "Please provide a video name or URL",
+          "searching": "Searching for video...",
+          "not_found": "Video not found",
+          "playing": "Now playing: %s",
+          "error": "Failed to play video"
+        }
+      },
+      "lyrics": {
+        "description": "Get song lyrics",
+        "no_query": "Please provide a song name",
+        "searching": "Searching for lyrics...",
+        "not_found": "Lyrics not found",
+        "success": "Found lyrics for: %s",
+        "error": "Failed to find lyrics"
+      },
+      "enhance": {
+        "description": "Enhance image quality",
+        "processing": "Enhancing image quality...",
+        "success": "Here's your enhanced image!",
+        "error": "Failed to enhance image"
+      },
+      "sharpen": {
+        "description": "Sharpen image",
+        "invalid_level": "Sharpening level must be between 1 and 10",
+        "processing": "Sharpening image...",
+        "success": "Image sharpened with level %d!",
+        "error": "Failed to sharpen image"
       }
     }
   },
