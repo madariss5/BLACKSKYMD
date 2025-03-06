@@ -1,5 +1,6 @@
 const { commandLoader } = require('../utils/commandLoader');
 const logger = require('../utils/logger');
+const config = require('../config/config');
 
 // Cooldown handling
 const cooldowns = new Map();
@@ -13,13 +14,29 @@ async function processCommand(sock, message, commandText) {
         const command = commandLoader.getCommand(commandName);
         if (!command) {
             await sock.sendMessage(sender, { 
-                text: `Unknown command: ${commandName}\nUse !help to see available commands.` 
+                text: `Unknown command: ${commandName}\nUse ${config.bot.prefix}help to see available commands.` 
+            });
+            return;
+        }
+
+        // Check if command is disabled
+        if (command.config?.disabled) {
+            await sock.sendMessage(sender, {
+                text: `This command is currently disabled.`
+            });
+            return;
+        }
+
+        // Check permissions
+        if (!commandLoader.hasPermission(commandName, 'user')) {
+            await sock.sendMessage(sender, {
+                text: 'You do not have permission to use this command.'
             });
             return;
         }
 
         // Check cooldown
-        const { cooldown = 3 } = command.config;
+        const { cooldown = 3 } = command.config || {};
         const now = Date.now();
         const timestamps = cooldowns.get(commandName);
         const cooldownAmount = cooldown * 1000;
@@ -42,14 +59,16 @@ async function processCommand(sock, message, commandText) {
         cooldowns.get(commandName).set(sender, now);
         setTimeout(() => cooldowns.get(commandName).delete(sender), cooldownAmount);
 
-        // Execute command
+        // Execute command with logging
+        logger.info(`Executing command: ${commandName} with args: ${args.join(' ')}`);
         await command.handler(sock, sender, args);
+        logger.info(`Command ${commandName} executed successfully`);
 
     } catch (err) {
         logger.error('Error processing command:', err);
         await sock.sendMessage(message.key.remoteJid, { 
             text: 'Error processing command. Please try again later.' 
-        });
+        }).catch(err => logger.error('Failed to send error message:', err));
     }
 }
 
