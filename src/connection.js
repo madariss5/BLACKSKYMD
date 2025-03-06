@@ -99,11 +99,11 @@ async function startConnection() {
             if (qr && !qrDisplayed) {
                 qrDisplayed = true;
                 process.stdout.write('\x1Bc'); 
-                console.log('\n'.repeat(2)); 
+                console.log('\n'); 
 
                 qrcode.generate(qr, {
                     small: false,
-                    scale: 2
+                    scale: 1
                 }, (qrcode) => {
                     console.log(qrcode);
                 });
