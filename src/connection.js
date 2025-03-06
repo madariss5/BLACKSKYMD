@@ -6,31 +6,67 @@ const fs = require('fs').promises;
 
 let sock = null;
 let retryCount = 0;
-const MAX_RETRIES = 10; // Increased from 5 to 10
-const RETRY_INTERVAL = 10000; // Increased from 5000 to 10000
+const MAX_RETRIES = 10;
+const RETRY_INTERVAL = 10000;
+const AUTH_DIR = path.join(process.cwd(), 'auth_info');
+
+async function validateSession() {
+    try {
+        const credentialsPath = path.join(AUTH_DIR, 'creds.json');
+        const exists = await fs.access(credentialsPath)
+            .then(() => true)
+            .catch(() => false);
+
+        if (!exists) {
+            logger.info('No existing session found');
+            return false;
+        }
+
+        const creds = JSON.parse(await fs.readFile(credentialsPath, 'utf8'));
+        return !!creds?.me?.id;
+    } catch (err) {
+        logger.error('Error validating session:', err);
+        return false;
+    }
+}
+
+async function cleanAuthState() {
+    try {
+        await fs.rm(AUTH_DIR, { recursive: true, force: true });
+        await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
+        logger.info('Auth state cleaned successfully');
+    } catch (err) {
+        logger.error('Error cleaning auth state:', err);
+        throw err;
+    }
+}
 
 async function startConnection() {
     try {
         // Ensure auth directory exists with proper permissions
-        const authDir = path.join(process.cwd(), 'auth_info');
-        await fs.mkdir(authDir, { recursive: true, mode: 0o700 });
+        await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
 
         // Get latest version of WhatsApp Web
         const { version } = await fetchLatestBaileysVersion();
         logger.info(`Using WA v${version.join('.')}`);
 
+        // Validate existing session
+        const isValidSession = await validateSession();
+        if (!isValidSession && retryCount > 0) {
+            logger.info('Invalid session detected, cleaning auth state');
+            await cleanAuthState();
+        }
+
         // Initialize auth state with enhanced error handling
         let state, saveCreds;
         try {
-            const auth = await useMultiFileAuthState(authDir);
+            const auth = await useMultiFileAuthState(AUTH_DIR);
             state = auth.state;
             saveCreds = auth.saveCreds;
         } catch (authErr) {
             logger.error('Auth state initialization failed:', authErr);
-            // Clear auth directory and retry
-            await fs.rm(authDir, { recursive: true, force: true });
-            await fs.mkdir(authDir, { recursive: true, mode: 0o700 });
-            const auth = await useMultiFileAuthState(authDir);
+            await cleanAuthState();
+            const auth = await useMultiFileAuthState(AUTH_DIR);
             state = auth.state;
             saveCreds = auth.saveCreds;
         }
@@ -42,10 +78,10 @@ async function startConnection() {
             printQRInTerminal: true,
             logger: logger,
             browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
-            connectTimeoutMs: 60000, // Increased timeout
-            qrTimeout: 60000, // Increased QR timeout
+            connectTimeoutMs: 60000,
+            qrTimeout: 60000,
             defaultQueryTimeoutMs: 30000,
-            keepAliveIntervalMs: 15000, // Increased keep-alive interval
+            keepAliveIntervalMs: 15000,
             retryRequestDelayMs: 5000,
             markOnlineOnConnect: true,
             // Additional connection stability options
@@ -99,15 +135,27 @@ async function startConnection() {
 
                 if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
-                    const delay = Math.min(RETRY_INTERVAL * Math.pow(1.5, retryCount - 1), 300000); // Exponential backoff
+                    const delay = Math.min(RETRY_INTERVAL * Math.pow(1.5, retryCount - 1), 300000);
                     logger.info(`Reconnecting (${retryCount}/${MAX_RETRIES}) in ${delay}ms...`);
+
+                    // Clean auth state before retry if session is invalid
+                    if (statusCode === DisconnectReason.connectionClosed) {
+                        const isValid = await validateSession();
+                        if (!isValid) {
+                            await cleanAuthState();
+                        }
+                    }
+
                     setTimeout(startConnection, delay);
-                } else if (!shouldReconnect) {
-                    logger.error('Connection terminated due to logout or forbidden status');
-                    process.exit(1);
                 } else {
-                    logger.error('Max retry attempts reached. Connection terminated permanently');
-                    process.exit(1);
+                    if (!shouldReconnect) {
+                        logger.error('Connection terminated due to logout or forbidden status. Please scan QR code again.');
+                        await cleanAuthState();
+                        process.exit(1);
+                    } else {
+                        logger.error('Max retry attempts reached. Connection terminated permanently');
+                        process.exit(1);
+                    }
                 }
             }
         });
@@ -121,10 +169,11 @@ async function startConnection() {
                 logger.error('Failed to save credentials:', err);
                 // Attempt to recreate auth files
                 try {
-                    await fs.writeFile(path.join(authDir, 'creds.json'), JSON.stringify(state.creds));
+                    await fs.writeFile(path.join(AUTH_DIR, 'creds.json'), JSON.stringify(state.creds));
                     logger.info('Credentials recovered and saved manually');
                 } catch (recoveryErr) {
                     logger.error('Failed to recover credentials:', recoveryErr);
+                    await cleanAuthState();
                 }
             }
         });
@@ -141,6 +190,13 @@ async function startConnection() {
                 retryCount++;
                 const delay = Math.min(RETRY_INTERVAL * Math.pow(1.5, retryCount - 1), 300000);
                 logger.info(`Attempting recovery (${retryCount}/${MAX_RETRIES}) in ${delay}ms...`);
+
+                // Validate session before retry
+                const isValid = await validateSession();
+                if (!isValid) {
+                    await cleanAuthState();
+                }
+
                 setTimeout(startConnection, delay);
             }
         });
@@ -154,7 +210,8 @@ async function startConnection() {
                     logger.info('Logging out of WhatsApp...');
                     await sock.logout();
                     await sock.end();
-                    logger.info('WhatsApp logout successful');
+                    await cleanAuthState();
+                    logger.info('WhatsApp logout and cleanup successful');
                 } catch (err) {
                     logger.error('Error during WhatsApp cleanup:', err);
                 }
