@@ -2,60 +2,31 @@ const express = require('express');
 const { startConnection } = require('./connection');
 const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
-const { languageManager } = require('./utils/language');
 const logger = require('./utils/logger');
 const config = require('./config/config');
-const { DisconnectReason } = require('@whiskeysockets/baileys');
-const path = require('path');
-
-async function findAvailablePort(startPort, maxAttempts = 10) {
-    const net = require('net');
-
-    function isPortAvailable(port) {
-        return new Promise((resolve) => {
-            const server = net.createServer();
-            server.once('error', () => resolve(false));
-            server.once('listening', () => {
-                server.close(() => resolve(true));
-            });
-            server.listen(port, '0.0.0.0');
-        });
-    }
-
-    for (let port = startPort; port < startPort + maxAttempts; port++) {
-        if (await isPortAvailable(port)) {
-            return port;
-        }
-    }
-    throw new Error(`No available ports found between ${startPort} and ${startPort + maxAttempts - 1}`);
-}
 
 async function startServer(sock) {
     const app = express();
     app.use(express.json());
 
-    // Health check endpoint with enhanced information
+    // Health check endpoint
     app.get('/', (req, res) => {
         res.json({
             status: sock ? 'connected' : 'disconnected',
-            message: languageManager.getText('system.bot_active'),
+            message: 'WhatsApp Bot is active',
             commands: commandLoader.getAllCommands().length,
-            language: config.bot.language,
-            uptime: process.uptime(),
-            missingConfig: config.validateConfig().missingVars
+            uptime: process.uptime()
         });
     });
 
-    // Find available port starting from 5000
-    const PORT = await findAvailablePort(5000);
-
-    const server = app.listen(PORT, '0.0.0.0')
+    // Always serve on port 5000 
+    const server = app.listen(5000, '0.0.0.0')
         .on('error', (err) => {
-            logger.error('Failed to start HTTP server:', err);
+            console.error('Failed to start HTTP server:', err);
             process.exit(1);
         })
         .on('listening', () => {
-            logger.info(`Server is running on http://0.0.0.0:${PORT}`);
+            console.log('Server is running on port 5000');
         });
 
     return server;
@@ -66,28 +37,23 @@ async function main() {
     let sock = null;
 
     try {
-        // Load translations first
-        logger.info('Loading translations...');
-        await languageManager.loadTranslations();
-        logger.info('Translations loaded successfully');
-
-        // Load commands with error handling
-        logger.info('Loading command configurations...');
+        // Load commands first
+        console.log('Loading command configurations...');
         try {
-            await commandLoader.loadCommandConfigs();
+            await commandLoader.loadCommandConfigs(); //Preserving this line from original
             await commandLoader.loadCommandHandlers();
-            logger.info(`Loaded ${commandLoader.getAllCommands().length} commands successfully`);
+            console.log(`Loaded ${commandLoader.getAllCommands().length} commands successfully`);
         } catch (err) {
-            logger.error('Error loading commands:', err);
+            console.error('Error loading commands:', err);
             throw err;
         }
 
-        // Start WhatsApp connection with enhanced error handling
-        logger.info('Initializing WhatsApp connection...');
+        // Start WhatsApp connection
+        console.log('Initializing WhatsApp connection...');
         try {
             sock = await startConnection();
         } catch (err) {
-            logger.error('Fatal error establishing WhatsApp connection:', err);
+            console.error('Fatal error establishing WhatsApp connection:', err);
             throw err;
         }
 
@@ -102,7 +68,7 @@ async function main() {
             try {
                 await messageHandler(sock, m);
             } catch (err) {
-                logger.error('Error handling message:', {
+                logger.error('Error handling message:', { //Preserving original logger here
                     error: err.message,
                     stack: err.stack,
                     messageId: m.key?.id,
@@ -113,25 +79,23 @@ async function main() {
 
         // Enhanced graceful shutdown
         const cleanup = async (signal) => {
-            logger.info(`Received ${signal} signal. Cleaning up...`);
+            console.log(`Received ${signal} signal. Cleaning up...`);
 
-            // Close server first
             if (server) {
                 await new Promise((resolve) => {
                     server.close(() => {
-                        logger.info('HTTP server closed');
+                        console.log('HTTP server closed');
                         resolve();
                     });
                 });
             }
 
-            // Cleanup WhatsApp connection
             if (sock) {
                 try {
                     await sock.logout();
-                    logger.info('WhatsApp logout successful');
+                    console.log('WhatsApp logout successful');
                 } catch (err) {
-                    logger.error('Error during WhatsApp logout:', err);
+                    console.error('Error during WhatsApp logout:', err);
                 }
             }
 
@@ -142,22 +106,18 @@ async function main() {
         process.on('SIGINT', () => cleanup('SIGINT'));
 
     } catch (err) {
-        logger.error('Fatal error starting bot:', {
-            error: err.message,
-            stack: err.stack
-        });
+        console.error('Fatal error starting bot:', err);
 
-        // Attempt cleanup if server was created
         if (server) {
             try {
                 await new Promise((resolve) => {
                     server.close(() => {
-                        logger.info('HTTP server closed due to fatal error');
+                        console.log('HTTP server closed due to fatal error');
                         resolve();
                     });
                 });
             } catch (cleanupErr) {
-                logger.error('Error during server cleanup:', cleanupErr);
+                console.error('Error during server cleanup:', cleanupErr);
             }
         }
 
@@ -165,11 +125,8 @@ async function main() {
     }
 }
 
-// Start the bot with error handling
+// Start the bot
 main().catch(err => {
-    logger.error('Fatal error starting bot:', {
-        error: err.message,
-        stack: err.stack
-    });
+    console.error('Fatal error starting bot:', err);
     process.exit(1);
 });

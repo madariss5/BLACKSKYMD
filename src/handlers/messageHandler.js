@@ -4,6 +4,8 @@ const config = require('../config/config');
 
 async function messageHandler(sock, message) {
     try {
+        console.log('\nReceived message:', message.key.remoteJid);
+
         // Extract message content with support for different message types
         const messageContent = message.message?.conversation || 
                            message.message?.extendedTextMessage?.text || 
@@ -18,34 +20,26 @@ async function messageHandler(sock, message) {
         const isGroup = sender.endsWith('@g.us');
         const prefix = config.bot.prefix;
 
+        console.log('Message content:', messageContent);
+
         // Check if message is a command
         if (messageContent.startsWith(prefix)) {
             const commandText = messageContent.slice(prefix.length).trim();
             if (commandText) {
+                console.log('Processing command:', commandText);
                 await processCommand(sock, message, commandText);
             }
             return;
         }
 
-        // Only respond to private messages, not groups
-        if (!isGroup) {
-            await handleNormalMessage(sock, sender, messageContent);
-        }
-
-    } catch (err) {
-        logger.error('Error in message handler:', err);
-    }
-}
-
-async function handleNormalMessage(sock, sender, content) {
-    try {
-        if (!content.includes(config.bot.prefix)) {
-            // Only send help message for non-command messages
-            const response = `To use the bot, start your message with ${config.bot.prefix}\nFor example: ${config.bot.prefix}help`;
+        // Only respond to private messages and first-time interactions
+        if (!isGroup && !messageContent.startsWith(prefix)) {
+            const response = `Welcome! To use the bot, start your message with ${prefix}\nFor example: ${prefix}help`;
             await sock.sendMessage(sender, { text: response });
         }
+
     } catch (err) {
-        logger.error('Error in normal message handler:', err);
+        console.error('Error in message handler:', err);
     }
 }
 

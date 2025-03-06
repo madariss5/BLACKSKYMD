@@ -4,6 +4,7 @@ const logger = require('./utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
 const { messageHandler } = require('./handlers/messageHandler');
+const { commandLoader } = require('./utils/commandLoader');
 
 let sock = null;
 let retryCount = 0;
@@ -39,6 +40,15 @@ async function cleanAuthState() {
 
 async function startConnection() {
     try {
+        // Load commands first
+        console.log('Initializing command system...');
+        const commandsLoaded = await commandLoader.loadCommandHandlers();
+        if (!commandsLoaded) {
+            console.error('Failed to load commands. Bot may not function properly.');
+        } else {
+            console.log('Commands loaded successfully!');
+        }
+
         await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
 
         const { version } = await fetchLatestBaileysVersion();
@@ -63,7 +73,7 @@ async function startConnection() {
         sock = makeWASocket({
             version,
             auth: state,
-            printQRInTerminal: false, // Disable default QR print
+            printQRInTerminal: false,
             logger: logger,
             browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
@@ -78,7 +88,7 @@ async function startConnection() {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
-                console.clear(); // Clear console before showing QR
+                console.clear();
                 qrcode.generate(qr, { small: true });
                 console.log('\nScan this QR code with WhatsApp to start the bot\n');
             }
@@ -137,21 +147,11 @@ async function startConnection() {
                 if (!message?.message) return;
                 await messageHandler(sock, message);
             } catch (err) {
-                logger.error('Message processing failed');
+                console.error('Message processing failed:', err);
             }
         });
 
-        sock.ev.on('creds.update', async () => {
-            try {
-                await saveCreds();
-            } catch (err) {
-                try {
-                    await fs.writeFile(path.join(AUTH_DIR, 'creds.json'), JSON.stringify(state.creds));
-                } catch (recoveryErr) {
-                    await cleanAuthState();
-                }
-            }
-        });
+        sock.ev.on('creds.update', saveCreds);
 
         const cleanup = async (signal) => {
             if (sock) {
