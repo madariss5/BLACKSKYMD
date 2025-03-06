@@ -39,8 +39,6 @@ async function startBot() {
 
         // Setup Express server
         const app = express();
-
-        // Basic middleware
         app.use(express.json());
 
         // Health check endpoint
@@ -55,18 +53,22 @@ async function startBot() {
             });
         });
 
-        // ALWAYS serve the app on port 5000
-        const server = app.listen(5000, '0.0.0.0', () => {
-            logger.info('Server is running on http://0.0.0.0:5000');
-        }).on('error', (err) => {
-            if (err.code === 'EADDRINUSE') {
-                logger.error(`Port ${5000} is already in use. Please ensure no other service is using this port.`);
-                process.exit(1);
-            } else {
-                logger.error('Failed to start HTTP server:', err);
-                process.exit(1);
-            }
-        });
+        // Create server with proper error handling
+        const PORT = 5000;
+        const server = app.listen(PORT, '0.0.0.0')
+            .on('error', (err) => {
+                if (err.code === 'EADDRINUSE') {
+                    logger.error(`Port ${PORT} is already in use`);
+                    // Exit process to allow for restart
+                    process.exit(1);
+                } else {
+                    logger.error('Failed to start HTTP server:', err);
+                    process.exit(1);
+                }
+            })
+            .on('listening', () => {
+                logger.info(`Server is running on http://0.0.0.0:${PORT}`);
+            });
 
         // Listen for messages
         sock.ev.on('messages.upsert', async ({ messages }) => {

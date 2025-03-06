@@ -68,7 +68,10 @@ const config = {
         maxRetries: 5,
         retryDelay: 5000,
         logLevel: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-        preventSleep: process.env.NODE_ENV === 'production'
+        preventSleep: process.env.NODE_ENV === 'production',
+        connectionTimeout: 60000, // 1 minute
+        queryTimeout: 60000, // 1 minute
+        reconnectInterval: 5000 // 5 seconds
     }
 };
 

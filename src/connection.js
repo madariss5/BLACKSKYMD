@@ -5,16 +5,9 @@ const { sessionManager } = require('./utils/sessionManager');
 const config = require('./config/config');
 const { languageManager } = require('./utils/language');
 
-// Enhanced exponential backoff with max delay
-const getRetryDelay = (attempt) => {
-    const maxDelay = 300000; // 5 minutes max
-    return Math.min(1000 * Math.pow(2, attempt), maxDelay);
-};
-
 async function startConnection(retryCount = 0) {
     try {
         logger.info('Initializing WhatsApp connection...');
-        await languageManager.loadTranslations();
 
         // Check for required configuration
         const { isValid, missingVars } = config.validateConfig();
@@ -22,109 +15,91 @@ async function startConnection(retryCount = 0) {
             logger.warn(`Missing required configuration: ${missingVars.join(', ')}`);
         }
 
+        // Clear session if this is a fresh start
+        if (retryCount === 0) {
+            await sessionManager.clearSession();
+            logger.info('Starting fresh session');
+        }
+
+        // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(config.session.authDir);
 
+        // Create socket with stable configuration
         const sock = makeWASocket({
-            printQRInTerminal: true,
             auth: state,
+            printQRInTerminal: true,
             logger: logger,
-            defaultQueryTimeoutMs: 60000, // 1 minute timeout
+            browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
+            version: [2, 2323, 4],
             connectTimeoutMs: 60000,
-            retryRequestDelayMs: getRetryDelay(retryCount),
-            browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Chrome', '1.0.0'],
-            connectionRetryInterval: getRetryDelay(retryCount),
-            markOnlineOnConnect: true,
-            syncFullHistory: false // Reduce initial sync time
+            defaultQueryTimeoutMs: 60000,
+            emitOwnEvents: true
         });
 
-        // Enhanced connection handling
-        sock.ev.on('connection.update', async ({ qr, connection, lastDisconnect }) => {
-            const logContext = {
-                connection,
-                retryCount,
-                statusCode: lastDisconnect?.error?.output?.statusCode
-            };
-            logger.debug('Connection update received:', logContext);
+        // Handle connection updates
+        sock.ev.on('connection.update', ({ qr, connection, lastDisconnect }) => {
+            logger.debug('Connection state:', { connection, retryCount });
 
             if (qr) {
-                logger.info('New QR code generated, please scan with WhatsApp');
+                logger.info('Please scan QR code with WhatsApp');
                 qrcode.generate(qr, { small: true });
             }
 
             if (connection === 'connecting') {
-                logger.info(`Attempting to connect (Attempt ${retryCount + 1})`);
+                logger.info('Connecting to WhatsApp...');
             }
 
             if (connection === 'open') {
-                logger.info('Successfully connected to WhatsApp!');
-                retryCount = 0; // Reset retry counter on successful connection
+                logger.info('Connected successfully!');
 
+                // Reset retry counter
+                retryCount = 0;
+
+                // Send startup message if owner number is configured
                 if (config.owner.number) {
                     const startupMessage = languageManager.getText('system.connected');
-                    await sock.sendMessage(config.owner.number, { 
+                    sock.sendMessage(`${config.owner.number}@s.whatsapp.net`, { 
                         text: startupMessage 
-                    }).catch(err => logger.error('Failed to send startup message:', err));
+                    }).catch(err => {
+                        logger.error('Failed to send startup message:', err.message);
+                    });
                 }
-
-                // Initialize session backup
-                await sessionManager.createBackupSchedule(sock);
-                await sessionManager.backupCredentials(sock);
             }
 
             if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-
-                logger.info('Connection closed:', { 
-                    statusCode,
-                    shouldReconnect,
-                    retryCount,
-                    maxRetries: config.settings.maxRetries
-                });
+                const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
+                logger.info('Connection closed:', { shouldReconnect, statusCode: lastDisconnect?.error?.output?.statusCode });
 
                 if (shouldReconnect && retryCount < config.settings.maxRetries) {
-                    const delay = getRetryDelay(retryCount);
-                    logger.info(`Scheduling reconnection in ${delay/1000}s...`);
+                    const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+                    logger.info(`Attempting reconnection in ${delay/1000}s... (Attempt ${retryCount + 1}/${config.settings.maxRetries})`);
 
-                    // Clean up before reconnecting
-                    sock.ev.removeAllListeners('connection.update');
-                    sock.ev.removeAllListeners('creds.update');
-
-                    setTimeout(async () => {
-                        try {
-                            await sessionManager.restoreFromBackup();
-                            await startConnection(retryCount + 1);
-                        } catch (err) {
-                            logger.error('Failed to reconnect:', err);
-                        }
+                    setTimeout(() => {
+                        startConnection(retryCount + 1);
                     }, delay);
-                } else if (statusCode === DisconnectReason.loggedOut) {
-                    logger.warn('Session logged out, clearing session and restarting...');
-                    await sessionManager.clearSession();
-                    await startConnection(0);
+                } else if (!shouldReconnect) {
+                    logger.warn('Session logged out, clearing session data...');
+                    sessionManager.clearSession().then(() => {
+                        startConnection(0);
+                    });
                 } else {
-                    logger.error(`Connection terminated: Max retries (${config.settings.maxRetries}) reached or fatal error`);
-                    throw new Error('Connection terminated');
+                    logger.error('Max reconnection attempts reached');
+                    process.exit(1);
                 }
             }
         });
 
-        // Handle credentials update
-        sock.ev.on('creds.update', async () => {
-            logger.debug('Credentials updated');
-            await saveCreds();
-        });
+        // Handle credentials updates
+        sock.ev.on('creds.update', saveCreds);
 
-        // Implement proper cleanup
+        // Cleanup handler
         const cleanup = async () => {
             logger.info('Cleaning up connection...');
             try {
-                await sessionManager.backupCredentials(sock);
                 sock.ev.removeAllListeners();
                 await sock.logout();
-                await sock.end();
             } catch (err) {
-                logger.error('Error during cleanup:', err);
+                logger.error('Error during cleanup:', err.message);
             }
         };
 
@@ -132,27 +107,22 @@ async function startConnection(retryCount = 0) {
         process.on('SIGINT', cleanup);
 
         return sock;
+
     } catch (err) {
-        logger.error('Error in connection:', err);
+        logger.error('Connection error:', {
+            message: err.message,
+            stack: err.stack,
+            attempt: retryCount
+        });
 
         if (retryCount < config.settings.maxRetries) {
-            const delay = getRetryDelay(retryCount);
-            logger.info(`Retrying connection in ${delay/1000}s... (Attempt ${retryCount + 1}/${config.settings.maxRetries})`);
-
-            return new Promise((resolve) => {
-                setTimeout(async () => {
-                    try {
-                        const sock = await startConnection(retryCount + 1);
-                        resolve(sock);
-                    } catch (retryErr) {
-                        logger.error('Retry failed:', retryErr);
-                        resolve(null);
-                    }
-                }, delay);
-            });
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+            logger.info(`Retrying in ${delay/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return startConnection(retryCount + 1);
         }
 
-        throw new Error(`Failed to establish connection after ${config.settings.maxRetries} attempts`);
+        throw err;
     }
 }
 
