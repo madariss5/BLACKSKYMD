@@ -1,4 +1,6 @@
 const logger = require('../utils/logger');
+const os = require('os');
+const fs = require('fs').promises;
 
 const basicCommands = {
     async help(sock, sender, args) {
@@ -20,6 +22,17 @@ Available Commands:
    !uptime - Show bot uptime
    !stats - Usage statistics
    !speed - Test response speed
+   !system - System information
+   !owner - Bot owner information
+   !donate - Support bot development
+   !report - Report bugs
+   !feedback - Provide feedback
+   !source - Bot source information
+   !runtime - Bot runtime details
+   !premium - Premium features
+   !support - Get support
+   !credits - Credits & acknowledgments
+
 
 2. Group Commands:
    !kick @user - Kick user from group
@@ -303,6 +316,160 @@ Terms may change without notice
         `.trim();
 
         await sock.sendMessage(sender, { text: speedTest });
+    },
+    async system(sock, sender) {
+        const systemInfo = `
+🖥️ System Information:
+• OS: ${os.type()} ${os.release()}
+• Architecture: ${os.arch()}
+• CPU Cores: ${os.cpus().length}
+• Total Memory: ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(2)} GB
+• Free Memory: ${(os.freemem() / 1024 / 1024 / 1024).toFixed(2)} GB
+• Platform: ${os.platform()}
+• Hostname: ${os.hostname()}
+• Kernel: ${os.version()}
+        `.trim();
+
+        await sock.sendMessage(sender, { text: systemInfo });
+    },
+
+    async owner(sock, sender) {
+        const ownerInfo = `
+👑 Bot Owner Information:
+• Name: ${process.env.OWNER_NAME || 'Bot Owner'}
+• Number: ${process.env.OWNER_NUMBER || 'Not specified'}
+• Website: ${process.env.OWNER_WEBSITE || 'Not specified'}
+• Email: ${process.env.OWNER_EMAIL || 'Not specified'}
+
+For business inquiries or support:
+Please contact the owner directly.
+        `.trim();
+
+        await sock.sendMessage(sender, { text: ownerInfo });
+    },
+
+    async donate(sock, sender) {
+        const donateInfo = `
+💝 Support Bot Development:
+• PayPal: ${process.env.PAYPAL || 'Not available'}
+• Ko-fi: ${process.env.KOFI || 'Not available'}
+• Patreon: ${process.env.PATREON || 'Not available'}
+
+Your support helps keep the bot running and improving!
+        `.trim();
+
+        await sock.sendMessage(sender, { text: donateInfo });
+    },
+
+    async report(sock, sender, args) {
+        if (!args.length) {
+            return await sock.sendMessage(sender, { 
+                text: '⚠️ Please provide a bug report or feature request description!' 
+            });
+        }
+
+        const report = args.join(' ');
+        logger.info(`New report from ${sender}: ${report}`);
+
+        await sock.sendMessage(sender, { 
+            text: '✅ Thank you for your report! The bot owner will review it.' 
+        });
+    },
+
+    async feedback(sock, sender, args) {
+        if (!args.length) {
+            return await sock.sendMessage(sender, { 
+                text: '⚠️ Please provide your feedback!' 
+            });
+        }
+
+        const feedback = args.join(' ');
+        logger.info(`New feedback from ${sender}: ${feedback}`);
+
+        await sock.sendMessage(sender, { 
+            text: '✅ Thank you for your feedback! We appreciate your input.' 
+        });
+    },
+
+    async source(sock, sender) {
+        const sourceInfo = `
+📦 Bot Source Information:
+• Version: ${process.env.BOT_VERSION || '1.0.0'}
+• Framework: @whiskeysockets/baileys
+• License: MIT
+• Repository: ${process.env.REPO_URL || 'Private'}
+• Contributors: ${process.env.CONTRIBUTORS || 'Various'}
+
+Want to contribute? Contact the owner!
+        `.trim();
+
+        await sock.sendMessage(sender, { text: sourceInfo });
+    },
+
+    async runtime(sock, sender) {
+        const runtime = process.uptime();
+        const days = Math.floor(runtime / 86400);
+        const hours = Math.floor((runtime % 86400) / 3600);
+        const minutes = Math.floor((runtime % 3600) / 60);
+        const seconds = Math.floor(runtime % 60);
+
+        const runtimeInfo = `
+⏰ Bot Runtime Details:
+• Days: ${days}
+• Hours: ${hours}
+• Minutes: ${minutes}
+• Seconds: ${seconds}
+
+Total Uptime: ${days}d ${hours}h ${minutes}m ${seconds}s
+        `.trim();
+
+        await sock.sendMessage(sender, { text: runtimeInfo });
+    },
+
+    async premium(sock, sender) {
+        const premiumInfo = `
+💎 Premium Features:
+• Priority Support
+• Unlimited Usage
+• Exclusive Commands
+• No Cooldowns
+• Custom Features
+• Early Access
+
+Contact owner to upgrade!
+        `.trim();
+
+        await sock.sendMessage(sender, { text: premiumInfo });
+    },
+
+    async support(sock, sender) {
+        const supportInfo = `
+🆘 Need Help?
+• Use !help for commands
+• Use !report for bugs
+• Use !feedback for suggestions
+• Join support group: ${process.env.SUPPORT_GROUP || 'Not available'}
+• Contact owner: !owner
+        `.trim();
+
+        await sock.sendMessage(sender, { text: supportInfo });
+    },
+
+    async credits(sock, sender) {
+        const creditsInfo = `
+👏 Credits & Acknowledgments:
+• @whiskeysockets/baileys - Core Library
+• Node.js Community
+• Bot Contributors
+• API Providers
+• Resource Providers
+• Beta Testers
+• Active Users
+
+Special thanks to everyone who helped make this bot possible!
+        `.trim();
+
+        await sock.sendMessage(sender, { text: creditsInfo });
     }
 };
 
