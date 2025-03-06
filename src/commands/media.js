@@ -87,7 +87,6 @@ const mediaCommands = {
                         sticker: { url: outputPath }
                     });
                 }
-
             } finally {
                 // Cleanup temp files
                 try {
@@ -97,7 +96,6 @@ const mediaCommands = {
                     logger.error('Error cleaning up temp files:', cleanupErr);
                 }
             }
-
         } catch (err) {
             logger.error('Error in sticker command:', err);
             await sock.sendMessage(message.key.remoteJid, { 
@@ -218,86 +216,6 @@ const mediaCommands = {
         } catch (err) {
             logger.error('Error in contrast command:', err);
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to adjust contrast.' });
-        }
-    },
-    async saturate(sock, message, args) {
-        try {
-            const remoteJid = message.key.remoteJid;
-            if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, {
-                    text: 'Please send an image with caption .saturate [level]'
-                });
-                return;
-            }
-
-            const level = parseInt(args[0]) || 100;
-            if (level < 0 || level > 200) {
-                await sock.sendMessage(remoteJid, { 
-                    text: 'Saturation level must be between 0 and 200' 
-                });
-                return;
-            }
-
-            const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
-
-            const outputPath = path.join(tempDir, `${Date.now()}.png`);
-            await sharp(buffer)
-                .modulate({
-                    saturation: level / 100
-                })
-                .png()
-                .toFile(outputPath);
-
-            await sock.sendMessage(remoteJid, {
-                image: { url: outputPath },
-                caption: `Adjusted saturation to ${level}%`
-            });
-
-            await fs.unlink(outputPath);
-
-        } catch (err) {
-            logger.error('Error in saturate command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: 'Failed to adjust saturation.' });
-        }
-    },
-    async hue(sock, message, args) {
-        try {
-            const remoteJid = message.key.remoteJid;
-            if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, {
-                    text: 'Please send an image with caption .hue [degrees]'
-                });
-                return;
-            }
-
-            const degrees = parseInt(args[0]) || 0;
-            // Normalize degrees to be between 0 and 360
-            const normalizedDegrees = ((degrees % 360) + 360) % 360;
-
-            const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
-
-            const outputPath = path.join(tempDir, `${Date.now()}.png`);
-            await sharp(buffer)
-                .modulate({
-                    hue: normalizedDegrees
-                })
-                .png()
-                .toFile(outputPath);
-
-            await sock.sendMessage(remoteJid, {
-                image: { url: outputPath },
-                caption: `Rotated hue by ${normalizedDegrees}°`
-            });
-
-            await fs.unlink(outputPath);
-
-        } catch (err) {
-            logger.error('Error in hue command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: 'Failed to adjust hue.' });
         }
     },
     async blur(sock, message, args) {
@@ -600,6 +518,9 @@ const mediaCommands = {
                 ffmpeg(inputPath)
                     .setFPS(30)
                     .videoFilters(`setpts=${1/factor}*PTS`)
+                    .on('progress', (progress) => {
+                        logger.info(`Processing: ${progress.percent}% done`);
+                    })
                     .save(outputPath)
                     .on('end', resolve)
                     .on('error', reject);
@@ -655,6 +576,9 @@ const mediaCommands = {
                 ffmpeg(inputPath)
                     .setFPS(30)
                     .videoFilters(`setpts=${1/factor}*PTS`)
+                    .on('progress', (progress) => {
+                        logger.info(`Processing: ${progress.percent}% done`);
+                    })
                     .save(outputPath)
                     .on('end', resolve)
                     .on('error', reject);
@@ -702,10 +626,10 @@ const mediaCommands = {
                 ffmpeg(inputPath)
                     .videoFilters('reverse')
                     .audioFilters('areverse')
-                    .save(outputPath)
                     .on('progress', (progress) => {
                         logger.info(`Processing: ${progress.percent}% done`);
                     })
+                    .save(outputPath)
                     .on('end', resolve)
                     .on('error', reject);
             });
@@ -724,14 +648,6 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { 
                 text: 'Failed to reverse video. Make sure the video is in a supported format.' 
             });
-
-            // Cleanup in case of error
-            try {
-                if (inputPath) await fs.unlink(inputPath);
-                if (outputPath) await fs.unlink(outputPath);
-            } catch (cleanupErr) {
-                logger.error('Error during cleanup:', cleanupErr);
-            }
         }
     },
     async boomerang(sock, message) {
