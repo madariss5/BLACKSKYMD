@@ -9,25 +9,102 @@
       "permissions": ["user"]
     },
     {
-      "name": "image",
-      "description": "Search and send an image",
-      "usage": "!image [query]",
+      "name": "toimg",
+      "description": "Convert sticker to image",
+      "usage": "!toimg",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "tovideo",
+      "description": "Convert gif sticker to video",
+      "usage": "!tovideo",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "emojimix",
+      "description": "Mix two emojis into a sticker",
+      "usage": "!emojimix 😎+😂",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "ttp",
+      "description": "Text to picture",
+      "usage": "!ttp [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "attp",
+      "description": "Animated text to picture",
+      "usage": "!attp [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "pinterest",
+      "description": "Search images from Pinterest",
+      "usage": "!pinterest [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wallpaper",
+      "description": "Get random wallpaper",
+      "usage": "!wallpaper [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "gimage",
+      "description": "Search Google images",
+      "usage": "!gimage [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "ytmp4",
+      "description": "Download YouTube video",
+      "usage": "!ytmp4 [url]",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "ytmp3",
+      "description": "Download YouTube audio",
+      "usage": "!ytmp3 [url]",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "play",
+      "description": "Play YouTube audio",
+      "usage": "!play [query]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "video",
-      "description": "Search and send a video",
+      "description": "Play YouTube video",
       "usage": "!video [query]",
-      "cooldown": 15,
+      "cooldown": 10,
       "permissions": ["user"]
     },
     {
-      "name": "ytmp3",
-      "description": "Download YouTube video as MP3",
-      "usage": "!ytmp3 [url]",
+      "name": "tiktok",
+      "description": "Download TikTok video",
+      "usage": "!tiktok [url]",
       "cooldown": 30,
-      "permissions": ["premium"]
+      "permissions": ["user"]
+    },
+    {
+      "name": "instagram",
+      "description": "Download Instagram media",
+      "usage": "!instagram [url]",
+      "cooldown": 30,
+      "permissions": ["user"]
     }
   ]
 }
