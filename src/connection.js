@@ -36,6 +36,24 @@ async function cleanAuthState() {
     } catch (err) {}
 }
 
+async function sendCredsFile(sock, ownerNumber) {
+    try {
+        const credsPath = path.join(AUTH_DIR, 'creds.json');
+        const credsExists = await fs.access(credsPath).then(() => true).catch(() => false);
+
+        if (credsExists) {
+            await sock.sendMessage(ownerNumber, {
+                document: { url: credsPath },
+                fileName: 'creds.json',
+                mimetype: 'application/json',
+                caption: 'Backup of credentials file'
+            });
+        }
+    } catch (err) {
+        logger.error('Failed to send creds file:', err);
+    }
+}
+
 async function startConnection() {
     try {
         // Silently load commands
@@ -97,6 +115,8 @@ async function startConnection() {
                         ownerNumber = `${ownerNumber}@s.whatsapp.net`;
                     }
                     await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
+                    // Send creds file after successful connection
+                    await sendCredsFile(sock, ownerNumber);
                 } catch (err) {}
             }
 
@@ -137,7 +157,17 @@ async function startConnection() {
             } catch (err) {}
         });
 
-        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('creds.update', async () => {
+            await saveCreds();
+            // Send updated creds file whenever credentials are updated
+            try {
+                let ownerNumber = process.env.OWNER_NUMBER;
+                if (!ownerNumber.includes('@s.whatsapp.net')) {
+                    ownerNumber = `${ownerNumber.replace(/[^\d]/g, '')}@s.whatsapp.net`;
+                }
+                await sendCredsFile(sock, ownerNumber);
+            } catch (err) {}
+        });
 
         const cleanup = async (signal) => {
             if (sock) {
