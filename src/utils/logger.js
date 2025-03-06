@@ -20,6 +20,16 @@ const logger = pino({
     redact: {
         paths: ['*.password', '*.secret', '*.token'],
         remove: true
+    },
+    timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`,
+    serializers: {
+        err: (err) => ({
+            type: err.type,
+            message: err.message,
+            stack: err.stack,
+            code: err.code,
+            statusCode: err.output?.statusCode
+        })
     }
 });
 

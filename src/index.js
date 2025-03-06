@@ -156,6 +156,21 @@ async function startBot() {
             error: err.message,
             stack: err.stack
         });
+
+        // Attempt cleanup if server was created
+        if (server) {
+            try {
+                await new Promise((resolve) => {
+                    server.close(() => {
+                        logger.info('HTTP server closed due to fatal error');
+                        resolve();
+                    });
+                });
+            } catch (cleanupErr) {
+                logger.error('Error during server cleanup:', cleanupErr);
+            }
+        }
+
         process.exit(1);
     }
 }
