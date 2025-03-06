@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const config = {
     // Bot Owner Info
     owner: {
@@ -22,21 +24,26 @@ const config = {
         version: process.env.BOT_VERSION || '1.0.0',
         prefix: process.env.BOT_PREFIX || '.',
         language: process.env.BOT_LANGUAGE || 'en',
+        debug: process.env.NODE_ENV !== 'production',
     },
 
-    // Server Configuration
+    // Server Configuration (for potential web features)
     server: {
         port: process.env.PORT || 5000,
         host: '0.0.0.0',
     },
 
-    // API Keys (Optional)
+    // API Keys
     apis: {
         openweather: process.env.OPENWEATHERMAP_API_KEY,
         google: process.env.GOOGLE_API_KEY,
         removebg: process.env.REMOVEBG_API_KEY,
         wolfram: process.env.WOLFRAM_APP_ID,
         news: process.env.NEWS_API_KEY,
+        spotify: {
+            clientId: process.env.SPOTIFY_CLIENT_ID,
+            clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+        }
     },
 
     // Other settings
@@ -45,6 +52,15 @@ const config = {
         autoTyping: true,
         autoRecord: false,
         backupInterval: 6 * 60 * 60 * 1000, // 6 hours
+        // Heroku-specific settings
+        keepAlive: process.env.NODE_ENV === 'production',
+        retryOnDisconnect: true,
+        maxRetries: 5,
+        retryDelay: 5000,
+        // Production-specific logging
+        logLevel: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+        // Heroku dyno prevention
+        preventSleep: process.env.NODE_ENV === 'production'
     }
 };
 

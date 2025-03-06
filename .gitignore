@@ -3,24 +3,43 @@ node_modules/
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # Logs
 *.log
 logs/
+npm-debug.log*
 
 # WhatsApp session files
 auth_info/
 sessions/
+*.json.bak
+*.db
+baileys_store.json
+baileys_store_multi.json
 
 # Media files
 media/
 temp/
 uploads/
+downloads/
 
 # Editor files
 .vscode/
 .idea/
+*.sublime-*
+*.swp
 
 # OS files
 .DS_Store
 Thumbs.db
+*.tmp
+
+# Build files
+dist/
+build/
+*.tsbuildinfo
+
+# Coverage
+coverage/
