@@ -2,9 +2,10 @@ const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = requi
 const qrcode = require('qrcode-terminal');
 const logger = require('./utils/logger');
 const { sessionManager } = require('./utils/sessionManager');
+const config = require('./config/config');
 
 async function startConnection() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+    const { state, saveCreds } = await useMultiFileAuthState(config.session.authDir);
 
     const sock = makeWASocket({
         printQRInTerminal: true,
@@ -24,7 +25,7 @@ async function startConnection() {
         }
 
         if (connection === 'open') {
-            logger.info('Connected to WhatsApp!');
+            logger.info(`Connected to WhatsApp as ${config.owner.name}!`);
 
             // Start credential backup scheduling
             await sessionManager.createBackupSchedule(sock);

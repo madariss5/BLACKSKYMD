@@ -1,11 +1,12 @@
 const fs = require('fs').promises;
 const logger = require('./logger');
+const config = require('../config/config');
 
 class SessionManager {
     constructor() {
-        this.sessionsDir = './sessions';
-        this.credentialsFile = 'auth_info/creds.json';
-        this.backupSessionID = 'session-backup';
+        this.sessionsDir = config.session.backupDir;
+        this.credentialsFile = `${config.session.authDir}/creds.json`;
+        this.backupSessionID = `${config.session.id}-backup`;
     }
 
     async saveSession(id, data) {
@@ -74,7 +75,7 @@ class SessionManager {
                     .createHash('sha256')
                     .update(credsData)
                     .digest('hex'),
-                version: '1.0.0',
+                version: config.bot.version,
                 platform: 'heroku'
             };
 
@@ -108,7 +109,6 @@ class SessionManager {
         }
     }
 
-    // Add helper function to check file existence
     async fileExists(filePath) {
         try {
             await fs.access(filePath);
@@ -118,7 +118,6 @@ class SessionManager {
         }
     }
 
-    // Update handleCredentialsBackup with better error handling
     async handleCredentialsBackup(message) {
         try {
             if (!message?.text) {
@@ -195,13 +194,13 @@ class SessionManager {
         // Initial backup
         await this.backupCredentials(sock);
 
-        // Schedule regular backups every 6 hours
+        // Schedule regular backups
         setInterval(async () => {
             const success = await this.backupCredentials(sock);
             if (!success) {
                 logger.warn('Scheduled backup failed, will retry in next interval');
             }
-        }, 6 * 60 * 60 * 1000); // 6 hours
+        }, config.settings.backupInterval);
 
         logger.info('Backup schedule created successfully');
     }
