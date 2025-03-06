@@ -1,102 +1,91 @@
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const logger = require('./utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
 
+let sock = null;
 let retryCount = 0;
 const MAX_RETRIES = 5;
 const RETRY_INTERVAL = 5000;
 
-async function ensureAuthDirs() {
-    const authDir = path.join(process.cwd(), 'auth_info');
-    try {
-        await fs.mkdir(authDir, { recursive: true });
-        return authDir;
-    } catch (err) {
-        logger.error('Failed to create auth directory:', err);
-        throw err;
-    }
-}
-
 async function startConnection() {
     try {
-        logger.info('Starting WhatsApp connection...');
-
         // Ensure auth directory exists
         const authDir = path.join(process.cwd(), 'auth_info');
         await fs.mkdir(authDir, { recursive: true });
 
+        // Get latest version of WhatsApp Web
+        const { version } = await fetchLatestBaileysVersion();
+        logger.info(`Using WA v${version.join('.')}`);
+
         // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
-        // Create socket with basic configuration
-        const sock = makeWASocket({
+        // Create socket with optimized configuration
+        sock = makeWASocket({
+            version,
             auth: state,
             printQRInTerminal: true,
             logger: logger,
-            browser: ['WhatsApp-MD', 'Safari', '1.0.0'],
-            version: [2, 2323, 4],
-            connectTimeoutMs: 60000,
-            keepAliveIntervalMs: 15000
+            browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
+            // Basic connection settings
+            connectTimeoutMs: 30000,
+            qrTimeout: 40000,
+            defaultQueryTimeoutMs: 20000,
+            // Keep-alive settings
+            keepAliveIntervalMs: 10000,
+            // Connection retry settings
+            retryRequestDelayMs: 2000,
+            // Browser identification
+            markOnlineOnConnect: true
         });
 
         // Connection update handler
-        sock.ev.on('connection.update', async (update) => {
+        sock.ev.on('connection.update', (update) => {
             const { connection, lastDisconnect, qr } = update;
 
-            // Detailed logging
-            logger.info('Connection update received:', {
-                connectionState: connection,
-                hasError: !!lastDisconnect?.error,
-                errorMessage: lastDisconnect?.error?.message,
-                errorCode: lastDisconnect?.error?.output?.statusCode,
-                retryAttempt: retryCount,
-                hasQR: !!qr
+            // Log connection updates
+            logger.info('Connection state:', { 
+                state: connection,
+                hasQR: !!qr,
+                error: lastDisconnect?.error?.message || 'none'
             });
 
             if (qr) {
-                logger.info('New QR code received, please scan with WhatsApp');
+                logger.info('Please scan QR code with WhatsApp');
                 qrcode.generate(qr, { small: true });
             }
 
             if (connection === 'open') {
-                logger.info('Successfully connected to WhatsApp');
+                logger.info('Connected to WhatsApp');
                 retryCount = 0;
 
-                // Send test message to owner
+                // Notify owner
                 try {
                     const ownerJid = `${process.env.OWNER_NUMBER}@s.whatsapp.net`;
-                    await sock.sendMessage(ownerJid, {
+                    sock.sendMessage(ownerJid, {
                         text: '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 Bot is now connected!'
                     });
-                    logger.info('Successfully sent connection message to owner');
                 } catch (err) {
-                    logger.error('Failed to send connection message:', err);
+                    logger.error('Failed to send owner notification:', err);
                 }
             }
 
             if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
+                                     statusCode !== DisconnectReason.forbidden;
 
                 logger.warn('Connection closed:', {
-                    shouldReconnect,
-                    errorCode: lastDisconnect?.error?.output?.statusCode,
-                    errorMessage: lastDisconnect?.error?.message,
-                    retryCount
+                    code: statusCode,
+                    error: lastDisconnect?.error?.message,
+                    willRetry: shouldReconnect && retryCount < MAX_RETRIES
                 });
 
                 if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
-                    logger.info(`Attempting reconnection ${retryCount}/${MAX_RETRIES}`);
-
-                    // Attempt to save credentials before reconnecting
-                    try {
-                        await saveCreds();
-                    } catch (err) {
-                        logger.error('Failed to save credentials before reconnection:', err);
-                    }
-
+                    logger.info(`Reconnecting (${retryCount}/${MAX_RETRIES})...`);
                     setTimeout(startConnection, RETRY_INTERVAL);
                 } else {
                     logger.error('Connection terminated permanently');
@@ -115,17 +104,39 @@ async function startConnection() {
             }
         });
 
+        // Error handler
+        sock.ev.on('error', (err) => {
+            logger.error('Connection error:', err);
+        });
+
+        // Process termination handlers
+        const cleanup = async () => {
+            if (sock) {
+                logger.info('Cleaning up connection...');
+                try {
+                    await sock.logout();
+                    await sock.end();
+                } catch (err) {
+                    logger.error('Error during cleanup:', err);
+                }
+            }
+            process.exit(0);
+        };
+
+        process.on('SIGTERM', cleanup);
+        process.on('SIGINT', cleanup);
+        process.on('uncaughtException', (err) => {
+            logger.error('Uncaught exception:', err);
+            cleanup();
+        });
+
         return sock;
     } catch (err) {
-        logger.error('Fatal error in connection:', {
-            error: err.message,
-            stack: err.stack,
-            retryCount
-        });
+        logger.error('Fatal connection error:', err);
 
         if (retryCount < MAX_RETRIES) {
             retryCount++;
-            logger.info(`Retrying connection in ${RETRY_INTERVAL}ms...`);
+            logger.info(`Retrying in ${RETRY_INTERVAL}ms...`);
             setTimeout(startConnection, RETRY_INTERVAL);
         } else {
             throw err;
