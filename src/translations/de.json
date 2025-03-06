@@ -6,7 +6,8 @@
     "command_disabled": "Dieser Befehl ist derzeit deaktiviert.",
     "no_permission": "Sie haben keine Berechtigung, diesen Befehl zu verwenden.",
     "cooldown": "Bitte warten Sie %.1f Sekunden, bevor Sie %s erneut verwenden.",
-    "error": "Fehler beim Verarbeiten des Befehls. Bitte versuchen Sie es später erneut."
+    "error": "Fehler beim Verarbeiten des Befehls. Bitte versuchen Sie es später erneut.",
+    "language_changed": "Sprache wurde zu Deutsch geändert"
   },
   "commands": {
     "help": {
@@ -30,6 +31,12 @@
       "not_found": "Song nicht gefunden",
       "playing": "Spiele jetzt: %s",
       "error": "Fehler beim Abspielen des Songs"
+    },
+    "language": {
+      "description": "Ändert die Sprache des Bots",
+      "usage": ".language [de|en]",
+      "success": "Sprache erfolgreich geändert",
+      "error": "Fehler beim Ändern der Sprache"
     }
   },
   "media": {

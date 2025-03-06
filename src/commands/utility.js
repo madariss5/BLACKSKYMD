@@ -379,7 +379,36 @@ const utilityCommands = {
         }
         // TODO: Implement notes system
         await sock.sendMessage(sender, { text: 'Managing notes...' });
-    }
+    },
+
+    async language(sock, sender, args) {
+        try {
+            const newLang = args[0]?.toLowerCase();
+            if (!newLang) {
+                const availableLangs = languageManager.getAvailableLanguages();
+                await sock.sendMessage(sender, { 
+                    text: `Available languages: ${availableLangs.join(', ')}\nCurrent language: ${config.bot.language}`
+                });
+                return;
+            }
+
+            if (!languageManager.isLanguageSupported(newLang)) {
+                await sock.sendMessage(sender, {
+                    text: `Language "${newLang}" is not supported. Available languages: ${languageManager.getAvailableLanguages().join(', ')}`
+                });
+                return;
+            }
+
+            config.bot.language = newLang;
+            await sock.sendMessage(sender, {
+                text: languageManager.getText('system.language_changed', newLang)
+            });
+
+        } catch (err) {
+            logger.error('Error in language command:', err);
+            await sock.sendMessage(sender, { text: 'Failed to change language.' });
+        }
+    },
 };
 
 module.exports = utilityCommands;

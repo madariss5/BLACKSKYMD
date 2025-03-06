@@ -4,6 +4,7 @@ const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
 const { languageManager } = require('./utils/language');
 const logger = require('./utils/logger');
+const config = require('./config/config'); // Added missing config import
 
 async function startBot() {
     try {
@@ -24,7 +25,7 @@ async function startBot() {
                 status: 'running',
                 message: languageManager.getText('system.bot_active'),
                 commands: commandLoader.getAllCommands().length,
-                language: config.bot.language // Assuming 'config' is defined elsewhere
+                language: config.bot.language
             });
         });
 
