@@ -5,23 +5,45 @@ const config = require('../config/config');
 class SessionManager {
     constructor() {
         this.sessionsDir = config.session.backupDir;
-        this.credentialsFile = `${config.session.authDir}/creds.json`;
+        this.authDir = config.session.authDir;
         this.backupSessionID = `${config.session.id}-backup`;
+    }
+
+    async clearSession() {
+        try {
+            logger.info('Clearing session data...');
+            const fs = require('fs').promises;
+
+            // Clear auth directory
+            await fs.rm(this.authDir, { recursive: true, force: true });
+            await fs.mkdir(this.authDir, { recursive: true });
+
+            // Clear sessions directory
+            await fs.rm(this.sessionsDir, { recursive: true, force: true });
+            await fs.mkdir(this.sessionsDir, { recursive: true });
+
+            logger.info('Session data cleared successfully');
+            return true;
+        } catch (err) {
+            logger.error('Error clearing session:', err);
+            return false;
+        }
     }
 
     async saveSession(id, data) {
         try {
             await fs.mkdir(this.sessionsDir, { recursive: true });
-            // Convert to single line JSON without spaces
             const compactJson = JSON.stringify(data).replace(/\s+/g, '');
             await fs.writeFile(
                 `${this.sessionsDir}/${id}.json`,
                 compactJson,
                 'utf8'
             );
+            logger.info(`Session saved: ${id}`);
+            return true;
         } catch (err) {
             logger.error('Error saving session:', err);
-            throw err;
+            return false;
         }
     }
 
@@ -33,7 +55,7 @@ class SessionManager {
             );
             return JSON.parse(data);
         } catch (err) {
-            logger.error('Error loading session:', err);
+            logger.debug('No existing session found:', err.message);
             return null;
         }
     }
@@ -190,18 +212,25 @@ class SessionManager {
     }
 
     async createBackupSchedule(sock) {
-        // Initial backup
-        await this.backupCredentials(sock);
+        try {
+            // Initial backup
+            await this.backupCredentials(sock);
+            logger.info('Initial session backup created');
 
-        // Schedule regular backups
-        setInterval(async () => {
-            const success = await this.backupCredentials(sock);
-            if (!success) {
-                logger.warn('Scheduled backup failed, will retry in next interval');
-            }
-        }, config.settings.backupInterval);
+            // Schedule regular backups
+            setInterval(async () => {
+                const success = await this.backupCredentials(sock);
+                if (!success) {
+                    logger.warn('Scheduled backup failed');
+                }
+            }, config.settings.backupInterval);
 
-        logger.info('Backup schedule created successfully');
+            logger.info('Backup schedule created successfully');
+            return true;
+        } catch (err) {
+            logger.error('Error creating backup schedule:', err);
+            return false;
+        }
     }
 }
 
