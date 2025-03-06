@@ -1,34 +1,27 @@
 const pino = require('pino');
 
 const logger = pino({
-    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+    level: process.env.NODE_ENV === 'production' ? 'warn' : 'warn', // Set to warn by default
     transport: {
         target: 'pino-pretty',
         options: {
             colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname',
-            messageFormat: '[{time}] {msg} {context}',
-            levelFirst: true
+            translateTime: false, // Disable timestamp
+            ignore: 'pid,hostname,time',
+            messageFormat: '{msg}', // Simplified format
+            levelFirst: false, // Hide level
+            hideObject: true // Hide object dumps
         }
     },
     formatters: {
         level: (label) => {
-            return { level: label.toUpperCase() };
+            return {}; // Hide level in output
         }
     },
-    redact: {
-        paths: ['*.password', '*.secret', '*.token'],
-        remove: true
-    },
-    timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`,
+    // Minimal serializers
     serializers: {
         err: (err) => ({
-            type: err.type,
-            message: err.message,
-            stack: err.stack,
-            code: err.code,
-            statusCode: err.output?.statusCode
+            message: err.message
         })
     }
 });

@@ -27,11 +27,11 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "NODE_ENV=development DEBUG=* node src/index.js"
+args = "NODE_ENV=development node src/index.js"
 waitForPort = 5000
 
 [deployment]
-run = ["sh", "-c", "NODE_ENV=development DEBUG=* node src/index.js"]
+run = ["sh", "-c", "NODE_ENV=development node src/index.js"]
 
 [[ports]]
 localPort = 5000
