@@ -20,6 +20,11 @@ async function startBot() {
 
         // Setup Express server
         const app = express();
+
+        // Basic middleware
+        app.use(express.json());
+
+        // Health check endpoint
         app.get('/', (req, res) => {
             res.json({
                 status: 'running',
@@ -29,12 +34,16 @@ async function startBot() {
             });
         });
 
+        // ALWAYS serve on port 5000
+        const PORT = 5000;
+        const HOST = '0.0.0.0';
+
         // Start HTTP server with proper error handling
-        const server = app.listen(5000, '0.0.0.0', () => {
-            logger.info(`HTTP server listening on port 5000`);
+        const server = app.listen(PORT, HOST, () => {
+            logger.info(`Server is running on http://${HOST}:${PORT}`);
         }).on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
-                logger.error('Port 5000 is already in use. Make sure no other instance is running.');
+                logger.error(`Port ${PORT} is already in use. Please ensure no other service is using this port.`);
                 process.exit(1);
             } else {
                 logger.error('Failed to start HTTP server:', err);
@@ -60,7 +69,7 @@ async function startBot() {
             if (connection === 'close') {
                 const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== 403;
                 if (shouldReconnect) {
-                    logger.info('Connection closed, reconnecting...');
+                    logger.info('Connection closed, attempting to reconnect...');
                     startBot();
                 }
             }
@@ -81,4 +90,8 @@ async function startBot() {
     }
 }
 
-startBot();
+// Start the bot
+startBot().catch(err => {
+    logger.error('Fatal error starting bot:', err);
+    process.exit(1);
+});
