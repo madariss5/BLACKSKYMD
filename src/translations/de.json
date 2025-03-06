@@ -16,6 +16,12 @@
       "list_title": "Verfügbare Befehle:",
       "command_info": "Befehl: %s\nBeschreibung: %s\nVerwendung: %s"
     },
+    "menu": {
+      "description": "Zeigt das Befehlsmenü mit Kategorien",
+      "usage": ".menu",
+      "success": "Menü erfolgreich gesendet",
+      "error": "Fehler beim Anzeigen des Menüs"
+    },
     "sticker": {
       "description": "Erstellt einen Sticker aus einem Bild oder Video",
       "usage": ".sticker [Name]",

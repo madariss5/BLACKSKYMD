@@ -16,6 +16,12 @@
       "list_title": "Available Commands:",
       "command_info": "Command: %s\nDescription: %s\nUsage: %s"
     },
+    "menu": {
+      "description": "Shows the command menu with categories",
+      "usage": ".menu",
+      "success": "Menu sent successfully",
+      "error": "Error displaying menu"
+    },
     "sticker": {
       "description": "Creates a sticker from image or video",
       "usage": ".sticker [name]",
