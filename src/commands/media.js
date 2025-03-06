@@ -4,9 +4,7 @@ const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const sharp = require('sharp');
 const fs = require('fs').promises;
 const path = require('path');
-const axios = require('axios');
-
-const audioQueue = new Map(); // Store queues for different chats
+const { writeExifToWebp } = require('../utils/stickerMetadata');
 
 const mediaCommands = {
     async sticker(sock, message, args) {
@@ -19,39 +17,94 @@ const mediaCommands = {
                 return;
             }
 
-            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            // Create temp directory if it doesn't exist
             const tempDir = path.join(__dirname, '../../temp');
             await fs.mkdir(tempDir, { recursive: true });
 
+            // Download media
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const inputPath = path.join(tempDir, `input_${Date.now()}`);
             const outputPath = path.join(tempDir, `${Date.now()}.webp`);
 
-            if (message.message.imageMessage) {
-                await sharp(buffer)
-                    .resize(512, 512, {
-                        fit: 'contain',
-                        background: { r: 0, g: 0, b: 0, alpha: 0 }
-                    })
-                    .webp()
-                    .toFile(outputPath);
-            } else {
-                await sock.sendMessage(remoteJid, { 
-                    text: 'Video sticker support coming soon!' 
-                });
-                return;
+            try {
+                // Save input buffer
+                await fs.writeFile(inputPath, buffer);
+
+                if (message.message.imageMessage) {
+                    // Process image to sticker
+                    await sharp(buffer)
+                        .resize(512, 512, {
+                            fit: 'contain',
+                            background: { r: 0, g: 0, b: 0, alpha: 0 }
+                        })
+                        .webp()
+                        .toFile(outputPath);
+
+                    // Add metadata
+                    await writeExifToWebp(outputPath, {
+                        packname: config.sticker?.packname || "WhatsApp Bot",
+                        author: config.sticker?.author || "Made with ❤️"
+                    });
+
+                    // Send sticker
+                    await sock.sendMessage(remoteJid, { 
+                        sticker: { url: outputPath }
+                    });
+                } else if (message.message.videoMessage) {
+                    // Video sticker support
+                    const ffmpeg = require('fluent-ffmpeg');
+                    const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+                    ffmpeg.setFfmpegPath(ffmpegPath);
+
+                    // Convert video to WebP
+                    await new Promise((resolve, reject) => {
+                        ffmpeg(inputPath)
+                            .inputFormat('mp4')
+                            .on('error', reject)
+                            .on('end', resolve)
+                            .addOutputOptions([
+                                "-vcodec", "libwebp",
+                                "-vf", "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease,fps=15, pad=320:320:-1:-1:color=white@0.0, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse",
+                                "-loop", "0",
+                                "-ss", "00:00:00",
+                                "-t", "00:00:05",
+                                "-preset", "default",
+                                "-an",
+                                "-vsync", "0"
+                            ])
+                            .toFormat('webp')
+                            .save(outputPath);
+                    });
+
+                    // Add metadata
+                    await writeExifToWebp(outputPath, {
+                        packname: config.sticker?.packname || "WhatsApp Bot",
+                        author: config.sticker?.author || "Made with ❤️"
+                    });
+
+                    // Send sticker
+                    await sock.sendMessage(remoteJid, { 
+                        sticker: { url: outputPath }
+                    });
+                }
+
+            } finally {
+                // Cleanup temp files
+                try {
+                    await fs.unlink(inputPath);
+                    await fs.unlink(outputPath);
+                } catch (cleanupErr) {
+                    logger.error('Error cleaning up temp files:', cleanupErr);
+                }
             }
-
-            await sock.sendMessage(remoteJid, { 
-                sticker: { url: outputPath }
-            });
-
-            await fs.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in sticker command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: 'Failed to create sticker.' });
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: 'Failed to create sticker. Please ensure the media is valid.' 
+            });
         }
     },
-
     async toimg(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
@@ -83,7 +136,6 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to convert sticker to image.' });
         }
     },
-
     async brightness(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
@@ -917,8 +969,7 @@ const mediaCommands = {
     async play(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const sender = message.key.remoteJid; //Corrected sender assignment
-
+            const sender = message.key.remoteJid; 
             if (!message.message?.audioMessage && !message.message?.videoMessage && args.length === 0) {
                 await sock.sendMessage(remoteJid, {
                     text: 'Please provide a YouTube URL or reply to an audio message'
@@ -998,7 +1049,7 @@ const mediaCommands = {
     async stop(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
-            const sender = message.key.remoteJid; //Corrected sender assignment
+            const sender = message.key.remoteJid; 
             if (!audioQueue.has(sender)) {
                 await sock.sendMessage(remoteJid, {
                     text: 'No audio is currently playing'
@@ -1020,7 +1071,7 @@ const mediaCommands = {
     async queue(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
-            const sender = message.key.remoteJid; //Corrected sender assignment
+            const sender = message.key.remoteJid; 
             if (!audioQueue.has(sender) || audioQueue.get(sender).length === 0) {
                 await sock.sendMessage(remoteJid, {
                     text: 'The queue is empty'
