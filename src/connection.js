@@ -82,7 +82,7 @@ async function startConnection() {
         sock = makeWASocket({
             version,
             auth: state,
-            printQRInTerminal: true,
+            printQRInTerminal: false, 
             logger: logger,
             browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
@@ -98,16 +98,28 @@ async function startConnection() {
 
             if (qr && !qrDisplayed) {
                 qrDisplayed = true;
-                console.clear();
-                qrcode.generate(qr, { small: false });
-                console.log('\nScan the QR code above with WhatsApp to start the bot');
-                console.log('Note: The QR code will refresh automatically if not scanned within 60 seconds\n');
+                process.stdout.write('\x1Bc'); 
+                console.log('\n'.repeat(2)); 
+
+                qrcode.generate(qr, {
+                    small: false,
+                    scale: 2
+                }, (qrcode) => {
+                    console.log(qrcode);
+                });
+
+                console.log('\n'); 
+                console.log('📱 Scan the QR code above with WhatsApp to start the bot');
+                console.log('⏳ QR code will refresh in 60 seconds if not scanned\n');
             }
 
             if (connection === 'open' && !isConnected) {
                 isConnected = true;
                 qrDisplayed = false;
                 retryCount = 0;
+                process.stdout.write('\x1Bc'); 
+                console.log('✅ Successfully connected to WhatsApp!\n');
+
                 try {
                     let ownerNumber = process.env.OWNER_NUMBER;
                     if (!ownerNumber.includes('@s.whatsapp.net')) {
@@ -139,19 +151,19 @@ async function startConnection() {
                         const isValid = await validateSession();
                         if (!isValid) {
                             await cleanAuthState();
-                            console.log('\nSession invalid. A new QR code will be generated.\n');
+                            console.log('\n❌ Session invalid. A new QR code will be generated.\n');
                         }
                     }
 
-                    logger.info(`Reconnecting in ${Math.floor(delay/1000)} seconds...`);
+                    logger.info(`🔄 Reconnecting in ${Math.floor(delay/1000)} seconds...`);
                     setTimeout(startConnection, delay);
                 } else {
                     if (!shouldReconnect) {
-                        console.log('\nSession expired. A new QR code will be generated.\n');
+                        console.log('\n❌ Session expired. A new QR code will be generated.\n');
                         await cleanAuthState();
                         startConnection();
                     } else {
-                        console.log('\nMaximum retry attempts reached. Please restart the bot.\n');
+                        console.log('\n❌ Maximum retry attempts reached. Please restart the bot.\n');
                         process.exit(1);
                     }
                 }
