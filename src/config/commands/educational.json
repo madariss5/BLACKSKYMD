@@ -3,267 +3,71 @@
   "commands": [
     {
       "name": "define",
-      "description": "Get word definition",
-      "usage": "!define [word]",
+      "description": "Get detailed word definition and examples",
+      "usage": ".define [word]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "translate",
-      "description": "Translate text to another language",
-      "usage": "!translate [target_language] [text]",
+      "description": "Translate text between languages",
+      "usage": ".translate [target_language] [text]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "grammar",
-      "description": "Check text grammar",
-      "usage": "!grammar [text]",
+      "description": "Check text for grammatical errors",
+      "usage": ".grammar [text]",
       "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "conjugate",
-      "description": "Conjugate verbs in different languages",
-      "usage": "!conjugate [language] [verb]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "vocabulary",
-      "description": "Learn and practice vocabulary",
-      "usage": "!vocabulary <learn|practice|test> [language]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "idioms",
-      "description": "Learn common idioms",
-      "usage": "!idioms [language]",
-      "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "calculate",
-      "description": "Calculate mathematical expression",
-      "usage": "!calculate [expression]",
+      "description": "Solve mathematical expressions",
+      "usage": ".calculate [expression]",
       "cooldown": 3,
       "permissions": ["user"]
     },
     {
-      "name": "algebra",
-      "description": "Solve algebraic equations",
-      "usage": "!algebra [equation]",
+      "name": "wikipedia",
+      "description": "Search Wikipedia articles",
+      "usage": ".wikipedia [query]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
-      "name": "geometry",
-      "description": "Calculate geometric properties",
-      "usage": "!geometry [area|perimeter|volume] [shape] [dimensions]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "graph",
-      "description": "Graph mathematical functions",
-      "usage": "!graph [function]",
+      "name": "quiz",
+      "description": "Start an educational quiz session",
+      "usage": ".quiz [subject]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
-      "name": "statistics",
-      "description": "Perform statistical calculations",
-      "usage": "!statistics [numbers...]",
+      "name": "flashcards",
+      "description": "Create and review flashcards",
+      "usage": ".flashcards [create|review|list] [subject]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "studytimer",
+      "description": "Set a Pomodoro study timer",
+      "usage": ".studytimer [minutes]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "periodic",
       "description": "Get periodic table information",
-      "usage": "!periodic [element]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "chemical",
-      "description": "Analyze chemical formulas",
-      "usage": "!chemical [formula]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "physics",
-      "description": "Solve physics problems",
-      "usage": "!physics [formula] [values]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "astronomy",
-      "description": "Get astronomy information",
-      "usage": "!astronomy [topic]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "code",
-      "description": "Execute code snippets",
-      "usage": "!code [language] [code]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "regex",
-      "description": "Test regular expressions",
-      "usage": "!regex [pattern] [text]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "git",
-      "description": "Learn git commands",
-      "usage": "!git [command]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "flashcards",
-      "description": "Create and review flashcards",
-      "usage": "!flashcards [create|review|list] [subject]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "quiz",
-      "description": "Generate subject-specific quizzes",
-      "usage": "!quiz [subject]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "studytimer",
-      "description": "Set a Pomodoro study timer",
-      "usage": "!studytimer [minutes]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "schedule",
-      "description": "Manage study schedule",
-      "usage": "!schedule <add|view|remove> [details]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "wikipedia",
-      "description": "Search Wikipedia articles",
-      "usage": "!wikipedia [query]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "cite",
-      "description": "Generate citations",
-      "usage": "!cite [style] [source details]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "thesaurus",
-      "description": "Find word synonyms and antonyms",
-      "usage": "!thesaurus [word]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "mindmap",
-      "description": "Create and manage mind maps",
-      "usage": "!mindmap <create|view|edit> [topic]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "geography",
-      "description": "Get geographical information",
-      "usage": "!geography <country|capital|continent> [query]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "timezone",
-      "description": "Get timezone information",
-      "usage": "!timezone [location]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "worldfacts",
-      "description": "Get world facts and statistics",
-      "usage": "!worldfacts [category]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "anatomy",
-      "description": "Learn about human anatomy",
-      "usage": "!anatomy [system]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "ecosystem",
-      "description": "Learn about different ecosystems",
-      "usage": "!ecosystem [type]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "species",
-      "description": "Get information about species",
-      "usage": "!species [name]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "studygoal",
-      "description": "Set and track study goals",
-      "usage": "!studygoal <set|check|update> [details]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "progress",
-      "description": "Track study progress",
-      "usage": "!progress [subject]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "reminder",
-      "description": "Set study reminders",
-      "usage": "!reminder [time] [message]",
+      "usage": ".periodic [element]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "history",
-      "description": "Learn about historical periods",
-      "usage": "!history [period]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "timeline",
-      "description": "Get event timelines",
-      "usage": "!timeline [event]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "discovery",
-      "description": "Learn about important discoveries",
-      "usage": "!discovery [field]",
+      "description": "Learn about historical events",
+      "usage": ".history [period|event]",
       "cooldown": 10,
       "permissions": ["user"]
     }

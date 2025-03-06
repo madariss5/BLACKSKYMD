@@ -3,253 +3,183 @@
   "commands": [
     {
       "name": "weather",
-      "description": "Get weather information",
-      "usage": "!weather [city]",
+      "description": "Get weather information for a location",
+      "usage": ".weather [city]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "translate",
       "description": "Translate text between languages",
-      "usage": "!translate [from] [to] [text]",
+      "usage": ".translate [from] [to] [text]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "calculate",
-      "description": "Calculator with advanced functions",
-      "usage": "!calculate [expression]",
+      "description": "Calculator with advanced mathematical functions",
+      "usage": ".calculate [expression]",
       "cooldown": 3,
       "permissions": ["user"]
     },
     {
       "name": "dictionary",
-      "description": "Look up word definitions",
-      "usage": "!dictionary [word]",
+      "description": "Look up word definitions and examples",
+      "usage": ".dictionary [word]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "covid",
-      "description": "Get COVID-19 statistics",
-      "usage": "!covid [country]",
+      "description": "Get COVID-19 statistics by country",
+      "usage": ".covid [country]",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "currency",
-      "description": "Convert between currencies",
-      "usage": "!currency [amount] [from] [to]",
+      "description": "Convert between currencies with live rates",
+      "usage": ".currency [amount] [from] [to]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
-      "name": "reminder",
-      "description": "Set a reminder",
-      "usage": "!reminder [time] [message]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
       "name": "shortlink",
-      "description": "Shorten long URLs",
-      "usage": "!shortlink [url]",
+      "description": "Shorten long URLs for easier sharing",
+      "usage": ".shortlink [url]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "wiki",
-      "description": "Search Wikipedia",
-      "usage": "!wiki [query]",
+      "description": "Search and get Wikipedia article summaries",
+      "usage": ".wiki [query]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "poll",
-      "description": "Create a poll",
-      "usage": "!poll [question] | [option1] | [option2] ...",
+      "description": "Create interactive polls",
+      "usage": ".poll [question] | [option1] | [option2] ...",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "news",
-      "description": "Get latest news",
-      "usage": "!news [category]",
+      "description": "Get latest news by category",
+      "usage": ".news [category]",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "timezone",
-      "description": "Check time in different zones",
-      "usage": "!timezone [city/country]",
+      "description": "Check time in different time zones",
+      "usage": ".timezone [city/country]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "encode",
       "description": "Encode text (base64, hex, etc)",
-      "usage": "!encode [type] [text]",
+      "usage": ".encode [type] [text]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "decode",
       "description": "Decode encoded text",
-      "usage": "!decode [type] [text]",
+      "usage": ".decode [type] [text]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "qrread",
       "description": "Read QR code from image",
-      "usage": "!qrread",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "wolfram",
-      "description": "Query Wolfram Alpha",
-      "usage": "!wolfram [query]",
-      "cooldown": 30,
-      "permissions": ["premium"]
-    },
-    {
-      "name": "github",
-      "description": "Search GitHub repositories",
-      "usage": "!github [query]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "npm",
-      "description": "Search NPM packages",
-      "usage": "!npm [package]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "ipinfo",
-      "description": "Get IP address information",
-      "usage": "!ipinfo [ip]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "whois",
-      "description": "WHOIS domain lookup",
-      "usage": "!whois [domain]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "ocr",
-      "description": "Extract text from images",
-      "usage": "!ocr (reply to image)",
+      "usage": ".qrread",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "qrgen",
-      "description": "Generate QR code",
-      "usage": "!qrgen [text]",
+      "description": "Generate QR code from text",
+      "usage": ".qrgen [text]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "screenshot",
       "description": "Take website screenshot",
-      "usage": "!screenshot [url]",
+      "usage": ".screenshot [url]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wolfram",
+      "description": "Query Wolfram Alpha for complex calculations",
+      "usage": ".wolfram [query]",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "github",
+      "description": "Search GitHub repositories",
+      "usage": ".github [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "npm",
+      "description": "Search NPM packages",
+      "usage": ".npm [package]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "color",
-      "description": "Get color information",
-      "usage": "!color [hex/rgb]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "lyrics",
-      "description": "Search song lyrics",
-      "usage": "!lyrics [song name]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "movie",
-      "description": "Get movie information",
-      "usage": "!movie [title]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "anime",
-      "description": "Get anime information",
-      "usage": "!anime [title]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "spotify",
-      "description": "Search Spotify tracks",
-      "usage": "!spotify [track name]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "urban",
-      "description": "Look up Urban Dictionary",
-      "usage": "!urban [term]",
+      "description": "Get color information and conversions",
+      "usage": ".color [hex/rgb]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "crypto",
-      "description": "Check cryptocurrency prices",
-      "usage": "!crypto [coin]",
+      "description": "Check cryptocurrency prices and info",
+      "usage": ".crypto [coin]",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "stocks",
-      "description": "Check stock prices",
-      "usage": "!stocks [symbol]",
+      "description": "Check stock market prices",
+      "usage": ".stocks [symbol]",
       "cooldown": 30,
       "permissions": ["user"]
     },
     {
       "name": "reminder",
-      "description": "Set a reminder",
-      "usage": "!reminder [time] [message]",
+      "description": "Set timed reminders",
+      "usage": ".reminder [time] [message]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "countdown",
       "description": "Create countdown timer",
-      "usage": "!countdown [event] [date]",
+      "usage": ".countdown [event] [date]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
-      "name": "poll",
-      "description": "Create a poll",
-      "usage": "!poll [question] | [option1] | [option2]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
       "name": "todo",
-      "description": "Manage todo list",
-      "usage": "!todo <add|remove|list> [item]",
+      "description": "Manage personal todo list",
+      "usage": ".todo <add|remove|list> [item]",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "notes",
       "description": "Manage personal notes",
-      "usage": "!notes <add|view|delete> [content]",
+      "usage": ".notes <add|view|delete> [content]",
       "cooldown": 5,
       "permissions": ["user"]
     }
