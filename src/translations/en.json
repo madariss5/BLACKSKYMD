@@ -1,0 +1,81 @@
+{
+  "system": {
+    "connected": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 successfully connected",
+    "bot_active": "WhatsApp Bot is active",
+    "command_not_found": "Unknown command: %s\nUse %shelp to see available commands",
+    "command_disabled": "This command is currently disabled.",
+    "no_permission": "You do not have permission to use this command.",
+    "cooldown": "Please wait %.1f seconds before using %s again.",
+    "error": "Error processing command. Please try again later.",
+    "language_changed": "Language has been changed to English"
+  },
+  "commands": {
+    "help": {
+      "description": "Shows help for available commands",
+      "usage": ".help [command]",
+      "list_title": "Available Commands:",
+      "command_info": "Command: %s\nDescription: %s\nUsage: %s"
+    },
+    "sticker": {
+      "description": "Creates a sticker from image or video",
+      "usage": ".sticker [name]",
+      "no_media": "Please send an image or video",
+      "processing": "Creating sticker...",
+      "error": "Error creating sticker"
+    },
+    "play": {
+      "description": "Plays music",
+      "usage": ".play [song name or URL]",
+      "no_query": "Please provide a song name or URL",
+      "searching": "Searching for song...",
+      "not_found": "Song not found",
+      "playing": "Now playing: %s",
+      "error": "Error playing song"
+    },
+    "language": {
+      "description": "Changes the bot's language",
+      "usage": ".language [en|de]",
+      "success": "Language changed successfully",
+      "error": "Failed to change language"
+    }
+  },
+  "media": {
+    "no_media": "Please send a media file",
+    "processing": "Processing media...",
+    "success": "Successfully processed!",
+    "error": "Error processing media"
+  },
+  "group": {
+    "admin_required": "You must be an admin to use this command",
+    "user_not_found": "User not found",
+    "user_is_admin": "User is already an admin",
+    "user_not_admin": "User is not an admin",
+    "action_success": "Action completed successfully",
+    "action_failed": "Action failed",
+    "kick": {
+      "description": "Removes a user from the group",
+      "usage": ".kick @user",
+      "success": "User has been removed from the group",
+      "error": "Error removing user"
+    },
+    "add": {
+      "description": "Adds a user to the group",
+      "usage": ".add [number]",
+      "success": "User has been added to the group",
+      "error": "Error adding user"
+    }
+  },
+  "educational": {
+    "define": {
+      "description": "Shows word definition",
+      "usage": ".define [word]",
+      "not_found": "No definition found",
+      "searching": "Searching definition..."
+    },
+    "translate": {
+      "description": "Translates text to other languages",
+      "usage": ".translate [target_language] [text]",
+      "error": "Translation failed"
+    }
+  }
+}

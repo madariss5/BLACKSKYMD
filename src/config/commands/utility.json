@@ -2,6 +2,13 @@
   "category": "utility",
   "commands": [
     {
+      "name": "language",
+      "description": "Change the bot's language (en/de)",
+      "usage": ".language [language_code]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
       "name": "weather",
       "description": "Get weather information for a location",
       "usage": ".weather [city]",
