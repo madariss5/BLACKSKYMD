@@ -40,7 +40,6 @@ async function main() {
         // Load commands first
         console.log('Loading command configurations...');
         try {
-            await commandLoader.loadCommandConfigs(); //Preserving this line from original
             await commandLoader.loadCommandHandlers();
             console.log(`Loaded ${commandLoader.getAllCommands().length} commands successfully`);
         } catch (err) {
@@ -68,7 +67,7 @@ async function main() {
             try {
                 await messageHandler(sock, m);
             } catch (err) {
-                logger.error('Error handling message:', { //Preserving original logger here
+                logger.error('Error handling message:', {
                     error: err.message,
                     stack: err.stack,
                     messageId: m.key?.id,
