@@ -354,6 +354,148 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     async divorce(sock, sender) {
         // TODO: Implement divorce system
         await sock.sendMessage(sender, { text: 'Divorce system coming soon!' });
+    },
+
+    // RPG Commands
+    async adventure(sock, sender, args) {
+        const locations = ['forest', 'cave', 'mountain', 'desert', 'dungeon'];
+        const location = args[0]?.toLowerCase();
+
+        if (!locations.includes(location)) {
+            await sock.sendMessage(sender, { 
+                text: `Available locations: ${locations.join(', ')}` 
+            });
+            return;
+        }
+
+        const events = [
+            'found treasure!',
+            'encountered a monster!',
+            'discovered a secret path!',
+            'found rare items!',
+            'met a mysterious stranger!'
+        ];
+
+        const event = events[Math.floor(Math.random() * events.length)];
+        await sock.sendMessage(sender, {
+            text: `🗺️ Adventure in ${location}: You ${event}`
+        });
+    },
+
+    async dungeon(sock, sender, args) {
+        const level = parseInt(args[0]) || 1;
+        const maxLevel = 10;
+
+        if (level < 1 || level > maxLevel) {
+            await sock.sendMessage(sender, {
+                text: `Please choose a level between 1 and ${maxLevel}`
+            });
+            return;
+        }
+
+        const events = [
+            'found rare loot!',
+            'defeated a boss!',
+            'discovered a treasure chest!',
+            'activated a trap!',
+            'found a secret room!'
+        ];
+
+        const event = events[Math.floor(Math.random() * events.length)];
+        await sock.sendMessage(sender, {
+            text: `⚔️ Dungeon Level ${level}: You ${event}`
+        });
+    },
+
+    async battle(sock, sender, args) {
+        const monsters = ['goblin', 'dragon', 'skeleton', 'witch', 'troll'];
+        const monster = args[0]?.toLowerCase();
+
+        if (!monsters.includes(monster)) {
+            await sock.sendMessage(sender, {
+                text: `Available monsters: ${monsters.join(', ')}`
+            });
+            return;
+        }
+
+        const outcomes = ['won', 'lost', 'escaped', 'critical hit', 'found treasure'];
+        const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
+        await sock.sendMessage(sender, {
+            text: `⚔️ Battle: You ${outcome} against the ${monster}!`
+        });
+    },
+
+    // Gambling Commands
+    async blackjack(sock, sender, args) {
+        const bet = parseInt(args[0]) || 10;
+        const cards = ['A♠️', '2♠️', '3♠️', '4♠️', '5♠️', '6♠️', '7♠️', '8♠️', '9♠️', '10♠️', 'J♠️', 'Q♠️', 'K♠️'];
+        const playerCards = [
+            cards[Math.floor(Math.random() * cards.length)],
+            cards[Math.floor(Math.random() * cards.length)]
+        ];
+        const dealerCards = [cards[Math.floor(Math.random() * cards.length)], '?️'];
+
+        await sock.sendMessage(sender, {
+            text: `🎰 Blackjack (Bet: ${bet})\nYour cards: ${playerCards.join(' ')}\nDealer cards: ${dealerCards.join(' ')}\nType !hit or !stand`
+        });
+    },
+
+    async poker(sock, sender, args) {
+        const bet = parseInt(args[0]) || 10;
+        const cards = ['A♠️', 'K♠️', 'Q♠️', 'J♠️', '10♠️'];
+        const playerCards = [
+            cards[Math.floor(Math.random() * cards.length)],
+            cards[Math.floor(Math.random() * cards.length)]
+        ];
+
+        await sock.sendMessage(sender, {
+            text: `🎰 Poker (Bet: ${bet})\nYour cards: ${playerCards.join(' ')}\nType !call, !raise, or !fold`
+        });
+    },
+
+    async roulette(sock, sender, args) {
+        const [bet, choice] = args;
+        const betAmount = parseInt(bet) || 10;
+
+        if (!choice) {
+            await sock.sendMessage(sender, {
+                text: 'Please specify your bet (number 0-36 or color red/black)'
+            });
+            return;
+        }
+
+        const result = Math.floor(Math.random() * 37);
+        const resultColor = result === 0 ? 'green' : (result % 2 === 0 ? 'red' : 'black');
+        const won = (choice.toLowerCase() === resultColor) || (parseInt(choice) === result);
+
+        await sock.sendMessage(sender, {
+            text: `🎰 Roulette\nResult: ${result} (${resultColor})\nYou ${won ? 'won' : 'lost'}!`
+        });
+    },
+
+    async heist(sock, sender, args) {
+        const targets = ['bank', 'casino', 'mansion', 'vault', 'train'];
+        const target = args[0]?.toLowerCase();
+
+        if (!targets.includes(target)) {
+            await sock.sendMessage(sender, {
+                text: `Available heist targets: ${targets.join(', ')}`
+            });
+            return;
+        }
+
+        const outcomes = [
+            'successfully completed the heist!',
+            'got caught by security!',
+            'found a secret vault!',
+            'triggered the alarm!',
+            'escaped with the loot!'
+        ];
+
+        const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
+        await sock.sendMessage(sender, {
+            text: `🦹 Heist: You ${outcome}`
+        });
     }
 };
 

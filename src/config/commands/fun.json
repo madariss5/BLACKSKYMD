@@ -252,6 +252,146 @@
       "usage": "!divorce",
       "cooldown": 86400,
       "permissions": ["user"]
+    },
+    {
+      "name": "adventure",
+      "description": "Start an adventure",
+      "usage": "!adventure [location]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "dungeon",
+      "description": "Explore a dungeon",
+      "usage": "!dungeon [level]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "battle",
+      "description": "Battle monsters",
+      "usage": "!battle [monster]",
+      "cooldown": 15,
+      "permissions": ["user"]
+    },
+    {
+      "name": "craft",
+      "description": "Craft items",
+      "usage": "!craft [item]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "enchant",
+      "description": "Enchant items",
+      "usage": "!enchant [item]",
+      "cooldown": 20,
+      "permissions": ["user"]
+    },
+    {
+      "name": "quest",
+      "description": "Accept or view quests",
+      "usage": "!quest [accept|view] [id]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "achievements",
+      "description": "View achievements",
+      "usage": "!achievements",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "daily",
+      "description": "Claim daily rewards",
+      "usage": "!daily",
+      "cooldown": 86400,
+      "permissions": ["user"]
+    },
+    {
+      "name": "weekly",
+      "description": "Claim weekly rewards",
+      "usage": "!weekly",
+      "cooldown": 604800,
+      "permissions": ["user"]
+    },
+    {
+      "name": "monthly",
+      "description": "Claim monthly rewards",
+      "usage": "!monthly",
+      "cooldown": 2592000,
+      "permissions": ["user"]
+    },
+    {
+      "name": "lottery",
+      "description": "Play lottery",
+      "usage": "!lottery [numbers]",
+      "cooldown": 3600,
+      "permissions": ["user"]
+    },
+    {
+      "name": "blackjack",
+      "description": "Play blackjack",
+      "usage": "!blackjack [bet]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "poker",
+      "description": "Play poker",
+      "usage": "!poker [bet]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "race",
+      "description": "Start a racing game",
+      "usage": "!race [bet]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "steal",
+      "description": "Steal from other users",
+      "usage": "!steal @user",
+      "cooldown": 3600,
+      "permissions": ["user"]
+    },
+    {
+      "name": "rob",
+      "description": "Rob other users",
+      "usage": "!rob @user",
+      "cooldown": 3600,
+      "permissions": ["user"]
+    },
+    {
+      "name": "heist",
+      "description": "Organize a heist",
+      "usage": "!heist [target]",
+      "cooldown": 7200,
+      "permissions": ["user"]
+    },
+    {
+      "name": "coinflip",
+      "description": "Bet on coin flip",
+      "usage": "!coinflip [bet] [heads|tails]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "dice",
+      "description": "Roll dice for money",
+      "usage": "!dice [bet] [number]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "roulette",
+      "description": "Play roulette",
+      "usage": "!roulette [bet] [number|color]",
+      "cooldown": 10,
+      "permissions": ["user"]
     }
   ]
 }

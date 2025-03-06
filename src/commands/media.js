@@ -137,6 +137,156 @@ const mediaCommands = {
         }
         // TODO: Implement Instagram media download
         await sock.sendMessage(sender, { text: 'Downloading Instagram media...' });
+    },
+
+    // Image Manipulation Commands
+    async removebg(sock, sender) {
+        // TODO: Implement background removal
+        await sock.sendMessage(sender, { text: 'Removing background...' });
+    },
+
+    async blur(sock, sender, args) {
+        const level = parseInt(args[0]) || 5;
+        // TODO: Implement blur effect
+        await sock.sendMessage(sender, { text: `Applying blur effect (level ${level})...` });
+    },
+
+    async pixelate(sock, sender, args) {
+        const level = parseInt(args[0]) || 8;
+        // TODO: Implement pixelation
+        await sock.sendMessage(sender, { text: `Pixelating image (level ${level})...` });
+    },
+
+    async deepfry(sock, sender) {
+        // TODO: Implement deep fry effect
+        await sock.sendMessage(sender, { text: 'Deep frying image...' });
+    },
+
+    async caption(sock, sender, args) {
+        const text = args.join(' ');
+        if (!text) {
+            await sock.sendMessage(sender, { text: 'Please provide caption text' });
+            return;
+        }
+        // TODO: Implement caption addition
+        await sock.sendMessage(sender, { text: 'Adding caption...' });
+    },
+
+    async meme(sock, sender, args) {
+        const [topText, bottomText] = args.join(' ').split('|').map(text => text.trim());
+        if (!topText || !bottomText) {
+            await sock.sendMessage(sender, { text: 'Please provide top and bottom text separated by |' });
+            return;
+        }
+        // TODO: Implement meme creation
+        await sock.sendMessage(sender, { text: 'Creating meme...' });
+    },
+
+    // Sticker Features
+    async stickersearch(sock, sender, args) {
+        const query = args.join(' ');
+        if (!query) {
+            await sock.sendMessage(sender, { text: 'Please provide a search term' });
+            return;
+        }
+        // TODO: Implement sticker search
+        await sock.sendMessage(sender, { text: 'Searching for stickers...' });
+    },
+
+    async stickerpack(sock, sender, args) {
+        const packName = args.join(' ');
+        if (!packName) {
+            await sock.sendMessage(sender, { text: 'Please provide a sticker pack name' });
+            return;
+        }
+        // TODO: Implement sticker pack download
+        await sock.sendMessage(sender, { text: 'Getting sticker pack...' });
+    },
+
+    // Image Processing
+    async compress(sock, sender, args) {
+        const quality = parseInt(args[0]) || 80;
+        // TODO: Implement image compression
+        await sock.sendMessage(sender, { text: `Compressing media (quality: ${quality}%)...` });
+    },
+
+    async enhance(sock, sender) {
+        // TODO: Implement image enhancement
+        await sock.sendMessage(sender, { text: 'Enhancing image quality...' });
+    },
+
+    async resize(sock, sender, args) {
+        const [width, height] = args.map(Number);
+        if (!width || !height) {
+            await sock.sendMessage(sender, { text: 'Please provide width and height' });
+            return;
+        }
+        // TODO: Implement image resizing
+        await sock.sendMessage(sender, { text: `Resizing image to ${width}x${height}...` });
+    },
+
+    async crop(sock, sender, args) {
+        const [x, y, width, height] = args.map(Number);
+        if (!x || !y || !width || !height) {
+            await sock.sendMessage(sender, { text: 'Please provide x, y, width, and height' });
+            return;
+        }
+        // TODO: Implement image cropping
+        await sock.sendMessage(sender, { text: 'Cropping image...' });
+    },
+
+    async flip(sock, sender, args) {
+        const direction = args[0]?.toLowerCase();
+        if (!direction || !['horizontal', 'vertical'].includes(direction)) {
+            await sock.sendMessage(sender, { text: 'Please specify horizontal or vertical' });
+            return;
+        }
+        // TODO: Implement image flipping
+        await sock.sendMessage(sender, { text: `Flipping image ${direction}ly...` });
+    },
+
+    async rotate(sock, sender, args) {
+        const degrees = parseInt(args[0]) || 90;
+        // TODO: Implement image rotation
+        await sock.sendMessage(sender, { text: `Rotating image ${degrees} degrees...` });
+    },
+
+    async filter(sock, sender, args) {
+        const filterType = args[0]?.toLowerCase();
+        const filters = ['grayscale', 'sepia', 'invert', 'brightness', 'contrast'];
+        if (!filterType || !filters.includes(filterType)) {
+            await sock.sendMessage(sender, { 
+                text: `Please specify a filter type: ${filters.join(', ')}` 
+            });
+            return;
+        }
+        // TODO: Implement filter application
+        await sock.sendMessage(sender, { text: `Applying ${filterType} filter...` });
+    },
+
+    async merge(sock, sender) {
+        // TODO: Implement image merging
+        await sock.sendMessage(sender, { text: 'Merging images...' });
+    },
+
+    async watermark(sock, sender, args) {
+        const text = args.join(' ');
+        if (!text) {
+            await sock.sendMessage(sender, { text: 'Please provide watermark text' });
+            return;
+        }
+        // TODO: Implement watermark addition
+        await sock.sendMessage(sender, { text: 'Adding watermark...' });
+    },
+
+    async qr(sock, sender, args) {
+        const text = args.join(' ');
+        if (!text) {
+            await sock.sendMessage(sender, { text: 'Please provide text for QR code' });
+            return;
+        }
+        // TODO: Implement QR code generation
+        await sock.sendMessage(sender, { text: 'Generating QR code...' });
     }
 };
 

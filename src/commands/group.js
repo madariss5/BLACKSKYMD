@@ -154,26 +154,171 @@ Group Information:
         await sock.sendMessage(sender, { text: 'Goodbye message settings updated' });
     },
 
-    async antilink(sock, sender, args) {
-        if (!args[0]) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !antilink <on|off>' 
+
+    // Group Security Commands
+    async blacklist(sock, sender, args) {
+        const [action, user] = args;
+        if (!action || (action !== 'list' && !user)) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !blacklist <add|remove|list> [@user]'
             });
             return;
         }
-        // Implement antilink logic here
-        await sock.sendMessage(sender, { text: 'Antilink settings updated' });
+        // TODO: Implement blacklist management
+        await sock.sendMessage(sender, { text: `Blacklist ${action} command received` });
     },
 
-    async antispam(sock, sender, args) {
-        if (!args[0]) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !antispam <on|off>' 
+    async whitelist(sock, sender, args) {
+        const [action, user] = args;
+        if (!action || (action !== 'list' && !user)) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !whitelist <add|remove|list> [@user]'
             });
             return;
         }
-        // Implement antispam logic here
-        await sock.sendMessage(sender, { text: 'Antispam settings updated' });
+        // TODO: Implement whitelist management
+        await sock.sendMessage(sender, { text: `Whitelist ${action} command received` });
+    },
+
+    async mute(sock, sender, args) {
+        const duration = args[0] || '1h';
+        // TODO: Implement group mute
+        await sock.sendMessage(sender, { text: `Group muted for ${duration}` });
+    },
+
+    async unmute(sock, sender) {
+        // TODO: Implement group unmute
+        await sock.sendMessage(sender, { text: 'Group unmuted' });
+    },
+
+    // Group Configuration Commands
+    async setprefix(sock, sender, args) {
+        const prefix = args[0];
+        if (!prefix) {
+            await sock.sendMessage(sender, { text: 'Please specify a new prefix' });
+            return;
+        }
+        // TODO: Implement prefix change
+        await sock.sendMessage(sender, { text: `Group prefix set to: ${prefix}` });
+    },
+
+    async setwelcome(sock, sender, args) {
+        const message = args.join(' ');
+        if (!message) {
+            await sock.sendMessage(sender, { text: 'Please specify a welcome message' });
+            return;
+        }
+        // TODO: Implement welcome message setting
+        await sock.sendMessage(sender, { text: 'Welcome message updated' });
+    },
+
+    async setgoodbye(sock, sender, args) {
+        const message = args.join(' ');
+        if (!message) {
+            await sock.sendMessage(sender, { text: 'Please specify a goodbye message' });
+            return;
+        }
+        // TODO: Implement goodbye message setting
+        await sock.sendMessage(sender, { text: 'Goodbye message updated' });
+    },
+
+    // Group Protection Commands
+    async antispam(sock, sender, args) {
+        const [status, limit] = args;
+        if (!status || !['on', 'off'].includes(status)) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !antispam <on|off> [limit]'
+            });
+            return;
+        }
+        // TODO: Implement anti-spam
+        await sock.sendMessage(sender, { text: `Anti-spam ${status}` });
+    },
+
+    async antilink(sock, sender, args) {
+        const status = args[0];
+        if (!status || !['on', 'off'].includes(status)) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !antilink <on|off>'
+            });
+            return;
+        }
+        // TODO: Implement anti-link
+        await sock.sendMessage(sender, { text: `Anti-link ${status}` });
+    },
+
+    async antisticker(sock, sender, args) {
+        const status = args[0];
+        if (!status || !['on', 'off'].includes(status)) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !antisticker <on|off>'
+            });
+            return;
+        }
+        // TODO: Implement anti-sticker
+        await sock.sendMessage(sender, { text: `Anti-sticker ${status}` });
+    },
+
+    async antiraid(sock, sender, args) {
+        const status = args[0];
+        if (!status || !['on', 'off'].includes(status)) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !antiraid <on|off>'
+            });
+            return;
+        }
+        // TODO: Implement anti-raid
+        await sock.sendMessage(sender, { text: `Anti-raid ${status}` });
+    },
+
+    // Warning System
+    async warn(sock, sender, args) {
+        const [user, ...reason] = args;
+        if (!user) {
+            await sock.sendMessage(sender, { text: 'Please specify a user to warn' });
+            return;
+        }
+        // TODO: Implement warning system
+        await sock.sendMessage(sender, {
+            text: `Warned ${user}${reason.length ? ` for: ${reason.join(' ')}` : ''}`
+        });
+    },
+
+    async removewarn(sock, sender, args) {
+        const user = args[0];
+        if (!user) {
+            await sock.sendMessage(sender, { text: 'Please specify a user' });
+            return;
+        }
+        // TODO: Implement warning removal
+        await sock.sendMessage(sender, { text: `Removed warning from ${user}` });
+    },
+
+    async warnings(sock, sender, args) {
+        const user = args[0];
+        // TODO: Implement warnings check
+        await sock.sendMessage(sender, {
+            text: user ? `Warnings for ${user}: 0` : 'Group warnings: None'
+        });
+    },
+
+    // Chat Control
+    async chatfilter(sock, sender, args) {
+        const [action, word] = args;
+        if (!action || (action !== 'list' && !word)) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !chatfilter <add|remove|list> [word]'
+            });
+            return;
+        }
+        // TODO: Implement chat filter
+        await sock.sendMessage(sender, { text: `Chat filter ${action} command received` });
+    },
+
+    async slowmode(sock, sender, args) {
+        const duration = args[0] || '10s';
+        // TODO: Implement slowmode
+        await sock.sendMessage(sender, { text: `Slowmode set to ${duration}` });
     }
 };
 

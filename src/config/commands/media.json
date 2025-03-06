@@ -105,6 +105,146 @@
       "usage": "!instagram [url]",
       "cooldown": 30,
       "permissions": ["user"]
+    },
+    {
+      "name": "removebg",
+      "description": "Remove background from image",
+      "usage": "!removebg",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "blur",
+      "description": "Apply blur effect to image",
+      "usage": "!blur [level]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "pixelate",
+      "description": "Pixelate an image",
+      "usage": "!pixelate [level]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "deepfry",
+      "description": "Deepfry an image",
+      "usage": "!deepfry",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "caption",
+      "description": "Add caption to image",
+      "usage": "!caption [text]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "meme",
+      "description": "Create a meme",
+      "usage": "!meme [top text] | [bottom text]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "gif",
+      "description": "Search and send GIF",
+      "usage": "!gif [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "stickersearch",
+      "description": "Search for stickers",
+      "usage": "!stickersearch [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "stickerpack",
+      "description": "Get sticker pack",
+      "usage": "!stickerpack [name]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "customsticker",
+      "description": "Create custom sticker",
+      "usage": "!customsticker [text]",
+      "cooldown": 20,
+      "permissions": ["user"]
+    },
+    {
+      "name": "compress",
+      "description": "Compress media file",
+      "usage": "!compress [quality]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "enhance",
+      "description": "Enhance image quality",
+      "usage": "!enhance",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "resize",
+      "description": "Resize image",
+      "usage": "!resize [width] [height]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "crop",
+      "description": "Crop image",
+      "usage": "!crop [x] [y] [width] [height]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "flip",
+      "description": "Flip image",
+      "usage": "!flip <horizontal|vertical>",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "rotate",
+      "description": "Rotate image",
+      "usage": "!rotate [degrees]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "filter",
+      "description": "Apply filter to image",
+      "usage": "!filter [type]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "merge",
+      "description": "Merge multiple images",
+      "usage": "!merge",
+      "cooldown": 20,
+      "permissions": ["user"]
+    },
+    {
+      "name": "watermark",
+      "description": "Add watermark to image",
+      "usage": "!watermark [text]",
+      "cooldown": 20,
+      "permissions": ["user"]
+    },
+    {
+      "name": "qr",
+      "description": "Generate QR code",
+      "usage": "!qr [text]",
+      "cooldown": 10,
+      "permissions": ["user"]
     }
   ]
 }

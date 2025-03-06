@@ -35,6 +35,146 @@
       "usage": "!groupinfo",
       "cooldown": 10,
       "permissions": ["user"]
+    },
+    {
+      "name": "blacklist",
+      "description": "Manage group blacklist",
+      "usage": "!blacklist <add|remove|list> [@user]",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "whitelist",
+      "description": "Manage group whitelist",
+      "usage": "!whitelist <add|remove|list> [@user]",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "mute",
+      "description": "Mute the group",
+      "usage": "!mute [duration]",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "unmute",
+      "description": "Unmute the group",
+      "usage": "!unmute",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "setprefix",
+      "description": "Set group command prefix",
+      "usage": "!setprefix [prefix]",
+      "cooldown": 30,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "setwelcome",
+      "description": "Set welcome message",
+      "usage": "!setwelcome [message]",
+      "cooldown": 30,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "setgoodbye",
+      "description": "Set goodbye message",
+      "usage": "!setgoodbye [message]",
+      "cooldown": 30,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "groupmode",
+      "description": "Set group mode",
+      "usage": "!groupmode <public|private|restricted>",
+      "cooldown": 30,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "antispam",
+      "description": "Configure anti-spam",
+      "usage": "!antispam <on|off> [limit]",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "antilink",
+      "description": "Configure anti-link",
+      "usage": "!antilink <on|off>",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "antisticker",
+      "description": "Configure anti-sticker spam",
+      "usage": "!antisticker <on|off>",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "antiraid",
+      "description": "Configure anti-raid protection",
+      "usage": "!antiraid <on|off>",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "restrict",
+      "description": "Restrict group features",
+      "usage": "!restrict <feature> <on|off>",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "warn",
+      "description": "Warn a user",
+      "usage": "!warn @user [reason]",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "removewarn",
+      "description": "Remove a warning",
+      "usage": "!removewarn @user",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "warnings",
+      "description": "Check warnings",
+      "usage": "!warnings [@user]",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "chatfilter",
+      "description": "Configure chat filter",
+      "usage": "!chatfilter <add|remove|list> [word]",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "slowmode",
+      "description": "Set slowmode",
+      "usage": "!slowmode <duration>",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "lockgroup",
+      "description": "Lock group settings",
+      "usage": "!lockgroup",
+      "cooldown": 30,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "unlockgroup",
+      "description": "Unlock group settings",
+      "usage": "!unlockgroup",
+      "cooldown": 30,
+      "permissions": ["admin"]
     }
   ]
 }
