@@ -245,6 +245,97 @@
       "usage": "!qr [text]",
       "cooldown": 10,
       "permissions": ["user"]
+    },
+    {
+      "name": "waifu",
+      "description": "Get random waifu image",
+      "usage": "!waifu [category]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "neko",
+      "description": "Get random neko image",
+      "usage": "!neko",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "animesearch",
+      "description": "Search for anime information",
+      "usage": "!animesearch [title]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "mangasearch",
+      "description": "Search for manga information",
+      "usage": "!mangasearch [title]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "facebook",
+      "description": "Download Facebook video",
+      "usage": "!facebook [url]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "twitter",
+      "description": "Download Twitter video/image",
+      "usage": "!twitter [url]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "soundcloud",
+      "description": "Download SoundCloud audio",
+      "usage": "!soundcloud [url]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "lyrics",
+      "description": "Get song lyrics",
+      "usage": "!lyrics [song name]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "movie",
+      "description": "Get movie information",
+      "usage": "!movie [title]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "series",
+      "description": "Get TV series information",
+      "usage": "!series [title]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "animestyle",
+      "description": "Convert image to anime style",
+      "usage": "!animestyle",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "cartoonize",
+      "description": "Convert image to cartoon style",
+      "usage": "!cartoonize",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "artstyle",
+      "description": "Apply artistic style to image",
+      "usage": "!artstyle [style]",
+      "cooldown": 30,
+      "permissions": ["premium"]
     }
   ]
 }

@@ -287,6 +287,133 @@ const mediaCommands = {
         }
         // TODO: Implement QR code generation
         await sock.sendMessage(sender, { text: 'Generating QR code...' });
+    },
+
+    // Anime Commands
+    async waifu(sock, sender, args) {
+        const category = args[0] || 'sfw';
+        const categories = ['sfw', 'nsfw'];
+
+        if (!categories.includes(category)) {
+            await sock.sendMessage(sender, { 
+                text: `Please specify a valid category: ${categories.join(', ')}` 
+            });
+            return;
+        }
+        // TODO: Implement waifu image fetching
+        await sock.sendMessage(sender, { text: 'Fetching waifu image...' });
+    },
+
+    async neko(sock, sender) {
+        // TODO: Implement neko image fetching
+        await sock.sendMessage(sender, { text: 'Fetching neko image...' });
+    },
+
+    async animesearch(sock, sender, args) {
+        const title = args.join(' ');
+        if (!title) {
+            await sock.sendMessage(sender, { text: 'Please provide an anime title' });
+            return;
+        }
+        // TODO: Implement anime search
+        await sock.sendMessage(sender, { text: `Searching for anime: ${title}` });
+    },
+
+    async mangasearch(sock, sender, args) {
+        const title = args.join(' ');
+        if (!title) {
+            await sock.sendMessage(sender, { text: 'Please provide a manga title' });
+            return;
+        }
+        // TODO: Implement manga search
+        await sock.sendMessage(sender, { text: `Searching for manga: ${title}` });
+    },
+
+    // Social Media Downloads
+    async facebook(sock, sender, args) {
+        const url = args[0];
+        if (!url) {
+            await sock.sendMessage(sender, { text: 'Please provide a Facebook video URL' });
+            return;
+        }
+        // TODO: Implement Facebook video download
+        await sock.sendMessage(sender, { text: 'Downloading Facebook video...' });
+    },
+
+    async twitter(sock, sender, args) {
+        const url = args[0];
+        if (!url) {
+            await sock.sendMessage(sender, { text: 'Please provide a Twitter URL' });
+            return;
+        }
+        // TODO: Implement Twitter media download
+        await sock.sendMessage(sender, { text: 'Downloading Twitter media...' });
+    },
+
+    async soundcloud(sock, sender, args) {
+        const url = args[0];
+        if (!url) {
+            await sock.sendMessage(sender, { text: 'Please provide a SoundCloud URL' });
+            return;
+        }
+        // TODO: Implement SoundCloud audio download
+        await sock.sendMessage(sender, { text: 'Downloading SoundCloud audio...' });
+    },
+
+    // Entertainment Commands
+    async lyrics(sock, sender, args) {
+        const song = args.join(' ');
+        if (!song) {
+            await sock.sendMessage(sender, { text: 'Please provide a song name' });
+            return;
+        }
+        // TODO: Implement lyrics search
+        await sock.sendMessage(sender, { text: `Searching lyrics for: ${song}` });
+    },
+
+    async movie(sock, sender, args) {
+        const title = args.join(' ');
+        if (!title) {
+            await sock.sendMessage(sender, { text: 'Please provide a movie title' });
+            return;
+        }
+        // TODO: Implement movie info search
+        await sock.sendMessage(sender, { text: `Searching movie info: ${title}` });
+    },
+
+    async series(sock, sender, args) {
+        const title = args.join(' ');
+        if (!title) {
+            await sock.sendMessage(sender, { text: 'Please provide a series title' });
+            return;
+        }
+        // TODO: Implement TV series info search
+        await sock.sendMessage(sender, { text: `Searching series info: ${title}` });
+    },
+
+    // AI Style Transfer Commands
+    async animestyle(sock, sender) {
+        // TODO: Implement anime style conversion
+        await sock.sendMessage(sender, { text: 'Converting image to anime style...' });
+    },
+
+    async cartoonize(sock, sender) {
+        // TODO: Implement cartoonization
+        await sock.sendMessage(sender, { text: 'Converting image to cartoon style...' });
+    },
+
+    async artstyle(sock, sender, args) {
+        const style = args[0];
+        const styles = ['vangogh', 'picasso', 'monet', 'abstract'];
+
+        if (!style || !styles.includes(style.toLowerCase())) {
+            await sock.sendMessage(sender, { 
+                text: `Please specify a valid style: ${styles.join(', ')}` 
+            });
+            return;
+        }
+        // TODO: Implement art style transfer
+        await sock.sendMessage(sender, { text: `Applying ${style} style to image...` });
     }
 };
 

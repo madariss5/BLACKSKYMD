@@ -5,28 +5,140 @@
       "name": "weather",
       "description": "Get weather information",
       "usage": "!weather [city]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "translate",
+      "description": "Translate text between languages",
+      "usage": "!translate [from] [to] [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "calculate",
+      "description": "Calculator with advanced functions",
+      "usage": "!calculate [expression]",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "dictionary",
+      "description": "Look up word definitions",
+      "usage": "!dictionary [word]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "covid",
+      "description": "Get COVID-19 statistics",
+      "usage": "!covid [country]",
       "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "currency",
+      "description": "Convert between currencies",
+      "usage": "!currency [amount] [from] [to]",
+      "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "reminder",
       "description": "Set a reminder",
       "usage": "!reminder [time] [message]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "shortlink",
+      "description": "Shorten long URLs",
+      "usage": "!shortlink [url]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wiki",
+      "description": "Search Wikipedia",
+      "usage": "!wiki [query]",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "poll",
       "description": "Create a poll",
-      "usage": "!poll [question] [option1] [option2] ...",
-      "cooldown": 60,
+      "usage": "!poll [question] | [option1] | [option2] ...",
+      "cooldown": 30,
       "permissions": ["user"]
     },
     {
-      "name": "stats",
-      "description": "Show bot statistics",
-      "usage": "!stats",
+      "name": "news",
+      "description": "Get latest news",
+      "usage": "!news [category]",
       "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "timezone",
+      "description": "Check time in different zones",
+      "usage": "!timezone [city/country]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "encode",
+      "description": "Encode text (base64, hex, etc)",
+      "usage": "!encode [type] [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "decode",
+      "description": "Decode encoded text",
+      "usage": "!decode [type] [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "qrread",
+      "description": "Read QR code from image",
+      "usage": "!qrread",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wolfram",
+      "description": "Query Wolfram Alpha",
+      "usage": "!wolfram [query]",
+      "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "github",
+      "description": "Search GitHub repositories",
+      "usage": "!github [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "npm",
+      "description": "Search NPM packages",
+      "usage": "!npm [package]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "ipinfo",
+      "description": "Get IP address information",
+      "usage": "!ipinfo [ip]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "whois",
+      "description": "WHOIS domain lookup",
+      "usage": "!whois [domain]",
+      "cooldown": 10,
       "permissions": ["user"]
     }
   ]
