@@ -184,30 +184,31 @@
       "permissions": ["admin"]
     },
     {
+      "name": "rules",
+      "description": "Manage group rules",
+      "usage": "!rules <add|remove|list> [rule]",
+      "example": "!rules add No spamming",
+      "cooldown": 10,
+      "permissions": ["admin"]
+    },
+    {
       "name": "stats",
       "description": "View group statistics",
       "usage": "!stats",
       "cooldown": 30,
-      "permissions": ["admin"]
+      "permissions": ["user"]
     },
     {
       "name": "activity",
-      "description": "View activity report",
+      "description": "View group activity report",
       "usage": "!activity",
       "cooldown": 30,
-      "permissions": ["admin"]
+      "permissions": ["user"]
     },
     {
       "name": "report",
       "description": "Generate group report",
       "usage": "!report <daily|weekly|monthly>",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "rules",
-      "description": "Manage group rules",
-      "usage": "!rules <add|remove|list> [rule]",
       "cooldown": 30,
       "permissions": ["admin"]
     },
