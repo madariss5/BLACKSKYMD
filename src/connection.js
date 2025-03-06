@@ -12,6 +12,7 @@ const MAX_RETRIES = 10;
 const RETRY_INTERVAL = 10000;
 const AUTH_DIR = path.join(process.cwd(), 'auth_info');
 let isConnected = false;
+let qrDisplayed = false;
 
 async function validateSession() {
     try {
@@ -56,7 +57,6 @@ async function sendCredsFile(sock, ownerNumber) {
 
 async function startConnection() {
     try {
-        // Silently load commands
         await commandLoader.loadCommandHandlers();
         await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
 
@@ -82,7 +82,7 @@ async function startConnection() {
         sock = makeWASocket({
             version,
             auth: state,
-            printQRInTerminal: false,
+            printQRInTerminal: true,
             logger: logger,
             browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
@@ -96,14 +96,17 @@ async function startConnection() {
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
-            if (qr) {
+            if (qr && !qrDisplayed) {
+                qrDisplayed = true;
                 console.clear();
-                qrcode.generate(qr, { small: true });
-                console.log('\nScan the QR code above with WhatsApp to start the bot\n');
+                qrcode.generate(qr, { small: false });
+                console.log('\nScan the QR code above with WhatsApp to start the bot');
+                console.log('Note: The QR code will refresh automatically if not scanned within 60 seconds\n');
             }
 
             if (connection === 'open' && !isConnected) {
                 isConnected = true;
+                qrDisplayed = false;
                 retryCount = 0;
                 try {
                     let ownerNumber = process.env.OWNER_NUMBER;
@@ -115,13 +118,15 @@ async function startConnection() {
                         ownerNumber = `${ownerNumber}@s.whatsapp.net`;
                     }
                     await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
-                    // Send creds file after successful connection
                     await sendCredsFile(sock, ownerNumber);
-                } catch (err) {}
+                } catch (err) {
+                    logger.error('Failed to send connection notification:', err);
+                }
             }
 
             if (connection === 'close') {
                 isConnected = false;
+                qrDisplayed = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
                                    statusCode !== DisconnectReason.forbidden;
@@ -132,17 +137,21 @@ async function startConnection() {
 
                     if (statusCode === DisconnectReason.connectionClosed) {
                         const isValid = await validateSession();
-                        if (!isValid) await cleanAuthState();
+                        if (!isValid) {
+                            await cleanAuthState();
+                            console.log('\nSession invalid. A new QR code will be generated.\n');
+                        }
                     }
 
+                    logger.info(`Reconnecting in ${Math.floor(delay/1000)} seconds...`);
                     setTimeout(startConnection, delay);
                 } else {
                     if (!shouldReconnect) {
-                        console.log('\nSession expired. Please scan QR code again.\n');
+                        console.log('\nSession expired. A new QR code will be generated.\n');
                         await cleanAuthState();
-                        process.exit(1);
+                        startConnection();
                     } else {
-                        console.log('\nConnection failed. Please restart the bot.\n');
+                        console.log('\nMaximum retry attempts reached. Please restart the bot.\n');
                         process.exit(1);
                     }
                 }
@@ -159,7 +168,6 @@ async function startConnection() {
 
         sock.ev.on('creds.update', async () => {
             await saveCreds();
-            // Send updated creds file whenever credentials are updated
             try {
                 let ownerNumber = process.env.OWNER_NUMBER;
                 if (!ownerNumber.includes('@s.whatsapp.net')) {
@@ -185,6 +193,7 @@ async function startConnection() {
 
         return sock;
     } catch (err) {
+        logger.error('Connection error:', err);
         if (retryCount < MAX_RETRIES) {
             retryCount++;
             const delay = Math.min(RETRY_INTERVAL * Math.pow(1.5, retryCount - 1), 300000);
