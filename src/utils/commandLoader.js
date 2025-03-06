@@ -7,6 +7,32 @@ class CommandLoader {
         this.commands = new Map();
         this.commandCache = new Map();
         this.initialized = false;
+        this.commandConfigs = new Map();
+    }
+
+    async loadCommandConfigs() {
+        try {
+            const configPath = path.join(__dirname, '../config/commands');
+            const files = await fs.readdir(configPath);
+
+            for (const file of files) {
+                if (file.endsWith('.json')) {
+                    const category = file.replace('.json', '');
+                    const configContent = await fs.readFile(path.join(configPath, file), 'utf8');
+                    const config = JSON.parse(configContent);
+
+                    for (const cmd of config.commands) {
+                        this.commandConfigs.set(cmd.name, {
+                            ...cmd,
+                            category
+                        });
+                    }
+                }
+            }
+            logger.info('Command configs loaded:', this.commandConfigs.size);
+        } catch (err) {
+            logger.error('Error loading command configs:', err);
+        }
     }
 
     async loadCommandHandlers() {
@@ -15,6 +41,9 @@ class CommandLoader {
                 logger.info('Commands already loaded, skipping initialization');
                 return true;
             }
+
+            // Load configs first
+            await this.loadCommandConfigs();
 
             const commandsPath = path.join(__dirname, '../commands');
             const files = await fs.readdir(commandsPath);
@@ -37,16 +66,19 @@ class CommandLoader {
                                 continue;
                             }
 
+                            // Get config from loaded configs
+                            const config = this.commandConfigs.get(name) || {
+                                name,
+                                description: 'No description available',
+                                usage: `${process.env.BOT_PREFIX || '.'}${name}`,
+                                cooldown: 3,
+                                permissions: ['user']
+                            };
+
                             // Add command to registry
                             this.commands.set(name, {
                                 execute: handler,
-                                config: handler.config || {
-                                    name,
-                                    description: 'No description available',
-                                    usage: `${process.env.BOT_PREFIX || '.'}${name}`,
-                                    cooldown: 3,
-                                    permissions: ['user']
-                                },
+                                config,
                                 category
                             });
 
@@ -61,6 +93,7 @@ class CommandLoader {
                         }
                     } catch (err) {
                         logger.error(`Error loading handlers from ${file}:`, err);
+                        logger.error('Stack trace:', err.stack);
                         continue;
                     }
                 }
@@ -71,11 +104,13 @@ class CommandLoader {
                 logger.info(`${category}: ${count} commands`);
             }
             logger.info('Total commands:', this.commands.size);
+            logger.info('Command configs:', this.commandConfigs.size);
 
             this.initialized = true;
             return this.commands.size > 0;
         } catch (err) {
             logger.error('Critical error in loadCommandHandlers:', err);
+            logger.error('Stack trace:', err.stack);
             return false;
         }
     }
@@ -103,13 +138,29 @@ class CommandLoader {
             }
         } catch (err) {
             logger.error('Error getting command:', err);
+            logger.error('Stack trace:', err.stack);
             return null;
         }
     }
 
     async hasPermission(sender, requiredPermissions) {
-        // For now, all users have basic permissions
-        return true;
+        try {
+            // If no permissions required, allow
+            if (!requiredPermissions || requiredPermissions.length === 0) {
+                return true;
+            }
+
+            // Owner permission check
+            if (requiredPermissions.includes('owner')) {
+                return sender === process.env.OWNER_NUMBER;
+            }
+
+            // For now, all other users have basic permissions
+            return requiredPermissions.includes('user');
+        } catch (err) {
+            logger.error('Error checking permissions:', err);
+            return false;
+        }
     }
 
     getCommandStats() {
