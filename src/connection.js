@@ -8,10 +8,6 @@ async function startConnection(retryCount = 0) {
     try {
         logger.info('Initializing WhatsApp connection...');
 
-        // Clear session data for fresh start
-        await sessionManager.clearSession();
-        logger.info('Starting fresh session');
-
         // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(config.session.authDir);
 
@@ -20,56 +16,63 @@ async function startConnection(retryCount = 0) {
             auth: state,
             printQRInTerminal: true,
             logger: logger,
-            browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
-            version: [2, 2323, 4]
+            browser: ['WhatsApp-MD', 'Safari', '1.0.0']
         });
 
         // Handle connection updates
-        sock.ev.on('connection.update', async ({ qr, connection, lastDisconnect }) => {
-            logger.debug('Connection state:', { 
-                connection, 
+        sock.ev.on('connection.update', async (update) => {
+            const { qr, connection, lastDisconnect } = update;
+
+            // Log detailed connection state
+            logger.debug('Connection update:', {
+                state: connection,
                 retryCount,
                 error: lastDisconnect?.error?.message,
-                code: lastDisconnect?.error?.output?.statusCode
+                code: lastDisconnect?.error?.output?.statusCode,
+                timestamp: new Date().toISOString()
             });
 
             if (qr) {
-                logger.info('Please scan QR code with WhatsApp');
+                logger.info('New QR code generated');
                 qrcode.generate(qr, { small: true });
             }
 
             if (connection === 'open') {
                 logger.info('Connected successfully!');
-                retryCount = 0;
 
                 // Send startup message
-                if (config.owner.number) {
-                    sock.sendMessage(`${config.owner.number}@s.whatsapp.net`, { 
+                const ownerJid = `${config.owner.number}@s.whatsapp.net`;
+                try {
+                    await sock.sendMessage(ownerJid, { 
                         text: '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 Bot Connected Successfully!'
-                    }).catch(err => {
-                        logger.error('Failed to send startup message:', err.message);
                     });
+                } catch (err) {
+                    logger.error('Failed to send startup message:', err.message);
                 }
             }
 
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
-                logger.info('Connection closed:', { 
-                    shouldReconnect, 
-                    statusCode: lastDisconnect?.error?.output?.statusCode,
+                logger.info('Connection closed:', {
+                    shouldReconnect,
+                    statusCode,
                     error: lastDisconnect?.error?.message,
                     stack: lastDisconnect?.error?.stack
                 });
 
                 if (shouldReconnect && retryCount < config.settings.maxRetries) {
+                    // Clean up listeners before reconnecting
+                    sock.ev.removeAllListeners();
+                    await sock.end();
+
                     const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
                     logger.info(`Reconnecting in ${delay/1000}s... (Attempt ${retryCount + 1}/${config.settings.maxRetries})`);
 
-                    // Clean up existing listeners
-                    sock.ev.removeAllListeners();
-
-                    setTimeout(() => startConnection(retryCount + 1), delay);
+                    setTimeout(async () => {
+                        await startConnection(retryCount + 1);
+                    }, delay);
                 } else {
                     logger.error('Connection terminated. Please restart the bot.');
                     process.exit(1);
@@ -77,7 +80,7 @@ async function startConnection(retryCount = 0) {
             }
         });
 
-        // Handle credentials updates
+        // Handle credentials update
         sock.ev.on('creds.update', saveCreds);
 
         // Cleanup handler
