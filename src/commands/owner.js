@@ -5,16 +5,44 @@ const ownerCommands = {
     // System Management
     async restart(sock, message, args) {
         const remoteJid = message.key.remoteJid;
-        await sock.sendMessage(remoteJid, { text: '🔄 Restarting bot...' });
-        // Implement clean restart
-        process.exit(0);
+        try {
+            logger.info('Initiating bot restart...');
+            await sock.sendMessage(remoteJid, { text: '🔄 Restarting bot...\nPlease wait a moment.' });
+
+            // Close all active connections
+            await sock.logout();
+            logger.info('WhatsApp connection closed');
+
+            // Give time for messages to be sent
+            setTimeout(() => {
+                logger.info('Exiting process for restart');
+                process.exit(0);
+            }, 2000);
+        } catch (err) {
+            logger.error('Error during restart:', err);
+            await sock.sendMessage(remoteJid, { text: '❌ Error during restart. Please check logs.' });
+        }
     },
 
     async shutdown(sock, message, args) {
         const remoteJid = message.key.remoteJid;
-        await sock.sendMessage(remoteJid, { text: '🛑 Shutting down bot...' });
-        // Implement clean shutdown
-        process.exit(0);
+        try {
+            logger.info('Initiating bot shutdown...');
+            await sock.sendMessage(remoteJid, { text: '🛑 Shutting down bot...\nGoodbye!' });
+
+            // Close all active connections
+            await sock.logout();
+            logger.info('WhatsApp connection closed');
+
+            // Give time for messages to be sent
+            setTimeout(() => {
+                logger.info('Exiting process for shutdown');
+                process.exit(0);
+            }, 2000);
+        } catch (err) {
+            logger.error('Error during shutdown:', err);
+            await sock.sendMessage(remoteJid, { text: '❌ Error during shutdown. Please check logs.' });
+        }
     },
 
     async update(sock, message, args) {
@@ -25,9 +53,26 @@ const ownerCommands = {
 
     async maintenance(sock, message, args) {
         const remoteJid = message.key.remoteJid;
-        const mode = args[0]?.toLowerCase() === 'on';
-        // Implement maintenance mode
-        await sock.sendMessage(remoteJid, { text: `🛠️ Maintenance mode ${mode ? 'enabled' : 'disabled'}` });
+        try {
+            const mode = args[0]?.toLowerCase() === 'on';
+            logger.info(`Setting maintenance mode to: ${mode}`);
+
+            // Set maintenance mode in global config
+            global.maintenanceMode = mode;
+
+            await sock.sendMessage(remoteJid, { 
+                text: `🛠️ Maintenance mode ${mode ? 'enabled' : 'disabled'}\n${mode ? 'Only owner commands will work.' : 'Normal operations resumed.'}` 
+            });
+
+            // Broadcast maintenance status to all active chats
+            if (mode) {
+                // TODO: Implement broadcast to active chats
+                logger.info('Broadcasting maintenance mode status');
+            }
+        } catch (err) {
+            logger.error('Error setting maintenance mode:', err);
+            await sock.sendMessage(remoteJid, { text: '❌ Error setting maintenance mode. Please check logs.' });
+        }
     },
 
     // Bot Configuration
@@ -95,30 +140,70 @@ const ownerCommands = {
     // Security Management
     async ban(sock, message, args) {
         const remoteJid = message.key.remoteJid;
-        const target = args[0];
-        if (!target) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please specify a user to ban' });
-            return;
+        try {
+            const target = args[0];
+            if (!target) {
+                await sock.sendMessage(remoteJid, { text: '⚠️ Please specify a user to ban' });
+                return;
+            }
+
+            // Normalize the phone number
+            const normalizedNumber = target.replace(/[^0-9]/g, '');
+
+            // Add to banned users list (implement in database)
+            // For now using temporary array
+            if (!global.bannedUsers) global.bannedUsers = new Set();
+            global.bannedUsers.add(normalizedNumber);
+
+            logger.info(`Banned user: ${normalizedNumber}`);
+            await sock.sendMessage(remoteJid, { text: `🚫 User ${target} has been banned` });
+        } catch (err) {
+            logger.error('Error banning user:', err);
+            await sock.sendMessage(remoteJid, { text: '❌ Error banning user. Please check logs.' });
         }
-        // Implement ban system
-        await sock.sendMessage(remoteJid, { text: `🚫 User ${target} has been banned` });
     },
 
     async unban(sock, message, args) {
         const remoteJid = message.key.remoteJid;
-        const target = args[0];
-        if (!target) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please specify a user to unban' });
-            return;
+        try {
+            const target = args[0];
+            if (!target) {
+                await sock.sendMessage(remoteJid, { text: '⚠️ Please specify a user to unban' });
+                return;
+            }
+
+            // Normalize the phone number
+            const normalizedNumber = target.replace(/[^0-9]/g, '');
+
+            // Remove from banned users list
+            if (global.bannedUsers) {
+                global.bannedUsers.delete(normalizedNumber);
+            }
+
+            logger.info(`Unbanned user: ${normalizedNumber}`);
+            await sock.sendMessage(remoteJid, { text: `✅ User ${target} has been unbanned` });
+        } catch (err) {
+            logger.error('Error unbanning user:', err);
+            await sock.sendMessage(remoteJid, { text: '❌ Error unbanning user. Please check logs.' });
         }
-        // Implement unban system
-        await sock.sendMessage(remoteJid, { text: `✅ User ${target} has been unbanned` });
     },
 
     async banlist(sock, message, args) {
         const remoteJid = message.key.remoteJid;
-        // Implement banned users list
-        await sock.sendMessage(remoteJid, { text: '📋 Banned users list:\n• None' });
+        try {
+            if (!global.bannedUsers || global.bannedUsers.size === 0) {
+                await sock.sendMessage(remoteJid, { text: '📋 No banned users' });
+                return;
+            }
+
+            const bannedList = Array.from(global.bannedUsers).join('\n• ');
+            await sock.sendMessage(remoteJid, { 
+                text: `📋 Banned users list:\n• ${bannedList}` 
+            });
+        } catch (err) {
+            logger.error('Error getting banned list:', err);
+            await sock.sendMessage(remoteJid, { text: '❌ Error getting banned list. Please check logs.' });
+        }
     },
 
     async whitelist(sock, message, args) {
@@ -215,13 +300,38 @@ const ownerCommands = {
     // Broadcast System
     async broadcast(sock, message, args) {
         const remoteJid = message.key.remoteJid;
-        const messageText = args.join(' ');
-        if (!messageText) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please provide a message to broadcast' });
-            return;
+        try {
+            const messageText = args.join(' ');
+            if (!messageText) {
+                await sock.sendMessage(remoteJid, { text: '⚠️ Please provide a message to broadcast' });
+                return;
+            }
+
+            logger.info('Starting broadcast to all chats');
+            await sock.sendMessage(remoteJid, { text: '📢 Starting broadcast...' });
+
+            // Get all chats
+            const chats = await sock.groupFetchAllParticipating();
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const [chatId, chat] of Object.entries(chats)) {
+                try {
+                    await sock.sendMessage(chatId, { text: `📢 *Broadcast Message*\n\n${messageText}` });
+                    successCount++;
+                } catch (err) {
+                    logger.error(`Failed to broadcast to ${chatId}:`, err);
+                    failCount++;
+                }
+            }
+
+            await sock.sendMessage(remoteJid, { 
+                text: `📢 Broadcast completed\n✅ Success: ${successCount}\n❌ Failed: ${failCount}` 
+            });
+        } catch (err) {
+            logger.error('Error during broadcast:', err);
+            await sock.sendMessage(remoteJid, { text: '❌ Error during broadcast. Please check logs.' });
         }
-        // Implement broadcast
-        await sock.sendMessage(remoteJid, { text: '📢 Broadcasting message...' });
     },
 
     async bcgroups(sock, message, args) {
@@ -289,14 +399,14 @@ const ownerCommands = {
         };
 
         const infoText = `
-🖥️ Server Information:
-• OS: ${info.os}
-• Platform: ${info.platform}
-• Architecture: ${info.arch}
-• CPU Cores: ${info.cpus}
-• Total Memory: ${info.memory.total}GB
-• Free Memory: ${info.memory.free}GB
-• Uptime: ${Math.floor(info.uptime / 3600)}h ${Math.floor((info.uptime % 3600) / 60)}m
+        🖥️ Server Information:
+        • OS: ${info.os}
+        • Platform: ${info.platform}
+        • Architecture: ${info.arch}
+        • CPU Cores: ${info.cpus}
+        • Total Memory: ${info.memory.total}GB
+        • Free Memory: ${info.memory.free}GB
+        • Uptime: ${Math.floor(info.uptime / 3600)}h ${Math.floor((info.uptime % 3600) / 60)}m
         `.trim();
 
         await sock.sendMessage(remoteJid, { text: infoText });
