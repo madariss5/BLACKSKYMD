@@ -1,0 +1,75 @@
+{
+  "category": "user",
+  "commands": [
+    {
+      "name": "register",
+      "description": "Register your user profile",
+      "usage": "!register [name] [age]",
+      "cooldown": 0,
+      "permissions": ["user"]
+    },
+    {
+      "name": "profile",
+      "description": "View user profile",
+      "usage": "!profile [@user]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "setbio",
+      "description": "Set your profile bio",
+      "usage": "!setbio [text]",
+      "cooldown": 300,
+      "permissions": ["user"]
+    },
+    {
+      "name": "settitle",
+      "description": "Set your custom title",
+      "usage": "!settitle [title]",
+      "cooldown": 300,
+      "permissions": ["user"]
+    },
+    {
+      "name": "level",
+      "description": "View your current level and progress",
+      "usage": "!level",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "daily",
+      "description": "Claim your daily rewards",
+      "usage": "!daily",
+      "cooldown": 86400,
+      "permissions": ["user"]
+    },
+    {
+      "name": "leaderboard",
+      "description": "View user rankings",
+      "usage": "!leaderboard [xp|coins|level]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "achievements",
+      "description": "View your achievements",
+      "usage": "!achievements",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "inventory",
+      "description": "View your inventory",
+      "usage": "!inventory",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "transfer",
+      "description": "Transfer coins to another user",
+      "usage": "!transfer @user [amount]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    }
+  ]
+}
