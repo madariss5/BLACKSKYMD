@@ -1,18 +1,32 @@
 const fs = require('fs').promises;
 const logger = require('./logger');
 const config = require('../config/config');
+const path = require('path');
 
 class SessionManager {
     constructor() {
-        this.sessionsDir = config.session.backupDir;
-        this.authDir = config.session.authDir;
-        this.backupSessionID = `${config.session.id}-backup`;
+        this.sessionsDir = path.join(process.cwd(), 'sessions');
+        this.authDir = path.join(process.cwd(), 'auth_info');
+        this.credentialsFile = path.join(this.authDir, 'creds.json');
+    }
+
+    async initialize() {
+        try {
+            // Ensure directories exist
+            await fs.mkdir(this.sessionsDir, { recursive: true });
+            await fs.mkdir(this.authDir, { recursive: true });
+
+            logger.info('Session directories initialized');
+            return true;
+        } catch (err) {
+            logger.error('Failed to initialize session directories:', err);
+            return false;
+        }
     }
 
     async clearSession() {
         try {
             logger.info('Clearing session data...');
-            const fs = require('fs').promises;
 
             // Clear auth directory
             await fs.rm(this.authDir, { recursive: true, force: true });
@@ -33,12 +47,17 @@ class SessionManager {
     async saveSession(id, data) {
         try {
             await fs.mkdir(this.sessionsDir, { recursive: true });
-            const compactJson = JSON.stringify(data).replace(/\s+/g, '');
+
+            // Remove sensitive data before saving
+            const sanitizedData = this._sanitizeSessionData(data);
+
+            // Compact JSON and save
             await fs.writeFile(
-                `${this.sessionsDir}/${id}.json`,
-                compactJson,
+                path.join(this.sessionsDir, `${id}.json`),
+                JSON.stringify(sanitizedData),
                 'utf8'
             );
+
             logger.info(`Session saved: ${id}`);
             return true;
         } catch (err) {
@@ -50,7 +69,7 @@ class SessionManager {
     async loadSession(id) {
         try {
             const data = await fs.readFile(
-                `${this.sessionsDir}/${id}.json`,
+                path.join(this.sessionsDir, `${id}.json`),
                 'utf8'
             );
             return JSON.parse(data);
@@ -60,82 +79,76 @@ class SessionManager {
         }
     }
 
-    async backupCredentials(sock) {
+    async backupCredentials() {
         try {
-            if (!sock?.user?.id) {
-                logger.warn('Cannot backup: socket or user ID not available');
+            if (!await this._fileExists(this.credentialsFile)) {
+                logger.error('Credentials file not found');
                 return false;
             }
 
-            logger.info('Starting credentials backup process...');
-
-            if (!await this.fileExists(this.credentialsFile)) {
-                logger.error(`Credentials file not found at: ${this.credentialsFile}`);
-                return false;
-            }
-
-            // Read the credentials file
             const credsData = await fs.readFile(this.credentialsFile, 'utf8');
-            logger.info('Successfully read credentials file');
+            const backupPath = path.join(this.sessionsDir, `creds_backup_${Date.now()}.json`);
 
-            // Parse and validate JSON
-            let creds;
-            try {
-                creds = JSON.parse(credsData);
-                logger.info('Successfully parsed credentials JSON');
-            } catch (err) {
-                logger.error('Failed to parse credentials JSON:', err);
-                return false;
-            }
+            await fs.writeFile(backupPath, credsData, 'utf8');
+            logger.info('Credentials backup created successfully');
 
-            // Create a secure backup message with additional metadata
-            const backupMessage = {
-                type: 'BOT_CREDENTIALS_BACKUP',
-                timestamp: new Date().toISOString(),
-                data: Buffer.from(JSON.stringify(creds).replace(/\s+/g, '')).toString('base64'),
-                checksum: require('crypto')
-                    .createHash('sha256')
-                    .update(JSON.stringify(creds).replace(/\s+/g, ''))
-                    .digest('hex'),
-                version: config.bot.version,
-                platform: 'heroku'
-            };
-
-            // Format bot's own number correctly
-            const botNumber = sock.user.id.split(':')[0];
-            const formattedNumber = `${botNumber}@s.whatsapp.net`;
-
-            logger.info(`Attempting to send backup to: ${formattedNumber}`);
-
-            // Send backup to self with enhanced metadata
-            await sock.sendMessage(formattedNumber, {
-                text: JSON.stringify(backupMessage).replace(/\s+/g, ''),
-                quoted: {
-                    key: {
-                        remoteJid: formattedNumber,
-                        fromMe: true,
-                        id: 'CREDENTIALS_BACKUP_' + Date.now()
-                    },
-                    message: {
-                        conversation: 'CREDENTIALS_BACKUP'
-                    }
-                }
-            });
-
-            logger.info('Credentials backup message sent successfully');
             return true;
-
         } catch (err) {
-            logger.error('Error in backupCredentials:', err);
+            logger.error('Error backing up credentials:', err);
             return false;
         }
     }
 
-    async fileExists(filePath) {
+    async emergencyCredsSave(state) {
+        try {
+            const emergencyPath = path.join(this.sessionsDir, `emergency_creds_${Date.now()}.json`);
+            await fs.writeFile(emergencyPath, JSON.stringify(state), 'utf8');
+            logger.info('Emergency credentials save successful');
+            return true;
+        } catch (err) {
+            logger.error('Emergency credentials save failed:', err);
+            return false;
+        }
+    }
+
+    async _fileExists(filePath) {
         try {
             await fs.access(filePath);
             return true;
         } catch {
+            return false;
+        }
+    }
+
+    _sanitizeSessionData(data) {
+        // Deep clone the data
+        const sanitized = JSON.parse(JSON.stringify(data));
+
+        // Remove sensitive fields
+        delete sanitized.encKey;
+        delete sanitized.macKey;
+
+        return sanitized;
+    }
+
+    async createBackupSchedule() {
+        try {
+            // Initial backup
+            await this.backupCredentials();
+            logger.info('Initial session backup created');
+
+            // Schedule regular backups
+            setInterval(async () => {
+                const success = await this.backupCredentials();
+                if (!success) {
+                    logger.warn('Scheduled backup failed');
+                }
+            }, 3600000); // Every hour
+
+            logger.info('Backup schedule created successfully');
+            return true;
+        } catch (err) {
+            logger.error('Error creating backup schedule:', err);
             return false;
         }
     }
@@ -207,28 +220,6 @@ class SessionManager {
             return true;
         } catch (err) {
             logger.error('Error restoring credentials:', err);
-            return false;
-        }
-    }
-
-    async createBackupSchedule(sock) {
-        try {
-            // Initial backup
-            await this.backupCredentials(sock);
-            logger.info('Initial session backup created');
-
-            // Schedule regular backups
-            setInterval(async () => {
-                const success = await this.backupCredentials(sock);
-                if (!success) {
-                    logger.warn('Scheduled backup failed');
-                }
-            }, config.settings.backupInterval);
-
-            logger.info('Backup schedule created successfully');
-            return true;
-        } catch (err) {
-            logger.error('Error creating backup schedule:', err);
             return false;
         }
     }

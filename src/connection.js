@@ -12,8 +12,11 @@ async function startConnection() {
     try {
         logger.info('Initializing WhatsApp connection...');
 
+        // Initialize session manager
+        await sessionManager.initialize();
+
         // Initialize auth state
-        const { state, saveCreds } = await useMultiFileAuthState(config.session.authDir);
+        const { state, saveCreds } = await useMultiFileAuthState(sessionManager.authDir);
 
         // Create socket with optimized configuration
         const sock = makeWASocket({
@@ -34,7 +37,8 @@ async function startConnection() {
         let connectionState = {
             lastActivity: Date.now(),
             isConnected: false,
-            hasQR: false
+            hasQR: false,
+            authInfo: null
         };
 
         // Activity monitor
@@ -74,6 +78,9 @@ async function startConnection() {
 
                 logger.info('Connection established successfully');
 
+                // Save successful connection state
+                await sessionManager.saveSession('latest', state);
+
                 try {
                     const ownerJid = `${config.owner.number}@s.whatsapp.net`;
                     await sock.sendMessage(ownerJid, { 
@@ -97,17 +104,17 @@ async function startConnection() {
                     retryCount
                 });
 
+                clearInterval(activityCheck);
+
                 if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
                     const delay = BASE_RETRY_INTERVAL * Math.pow(1.5, retryCount - 1);
 
                     logger.info(`Scheduling reconnection attempt ${retryCount}/${MAX_RETRIES} in ${delay/1000}s`);
 
-                    // Clean up existing connection
-                    clearInterval(activityCheck);
-                    await cleanup(sock);
+                    // Backup credentials before attempting reconnection
+                    await sessionManager.backupCredentials();
 
-                    // Attempt reconnection
                     setTimeout(async () => {
                         try {
                             // Save current state before reconnecting
@@ -120,7 +127,6 @@ async function startConnection() {
                     }, delay);
                 } else {
                     logger.error('Maximum retry attempts reached or permanent disconnection');
-                    clearInterval(activityCheck);
                     process.exit(1);
                 }
             }
@@ -130,67 +136,20 @@ async function startConnection() {
         sock.ev.on('creds.update', async () => {
             try {
                 await saveCreds();
-                logger.info('Credentials updated successfully');
+                await sessionManager.backupCredentials();
+                logger.info('Credentials updated and backed up successfully');
             } catch (err) {
                 logger.error('Failed to save credentials:', err.message);
                 try {
                     await sessionManager.emergencyCredsSave(state);
-                    logger.info('Emergency credentials backup successful');
                 } catch (backupErr) {
                     logger.error('Emergency credentials save failed:', backupErr.message);
                 }
             }
         });
 
-        // Cleanup function
-        async function cleanup(socket) {
-            logger.info('Initiating connection cleanup');
-
-            try {
-                // Save credentials before cleanup
-                await saveCreds();
-
-                if (socket) {
-                    // Remove all listeners
-                    socket.ev.removeAllListeners();
-
-                    // Close WebSocket connection if it exists
-                    if (socket.ws) {
-                        socket.ws.close();
-                    }
-
-                    // End the connection
-                    await socket.logout();
-                    await socket.end();
-                }
-
-                logger.info('Cleanup completed successfully');
-            } catch (err) {
-                logger.error('Error during cleanup:', err.message);
-            }
-        }
-
-        // Process termination handlers
-        process.once('SIGTERM', async () => {
-            logger.info('Received SIGTERM signal');
-            await cleanup(sock);
-            process.exit(0);
-        });
-
-        process.once('SIGINT', async () => {
-            logger.info('Received SIGINT signal');
-            await cleanup(sock);
-            process.exit(0);
-        });
-        process.on('uncaughtException', async (err) => {
-            logger.error('Uncaught Exception:', err);
-            try {
-                await cleanup(sock);
-            } catch (cleanupErr) {
-                logger.error('Error during uncaught exception cleanup:', cleanupErr);
-            }
-            process.exit(1);
-        });
+        // Setup backup schedule
+        await sessionManager.createBackupSchedule();
 
         return sock;
 
