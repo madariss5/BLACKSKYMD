@@ -11,8 +11,9 @@ const audioQueue = new Map(); // Store queues for different chats
 const mediaCommands = {
     async sticker(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage && !message.message?.videoMessage) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Please send an image or short video with caption .sticker' 
                 });
                 return;
@@ -33,13 +34,13 @@ const mediaCommands = {
                     .webp()
                     .toFile(outputPath);
             } else {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Video sticker support coming soon!' 
                 });
                 return;
             }
 
-            await sock.sendMessage(message.key.remoteJid, { 
+            await sock.sendMessage(remoteJid, { 
                 sticker: { url: outputPath }
             });
 
@@ -53,8 +54,9 @@ const mediaCommands = {
 
     async toimg(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.stickerMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please reply to a sticker'
                 });
                 return;
@@ -69,7 +71,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: 'Here\'s your image!'
             });
@@ -84,8 +86,9 @@ const mediaCommands = {
 
     async brightness(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .brightness [level]'
                 });
                 return;
@@ -93,7 +96,7 @@ const mediaCommands = {
 
             const level = parseInt(args[0]) || 100;
             if (level < 0 || level > 200) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Brightness level must be between 0 and 200' 
                 });
                 return;
@@ -111,7 +114,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Adjusted brightness to ${level}%`
             });
@@ -123,10 +126,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to adjust brightness.' });
         }
     },
-    async contrast(sock, sender, args, message) {
+    async contrast(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .contrast [level]'
                 });
                 return;
@@ -134,7 +138,7 @@ const mediaCommands = {
 
             const level = parseInt(args[0]) || 100;
             if (level < 0 || level > 200) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Contrast level must be between 0 and 200' 
                 });
                 return;
@@ -152,7 +156,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Adjusted contrast to ${level}%`
             });
@@ -164,10 +168,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to adjust contrast.' });
         }
     },
-    async saturate(sock, sender, args, message) {
+    async saturate(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .saturate [level]'
                 });
                 return;
@@ -175,7 +180,7 @@ const mediaCommands = {
 
             const level = parseInt(args[0]) || 100;
             if (level < 0 || level > 200) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Saturation level must be between 0 and 200' 
                 });
                 return;
@@ -193,7 +198,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Adjusted saturation to ${level}%`
             });
@@ -205,10 +210,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to adjust saturation.' });
         }
     },
-    async hue(sock, sender, args, message) {
+    async hue(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .hue [degrees]'
                 });
                 return;
@@ -230,7 +236,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Rotated hue by ${normalizedDegrees}°`
             });
@@ -242,10 +248,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to adjust hue.' });
         }
     },
-    async blur(sock, sender, args, message) {
+    async blur(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .blur [level]'
                 });
                 return;
@@ -253,7 +260,7 @@ const mediaCommands = {
 
             const level = parseInt(args[0]) || 5;
             if (level < 0.3 || level > 20) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Blur level must be between 0.3 and 20' 
                 });
                 return;
@@ -269,7 +276,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Applied blur effect with radius ${level}`
             });
@@ -281,10 +288,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to apply blur effect.' });
         }
     },
-    async pixelate(sock, sender, args, message) {
+    async pixelate(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .pixelate [level]'
                 });
                 return;
@@ -292,7 +300,7 @@ const mediaCommands = {
 
             const level = parseInt(args[0]) || 8;
             if (level < 2 || level > 100) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Pixelation level must be between 2 and 100' 
                 });
                 return;
@@ -318,7 +326,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Applied pixelation effect with level ${level}`
             });
@@ -330,24 +338,28 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to pixelate image.' });
         }
     },
-    async cartoon(sock, sender) {
+    async cartoon(sock, message) {
+        const remoteJid = message.key.remoteJid;
         // TODO: Implement cartoon effect
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async painting(sock, sender, args) {
+    async painting(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const style = args[0] || 'oil';
         // TODO: Implement painting effect
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async sketch(sock, sender, args) {
+    async sketch(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const type = args[0] || 'pencil';
         // TODO: Implement sketch effect
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async resize(sock, sender, args, message) {
+    async resize(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .resize [width] [height]'
                 });
                 return;
@@ -355,7 +367,7 @@ const mediaCommands = {
 
             const [width, height] = args.map(Number);
             if (!width || !height) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Please provide valid width and height values' 
                 });
                 return;
@@ -371,7 +383,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Resized to ${width}x${height}`
             });
@@ -383,10 +395,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to resize image.' });
         }
     },
-    async crop(sock, sender, args, message) {
+    async crop(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .crop [x] [y] [width] [height]'
                 });
                 return;
@@ -394,7 +407,7 @@ const mediaCommands = {
 
             const [x, y, width, height] = args.map(Number);
             if (!x || !y || !width || !height) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Please provide valid x, y, width, and height values' 
                 });
                 return;
@@ -410,7 +423,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Cropped image to ${width}x${height} from position (${x},${y})`
             });
@@ -422,10 +435,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to crop image.' });
         }
     },
-    async rotate(sock, sender, args, message) {
+    async rotate(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .rotate [degrees]'
                 });
                 return;
@@ -445,7 +459,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Rotated image by ${normalizedDegrees}°`
             });
@@ -457,10 +471,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to rotate image.' });
         }
     },
-    async flip(sock, sender, args, message) {
+    async flip(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image with caption .flip [horizontal|vertical]'
                 });
                 return;
@@ -468,7 +483,7 @@ const mediaCommands = {
 
             const direction = args[0]?.toLowerCase();
             if (!direction || !['horizontal', 'vertical'].includes(direction)) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Please specify horizontal or vertical' 
                 });
                 return;
@@ -485,7 +500,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Flipped image ${direction}ly`
             });
@@ -497,10 +512,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to flip image.' });
         }
     },
-    async slow(sock, sender, args, message) {
+    async slow(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.videoMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send a video with caption .slow [factor]'
                 });
                 return;
@@ -508,7 +524,7 @@ const mediaCommands = {
 
             const factor = parseFloat(args[0]) || 0.5;
             if (factor <= 0 || factor > 1) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Speed factor must be between 0 and 1'
                 });
                 return;
@@ -537,7 +553,7 @@ const mediaCommands = {
                     .on('error', reject);
             });
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 video: { url: outputPath },
                 caption: `Slowed video by ${factor}x`
             });
@@ -551,10 +567,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to process video.' });
         }
     },
-    async fast(sock, sender, args, message) {
+    async fast(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.videoMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send a video with caption .fast [factor]'
                 });
                 return;
@@ -562,7 +579,7 @@ const mediaCommands = {
 
             const factor = parseFloat(args[0]) || 2.0;
             if (factor < 1 || factor > 4) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Speed factor must be between 1 and 4'
                 });
                 return;
@@ -591,7 +608,7 @@ const mediaCommands = {
                     .on('error', reject);
             });
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 video: { url: outputPath },
                 caption: `Sped up video by ${factor}x`
             });
@@ -605,10 +622,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to process video.' });
         }
     },
-    async reverse(sock, sender, message) {
+    async reverse(sock, message) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.videoMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send a video with caption .reverse'
                 });
                 return;
@@ -640,7 +658,7 @@ const mediaCommands = {
                     .on('error', reject);
             });
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 video: { url: outputPath },
                 caption: 'Here\'s your reversed video!'
             });
@@ -664,35 +682,41 @@ const mediaCommands = {
             }
         }
     },
-    async boomerang(sock, sender) {
+    async boomerang(sock, message) {
+        const remoteJid = message.key.remoteJid;
         // TODO: Implement boomerang effect
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async pitch(sock, sender, args) {
+    async pitch(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const level = parseFloat(args[0]) || 1.0;
         // TODO: Implement pitch adjustment
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async tempo(sock, sender, args) {
+    async tempo(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const speed = parseFloat(args[0]) || 1.0;
         // TODO: Implement tempo adjustment
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async echo(sock, sender, args) {
+    async echo(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const delay = parseInt(args[0]) || 100;
         // TODO: Implement echo effect
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async bass(sock, sender, args) {
+    async bass(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const level = parseInt(args[0]) || 5;
         // TODO: Implement bass boost
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async tiktok(sock, sender, args) {
+    async tiktok(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             const url = args[0];
             if (!url || !url.includes('tiktok.com')) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Please provide a valid TikTok URL' 
                 });
                 return;
@@ -700,18 +724,18 @@ const mediaCommands = {
 
             // Basic URL validation
             if (!url.match(/https?:\/\/(www\.)?tiktok\.com\/.*$/)) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Invalid TikTok URL format'
                 });
                 return;
             }
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 text: 'Downloading TikTok video...'
             });
 
             // TODO: Implement TikTok download using a reliable API
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 text: 'TikTok download feature will be available soon!'
             });
 
@@ -720,77 +744,84 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to download TikTok video.' });
         }
     },
-    async instagram(sock, sender, args) {
+    async instagram(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const url = args[0];
         if (!url) {
-            await sock.sendMessage(message.key.remoteJid, { text: 'Please provide an Instagram URL' });
+            await sock.sendMessage(remoteJid, { text: 'Please provide an Instagram URL' });
             return;
         }
         // TODO: Implement Instagram media download
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async facebook(sock, sender, args) {
+    async facebook(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const url = args[0];
         if (!url) {
-            await sock.sendMessage(message.key.remoteJid, { text: 'Please provide a Facebook URL' });
+            await sock.sendMessage(remoteJid, { text: 'Please provide a Facebook URL' });
             return;
         }
         // TODO: Implement Facebook video download
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async twitter(sock, sender, args) {
+    async twitter(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const url = args[0];
         if (!url) {
-            await sock.sendMessage(message.key.remoteJid, { text: 'Please provide a Twitter URL' });
+            await sock.sendMessage(remoteJid, { text: 'Please provide a Twitter URL' });
             return;
         }
         // TODO: Implement Twitter media download
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async gimage(sock, sender, args) {
+    async gimage(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!config.apis.google) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Google API key not configured.' 
                 });
                 return;
             }
             const query = args.join(' ');
             if (!query) {
-                await sock.sendMessage(message.key.remoteJid, { 
+                await sock.sendMessage(remoteJid, { 
                     text: 'Please provide a search term' 
                 });
                 return;
             }
             // TODO: Implement Google image search
-            await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+            await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
         } catch (err) {
             logger.error('Error in gimage command:', err);
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to search images.' });
         }
     },
-    async pinterest(sock, sender, args) {
+    async pinterest(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const query = args.join(' ');
         if (!query) {
-            await sock.sendMessage(message.key.remoteJid, { text: 'Please provide a search term' });
+            await sock.sendMessage(remoteJid, { text: 'Please provide a search term' });
             return;
         }
         // TODO: Implement Pinterest image search
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async wallpaper(sock, sender, args) {
+    async wallpaper(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const query = args.join(' ');
         if (!query) {
-            await sock.sendMessage(message.key.remoteJid, { text: 'Please provide a search term' });
+            await sock.sendMessage(remoteJid, { text: 'Please provide a search term' });
             return;
         }
         // TODO: Implement wallpaper search
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async trim(sock, sender, args, message) {
+    async trim(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.videoMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send a video with caption .trim [start_time] [end_time] (in seconds)'
                 });
                 return;
@@ -798,7 +829,7 @@ const mediaCommands = {
 
             const [startTime, endTime] = args.map(Number);
             if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime || startTime < 0) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please provide valid start and end times in seconds'
                 });
                 return;
@@ -829,7 +860,7 @@ const mediaCommands = {
 
             if (endTime > duration) {
                 await fs.unlink(inputPath);
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: `Video is only ${Math.floor(duration)} seconds long. Please provide a valid end time.`
                 });
                 return;
@@ -848,7 +879,7 @@ const mediaCommands = {
                     .run();
             });
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 video: { url: outputPath },
                 caption: `Trimmed video from ${startTime}s to ${endTime}s`
             });
@@ -872,19 +903,24 @@ const mediaCommands = {
             }
         }
     },
-    async speed(sock, sender, args) {
+    async speed(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
         const speed = parseFloat(args[0]) || 1.0;
         // TODO: Implement video speed adjustment
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async mp3(sock, sender) {
+    async mp3(sock, message) {
+        const remoteJid = message.key.remoteJid;
         // TODO: Implement video to MP3 conversion
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async play(sock, sender, args, message) {
+    async play(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
+            const sender = message.key.remoteJid; //Corrected sender assignment
+
             if (!message.message?.audioMessage && !message.message?.videoMessage && args.length === 0) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please provide a YouTube URL or reply to an audio message'
                 });
                 return;
@@ -902,13 +938,13 @@ const mediaCommands = {
                 // Download from YouTube
                 const url = args[0];
                 if (!url.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/)) {
-                    await sock.sendMessage(message.key.remoteJid, {
+                    await sock.sendMessage(remoteJid, {
                         text: 'Please provide a valid YouTube URL'
                     });
                     return;
                 }
 
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Downloading audio from YouTube...'
                 });
 
@@ -923,7 +959,7 @@ const mediaCommands = {
                     audioBuffer = await fs.readFile(inputPath);
                     await fs.unlink(inputPath);
                 } catch (err) {
-                    await sock.sendMessage(message.key.remoteJid, {
+                    await sock.sendMessage(remoteJid, {
                         text: 'Failed to download audio from YouTube'
                     });
                     return;
@@ -935,7 +971,7 @@ const mediaCommands = {
 
             // Add to queue
             queue.push(audioBuffer);
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 text: `Added to queue. Position: ${queue.length}`
             });
 
@@ -949,18 +985,22 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to play audio.' });
         }
     },
-    async pause(sock, sender) {
+    async pause(sock, message) {
+        const remoteJid = message.key.remoteJid;
         // TODO: Implement pause functionality
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async resume(sock, sender) {
+    async resume(sock, message) {
+        const remoteJid = message.key.remoteJid;
         // TODO: Implement resume functionality
-        await sock.sendMessage(message.key.remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
     },
-    async stop(sock, sender) {
+    async stop(sock, message) {
         try {
+            const remoteJid = message.key.remoteJid;
+            const sender = message.key.remoteJid; //Corrected sender assignment
             if (!audioQueue.has(sender)) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'No audio is currently playing'
                 });
                 return;
@@ -968,7 +1008,7 @@ const mediaCommands = {
 
             // Clear the queue
             audioQueue.set(sender, []);
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 text: 'Stopped playback and cleared queue'
             });
 
@@ -977,10 +1017,12 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to stop playback.' });
         }
     },
-    async queue(sock, sender) {
+    async queue(sock, message) {
         try {
+            const remoteJid = message.key.remoteJid;
+            const sender = message.key.remoteJid; //Corrected sender assignment
             if (!audioQueue.has(sender) || audioQueue.get(sender).length === 0) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'The queue is empty'
                 });
                 return;
@@ -988,24 +1030,25 @@ const mediaCommands = {
 
             const queue = audioQueue.get(sender);
             const queueStatus = `Current queue length: ${queue.length}`;
-            await sock.sendMessage(message.key.remoteJid, { text: queueStatus });
+            await sock.sendMessage(remoteJid, { text: queueStatus });
 
         } catch (err) {
             logger.error('Error in queue command:', err);
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to get queue status.' });
         }
     },
-    async removebg(sock, sender, message) {
+    async removebg(sock, message) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!config.apis.removebg) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Remove.bg API key not configured'
                 });
                 return;
             }
 
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image to remove its background'
                 });
                 return;
@@ -1035,7 +1078,7 @@ const mediaCommands = {
                 const outputPath = path.join(tempDir, `output_${Date.now()}.png`);
                 await fs.writeFile(outputPath, response.data);
 
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     image: { url: outputPath },
                     caption: 'Background removed!'
                 });
@@ -1046,7 +1089,7 @@ const mediaCommands = {
 
             } catch (apiErr) {
                 logger.error('Error with remove.bg API:', apiErr);
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Failed to remove background. Please try again later.'
                 });
             }
@@ -1056,10 +1099,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to process image.' });
         }
     },
-    async deepfry(sock, sender, message) {
+    async deepfry(sock, message) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image to deep fry'
                 });
                 return;
@@ -1084,7 +1128,7 @@ const mediaCommands = {
                 })
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: '🔥 Deep fried!'
             });
@@ -1096,10 +1140,11 @@ const mediaCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: 'Failed to deep fry image.' });
         }
     },
-    async compress(sock, sender, args, message) {
+    async compress(sock, message, args) {
         try {
+            const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Please send an image to compress'
                 });
                 return;
@@ -1107,7 +1152,7 @@ const mediaCommands = {
 
             const quality = parseInt(args[0]) || 50;
             if (quality < 1 || quality > 100) {
-                await sock.sendMessage(message.key.remoteJid, {
+                await sock.sendMessage(remoteJid, {
                     text: 'Quality must be between 1 and 100'
                 });
                 return;
@@ -1126,7 +1171,7 @@ const mediaCommands = {
                 })
                 .toFile(outputPath);
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
                 caption: `Compressed with ${quality}% quality`
             });
