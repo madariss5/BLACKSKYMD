@@ -408,20 +408,16 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     },
 
     async battle(sock, sender, args) {
-        const monsters = ['goblin', 'dragon', 'skeleton', 'witch', 'troll'];
-        const monster = args[0]?.toLowerCase();
-
-        if (!monsters.includes(monster)) {
-            await sock.sendMessage(sender, {
-                text: `Available monsters: ${monsters.join(', ')}`
-            });
+        const targetUser = args[0];
+        if (!targetUser) {
+            await sock.sendMessage(sender, { text: 'Please mention a user to battle' });
             return;
         }
 
-        const outcomes = ['won', 'lost', 'escaped', 'critical hit', 'found treasure'];
+        const outcomes = ['won', 'lost', 'critical hit', 'special move', 'draw'];
         const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
         await sock.sendMessage(sender, {
-            text: `⚔️ Battle: You ${outcome} against the ${monster}!`
+            text: `⚔️ Battle: You ${outcome} against ${targetUser}!`
         });
     },
 
@@ -495,6 +491,162 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
         const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
         await sock.sendMessage(sender, {
             text: `🦹 Heist: You ${outcome}`
+        });
+    },
+
+
+    // Character System
+    async class(sock, sender, args) {
+        const classes = ['warrior', 'mage', 'rogue', 'priest'];
+        const selectedClass = args[0]?.toLowerCase();
+
+        if (!selectedClass || !classes.includes(selectedClass)) {
+            await sock.sendMessage(sender, {
+                text: `Available classes: ${classes.join(', ')}`
+            });
+            return;
+        }
+
+        await sock.sendMessage(sender, {
+            text: `You are now a ${selectedClass}!`
+        });
+    },
+
+    async skills(sock, sender, args) {
+        const [action, skillName] = args;
+        const actions = ['list', 'upgrade'];
+
+        if (!action || !actions.includes(action.toLowerCase())) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !skills [list|upgrade] [skillname]'
+            });
+            return;
+        }
+
+        if (action === 'list') {
+            await sock.sendMessage(sender, {
+                text: '🎯 Available Skills:\n1. Attack\n2. Defense\n3. Magic\n4. Speed'
+            });
+        } else {
+            if (!skillName) {
+                await sock.sendMessage(sender, { text: 'Please specify a skill to upgrade' });
+                return;
+            }
+            await sock.sendMessage(sender, {
+                text: `Upgraded ${skillName}!`
+            });
+        }
+    },
+
+    async inventory(sock, sender, args) {
+        const page = parseInt(args[0]) || 1;
+        // TODO: Implement inventory system
+        await sock.sendMessage(sender, {
+            text: `📦 Inventory (Page ${page}):\n- Empty -`
+        });
+    },
+
+    // Mini Games
+    async _8ball(sock, sender, args) {
+        const question = args.join(' ');
+        if (!question) {
+            await sock.sendMessage(sender, { text: 'Please ask a question' });
+            return;
+        }
+
+        const responses = [
+            'Yes, definitely',
+            'No way',
+            'Maybe',
+            'Ask again later',
+            'Cannot predict now'
+        ];
+
+        const response = responses[Math.floor(Math.random() * responses.length)];
+        await sock.sendMessage(sender, {
+            text: `🎱 ${question}\nAnswer: ${response}`
+        });
+    },
+
+    async wordchain(sock, sender, args) {
+        const [action, word] = args;
+        if (!action || !['start', 'play'].includes(action.toLowerCase())) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !wordchain [start|play] [word]'
+            });
+            return;
+        }
+
+        if (action === 'start') {
+            await sock.sendMessage(sender, {
+                text: '🔤 Word Chain Game Started!\nRules: Reply with a word that starts with the last letter of the previous word'
+            });
+        } else {
+            if (!word) {
+                await sock.sendMessage(sender, { text: 'Please provide a word' });
+                return;
+            }
+            // TODO: Implement word validation and game logic
+            await sock.sendMessage(sender, {
+                text: `Word accepted: ${word}`
+            });
+        }
+    },
+
+    async scramble(sock, sender, args) {
+        const categories = ['animals', 'fruits', 'countries'];
+        const category = args[0]?.toLowerCase();
+
+        if (!category || !categories.includes(category)) {
+            await sock.sendMessage(sender, {
+                text: `Available categories: ${categories.join(', ')}`
+            });
+            return;
+        }
+
+        // TODO: Implement word scramble game
+        await sock.sendMessage(sender, {
+            text: 'Word Scramble game starting...'
+        });
+    },
+
+    // Pet System
+    async pet(sock, sender, args) {
+        const actions = ['feed', 'play', 'sleep', 'train', 'status'];
+        const action = args[0]?.toLowerCase();
+
+        if (!action || !actions.includes(action)) {
+            await sock.sendMessage(sender, {
+                text: `Available actions: ${actions.join(', ')}`
+            });
+            return;
+        }
+
+        // TODO: Implement virtual pet system
+        await sock.sendMessage(sender, {
+            text: `🐱 Pet ${action} command executed!`
+        });
+    },
+
+    async petshop(sock, sender, args) {
+        const [action, item] = args;
+        if (!action || action.toLowerCase() !== 'buy' || !item) {
+            await sock.sendMessage(sender, {
+                text: 'Usage: !petshop buy [item]'
+            });
+            return;
+        }
+
+        // TODO: Implement pet shop system
+        await sock.sendMessage(sender, {
+            text: `🏪 Bought ${item} for your pet!`
+        });
+    },
+
+    async petstatus(sock, sender) {
+        // TODO: Implement pet status system
+        await sock.sendMessage(sender, {
+            text: '🐱 Pet Status:\nHappiness: ❤️❤️❤️\nHunger: 🍖🍖\nEnergy: ⚡⚡⚡'
         });
     }
 };
