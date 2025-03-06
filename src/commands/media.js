@@ -309,21 +309,254 @@ const mediaCommands = {
         }
     },
     async cartoon(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // TODO: Implement cartoon effect
-        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please send an image with caption .cartoon'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            try {
+                await sharp(buffer)
+                    .median(5)
+                    .normalize()
+                    .modulate({
+                        brightness: 1.1,
+                        saturation: 1.5
+                    })
+                    .posterize(5)
+                    .png()
+                    .toFile(outputPath);
+
+                await sock.sendMessage(remoteJid, {
+                    image: { url: outputPath },
+                    caption: 'Here\'s your cartoon effect!'
+                });
+
+                await fs.unlink(outputPath);
+            } catch (err) {
+                throw err;
+            }
+
+        } catch (err) {
+            logger.error('Error in cartoon command:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: 'Failed to apply cartoon effect. Please try again.' 
+            });
+        }
     },
+
     async painting(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const style = args[0] || 'oil';
-        // TODO: Implement painting effect
-        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please send an image with caption .painting [style]'
+                });
+                return;
+            }
+
+            const style = args[0]?.toLowerCase() || 'oil';
+            const validStyles = ['oil', 'watercolor'];
+
+            if (!validStyles.includes(style)) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please choose a valid style: oil, watercolor'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            try {
+                // Apply different effects based on style
+                const sharpInstance = sharp(buffer);
+
+                if (style === 'oil') {
+                    await sharpInstance
+                        .median(10)
+                        .modulate({
+                            brightness: 1.1,
+                            saturation: 1.5
+                        })
+                        .gamma(1.5)
+                        .png()
+                        .toFile(outputPath);
+                } else if (style === 'watercolor') {
+                    await sharpInstance
+                        .blur(2)
+                        .modulate({
+                            brightness: 1.1,
+                            saturation: 1.2
+                        })
+                        .gamma(0.8)
+                        .png()
+                        .toFile(outputPath);
+                }
+
+                await sock.sendMessage(remoteJid, {
+                    image: { url: outputPath },
+                    caption: `Here's your ${style} painting effect!`
+                });
+
+                await fs.unlink(outputPath);
+            } catch (err) {
+                throw err;
+            }
+
+        } catch (err) {
+            logger.error('Error in painting command:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: 'Failed to apply painting effect. Please try again.' 
+            });
+        }
     },
+
     async sketch(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const type = args[0] || 'pencil';
-        // TODO: Implement sketch effect
-        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.imageMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please send an image with caption .sketch [type]'
+                });
+                return;
+            }
+
+            const type = args[0]?.toLowerCase() || 'pencil';
+            const validTypes = ['pencil', 'charcoal'];
+
+            if (!validTypes.includes(type)) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please choose a valid type: pencil, charcoal'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            try {
+                // Convert to grayscale and apply sketch effect
+                const sharpInstance = sharp(buffer);
+
+                if (type === 'pencil') {
+                    await sharpInstance
+                        .grayscale()
+                        .normalize()
+                        .modulate({
+                            brightness: 1.1
+                        })
+                        .sharpen(2)
+                        .png()
+                        .toFile(outputPath);
+                } else if (type === 'charcoal') {
+                    await sharpInstance
+                        .grayscale()
+                        .normalize()
+                        .modulate({
+                            brightness: 0.9,
+                            contrast: 1.2
+                        })
+                        .sharpen(3)
+                        .png()
+                        .toFile(outputPath);
+                }
+
+                await sock.sendMessage(remoteJid, {
+                    image: { url: outputPath },
+                    caption: `Here's your ${type} sketch effect!`
+                });
+
+                await fs.unlink(outputPath);
+            } catch (err) {
+                throw err;
+            }
+
+        } catch (err) {
+            logger.error('Error in sketch command:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: 'Failed to apply sketch effect. Please try again.' 
+            });
+        }
+    },
+
+    async boomerang(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.videoMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please send a video with caption .boomerang'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
+            const reversedPath = path.join(tempDir, `reversed_${Date.now()}.mp4`);
+            const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
+
+            await fs.writeFile(inputPath, buffer);
+
+            // Get video duration
+            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+            ffmpeg.setFfmpegPath(ffmpegPath);
+
+            // First create reversed video
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .videoFilters('reverse')
+                    .audioFilters('areverse')
+                    .save(reversedPath)
+                    .on('end', resolve)
+                    .on('error', reject);
+            });
+
+            // Then concatenate original and reversed
+            await new Promise((resolve, reject) => {
+                ffmpeg()
+                    .input(inputPath)
+                    .input(reversedPath)
+                    .complexFilter(['concat=n=2:v=1:a=1'])
+                    .save(outputPath)
+                    .on('end', resolve)
+                    .on('error', reject);
+            });
+
+            await sock.sendMessage(remoteJid, {
+                video: { url: outputPath },
+                caption: 'Here\'s your boomerang video!'
+            });
+
+            // Cleanup
+            await fs.unlink(inputPath);
+            await fs.unlink(reversedPath);
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in boomerang command:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: 'Failed to create boomerang effect. Please try again.' 
+            });
+        }
     },
     async resize(sock, message, args) {
         try {
@@ -651,9 +884,67 @@ const mediaCommands = {
         }
     },
     async boomerang(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // TODO: Implement boomerang effect
-        await sock.sendMessage(remoteJid, { text: 'NOT_IMPLEMENTED_MSG' });
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (!message.message?.videoMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: 'Please send a video with caption .boomerang'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
+            const reversedPath = path.join(tempDir, `reversed_${Date.now()}.mp4`);
+            const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
+
+            await fs.writeFile(inputPath, buffer);
+
+            // Get video duration
+            const ffmpeg = require('fluent-ffmpeg');
+            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+            ffmpeg.setFfmpegPath(ffmpegPath);
+
+            // First create reversed video
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath)
+                    .videoFilters('reverse')
+                    .audioFilters('areverse')
+                    .save(reversedPath)
+                    .on('end', resolve)
+                    .on('error', reject);
+            });
+
+            // Then concatenate original and reversed
+            await new Promise((resolve, reject) => {
+                ffmpeg()
+                    .input(inputPath)
+                    .input(reversedPath)
+                    .complexFilter(['concat=n=2:v=1:a=1'])
+                    .save(outputPath)
+                    .on('end', resolve)
+                    .on('error', reject);
+            });
+
+            await sock.sendMessage(remoteJid, {
+                video: { url: outputPath },
+                caption: 'Here\'s your boomerang video!'
+            });
+
+            // Cleanup
+            await fs.unlink(inputPath);
+            await fs.unlink(reversedPath);
+            await fs.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in boomerang command:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: 'Failed to create boomerang effect. Please try again.' 
+            });
+        }
     },
     async pitch(sock, message, args) {
         const remoteJid = message.key.remoteJid;
