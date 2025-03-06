@@ -82,7 +82,7 @@ async function startConnection() {
         sock = makeWASocket({
             version,
             auth: state,
-            printQRInTerminal: false, 
+            printQRInTerminal: false,
             logger: logger,
             browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
@@ -98,17 +98,15 @@ async function startConnection() {
 
             if (qr && !qrDisplayed) {
                 qrDisplayed = true;
-                process.stdout.write('\x1Bc'); 
-                console.log('\n'); 
+                process.stdout.write('\x1Bc');
 
                 qrcode.generate(qr, {
-                    small: false,
+                    small: true,
                     scale: 1
                 }, (qrcode) => {
                     console.log(qrcode);
                 });
 
-                console.log('\n'); 
                 console.log('📱 Scan the QR code above with WhatsApp to start the bot');
                 console.log('⏳ QR code will refresh in 60 seconds if not scanned\n');
             }
@@ -117,7 +115,7 @@ async function startConnection() {
                 isConnected = true;
                 qrDisplayed = false;
                 retryCount = 0;
-                process.stdout.write('\x1Bc'); 
+                process.stdout.write('\x1Bc');
                 console.log('✅ Successfully connected to WhatsApp!\n');
 
                 try {
@@ -140,8 +138,8 @@ async function startConnection() {
                 isConnected = false;
                 qrDisplayed = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
-                                   statusCode !== DisconnectReason.forbidden;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
+                    statusCode !== DisconnectReason.forbidden;
 
                 if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
@@ -155,7 +153,7 @@ async function startConnection() {
                         }
                     }
 
-                    logger.info(`🔄 Reconnecting in ${Math.floor(delay/1000)} seconds...`);
+                    logger.info(`🔄 Reconnecting in ${Math.floor(delay / 1000)} seconds...`);
                     setTimeout(startConnection, delay);
                 } else {
                     if (!shouldReconnect) {
