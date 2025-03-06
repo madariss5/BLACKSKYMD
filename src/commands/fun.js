@@ -23,7 +23,7 @@ const funCommands = {
     },
 
     async meme(sock, sender) {
-        // Implement meme generation/fetching here
+        // TODO: Implement meme generation/fetching here
         await sock.sendMessage(sender, { text: "Here's your meme! (Feature coming soon)" });
     },
 
@@ -35,7 +35,7 @@ const funCommands = {
             });
             return;
         }
-        // Implement tic-tac-toe game logic here
+        // TODO: Implement tic-tac-toe game logic here
         await sock.sendMessage(sender, { text: 'Tic-tac-toe game command executed' });
     },
 
@@ -46,12 +46,12 @@ const funCommands = {
             });
             return;
         }
-        // Implement hangman game logic here
+        // TODO: Implement hangman game logic here
         await sock.sendMessage(sender, { text: 'Hangman game command executed' });
     },
 
     async quiz(sock, sender) {
-        // Implement quiz game logic here
+        // TODO: Implement quiz game logic here
         await sock.sendMessage(sender, { text: 'Quiz game starting soon!' });
     },
 
@@ -84,7 +84,7 @@ const funCommands = {
             await sock.sendMessage(sender, { text: 'Please provide text to convert to ASCII art' });
             return;
         }
-        // Implement ASCII art conversion here
+        // TODO: Implement ASCII art conversion here
         await sock.sendMessage(sender, { text: 'ASCII art feature coming soon!' });
     },
 
@@ -140,7 +140,7 @@ const funCommands = {
             });
             return;
         }
-        // Implement horoscope logic here
+        // TODO: Implement horoscope logic here
         await sock.sendMessage(sender, { text: 'Horoscope feature coming soon!' });
     },
 

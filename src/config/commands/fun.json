@@ -35,6 +35,83 @@
       "usage": "!hangman <start|guess> [letter]",
       "cooldown": 3,
       "permissions": ["user"]
+    },
+    {
+      "name": "quiz",
+      "description": "Start a quiz game",
+      "usage": "!quiz [category]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "mock",
+      "description": "Mock text in Spongebob style",
+      "usage": "!mock [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "reverse",
+      "description": "Reverse text",
+      "usage": "!reverse [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "ascii",
+      "description": "Convert text to ASCII art",
+      "usage": "!ascii [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "roll",
+      "description": "Roll a dice",
+      "usage": "!roll [sides]",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "flip",
+      "description": "Flip a coin",
+      "usage": "!flip",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "choose",
+      "description": "Choose between options",
+      "usage": "!choose [option1] [option2] ...",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "fact",
+      "description": "Get a random fun fact",
+      "usage": "!fact",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "riddle",
+      "description": "Get a random riddle",
+      "usage": "!riddle",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "horoscope",
+      "description": "Get daily horoscope",
+      "usage": "!horoscope [sign]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "fortune",
+      "description": "Get your fortune",
+      "usage": "!fortune",
+      "cooldown": 10,
+      "permissions": ["user"]
     }
   ]
 }
