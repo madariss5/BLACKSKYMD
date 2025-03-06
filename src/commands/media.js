@@ -17,6 +17,254 @@ const mediaCommands = {
         await sock.sendMessage(sender, { text: 'Converting to video...' });
     },
 
+    // New Image Manipulation Commands
+    async blur(sock, sender, args) {
+        const level = parseInt(args[0]) || 5;
+        // TODO: Implement blur effect
+        await sock.sendMessage(sender, { text: `Applying blur effect (level ${level})...` });
+    },
+
+    async pixelate(sock, sender, args) {
+        const level = parseInt(args[0]) || 8;
+        // TODO: Implement pixelation
+        await sock.sendMessage(sender, { text: `Pixelating image (level ${level})...` });
+    },
+
+    async glitch(sock, sender) {
+        // TODO: Implement glitch effect
+        await sock.sendMessage(sender, { text: 'Applying glitch effect...' });
+    },
+
+    async distort(sock, sender, args) {
+        const level = parseInt(args[0]) || 5;
+        // TODO: Implement distortion effect
+        await sock.sendMessage(sender, { text: `Applying distortion (level ${level})...` });
+    },
+
+    async invert(sock, sender) {
+        // TODO: Implement color inversion
+        await sock.sendMessage(sender, { text: 'Inverting colors...' });
+    },
+
+    async sharpen(sock, sender, args) {
+        const level = parseInt(args[0]) || 5;
+        // TODO: Implement image sharpening
+        await sock.sendMessage(sender, { text: `Sharpening image (level ${level})...` });
+    },
+
+    async vintage(sock, sender) {
+        // TODO: Implement vintage filter
+        await sock.sendMessage(sender, { text: 'Applying vintage filter...' });
+    },
+
+    async oil(sock, sender) {
+        // TODO: Implement oil painting effect
+        await sock.sendMessage(sender, { text: 'Applying oil painting effect...' });
+    },
+
+    async sketch(sock, sender) {
+        // TODO: Implement sketch effect
+        await sock.sendMessage(sender, { text: 'Converting to sketch...' });
+    },
+
+    // Enhanced Video Commands
+    async trim(sock, sender, args) {
+        if (args.length < 2) {
+            await sock.sendMessage(sender, { 
+                text: 'Usage: !trim [start_time] [end_time] (in seconds)' 
+            });
+            return;
+        }
+        // TODO: Implement video trimming
+        await sock.sendMessage(sender, { text: 'Trimming video...' });
+    },
+
+    async speed(sock, sender, args) {
+        const speed = parseFloat(args[0]) || 1.0;
+        // TODO: Implement video speed adjustment
+        await sock.sendMessage(sender, { text: `Adjusting video speed (${speed}x)...` });
+    },
+
+    async reverse(sock, sender) {
+        // TODO: Implement video reversal
+        await sock.sendMessage(sender, { text: 'Reversing video...' });
+    },
+
+    async rotate(sock, sender, args) {
+        const degrees = parseInt(args[0]) || 90;
+        // TODO: Implement video rotation
+        await sock.sendMessage(sender, { text: `Rotating video ${degrees}°...` });
+    },
+
+    async loop(sock, sender, args) {
+        const count = parseInt(args[0]) || 3;
+        // TODO: Implement video looping
+        await sock.sendMessage(sender, { text: `Creating ${count} loops...` });
+    },
+
+    // Audio Commands
+    async mp3(sock, sender) {
+        // TODO: Implement video to MP3 conversion
+        await sock.sendMessage(sender, { text: 'Converting to MP3...' });
+    },
+
+    async pitch(sock, sender, args) {
+        const pitch = parseFloat(args[0]) || 1.0;
+        // TODO: Implement audio pitch adjustment
+        await sock.sendMessage(sender, { text: `Adjusting pitch (${pitch})...` });
+    },
+
+    async bass(sock, sender, args) {
+        const level = parseInt(args[0]) || 5;
+        // TODO: Implement bass boost
+        await sock.sendMessage(sender, { text: `Boosting bass (level ${level})...` });
+    },
+
+    async volume(sock, sender, args) {
+        const level = parseInt(args[0]) || 100;
+        // TODO: Implement volume adjustment
+        await sock.sendMessage(sender, { text: `Adjusting volume to ${level}%...` });
+    },
+
+    async remix(sock, sender) {
+        // TODO: Implement audio remix
+        await sock.sendMessage(sender, { text: 'Creating remix...' });
+    },
+
+    // Social Media Downloads
+    async tiktok(sock, sender, args) {
+        const url = args[0];
+        if (!url) {
+            await sock.sendMessage(sender, { text: 'Please provide a TikTok URL' });
+            return;
+        }
+        // TODO: Implement TikTok video download
+        await sock.sendMessage(sender, { text: 'Downloading TikTok video...' });
+    },
+
+    async instagram(sock, sender, args) {
+        const url = args[0];
+        if (!url) {
+            await sock.sendMessage(sender, { text: 'Please provide an Instagram URL' });
+            return;
+        }
+        // TODO: Implement Instagram media download
+        await sock.sendMessage(sender, { text: 'Downloading Instagram media...' });
+    },
+
+    async facebook(sock, sender, args) {
+        const url = args[0];
+        if (!url) {
+            await sock.sendMessage(sender, { text: 'Please provide a Facebook video URL' });
+            return;
+        }
+        // TODO: Implement Facebook video download
+        await sock.sendMessage(sender, { text: 'Downloading Facebook video...' });
+    },
+
+    async twitter(sock, sender, args) {
+        const url = args[0];
+        if (!url) {
+            await sock.sendMessage(sender, { text: 'Please provide a Twitter URL' });
+            return;
+        }
+        // TODO: Implement Twitter media download
+        await sock.sendMessage(sender, { text: 'Downloading Twitter media...' });
+    },
+
+    // Advanced Media Search
+    async gimage(sock, sender, args) {
+        const query = args.join(' ');
+        if (!query) {
+            await sock.sendMessage(sender, { text: 'Please provide a search term' });
+            return;
+        }
+        // TODO: Implement Google image search
+        await sock.sendMessage(sender, { text: 'Searching Google images...' });
+    },
+
+    async pinterest(sock, sender, args) {
+        const query = args.join(' ');
+        if (!query) {
+            await sock.sendMessage(sender, { text: 'Please provide a search term' });
+            return;
+        }
+        // TODO: Implement Pinterest image search
+        await sock.sendMessage(sender, { text: 'Searching Pinterest...' });
+    },
+
+    async wallpaper(sock, sender, args) {
+        const query = args.join(' ');
+        if (!query) {
+            await sock.sendMessage(sender, { text: 'Please provide a search term' });
+            return;
+        }
+        // TODO: Implement wallpaper search
+        await sock.sendMessage(sender, { text: 'Searching wallpapers...' });
+    },
+
+    // Meme Generation
+    async meme(sock, sender, args) {
+        const [topText, bottomText] = args.join(' ').split('|').map(text => text.trim());
+        if (!topText || !bottomText) {
+            await sock.sendMessage(sender, { text: 'Please provide top and bottom text separated by |' });
+            return;
+        }
+        // TODO: Implement meme creation
+        await sock.sendMessage(sender, { text: 'Creating meme...' });
+    },
+
+    async drake(sock, sender, args) {
+        const [topText, bottomText] = args.join(' ').split('|').map(text => text.trim());
+        if (!topText || !bottomText) {
+            await sock.sendMessage(sender, { text: 'Please provide two texts separated by |' });
+            return;
+        }
+        // TODO: Implement Drake meme creation
+        await sock.sendMessage(sender, { text: 'Creating Drake meme...' });
+    },
+
+    async brain(sock, sender, args) {
+        const texts = args.join(' ').split('|').map(text => text.trim());
+        if (texts.length < 2) {
+            await sock.sendMessage(sender, { text: 'Please provide at least 2 texts separated by |' });
+            return;
+        }
+        // TODO: Implement expanding brain meme creation
+        await sock.sendMessage(sender, { text: 'Creating expanding brain meme...' });
+    },
+
+    // Advanced Text Effects
+    async textart(sock, sender, args) {
+        const text = args.join(' ');
+        if (!text) {
+            await sock.sendMessage(sender, { text: 'Please provide text to convert' });
+            return;
+        }
+        // TODO: Implement ASCII art generation
+        await sock.sendMessage(sender, { text: 'Creating text art...' });
+    },
+
+    async gradient(sock, sender, args) {
+        const text = args.join(' ');
+        if (!text) {
+            await sock.sendMessage(sender, { text: 'Please provide text to style' });
+            return;
+        }
+        // TODO: Implement gradient text effect
+        await sock.sendMessage(sender, { text: 'Creating gradient text...' });
+    },
+
+    async neon(sock, sender, args) {
+        const text = args.join(' ');
+        if (!text) {
+            await sock.sendMessage(sender, { text: 'Please provide text to style' });
+            return;
+        }
+        // TODO: Implement neon text effect
+        await sock.sendMessage(sender, { text: 'Creating neon text...' });
+    },
+
     async emojimix(sock, sender, args) {
         const emojis = args[0]?.split('+');
         if (!emojis || emojis.length !== 2) {
