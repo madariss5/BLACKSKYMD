@@ -30,6 +30,20 @@
       "permissions": ["user"]
     },
     {
+      "name": "vocabulary",
+      "description": "Learn and practice vocabulary",
+      "usage": "!vocabulary <learn|practice|test> [language]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "idioms",
+      "description": "Learn common idioms",
+      "usage": "!idioms [language]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
       "name": "calculate",
       "description": "Calculate mathematical expression",
       "usage": "!calculate [expression]",
@@ -48,6 +62,13 @@
       "description": "Calculate geometric properties",
       "usage": "!geometry [area|perimeter|volume] [shape] [dimensions]",
       "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "graph",
+      "description": "Graph mathematical functions",
+      "usage": "!graph [function]",
+      "cooldown": 10,
       "permissions": ["user"]
     },
     {
@@ -76,6 +97,13 @@
       "description": "Solve physics problems",
       "usage": "!physics [formula] [values]",
       "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "astronomy",
+      "description": "Get astronomy information",
+      "usage": "!astronomy [topic]",
+      "cooldown": 10,
       "permissions": ["user"]
     },
     {
@@ -121,6 +149,13 @@
       "permissions": ["user"]
     },
     {
+      "name": "schedule",
+      "description": "Manage study schedule",
+      "usage": "!schedule <add|view|remove> [details]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
       "name": "wikipedia",
       "description": "Search Wikipedia articles",
       "usage": "!wikipedia [query]",
@@ -139,6 +174,97 @@
       "description": "Find word synonyms and antonyms",
       "usage": "!thesaurus [word]",
       "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "mindmap",
+      "description": "Create and manage mind maps",
+      "usage": "!mindmap <create|view|edit> [topic]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "geography",
+      "description": "Get geographical information",
+      "usage": "!geography <country|capital|continent> [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "timezone",
+      "description": "Get timezone information",
+      "usage": "!timezone [location]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "worldfacts",
+      "description": "Get world facts and statistics",
+      "usage": "!worldfacts [category]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "anatomy",
+      "description": "Learn about human anatomy",
+      "usage": "!anatomy [system]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "ecosystem",
+      "description": "Learn about different ecosystems",
+      "usage": "!ecosystem [type]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "species",
+      "description": "Get information about species",
+      "usage": "!species [name]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "studygoal",
+      "description": "Set and track study goals",
+      "usage": "!studygoal <set|check|update> [details]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "progress",
+      "description": "Track study progress",
+      "usage": "!progress [subject]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "reminder",
+      "description": "Set study reminders",
+      "usage": "!reminder [time] [message]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "history",
+      "description": "Learn about historical periods",
+      "usage": "!history [period]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "timeline",
+      "description": "Get event timelines",
+      "usage": "!timeline [event]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "discovery",
+      "description": "Learn about important discoveries",
+      "usage": "!discovery [field]",
+      "cooldown": 10,
       "permissions": ["user"]
     }
   ]
