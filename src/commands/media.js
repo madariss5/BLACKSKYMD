@@ -49,12 +49,10 @@ const mediaCommands = {
             await fs.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
-            const reversedPath = path.join(tempDir, `reversed_${Date.now()}.mp4`);
             const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
 
             await fs.writeFile(inputPath, buffer);
 
-            // Get video duration
             const ffmpeg = require('fluent-ffmpeg');
             const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
             ffmpeg.setFfmpegPath(ffmpegPath);
@@ -84,7 +82,6 @@ const mediaCommands = {
         }
     },
 
-    // Keep only one copy of enhance and sharpen functions
     async enhance(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
