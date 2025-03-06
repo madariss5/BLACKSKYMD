@@ -5,6 +5,7 @@ const { commandLoader } = require('./utils/commandLoader');
 const { languageManager } = require('./utils/language');
 const logger = require('./utils/logger');
 const config = require('./config/config');
+const { DisconnectReason } = require('@whiskeysockets/baileys');
 
 async function startBot() {
     try {
@@ -34,16 +35,12 @@ async function startBot() {
             });
         });
 
-        // ALWAYS serve on port 5000
-        const PORT = 5000;
-        const HOST = '0.0.0.0';
-
-        // Start HTTP server with proper error handling
-        const server = app.listen(PORT, HOST, () => {
-            logger.info(`Server is running on http://${HOST}:${PORT}`);
+        // ALWAYS serve the app on port 5000
+        const server = app.listen(5000, '0.0.0.0', () => {
+            logger.info(`Server is running on http://0.0.0.0:5000`);
         }).on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
-                logger.error(`Port ${PORT} is already in use. Please ensure no other service is using this port.`);
+                logger.error(`Port ${5000} is already in use. Please ensure no other service is using this port.`);
                 process.exit(1);
             } else {
                 logger.error('Failed to start HTTP server:', err);
@@ -67,7 +64,7 @@ async function startBot() {
         sock.ev.on('connection.update', (update) => {
             const { connection, lastDisconnect } = update;
             if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== 403;
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
                 if (shouldReconnect) {
                     logger.info('Connection closed, attempting to reconnect...');
                     startBot();
