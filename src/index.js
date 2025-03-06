@@ -6,7 +6,14 @@ const logger = require('./utils/logger');
 
 async function startBot() {
     try {
-        // Setup Express server
+        // Load commands first
+        await commandLoader.loadCommandConfigs();
+        await commandLoader.loadCommandHandlers();
+
+        // Start WhatsApp connection
+        const sock = await startConnection();
+
+        // Setup Express server only after WhatsApp connection
         const app = express();
         app.get('/', (req, res) => {
             res.json({
@@ -16,16 +23,18 @@ async function startBot() {
             });
         });
 
-        // Start HTTP server
-        app.listen(5000, '0.0.0.0', () => {
-            logger.info('HTTP server listening on port 5000');
+        // Start HTTP server with proper error handling
+        const server = app.listen(process.env.PORT || 5000, '0.0.0.0', () => {
+            logger.info(`HTTP server listening on port ${process.env.PORT || 5000}`);
+        }).on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                logger.error('Port is already in use. Make sure no other instance is running.');
+                process.exit(1);
+            } else {
+                logger.error('Failed to start HTTP server:', err);
+                process.exit(1);
+            }
         });
-
-        // Load commands first
-        await commandLoader.loadCommandConfigs();
-        await commandLoader.loadCommandHandlers();
-
-        const sock = await startConnection();
 
         // Listen for messages
         sock.ev.on('messages.upsert', async ({ messages }) => {
@@ -49,6 +58,15 @@ async function startBot() {
                     startBot();
                 }
             }
+        });
+
+        // Graceful shutdown
+        process.on('SIGTERM', () => {
+            logger.info('SIGTERM received. Closing server...');
+            server.close(() => {
+                logger.info('Server closed. Exiting process.');
+                process.exit(0);
+            });
         });
 
     } catch (err) {

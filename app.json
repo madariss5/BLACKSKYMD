@@ -1,0 +1,36 @@
+{
+  "name": "WhatsApp Multi-Device Bot",
+  "description": "A comprehensive WhatsApp bot with multi-device support and extensive features",
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "baileys",
+    "multi-device"
+  ],
+  "repository": "",
+  "env": {
+    "OWNER_NAME": {
+      "description": "Name of the bot owner",
+      "required": true
+    },
+    "OWNER_NUMBER": {
+      "description": "WhatsApp number of the bot owner",
+      "required": true
+    },
+    "NODE_ENV": {
+      "description": "Environment mode",
+      "value": "production"
+    }
+  },
+  "formation": {
+    "worker": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ]
+}
