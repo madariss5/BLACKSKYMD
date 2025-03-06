@@ -6,6 +6,8 @@ const fs = require('fs').promises;
 const path = require('path');
 const axios = require('axios');
 
+const audioQueue = new Map(); // Store queues for different chats
+
 const mediaCommands = {
     // Sticker Commands
     async sticker(sock, sender, message) {
@@ -745,6 +747,7 @@ const mediaCommands = {
             await sock.sendMessage(sender, { text: 'Failed to download TikTok video.' });
         }
     },
+
     async instagram(sock, sender, args) {
         const url = args[0];
         if (!url) {
@@ -754,6 +757,7 @@ const mediaCommands = {
         // TODO: Implement Instagram media download
         await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
     },
+
     async facebook(sock, sender, args) {
         const url = args[0];
         if (!url) {
@@ -763,6 +767,7 @@ const mediaCommands = {
         // TODO: Implement Facebook video download
         await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
     },
+
     async twitter(sock, sender, args) {
         const url = args[0];
         if (!url) {
@@ -796,6 +801,7 @@ const mediaCommands = {
             await sock.sendMessage(sender, { text: 'Failed to search images.' });
         }
     },
+
     async pinterest(sock, sender, args) {
         const query = args.join(' ');
         if (!query) {
@@ -805,6 +811,7 @@ const mediaCommands = {
         // TODO: Implement Pinterest image search
         await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
     },
+
     async wallpaper(sock, sender, args) {
         const query = args.join(' ');
         if (!query) {
@@ -909,72 +916,66 @@ const mediaCommands = {
         // TODO: Implement video to MP3 conversion
         await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
     },
-    audioQueue: new Map(), // Store queues for different chats
-
     async play(sock, sender, args, message) {
         try {
             if (!message.message?.audioMessage && !message.message?.videoMessage && args.length === 0) {
                 await sock.sendMessage(sender, {
-                    text: 'Please send an audio file or provide a URL to play'
+                    text: 'Please provide a YouTube URL or reply to an audio message'
                 });
                 return;
             }
 
-            const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
-            let inputPath;
+            // Initialize queue for this chat if it doesn't exist
+            if (!audioQueue.has(sender)) {
+                audioQueue.set(sender, []);
+            }
 
-            if (message.message?.audioMessage || message.message?.videoMessage) {
-                // Handle uploaded audio/video file
-                const buffer = await downloadMediaMessage(message, 'buffer', {});
-                inputPath = path.join(tempDir, `input_${Date.now()}.mp3`);
-                await fs.writeFile(inputPath, buffer);
-            } else if (args[0]) {
-                // Handle URL
-                try {
-                    const response = await axios({
-                        method: 'get',
-                        url: args[0],
-                        responseType: 'arraybuffer'
-                    });
-                    inputPath = path.jointempDir, `input_${Date.now()}.mp3`);
-                    await fs.writeFile(inputPath, response.data);
-                } catch (err) {
+            const queue = audioQueue.get(sender);
+            let audioBuffer;
+
+            if (args.length > 0) {
+                // Download from YouTube
+                const url = args[0];
+                if (!url.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/)) {
                     await sock.sendMessage(sender, {
-                        text: 'Failed to download audio from URL. Please ensure it\'s a valid audio link.'
+                        text: 'Please provide a valid YouTube URL'
                     });
                     return;
                 }
+
+                await sock.sendMessage(sender, {
+                    text: 'Downloading audio from YouTube...'
+                });
+
+                try {                    const response = await axios({
+                        url: args[0],
+                        responseType: 'arraybuffer'
+                    });
+                    const inputPath = path.join(tempDir, `input_${Date.now()}.mp3`);
+                    await fs.writeFile(inputPath, response.data);
+                    audioBuffer = await fs.readFile(inputPath);
+                    await fs.unlink(inputPath);
+                } catch (err) {
+                    await sock.sendMessage(sender, {
+                        text: 'Failed to download audio from YouTube'
+                    });
+                    return;
+                }
+            } else {
+                // Use replied audio message
+                audioBuffer = await downloadMediaMessage(message, 'buffer', {});
             }
 
-            // Process audio using fluent-ffmpeg
-            const ffmpeg = require('fluent-ffmpeg');
-            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-            ffmpeg.setFfmpegPath(ffmpegPath);
-
-            // Convert to mp3 format if needed
-            const outputPath = path.join(tempDir, `output_${Date.now()}.mp3`);
-            await new Promise((resolve, reject) => {
-                ffmpeg(inputPath)
-                    .toFormat('mp3')
-                    .on('progress', (progress) => {
-                        logger.info(`Processing: ${progress.percent}% done`);
-                    })
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .save(outputPath);
-            });
-
-            // Send processed audio
+            // Add to queue
+            queue.push(audioBuffer);
             await sock.sendMessage(sender, {
-                audio: { url: outputPath },
-                mimetype: 'audio/mp3',
-                ptt: false // Set to true for voice notes
+                text: `Added to queue. Position: ${queue.length}`
             });
 
-            // Cleanup
-            await fs.unlink(inputPath);
-            await fs.unlink(outputPath);
+            // If it's the only item, start playing
+            if (queue.length === 1) {
+                await playNextInQueue(sock, sender);
+            }
 
         } catch (err) {
             logger.error('Error in play command:', err);
@@ -983,136 +984,67 @@ const mediaCommands = {
     },
 
     async pause(sock, sender) {
-        try {
-            // Since WhatsApp doesn't support real-time audio control,
-            // we'll send a message explaining this limitation
-            await sock.sendMessage(sender, {
-                text: 'WhatsApp does not support pausing ongoing audio playback. Please stop and replay the audio instead.'
-            });
-        } catch (err) {
-            logger.error('Error in pause command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to execute pause command.' });
-        }
+        // TODO: Implement pause functionality
+        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
     },
 
     async resume(sock, sender) {
-        try {
-            // Similar to pause, explain the limitation
-            await sock.sendMessage(sender, {
-                text: 'WhatsApp does not support resuming audio playback. Please play the audio again.'
-            });
-        } catch (err) {
-            logger.error('Error in resume command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to execute resume command.' });
-        }
+        // TODO: Implement resume functionality
+        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
     },
 
     async stop(sock, sender) {
         try {
-            // Explain the limitation
+            if (!audioQueue.has(sender)) {
+                await sock.sendMessage(sender, {
+                    text: 'No audio is currently playing'
+                });
+                return;
+            }
+
+            // Clear the queue
+            audioQueue.set(sender, []);
             await sock.sendMessage(sender, {
-                text: 'WhatsApp does not support stopping ongoing audio playback. The audio will play until completion or you can close the chat.'
+                text: 'Stopped playback and cleared queue'
             });
+
         } catch (err) {
             logger.error('Error in stop command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to execute stop command.' });
+            await sock.sendMessage(sender, { text: 'Failed to stop playback.' });
         }
     },
 
-    // Queue system for playlist management
-    
-
-    async queue(sock, sender, args) {
+    async queue(sock, sender) {
         try {
-            if (!this.audioQueue.has(sender)) {
-                this.audioQueue.set(sender, []);
-            }
-
-            const queue = this.audioQueue.get(sender);
-
-            if (!args.length) {
-                // Display queue
-                if (queue.length === 0) {
-                    await sock.sendMessage(sender, {
-                        text: 'The playlist is empty. Add songs using .queue add [url]'
-                    });
-                    return;
-                }
-
-                const queueList = queue.map((song, index) => 
-                    `${index + 1}. ${song.title || song.url}`
-                ).join('\n');
-
+            if (!audioQueue.has(sender) || audioQueue.get(sender).length === 0) {
                 await sock.sendMessage(sender, {
-                    text: `Current Playlist:\n${queueList}`
+                    text: 'The queue is empty'
                 });
                 return;
             }
 
-            const action = args[0].toLowerCase();
-            const url = args[1];
+            const queue = audioQueue.get(sender);
+            const queueStatus = `Current queue length: ${queue.length}`;
+            await sock.sendMessage(sender, { text: queueStatus });
 
-            switch (action) {
-                case 'add':
-                    if (!url) {
-                        await sock.sendMessage(sender, {
-                            text: 'Please provide a URL to add to the queue'
-                        });
-                        return;
-                    }
-                    queue.push({ url });
-                    await sock.sendMessage(sender, {
-                        text: 'Added to playlist!'
-                    });
-                    break;
-
-                case 'remove':
-                    const index = parseInt(args[1]) - 1;
-                    if (isNaN(index) || index < 0 || index >= queue.length) {
-                        await sock.sendMessage(sender, {
-                            text: 'Please provide a valid track number to remove'
-                        });
-                        return;
-                    }
-                    queue.splice(index, 1);
-                    await sock.sendMessage(sender, {
-                        text: 'Removed from playlist!'
-                    });
-                    break;
-
-                case 'clear':
-                    queue.length = 0;
-                    await sock.sendMessage(sender, {
-                        text: 'Playlist cleared!'
-                    });
-                    break;
-
-                default:
-                    await sock.sendMessage(sender, {
-                        text: 'Invalid queue command. Use: add, remove, clear, or no argument to view queue'
-                    });
-            }
         } catch (err) {
             logger.error('Error in queue command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to manage queue.' });
+            await sock.sendMessage(sender, { text: 'Failed to get queue status.' });
         }
     },
 
-    async volume(sock, sender, args, message) {
+    async removebg(sock, sender, message) {
         try {
-            const level = parseInt(args[0]) || 100;
-            if (level < 0 || level > 200) {
+            if (!config.apis.removebg) {
                 await sock.sendMessage(sender, {
-                    text: 'Volume level must be between 0 and 200'
+                    text: 'Remove.bg API key not configured'
                 });
                 return;
             }
 
-            // Since WhatsApp doesn't support real-time volume control,
-            // we'll need to process the audio file with the new volume
-            if (!message.message?.audioMessage && !message.message?.videoMessage) {
+            if (!message.message?.imageMessage) {
                 await sock.sendMessage(sender, {
-                    text: 'Please reply to an audio message to adjust its volume'
+                    text: 'Please send an image to remove its background'
                 });
                 return;
             }
@@ -1121,253 +1053,53 @@ const mediaCommands = {
             const tempDir = path.join(__dirname, '../../temp');
             await fs.mkdir(tempDir, { recursive: true });
 
-            const inputPath = path.join(tempDir, `input_${Date.now()}.mp3`);
-            const outputPath = path.join(tempDir, `output_${Date.now()}.mp3`);
-
+            const inputPath = path.join(tempDir, `input_${Date.now()}.png`);
             await fs.writeFile(inputPath, buffer);
 
-            // Process audio using fluent-ffmpeg
-            const ffmpeg = require('fluent-ffmpeg');
-            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-            ffmpeg.setFfmpegPath(ffmpegPath);
-
-            await new Promise((resolve, reject) => {
-                ffmpeg(inputPath)
-                    .audioFilters(`volume=${level/100}`)
-                    .toFormat('mp3')
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .save(outputPath);
-            });
-
-            await sock.sendMessage(sender, {
-                audio: { url: outputPath },
-                mimetype: 'audio/mp3',
-                ptt: false
-            });
-
-            // Cleanup
-            await fs.unlink(inputPath);
-            await fs.unlink(outputPath);
-
-        } catch (err) {
-            logger.error('Error in volume command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to adjust volume.' });
-        }
-    },
-
-    // Social Media Downloads
-    async tiktok(sock, sender, args) {
-        try {
-            const url = args[0];
-            if (!url || !url.includes('tiktok.com')) {
-                await sock.sendMessage(sender, { 
-                    text: 'Please provide a valid TikTok URL' 
-                });
-                return;
-            }
-
-            // Basic URL validation
-            if (!url.match(/https?:\/\/(www\.)?tiktok\.com\/.*$/)) {
-                await sock.sendMessage(sender, {
-                    text: 'Invalid TikTok URL format'
-                });
-                return;
-            }
-
-            await sock.sendMessage(sender, {
-                text: 'Downloading TikTok video...'
-            });
-
-            // TODO: Implement TikTok download using a reliable API
-            await sock.sendMessage(sender, {
-                text: 'TikTok download feature will be available soon!'
-            });
-
-        } catch (err) {
-            logger.error('Error in tiktok command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to download TikTok video.' });
-        }
-    },
-    async instagram(sock, sender, args) {
-        const url = args[0];
-        if (!url) {
-            await sock.sendMessage(sender, { text: 'Please provide an Instagram URL' });
-            return;
-        }
-        // TODO: Implement Instagram media download
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async facebook(sock, sender, args) {
-        const url = args[0];
-        if (!url) {
-            await sock.sendMessage(sender, { text: 'Please provide a Facebook URL' });
-            return;
-        }
-        // TODO: Implement Facebook video download
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async twitter(sock, sender, args) {
-        const url = args[0];
-        if (!url) {
-            await sock.sendMessage(sender, { text: 'Please provide a Twitter URL' });
-            return;
-        }
-        // TODO: Implement Twitter media download
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-
-    // Media Search
-    async gimage(sock, sender, args) {
-        try {
-            if (!config.apis.google) {
-                await sock.sendMessage(sender, { 
-                    text: 'Google API key not configured.' 
-                });
-                return;
-            }
-            const query = args.join(' ');
-            if (!query) {
-                await sock.sendMessage(sender, { 
-                    text: 'Please provide a search term' 
-                });
-                return;
-            }
-            // TODO: Implement Google image search
-            await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-        } catch (err) {
-            logger.error('Error in gimage command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to search images.' });
-        }
-    },
-    async pinterest(sock, sender, args) {
-        const query = args.join(' ');
-        if (!query) {
-            await sock.sendMessage(sender, { text: 'Please provide a search term' });
-            return;
-        }
-        // TODO: Implement Pinterest image search
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async wallpaper(sock, sender, args) {
-        const query = args.join(' ');
-        if (!query) {
-            await sock.sendMessage(sender, { text: 'Please provide a search term' });
-            return;
-        }
-        // TODO: Implement wallpaper search
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async trim(sock, sender, args, message) {
-        try {
-            if (!message.message?.videoMessage) {
-                await sock.sendMessage(sender, {
-                    text: 'Please send a video with caption .trim [start_time] [end_time] (in seconds)'
-                });
-                return;
-            }
-
-            const [startTime, endTime] = args.map(Number);
-            if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime || startTime < 0) {
-                await sock.sendMessage(sender, {
-                    text: 'Please provide valid start and end times in seconds'
-                });
-                return;
-            }
-
-            // Get video duration
-            const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
-
-            const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
-            const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
-
-            await fs.writeFile(inputPath, buffer);
-
-            // Process video using fluent-ffmpeg
-            const ffmpeg = require('fluent-ffmpeg');
-            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-            ffmpeg.setFfmpegPath(ffmpegPath);
-
-            // Get video duration first
-            const duration = await new Promise((resolve, reject) => {
-                ffmpeg.ffprobe(inputPath, (err, metadata) => {
-                    if (err) reject(err);
-                    else resolve(metadata.format.duration);
-                });
-            });
-
-            if (endTime > duration) {
-                await fs.unlink(inputPath);
-                await sock.sendMessage(sender, {
-                    text: `Video is only ${Math.floor(duration)} seconds long. Please provide a valid end time.`
-                });
-                return;
-            }
-
-            await new Promise((resolve, reject) => {
-                ffmpeg(inputPath)
-                    .setStartTime(startTime)
-                    .setDuration(endTime - startTime)
-                    .output(outputPath)
-                    .on('progress', (progress) => {
-                        logger.info(`Processing: ${progress.percent}% done`);
-                    })
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .run();
-            });
-
-            await sock.sendMessage(sender, {
-                video: { url: outputPath },
-                caption: `Trimmed video from ${startTime}s to ${endTime}s`
-            });
-
-            // Cleanup
-            await fs.unlink(inputPath);
-            await fs.unlink(outputPath);
-
-        } catch (err) {
-            logger.error('Error in trim command:', err);
-            await sock.sendMessage(sender, { 
-                text: 'Failed to trim video. Make sure the video is in a supported format and the time values are valid.' 
-            });
-
-            // Cleanup in case of error
             try {
-                if (inputPath) await fs.unlink(inputPath);
-                if (outputPath) await fs.unlink(outputPath);
-            } catch (cleanupErr) {
-                logger.error('Error during cleanup:', cleanupErr);
+                const response = await axios({
+                    method: 'post',
+                    url: 'https://api.remove.bg/v1.0/removebg',
+                    data: {
+                        image_file: await fs.readFile(inputPath),
+                        size: 'auto'
+                    },
+                    headers: {
+                        'X-Api-Key': config.apis.removebg
+                    },
+                    responseType: 'arraybuffer'
+                });
+
+                const outputPath = path.join(tempDir, `output_${Date.now()}.png`);
+                await fs.writeFile(outputPath, response.data);
+
+                await sock.sendMessage(sender, {
+                    image: { url: outputPath },
+                    caption: 'Background removed!'
+                });
+
+                // Cleanup
+                await fs.unlink(inputPath);
+                await fs.unlink(outputPath);
+
+            } catch (apiErr) {
+                logger.error('Error with remove.bg API:', apiErr);
+                await sock.sendMessage(sender, {
+                    text: 'Failed to remove background. Please try again later.'
+                });
             }
+
+        } catch (err) {
+            logger.error('Error in removebg command:', err);
+            await sock.sendMessage(sender, { text: 'Failed to process image.' });
         }
     },
 
-    async speed(sock, sender, args) {
-        const speed = parseFloat(args[0]) || 1.0;
-        // TODO: Implement video speed adjustment
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async mp3(sock, sender) {
-        // TODO: Implement video to MP3 conversion
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async volume(sock, sender, args, message) {
+    async deepfry(sock, sender, message) {
         try {
-            const level = parseInt(args[0]) || 100;
-            if (level < 0 || level > 200) {
+            if (!message.message?.imageMessage) {
                 await sock.sendMessage(sender, {
-                    text: 'Volume level must be between 0 and 200'
-                });
-                return;
-            }
-
-            // Since WhatsApp doesn't support real-time volume control,
-            // we'll need to process the audio file with the new volume
-            if (!message.message?.audioMessage && !message.message?.videoMessage) {
-                await sock.sendMessage(sender, {
-                    text: 'Please reply to an audio message to adjust its volume'
+                    text: 'Please send an image to deep fry'
                 });
                 return;
             }
@@ -1376,346 +1108,112 @@ const mediaCommands = {
             const tempDir = path.join(__dirname, '../../temp');
             await fs.mkdir(tempDir, { recursive: true });
 
-            const inputPath = path.join(tempDir, `input_${Date.now()}.mp3`);
-            const outputPath = path.join(tempDir, `output_${Date.now()}.mp3`);
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
-            await fs.writeFile(inputPath, buffer);
-
-            // Process audio using fluent-ffmpeg
-            const ffmpeg = require('fluent-ffmpeg');
-            const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-            ffmpeg.setFfmpegPath(ffmpegPath);
-
-            await new Promise((resolve, reject) => {
-                ffmpeg(inputPath)
-                    .audioFilters(`volume=${level/100}`)
-                    .toFormat('mp3')
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .save(outputPath);
-            });
+            // Apply deep fry effect
+            await sharp(buffer)
+                .modulate({
+                    brightness: 1.2,
+                    saturation: 2.5
+                })
+                .sharpen(10, 5, 10)
+                .jpeg({
+                    quality: 15,
+                    force: true
+                })
+                .toFile(outputPath);
 
             await sock.sendMessage(sender, {
-                audio: { url: outputPath },
-                mimetype: 'audio/mp3',
-                ptt: false
+                image: { url: outputPath },
+                caption: '🔥 Deep fried!'
             });
 
-            // Cleanup
-            await fs.unlink(inputPath);
             await fs.unlink(outputPath);
 
         } catch (err) {
-            logger.error('Error in volume command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to adjust volume.' });
+            logger.error('Error in deepfry command:', err);
+            await sock.sendMessage(sender, { text: 'Failed to deep fry image.' });
         }
     },
 
-    async remix(sock, sender) {
-        // TODO: Implement audio remix
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async removebg(sock, sender) {
-        // TODO: Implement background removal
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async deepfry(sock, sender) {
-        // TODO: Implement deep fry effect
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async caption(sock, sender, args) {
-        const text = args.join(' ');
-        if (!text) {
-            await sock.sendMessage(sender, { text: 'Please provide caption text' });
-            return;
-        }
-        // TODO: Implement caption addition
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async meme(sock, sender, args) {
-        const [topText, bottomText] = args.join(' ').split('|').map(text => text.trim());
-        if (!topText || !bottomText) {
-            await sock.sendMessage(sender, { text: 'Please provide top and bottom text separated by |' });
-            return;
-        }
-        // TODO: Implement meme creation
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async stickersearch(sock, sender, args) {
-        const query = args.join(' ');
-        if (!query) {
-            await sock.sendMessage(sender, { text: 'Please provide a search term' });
-            return;
-        }
-        // TODO: Implement sticker search
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async stickerpack(sock, sender, args) {
-        const packName = args.join(' ');
-        if (!packName) {
-            await sock.sendMessage(sender, { text: 'Please provide a sticker pack name' });
-            return;
-        }
-        // TODO: Implement sticker pack download
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async compress(sock, sender, args) {
-        const quality = parseInt(args[0]) || 80;
-        // TODO: Implement image compression
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async enhance(sock, sender) {
-        // TODO: Implement image enhancement
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async invert(sock, sender) {
-        // TODO: Implement color inversion
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });    },
-    async sharpen(sock, sender, args) {
-        const level = parseInt(args[0]) || 5;
-        // TODO: Implement image sharpening
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async vintage(sock, sender) {
-        // TODO: Implement vintage filter
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async oil(sock, sender) {
-        // TODO: Implement oil painting effect
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async glitch(sock, sender) {
-        // TODO: Implement glitch effect
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async distort(sock, sender, args) {
-        const level = parseInt(args[0]) || 5;
-        // TODO: Implement distortion effect
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async textart(sock, sender, args) {
-        const text = args.join(' ');
-        if (!text) {
-            await sock.sendMessage(sender, { text: 'Please provide text to convert' });
-            return;
-        }
-        // TODO: Implement ASCII art generation
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async gradient(sock, sender, args) {
-        const text = args.join(' ');
-        if (!text) {
-            await sock.sendMessage(sender, { text: 'Please provide text to style' });
-            return;
-        }
-        // TODO: Implement gradient text effect
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async neon(sock, sender, args) {
-        const text = args.join(' ');
-        if (!text) {
-            await sock.sendMessage(sender, { text: 'Please provide text to style' });
-            return;
-        }
-        // TODO: Implement neon text effect
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async emojimix(sock, sender, args) {
-        const emojis = args[0]?.split('+');
-        if (!emojis || emojis.length !== 2) {
-            await sock.sendMessage(sender, { text: 'Please provide two emojis separated by +' });
-            return;
-        }
-        // TODO: Implement emoji mixing
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async ttp(sock, sender, args) {
-        const text = args.join(' ');
-        if (!text) {
-            await sock.sendMessage(sender, { text: 'Please provide text to convert' });
-            return;
-        }
-        // TODO: Implement text to picture
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async attp(sock, sender, args) {
-        const text = args.join(' ');
-        if (!text) {
-            await sock.sendMessage(sender, { text: 'Please provide text to convert' });
-            return;
-        }
-        // TODO: Implement animated text to picture
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async ytmp4(sock, sender, args) {
+    async compress(sock, sender, args, message) {
         try {
-            const url = args[0];
-            if (!url || !url.includes('youtube.com') && !url.includes('youtu.be')) {
-                await sock.sendMessage(sender, { 
-                    text: 'Please provide a valid YouTube URL' 
+            if (!message.message?.imageMessage) {
+                await sock.sendMessage(sender, {
+                    text: 'Please send an image to compress'
                 });
                 return;
             }
-            // TODO: Implement YouTube video download
-            await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
+
+            const quality = parseInt(args[0]) || 50;
+            if (quality < 1 || quality > 100) {
+                await sock.sendMessage(sender, {
+                    text: 'Quality must be between 1 and 100'
+                });
+                return;
+            }
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.jpg`);
+
+            await sharp(buffer)
+                .jpeg({
+                    quality: quality,
+                    force: true
+                })
+                .toFile(outputPath);
+
+            await sock.sendMessage(sender, {
+                image: { url: outputPath },
+                caption: `Compressed with ${quality}% quality`
+            });
+
+            await fs.unlink(outputPath);
+
         } catch (err) {
-            logger.error('Error in ytmp4 command:', err);
-            await sock.sendMessage(sender, { text: 'Failed to download YouTube video.' });
+            logger.error('Error in compress command:', err);
+            await sock.sendMessage(sender, { text: 'Failed to compress image.' });
         }
-    },
-    async ytmp3(sock, sender, args) {
-        const url = args[0];
-        if (!url) {
-            await sock.sendMessage(sender, { text: 'Please provide a YouTube URL' });
-            return;
-        }
-        // TODO: Implement YouTube audio download
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async play(sock, sender, args) {
-        const query = args.join(' ');
-        if (!query) {
-            await sock.sendMessage(sender, { text: 'Please provide a song name' });
-            return;
-        }
-        // TODO: Implement YouTube music search and play
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async video(sock, sender, args) {
-        const query = args.join(' ');
-        if (!query) {
-            await sock.sendMessage(sender, { text: 'Please provide a video name' });
-            return;
-        }
-        // TODO: Implement YouTube video search and play
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async soundcloud(sock, sender, args) {
-        const url = args[0];
-        if (!url) {
-            await sock.sendMessage(sender, { text: 'Please provide a SoundCloud URL' });
-            return;
-        }
-        // TODO: Implement SoundCloud audio download
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async lyrics(sock, sender, args) {        const song = args.join(' ');
-        if (!song) {
-            await sock.sendMessage(sender, { text: 'Please provide a song name' });
-            return;
-        }
-        // TODO: Implement lyrics search
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async movie(sock, sender, args) {
-        const title = args.join(' ');
-        if (!title) {
-            await sock.sendMessage(sender, { text: 'Please provide a movie title' });
-            return;
-        }
-        // TODO: Implement movie info search
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async series(sock, sender, args) {
-        const title = args.join(' ');
-        if (!title) {
-            await sock.sendMessage(sender, { text: 'Please provide a series title' });
-            return;
-        }
-        // TODO: Implement TV series info search
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async animestyle(sock, sender) {
-        // TODO: Implement anime style conversion
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async cartoonize(sock, sender) {
-        // TODO: Implement cartoonization
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async artstyle(sock, sender, args) {
-        const style = args[0];
-        const styles = ['vangogh', 'picasso', 'monet', 'abstract'];
-
-        if (!style || !styles.includes(style.toLowerCase())) {
-            await sock.sendMessage(sender, { 
-                text: `Please specify avalid style: ${styles.join(', ')}` 
-            });
-            return;
-        }
-        // TODO: Implement art style transfer
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async drake(sock, sender, args) {
-        const [topText, bottomText] = args.join(' ').split('|').map(text => text.trim());
-        if (!topText || !bottomText) {
-            await sock.sendMessage(sender, { text: 'Please provide two texts separated by |' });
-            return;
-        }
-        // TODO: Implement Drake meme creation
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async brain(sock, sender, args) {
-        const texts = args.join(' ').split('|').map(text => text.trim());
-        if (texts.length < 2) {
-            await sock.sendMessage(sender, { text: 'Please provide at least 2 texts separated by |' });
-            return;
-        }
-        // TODO: Implement expanding brain meme creation
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async waifu(sock, sender, args) {
-        const category = args[0] || 'sfw';
-        const categories = ['sfw', 'nsfw'];
-
-        if (!categories.includes(category)) {
-            await sock.sendMessage(sender, { 
-                text: `Please specify a valid category: ${categories.join(', ')}` 
-            });
-            return;
-        }
-        // TODO: Implement waifu image fetching
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async neko(sock, sender) {
-        // TODO: Implement neko image fetching
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async animesearch(sock, sender, args) {
-        const title = args.join(' ');
-        if (!title) {
-            await sock.sendMessage(sender, { text: 'Please provide an anime title' });
-            return;
-        }
-        // TODO: Implement anime search
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-    async mangasearch(sock, sender, args) {
-        const title = args.join(' ');
-        if (!title) {
-            await sock.sendMessage(sender, { text: 'Please provide a manga title' });
-            return;
-        }
-        // TODO: Implement manga search
-        await sock.sendMessage(sender, { text: NOT_IMPLEMENTED_MSG });
-    },
-
-    // Default handler for unimplemented commands
-    async defaultHandler(sock, sender, command) {
-        await sock.sendMessage(sender, { 
-            text: `The ${command} command will be available soon! Stay tuned for updates.`
-        });
     }
 };
 
-// Add default handler for all unimplemented commands
-const commands = require('../config/commands/media.json').commands;
-for (const command of commands) {
-    if (!mediaCommands[command.name]) {
-        mediaCommands[command.name] = async (sock, sender) => {
-            await mediaCommands.defaultHandler(sock, sender, command.name);
-        };
+// Helper function for audio queue
+async function playNextInQueue(sock, sender) {
+    try {
+        const queue = audioQueue.get(sender);
+        if (!queue || queue.length === 0) {
+            return;
+        }
+
+        const audioBuffer = queue[0];
+        const tempDir = path.join(__dirname, '../../temp');
+        await fs.mkdir(tempDir, { recursive: true });
+
+        const outputPath = path.join(tempDir, `${Date.now()}.mp3`);
+        await fs.writeFile(outputPath, audioBuffer);
+
+        await sock.sendMessage(sender, {
+            audio: { url: outputPath },
+            mimetype: 'audio/mp3',
+            ptt: false
+        });
+
+        // Remove played audio and cleanup
+        queue.shift();
+        await fs.unlink(outputPath);
+
+        // Play next in queue if any
+        if (queue.length > 0) {
+            await playNextInQueue(sock, sender);
+        }
+
+    } catch (err) {
+        logger.error('Error in playNextInQueue:', err);
+        await sock.sendMessage(sender, { text: 'Failed to play next audio in queue.' });
     }
 }
 
-module.exports = mediaCommands;
+module.exports = { mediaCommands, audioQueue };

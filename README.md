@@ -15,9 +15,8 @@ A comprehensive WhatsApp bot with multi-device support and extensive features us
 
 - Node.js 16 or higher
 - A WhatsApp account
-- Heroku account (for deployment)
 
-## Local Development
+## Installation
 
 1. Clone the repository
 ```bash
@@ -41,52 +40,13 @@ cp .env.example .env
 npm start
 ```
 
-## Heroku Deployment
-
-### Method 1: Deploy with Button
-
-[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
-
-1. Click the Deploy button above
-2. Fill in the required environment variables:
-   - `OWNER_NUMBER`: Your WhatsApp number (format: 1234567890)
-   - `SESSION_ID`: Will be auto-generated
-   - `BOT_PREFIX`: Command prefix (default: .)
-   - `BOT_NAME`: Your bot's name
-   - Optional API keys for enhanced features
-
-### Method 2: Manual Deployment
-
-1. Create a new Heroku app
-2. Add the following buildpack:
-   - heroku/nodejs
-
-3. Configure environment variables in Heroku Settings:
-   - Set all variables from .env.example
-   - Ensure `NODE_ENV` is set to "production"
-
-4. Deploy using Heroku Git:
-```bash
-heroku login
-heroku git:remote -a your-app-name
-git push heroku main
-```
-
-5. Enable the worker dyno:
-```bash
-heroku ps:scale worker=1
-```
-
 ## Environment Variables
-
-Make sure to set these environment variables in your Heroku settings:
 
 Required:
 - `OWNER_NUMBER`: Your WhatsApp number (format: 1234567890)
 - `SESSION_ID`: Unique session ID for multi-device support (auto-generated)
 - `BOT_PREFIX`: Command prefix for the bot (default: .)
 - `BOT_NAME`: Custom name for your bot
-- `NODE_ENV`: Set to "production" for deployment
 
 Optional API keys for enhanced features:
 - `OPENWEATHERMAP_API_KEY`: For weather commands
@@ -94,18 +54,18 @@ Optional API keys for enhanced features:
 - `WOLFRAM_APP_ID`: For Wolfram Alpha queries
 - `NEWS_API_KEY`: For news commands
 
-## Troubleshooting
+## Available Commands
 
-If you encounter any issues during deployment:
+The bot includes various command categories:
 
-1. Check Heroku logs:
-```bash
-heroku logs --tail
-```
+- Basic Commands: help, ping, info
+- Media Commands: sticker, toimg, brightness, blur
+- Group Commands: kick, add, promote, demote
+- Fun Commands: meme, joke, tictactoe
+- Educational Commands: define, translate, calculate
+- Utility Commands: weather, currency, reminder
+- And many more!
 
-2. Verify environment variables are set correctly
-3. Ensure worker dyno is running
-4. Check if the WhatsApp connection is established
 
 ## Contributing
 
@@ -114,3 +74,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For support and queries, please create an issue in the repository.
+
+## Acknowledgements
+
+- [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) for the WhatsApp Web API
+- All contributors and users of this bot

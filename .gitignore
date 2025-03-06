@@ -43,3 +43,8 @@ build/
 
 # Coverage
 coverage/
+
+# API Keys and Secrets
+config.*.json
+auth.json
+credentials.json
