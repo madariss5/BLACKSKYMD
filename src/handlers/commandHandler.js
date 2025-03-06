@@ -10,6 +10,7 @@ async function processCommand(sock, message, commandText) {
         const sender = message.key.remoteJid;
 
         logger.info(`Processing command: ${commandName} with args:`, args);
+        logger.info('Message object:', JSON.stringify(message, null, 2));
 
         if (!commandName) {
             logger.warn('Empty command received');
@@ -70,10 +71,18 @@ async function processCommand(sock, message, commandText) {
 
         logger.info('Executing command...');
 
-        // Execute command
-        await command.execute(sock, message, args);
-
-        logger.info('Command executed successfully');
+        // Execute command with enhanced error logging
+        try {
+            await command.execute(sock, message, args);
+            logger.info('Command executed successfully');
+        } catch (execErr) {
+            logger.error('Command execution error:', {
+                command: commandName,
+                error: execErr.message,
+                stack: execErr.stack
+            });
+            throw execErr; // Re-throw to be caught by outer try-catch
+        }
 
         // Remove cooldown after command execution
         setTimeout(() => {
@@ -87,7 +96,11 @@ async function processCommand(sock, message, commandText) {
         }, cooldownAmount);
 
     } catch (err) {
-        logger.error('Error processing command:', err);
+        logger.error('Error processing command:', {
+            error: err.message,
+            stack: err.stack,
+            command: commandText
+        });
         try {
             await sock.sendMessage(message.key.remoteJid, { 
                 text: '❌ Error processing command. Please try again.' 
