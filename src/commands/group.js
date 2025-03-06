@@ -1,51 +1,199 @@
 const logger = require('../utils/logger');
+const { isAdmin } = require('../utils/permissions');
 
 const groupCommands = {
-    // Member Management
     async kick(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const target = args[0];
-        if (!target) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please specify a user to kick' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Get mentioned user or quoted message
+            let target;
+            if (message.message.extendedTextMessage?.contextInfo?.participant) {
+                target = message.message.extendedTextMessage.contextInfo.participant;
+            } else if (args[0]) {
+                target = args[0].replace('@', '') + '@s.whatsapp.net';
+            }
+
+            if (!target) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please mention a user to kick' });
+                return;
+            }
+
+            // Check if target is admin
+            const isTargetAdmin = await isAdmin(sock, remoteJid, target);
+            if (isTargetAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ Cannot kick an admin' });
+                return;
+            }
+
+            // Kick user
+            await sock.groupParticipantsUpdate(remoteJid, [target], 'remove');
+            await sock.sendMessage(remoteJid, { text: '✅ User has been kicked from the group' });
+
+        } catch (err) {
+            logger.error('Error in kick command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to kick user' });
         }
-        // TODO: Implement kick logic
-        await sock.sendMessage(remoteJid, { text: `🚫 User ${target} has been kicked` });
     },
 
     async add(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const target = args[0];
-        if (!target) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please specify a user to add' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            if (!args[0]) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please provide a phone number to add' });
+                return;
+            }
+
+            // Format phone number
+            let number = args[0].replace(/[+ -]/g, '');
+            if (!number.includes('@s.whatsapp.net')) {
+                number = number + '@s.whatsapp.net';
+            }
+
+            // Add user
+            try {
+                await sock.groupParticipantsUpdate(remoteJid, [number], 'add');
+                await sock.sendMessage(remoteJid, { text: '✅ User has been added to the group' });
+            } catch (err) {
+                if (err.toString().includes('not-authorized')) {
+                    await sock.sendMessage(remoteJid, { text: '❌ Bot must be admin to add users' });
+                } else if (err.toString().includes('403')) {
+                    await sock.sendMessage(remoteJid, { text: '❌ Cannot add user. They may have privacy settings enabled' });
+                } else {
+                    throw err;
+                }
+            }
+
+        } catch (err) {
+            logger.error('Error in add command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to add user' });
         }
-        // TODO: Implement add logic
-        await sock.sendMessage(remoteJid, { text: `✅ User ${target} has been added` });
     },
 
     async promote(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const target = args[0];
-        if (!target) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please specify a user to promote' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Get mentioned user or quoted message
+            let target;
+            if (message.message.extendedTextMessage?.contextInfo?.participant) {
+                target = message.message.extendedTextMessage.contextInfo.participant;
+            } else if (args[0]) {
+                target = args[0].replace('@', '') + '@s.whatsapp.net';
+            }
+
+            if (!target) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please mention a user to promote' });
+                return;
+            }
+
+            // Check if target is already admin
+            const isTargetAdmin = await isAdmin(sock, remoteJid, target);
+            if (isTargetAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ User is already an admin' });
+                return;
+            }
+
+            // Promote user
+            await sock.groupParticipantsUpdate(remoteJid, [target], 'promote');
+            await sock.sendMessage(remoteJid, { text: '✅ User has been promoted to admin' });
+
+        } catch (err) {
+            logger.error('Error in promote command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to promote user' });
         }
-        // TODO: Implement promote logic
-        await sock.sendMessage(remoteJid, { text: `👑 User ${target} has been promoted to admin` });
     },
 
     async demote(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const target = args[0];
-        if (!target) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please specify a user to demote' });
-            return;
-        }
-        // TODO: Implement demote logic
-        await sock.sendMessage(remoteJid, { text: `⬇️ User ${target} has been demoted` });
-    },
+        try {
+            const remoteJid = message.key.remoteJid;
 
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Get mentioned user or quoted message
+            let target;
+            if (message.message.extendedTextMessage?.contextInfo?.participant) {
+                target = message.message.extendedTextMessage.contextInfo.participant;
+            } else if (args[0]) {
+                target = args[0].replace('@', '') + '@s.whatsapp.net';
+            }
+
+            if (!target) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please mention a user to demote' });
+                return;
+            }
+
+            // Check if target is not admin
+            const isTargetAdmin = await isAdmin(sock, remoteJid, target);
+            if (!isTargetAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ User is not an admin' });
+                return;
+            }
+
+            // Demote user
+            await sock.groupParticipantsUpdate(remoteJid, [target], 'demote');
+            await sock.sendMessage(remoteJid, { text: '✅ User has been demoted from admin' });
+
+        } catch (err) {
+            logger.error('Error in demote command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to demote user' });
+        }
+    },
     // Anti-spam and Security
     async antispam(sock, message, args) {
         const remoteJid = message.key.remoteJid;
@@ -122,16 +270,97 @@ const groupCommands = {
     },
 
     async mute(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const duration = args[0] || '1h';
-        // TODO: Implement group mute
-        await sock.sendMessage(remoteJid, { text: `🔇 Group muted for ${duration}` });
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Check if bot is admin
+            const isBotAdminInGroup = await isBotAdmin(sock, remoteJid);
+            if (!isBotAdminInGroup) {
+                await sock.sendMessage(remoteJid, { text: '❌ Bot must be admin to mute the group' });
+                return;
+            }
+
+            // Parse duration
+            let duration = args[0] ? parseDuration(args[0]) : 1 * 60 * 60; // Default 1 hour
+            if (duration === null) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '❌ Invalid duration format. Use numbers followed by s/m/h/d\nExample: 30s, 5m, 2h, 1d' 
+                });
+                return;
+            }
+
+            // Update group settings
+            await sock.groupSettingUpdate(remoteJid, 'announcement');
+
+            // Send confirmation
+            const durationText = formatDuration(duration);
+            await sock.sendMessage(remoteJid, { 
+                text: `🔇 Group has been muted for ${durationText}` 
+            });
+
+            // Schedule unmute
+            setTimeout(async () => {
+                try {
+                    await sock.groupSettingUpdate(remoteJid, 'not_announcement');
+                    await sock.sendMessage(remoteJid, { text: '🔊 Group has been automatically unmuted' });
+                } catch (err) {
+                    logger.error('Error in auto-unmute:', err);
+                }
+            }, duration * 1000);
+
+        } catch (err) {
+            logger.error('Error in mute command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to mute group' });
+        }
     },
 
     async unmute(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // TODO: Implement group unmute
-        await sock.sendMessage(remoteJid, { text: '🔊 Group unmuted' });
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Check if bot is admin
+            const isBotAdminInGroup = await isBotAdmin(sock, remoteJid);
+            if (!isBotAdminInGroup) {
+                await sock.sendMessage(remoteJid, { text: '❌ Bot must be admin to unmute the group' });
+                return;
+            }
+
+            // Update group settings
+            await sock.groupSettingUpdate(remoteJid, 'not_announcement');
+            await sock.sendMessage(remoteJid, { text: '🔊 Group has been unmuted' });
+
+        } catch (err) {
+            logger.error('Error in unmute command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to unmute group' });
+        }
     },
 
     // Group Settings
@@ -573,7 +802,7 @@ const groupCommands = {
         const remoteJid = message.key.remoteJid;
         const [count] = args;
         if (!count || isNaN(count)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !purge [number]' });
+            await sock.sendMessage(remoteJidJid, { text: '⚠️ Usage: !purge [number]' });
             return;
         }
         // TODO: Implement message purge
@@ -647,7 +876,7 @@ const groupCommands = {
             return;
         }
         // TODO: Implement nickname setting
-        await sock.sendMessage(remoteJid, { text: '📝 Nickname updated' });
+        await sock.sendMessage(remoteJJid, { text: '📝 Nickname updated' });
     },
 
     async resetname(sock, message, args) {
@@ -766,5 +995,29 @@ const groupCommands = {
         await sock.sendMessage(remoteJid, { text: '🛡️ Auto-moderation updated' });
     }
 };
+
+// Helper functions for duration parsing
+function parseDuration(str) {
+    const match = str.match(/^(\d+)(s|m|h|d)$/);
+    if (!match) return null;
+
+    const num = parseInt(match[1]);
+    const unit = match[2];
+
+    switch (unit) {
+        case 's': return num;
+        case 'm': return num * 60;
+        case 'h': return num * 60 * 60;
+        case 'd': return num * 24 * 60 * 60;
+        default: return null;
+    }
+}
+
+function formatDuration(seconds) {
+    if (seconds < 60) return `${seconds} seconds`;
+    if (seconds < 3600) return `${Math.floor(seconds/60)} minutes`;
+    if (seconds < 86400) return `${Math.floor(seconds/3600)} hours`;
+    return `${Math.floor(seconds/86400)} days`;
+}
 
 module.exports = groupCommands;
