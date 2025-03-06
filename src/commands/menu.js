@@ -1,5 +1,6 @@
 const { languageManager } = require('../utils/language');
 const config = require('../config/config');
+const logger = require('../utils/logger');
 
 const commandCategories = {
     basic: {
@@ -27,11 +28,11 @@ const commandCategories = {
 async function menuCommand(sock, msg, args) {
     try {
         let menuText = `*${config.bot.name} - Command Menu*\n\n`;
-        
+
         // Add bot info
         menuText += `*Bot Prefix:* ${config.bot.prefix}\n`;
         menuText += `*Language:* ${config.bot.language}\n\n`;
-        
+
         // Add categories and commands
         for (const [category, data] of Object.entries(commandCategories)) {
             menuText += `${data.title}\n`;
@@ -42,7 +43,7 @@ async function menuCommand(sock, msg, args) {
             });
             menuText += '\n';
         }
-        
+
         // Add footer
         menuText += `\n_Send ${config.bot.prefix}help [command] for detailed info about a specific command_`;
 
