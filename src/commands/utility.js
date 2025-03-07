@@ -569,7 +569,100 @@ const utilityCommands = {
                 text: 'Error changing language. Please try again.' 
             });
         }
+    },
+    async wordcount(sock, sender, args) {
+        try {
+            const text = args.join(' ');
+            if (!text) {
+                await sock.sendMessage(sender, { text: 'Please provide text to count' });
+                return;
+            }
+
+            const words = text.trim().split(/\s+/).length;
+            const chars = text.length;
+            const chars_no_space = text.replace(/\s+/g, '').length;
+
+            const message = `📊 Word Count:
+Words: ${words}
+Characters (with spaces): ${chars}
+Characters (no spaces): ${chars_no_space}`;
+
+            await sock.sendMessage(sender, { text: message });
+        } catch (err) {
+            logger.error('Word count command error:', err);
+            await sock.sendMessage(sender, { text: 'Error counting words. Please try again.' });
+        }
+    },
+
+    async random(sock, sender, args) {
+        try {
+            const [min = 1, max = 100] = args.map(Number);
+            if (isNaN(min) || isNaN(max)) {
+                await sock.sendMessage(sender, { 
+                    text: 'Please provide valid numbers\nUsage: .random [min] [max]' 
+                });
+                return;
+            }
+
+            const result = Math.floor(Math.random() * (max - min + 1)) + min;
+            await sock.sendMessage(sender, { text: `🎲 Random number between ${min} and ${max}: ${result}` });
+        } catch (err) {
+            logger.error('Random command error:', err);
+            await sock.sendMessage(sender, { text: 'Error generating random number. Please try again.' });
+        }
+    },
+
+    async time(sock, sender) {
+        try {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            const dateString = now.toLocaleDateString();
+            const utc = now.toUTCString();
+
+            const message = `🕒 Current Time:
+Local: ${timeString}
+Date: ${dateString}
+UTC: ${utc}`;
+
+            await sock.sendMessage(sender, { text: message });
+        } catch (err) {
+            logger.error('Time command error:', err);
+            await sock.sendMessage(sender, { text: 'Error getting current time. Please try again.' });
+        }
+    },
+
+    async case(sock, sender, args) {
+        try {
+            const [type, ...text] = args;
+            if (!type || !text.length) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: .case <upper|lower> [text]' 
+                });
+                return;
+            }
+
+            const input = text.join(' ');
+            let result;
+
+            switch (type.toLowerCase()) {
+                case 'upper':
+                    result = input.toUpperCase();
+                    break;
+                case 'lower':
+                    result = input.toLowerCase();
+                    break;
+                default:
+                    await sock.sendMessage(sender, { text: 'Invalid case type. Use "upper" or "lower"' });
+                    return;
+            }
+
+            await sock.sendMessage(sender, { text: result });
+        } catch (err) {
+            logger.error('Case command error:', err);
+            await sock.sendMessage(sender, { text: 'Error converting case. Please try again.' });
+        }
     }
+
 };
 
 module.exports = utilityCommands;

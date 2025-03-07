@@ -3,182 +3,47 @@
   "commands": [
     {
       "name": "tictactoe",
-      "description": "Play Tic-tac-toe",
-      "usage": ".tictactoe <start|move> [position]",
+      "description": "Play Tic-tac-toe against the bot",
+      "usage": ".tictactoe <start|move> [1-9]",
+      "example": ".tictactoe start",
       "cooldown": 3,
       "permissions": ["user"]
     },
     {
       "name": "hangman",
-      "description": "Play Hangman",
+      "description": "Play Hangman word guessing game",
       "usage": ".hangman <start|guess> [letter]",
+      "example": ".hangman start",
       "cooldown": 3,
-      "permissions": ["user"]
-    },
-    {
-      "name": "quiz",
-      "description": "Start a quiz game",
-      "usage": ".quiz [category]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "mock",
-      "description": "Mock text in Spongebob style",
-      "usage": ".mock [text]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "reverse",
-      "description": "Reverse text",
-      "usage": ".reverse [text]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "roll",
-      "description": "Roll a dice",
-      "usage": ".roll [sides]",
-      "cooldown": 3,
-      "permissions": ["user"]
-    },
-    {
-      "name": "flip",
-      "description": "Flip a coin",
-      "usage": ".flip",
-      "cooldown": 3,
-      "permissions": ["user"]
-    },
-    {
-      "name": "choose",
-      "description": "Choose between options",
-      "usage": ".choose [option1] [option2] ...",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "horoscope",
-      "description": "Get daily horoscope",
-      "usage": ".horoscope [sign]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "fortune",
-      "description": "Get your fortune",
-      "usage": ".fortune",
-      "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "wordle",
-      "description": "Play Wordle game",
-      "usage": ".wordle [guess]",
+      "description": "Play Wordle word guessing game",
+      "usage": ".wordle <start|guess> [word]",
+      "example": ".wordle start",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "trivia",
-      "description": "Play trivia game",
+      "description": "Play trivia quiz game",
       "usage": ".trivia [category]",
+      "example": ".trivia general",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
-      "name": "truth",
-      "description": "Get a truth question",
-      "usage": ".truth",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "dare",
-      "description": "Get a dare challenge",
-      "usage": ".dare",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "ship",
-      "description": "Ship two users together",
-      "usage": ".ship @user1 @user2",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "fish",
-      "description": "Go fishing for items",
-      "usage": ".fish",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "hunt",
-      "description": "Go hunting for items",
-      "usage": ".hunt",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "mine",
-      "description": "Mine for resources",
-      "usage": ".mine",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "adventure",
-      "description": "Go on an adventure",
-      "usage": ".adventure [location]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "dungeon",
-      "description": "Explore a dungeon",
-      "usage": ".dungeon [level]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "battle",
-      "description": "Battle other users",
-      "usage": ".battle @user",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "petadopt",
-      "description": "Adopt a virtual pet",
-      "usage": ".petadopt [type]",
-      "cooldown": 86400,
-      "permissions": ["user"]
-    },
-    {
-      "name": "petcare",
-      "description": "Take care of your pet",
-      "usage": ".petcare [action]",
-      "cooldown": 300,
-      "permissions": ["user"]
-    },
-    {
-      "name": "poker",
-      "description": "Play poker",
-      "usage": ".poker [bet]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "blackjack",
-      "description": "Play blackjack",
-      "usage": ".blackjack [bet]",
-      "cooldown": 10,
+      "name": "rps",
+      "description": "Play Rock Paper Scissors against the bot",
+      "usage": ".rps <rock|paper|scissors>",
+      "example": ".rps rock",
+      "cooldown": 3,
       "permissions": ["user"]
     },
     {
       "name": "quote",
-      "description": "Get a random quote",
+      "description": "Get a random inspirational quote",
       "usage": ".quote",
       "cooldown": 5,
       "permissions": ["user"]
@@ -187,20 +52,6 @@
       "name": "joke",
       "description": "Get a random joke",
       "usage": ".joke",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "meme",
-      "description": "Get a random meme",
-      "usage": ".meme",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "ascii",
-      "description": "Convert text to ASCII art",
-      "usage": ".ascii [text]",
       "cooldown": 5,
       "permissions": ["user"]
     },
@@ -219,367 +70,33 @@
       "permissions": ["user"]
     },
     {
-      "name": "slot",
-      "description": "Play slot machine game",
-      "usage": ".slot [bet]",
+      "name": "fortune",
+      "description": "Get your fortune told",
+      "usage": ".fortune",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
-      "name": "rps",
-      "description": "Play rock paper scissors",
-      "usage": ".rps [choice]",
+      "name": "roll",
+      "description": "Roll a dice with specified sides",
+      "usage": ".roll [sides]",
+      "example": ".roll 20",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "flip",
+      "description": "Flip a coin",
+      "usage": ".flip",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "choose",
+      "description": "Choose between multiple options",
+      "usage": ".choose [option1] | [option2] | [option3]",
+      "example": ".choose pizza | burger | salad",
       "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "chess",
-      "description": "Play chess with other users",
-      "usage": ".chess [start|move] [position]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "collect",
-      "description": "Collect daily rewards",
-      "usage": ".collect",
-      "cooldown": 86400,
-      "permissions": ["user"]
-    },
-    {
-      "name": "inventory",
-      "description": "Check your inventory",
-      "usage": ".inventory",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "shop",
-      "description": "Visit the virtual shop",
-      "usage": ".shop [buy|sell] [item]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "gift",
-      "description": "Gift items to other users",
-      "usage": ".gift @user [item]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "challenge",
-      "description": "Challenge other users",
-      "usage": ".challenge @user [type]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "duel",
-      "description": "Duel other users",
-      "usage": ".duel @user [bet]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "marry",
-      "description": "Virtual marriage system",
-      "usage": ".marry @user",
-      "cooldown": 86400,
-      "permissions": ["user"]
-    },
-    {
-      "name": "divorce",
-      "description": "End virtual marriage",
-      "usage": ".divorce",
-      "cooldown": 86400,
-      "permissions": ["user"]
-    },
-    {
-      "name": "craft",
-      "description": "Craft items",
-      "usage": ".craft [item]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "enchant",
-      "description": "Enchant items",
-      "usage": ".enchant [item]",
-      "cooldown": 20,
-      "permissions": ["user"]
-    },
-    {
-      "name": "quest",
-      "description": "Accept or view quests",
-      "usage": ".quest [accept|view] [id]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "achievements",
-      "description": "View achievements",
-      "usage": ".achievements",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "daily",
-      "description": "Claim daily rewards",
-      "usage": ".daily",
-      "cooldown": 86400,
-      "permissions": ["user"]
-    },
-    {
-      "name": "weekly",
-      "description": "Claim weekly rewards",
-      "usage": ".weekly",
-      "cooldown": 604800,
-      "permissions": ["user"]
-    },
-    {
-      "name": "monthly",
-      "description": "Claim monthly rewards",
-      "usage": ".monthly",
-      "cooldown": 2592000,
-      "permissions": ["user"]
-    },
-    {
-      "name": "lottery",
-      "description": "Play lottery",
-      "usage": ".lottery [numbers]",
-      "cooldown": 3600,
-      "permissions": ["user"]
-    },
-    {
-      "name": "coinflip",
-      "description": "Bet on coin flip",
-      "usage": ".coinflip [bet] [heads|tails]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "dice",
-      "description": "Roll dice for money",
-      "usage": ".dice [bet] [number]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "roulette",
-      "description": "Play roulette",
-      "usage": ".roulette [bet] [number|color]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "race",
-      "description": "Start a racing game",
-      "usage": ".race [bet]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "steal",
-      "description": "Steal from other users",
-      "usage": ".steal @user",
-      "cooldown": 3600,
-      "permissions": ["user"]
-    },
-    {
-      "name": "rob",
-      "description": "Rob other users",
-      "usage": ".rob @user",
-      "cooldown": 3600,
-      "permissions": ["user"]
-    },
-    {
-      "name": "heist",
-      "description": "Organize a heist",
-      "usage": ".heist [target]",
-      "cooldown": 7200,
-      "permissions": ["user"]
-    },
-    {
-      "name": "8ball",
-      "description": "Ask the magic 8-ball",
-      "usage": ".8ball [question]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "wordchain",
-      "description": "Play word chain game",
-      "usage": ".wordchain [start|play] [word]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "scramble",
-      "description": "Word scramble game",
-      "usage": ".scramble [category]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "slots",
-      "description": "Play slot machine",
-      "usage": ".slots [bet]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "pet",
-      "description": "Virtual pet system",
-      "usage": ".pet [action]",
-      "cooldown": 300,
-      "permissions": ["user"]
-    },
-    {
-      "name": "petshop",
-      "description": "Buy items for your pet",
-      "usage": ".petshop [buy] [item]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "petstatus",
-      "description": "Check pet status",
-      "usage": ".petstatus",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "profile",
-      "description": "View or edit profile",
-      "usage": ".profile [view|edit] [@user]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "leaderboard",
-      "description": "View game leaderboards",
-      "usage": ".leaderboard [category]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "trade",
-      "description": "Trade items with players",
-      "usage": ".trade @user [item] [amount]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "farm",
-      "description": "Manage your farm",
-      "usage": ".farm [action] [crop]",
-      "cooldown": 300,
-      "permissions": ["user"]
-    },
-    {
-      "name": "clan",
-      "description": "Clan management system",
-      "usage": ".clan [action]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "pvp",
-      "description": "Player vs Player combat",
-      "usage": ".pvp @user",
-      "cooldown": 300,
-      "permissions": ["user"]
-    },
-    {
-      "name": "arena",
-      "description": "Join arena battles",
-      "usage": ".arena [join|leave]",
-      "cooldown": 300,
-      "permissions": ["user"]
-    },
-    {
-      "name": "tournament",
-      "description": "Join tournaments",
-      "usage": ".tournament [join|info]",
-      "cooldown": 3600,
-      "permissions": ["user"]
-    },
-    {
-      "name": "madlibs",
-      "description": "Play a fun word-filling story game",
-      "usage": ".madlibs [words...]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "charades",
-      "description": "Play word guessing game",
-      "usage": ".charades <start|guess> [category|word]",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "scavenger",
-      "description": "Start a scavenger hunt",
-      "usage": ".scavenger <start|found> [item]",
-      "cooldown": 30,
-      "permissions": ["user"]
-    },
-    {
-      "name": "compliment",
-      "description": "Send a nice compliment",
-      "usage": ".compliment @user",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "roast",
-      "description": "Playfully roast someone",
-      "usage": ".roast @user",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "animegif",
-      "description": "Get a random anime GIF",
-      "usage": ".animegif [category]",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "waifu",
-      "description": "Get a random waifu image",
-      "usage": ".waifu <sfw|nsfw>",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "neko",
-      "description": "Get a random neko image",
-      "usage": ".neko <sfw|nsfw>",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "animeface",
-      "description": "Generate a random anime face",
-      "usage": ".animeface",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "animequote",
-      "description": "Get a random anime quote",
-      "usage": ".animequote",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "animetrivia",
-      "description": "Get an anime trivia question",
-      "usage": ".animetrivia",
-      "cooldown": 10,
       "permissions": ["user"]
     }
   ]

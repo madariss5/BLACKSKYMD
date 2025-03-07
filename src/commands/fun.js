@@ -31,25 +31,215 @@ const funCommands = {
 
     // Games
     async tictactoe(sock, sender, args) {
-        if (!args[0]) {
-            await sock.sendMessage(sender, {
-                text: 'Usage: !tictactoe <start|move> [position]'
-            });
-            return;
+        try {
+            if (!global.games) global.games = new Map();
+
+            const gameId = sender;
+            let game = global.games.get(gameId);
+
+            if (!args[0]) {
+                await sock.sendMessage(sender, {
+                    text: 'Usage:\n!tictactoe start - Start new game\n!tictactoe move [1-9] - Make a move'
+                });
+                return;
+            }
+
+            const action = args[0].toLowerCase();
+
+            if (action === 'start') {
+                if (game) {
+                    await sock.sendMessage(sender, { text: '❌ A game is already in progress!' });
+                    return;
+                }
+
+                game = {
+                    board: Array(9).fill(' '),
+                    currentPlayer: 'X',
+                    moves: 0
+                };
+                global.games.set(gameId, game);
+
+                const boardDisplay = renderBoard(game.board);
+                await sock.sendMessage(sender, {
+                    text: `🎮 New game started!\n\n${boardDisplay}\n\nMake a move (1-9):`
+                });
+                return;
+            }
+
+            if (action === 'move') {
+                if (!game) {
+                    await sock.sendMessage(sender, { text: '❌ No game in progress. Start with !tictactoe start' });
+                    return;
+                }
+
+                const position = parseInt(args[1]);
+                if (isNaN(position) || position < 1 || position > 9) {
+                    await sock.sendMessage(sender, { text: '❌ Invalid move! Use numbers 1-9' });
+                    return;
+                }
+
+                const index = position - 1;
+                if (game.board[index] !== ' ') {
+                    await sock.sendMessage(sender, { text: '❌ That position is already taken!' });
+                    return;
+                }
+
+                game.board[index] = game.currentPlayer;
+                game.moves++;
+
+                const winner = checkWinner(game.board);
+                const boardDisplay = renderBoard(game.board);
+
+                if (winner) {
+                    await sock.sendMessage(sender, {
+                        text: `🎮 ${boardDisplay}\n\n🎉 Player ${winner} wins!`
+                    });
+                    global.games.delete(gameId);
+                    return;
+                }
+
+                if (game.moves === 9) {
+                    await sock.sendMessage(sender, {
+                        text: `🎮 ${boardDisplay}\n\n🤝 It's a draw!`
+                    });
+                    global.games.delete(gameId);
+                    return;
+                }
+
+                game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X';
+                global.games.set(gameId, game);
+
+                // Bot's move
+                if (game.currentPlayer === 'O') {
+                    const botMove = getBotMove(game.board);
+                    game.board[botMove] = 'O';
+                    game.moves++;
+
+                    const winner = checkWinner(game.board);
+                    const boardDisplay = renderBoard(game.board);
+
+                    if (winner) {
+                        await sock.sendMessage(sender, {
+                            text: `🎮 ${boardDisplay}\n\n${winner === 'O' ? '🤖 Bot wins!' : '🎉 You win!'}`
+                        });
+                        global.games.delete(gameId);
+                        return;
+                    }
+
+                    if (game.moves === 9) {
+                        await sock.sendMessage(sender, {
+                            text: `🎮 ${boardDisplay}\n\n🤝 It's a draw!`
+                        });
+                        global.games.delete(gameId);
+                        return;
+                    }
+
+                    game.currentPlayer = 'X';
+                    global.games.set(gameId, game);
+
+                    await sock.sendMessage(sender, {
+                        text: `🎮 ${boardDisplay}\n\nYour turn! Make a move (1-9):`
+                    });
+                }
+            }
+        } catch (err) {
+            logger.error('Tic-tac-toe error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
         }
-        // TODO: Implement tic-tac-toe game logic here
-        await sock.sendMessage(sender, { text: 'Tic-tac-toe game starting...' });
     },
 
     async hangman(sock, sender, args) {
-        if (!args[0]) {
-            await sock.sendMessage(sender, {
-                text: 'Usage: !hangman <start|guess> [letter]'
-            });
-            return;
+        try {
+            if (!global.hangmanGames) global.hangmanGames = new Map();
+
+            const gameId = sender;
+            let game = global.hangmanGames.get(gameId);
+
+            if (!args[0]) {
+                await sock.sendMessage(sender, {
+                    text: 'Usage:\n!hangman start - Start new game\n!hangman guess [letter] - Guess a letter'
+                });
+                return;
+            }
+
+            const action = args[0].toLowerCase();
+
+            if (action === 'start') {
+                if (game) {
+                    await sock.sendMessage(sender, { text: '❌ A game is already in progress!' });
+                    return;
+                }
+
+                const words = [
+                    'PROGRAMMING', 'JAVASCRIPT', 'COMPUTER', 'ALGORITHM',
+                    'DATABASE', 'NETWORK', 'SECURITY', 'FRAMEWORK',
+                    'DEVELOPER', 'SOFTWARE', 'INTERNET', 'PROTOCOL'
+                ];
+                const word = words[Math.floor(Math.random() * words.length)];
+
+                game = {
+                    word: word,
+                    guessed: new Set(),
+                    mistakes: 0,
+                    maxMistakes: 6
+                };
+
+                global.hangmanGames.set(gameId, game);
+
+                const display = getHangmanDisplay(game);
+                await sock.sendMessage(sender, {
+                    text: `🎮 Hangman Game Started!\n\n${display}\n\nGuess a letter using: !hangman guess [letter]`
+                });
+                return;
+            }
+
+            if (action === 'guess') {
+                if (!game) {
+                    await sock.sendMessage(sender, { text: '❌ No game in progress. Start with !hangman start' });
+                    return;
+                }
+
+                const letter = args[1]?.toUpperCase();
+                if (!letter || letter.length !== 1 || !/[A-Z]/.test(letter)) {
+                    await sock.sendMessage(sender, { text: '❌ Please guess a single letter' });
+                    return;
+                }
+
+                if (game.guessed.has(letter)) {
+                    await sock.sendMessage(sender, { text: '❌ You already guessed that letter!' });
+                    return;
+                }
+
+                game.guessed.add(letter);
+
+                if (!game.word.includes(letter)) {
+                    game.mistakes++;
+                }
+
+                const display = getHangmanDisplay(game);
+                const isWon = [...game.word].every(l => game.guessed.has(l));
+                const isLost = game.mistakes >= game.maxMistakes;
+
+                if (isWon) {
+                    await sock.sendMessage(sender, {
+                        text: `${display}\n\n🎉 Congratulations! You won!\nThe word was: ${game.word}`
+                    });
+                    global.hangmanGames.delete(gameId);
+                } else if (isLost) {
+                    await sock.sendMessage(sender, {
+                        text: `${display}\n\n💀 Game Over! You lost.\nThe word was: ${game.word}`
+                    });
+                    global.hangmanGames.delete(gameId);
+                } else {
+                    await sock.sendMessage(sender, {
+                        text: `${display}\n\nGuessed letters: ${[...game.guessed].join(' ')}`
+                    });
+                }
+            }
+        } catch (err) {
+            logger.error('Hangman error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
         }
-        // TODO: Implement hangman game logic here
-        await sock.sendMessage(sender, { text: 'Hangman game starting...' });
     },
 
     async quiz(sock, sender) {
@@ -174,29 +364,48 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     },
 
     async rps(sock, sender, args) {
-        const choices = ['rock', 'paper', 'scissors'];
-        const userChoice = args[0]?.toLowerCase();
-        if (!choices.includes(userChoice)) {
-            await sock.sendMessage(sender, { text: 'Please choose rock, paper, or scissors' });
-            return;
+        try {
+            const choices = ['rock', 'paper', 'scissors'];
+            const userChoice = args[0]?.toLowerCase();
+
+            if (!userChoice || !choices.includes(userChoice)) {
+                await sock.sendMessage(sender, {
+                    text: 'Usage: !rps <rock|paper|scissors>\nExample: !rps rock'
+                });
+                return;
+            }
+
+            const botChoice = choices[Math.floor(Math.random() * choices.length)];
+            let result = "It's a tie! 🤝";
+
+            if (
+                (userChoice === 'rock' && botChoice === 'scissors') ||
+                (userChoice === 'paper' && botChoice === 'rock') ||
+                (userChoice === 'scissors' && botChoice === 'paper')
+            ) {
+                result = 'You win! 🎉';
+            } else if (userChoice !== botChoice) {
+                result = 'Bot wins! 🤖';
+            }
+
+            const emojis = {
+                rock: '🪨',
+                paper: '📄',
+                scissors: '✂️'
+            };
+
+            const message = `
+🎮 Rock Paper Scissors
+You: ${emojis[userChoice]} ${userChoice}
+Bot: ${emojis[botChoice]} ${botChoice}
+Result: ${result}
+            `.trim();
+
+            await sock.sendMessage(sender, { text: message });
+        } catch (err) {
+            logger.error('RPS game error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
         }
-
-        const botChoice = choices[Math.floor(Math.random() * choices.length)];
-        let result = 'It\'s a tie!';
-
-        if (
-            (userChoice === 'rock' && botChoice === 'scissors') ||
-            (userChoice === 'paper' && botChoice === 'rock') ||
-            (userChoice === 'scissors' && botChoice === 'paper')
-        ) {
-            result = 'You win!';
-        } else if (userChoice !== botChoice) {
-            result = 'Bot wins!';
-        }
-
-        await sock.sendMessage(sender, {
-            text: `You: ${userChoice}\nBot: ${botChoice}\n${result}`
-        });
     },
 
     async chess(sock, sender, args) {
@@ -211,24 +420,246 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     },
 
     async wordle(sock, sender, args) {
-        if (!args[0]) {
-            await sock.sendMessage(sender, { text: '❓ Please provide your 5-letter guess' });
-            return;
+        try {
+            if (!global.wordleGames) global.wordleGames = new Map();
+
+            const gameId = sender;
+            let game = global.wordleGames.get(gameId);
+
+            if (!args[0]) {
+                await sock.sendMessage(sender, {
+                    text: 'Usage:\n!wordle start - Start new game\n!wordle guess [word] - Make a guess'
+                });
+                return;
+            }
+
+            const action = args[0].toLowerCase();
+
+            if (action === 'start') {
+                if (game) {
+                    await sock.sendMessage(sender, { text: '❌ A game is already in progress!' });
+                    return;
+                }
+
+                const words = [
+                    'SWEET', 'BREAD', 'CLOUD', 'DREAM', 'HAPPY',
+                    'LIGHT', 'MUSIC', 'PEACE', 'SMILE', 'WORLD',
+                    'BEACH', 'CLEAN', 'DANCE', 'EARTH', 'FRESH'
+                ];
+
+                game = {
+                    word: words[Math.floor(Math.random() * words.length)],
+                    guesses: [],
+                    maxAttempts: 6
+                };
+
+                global.wordleGames.set(gameId, game);
+
+                await sock.sendMessage(sender, {
+                    text: `🎮 Wordle Game Started!\nGuess the 5-letter word\nYou have ${game.maxAttempts} attempts.\n\n⬜⬜⬜⬜⬜\n\nUse: !wordle guess [word]`
+                });
+                return;
+            }
+
+            if (action === 'guess') {
+                if (!game) {
+                    await sock.sendMessage(sender, { text: '❌ No game in progress. Start with !wordle start' });
+                    return;
+                }
+
+                const guess = args[1]?.toUpperCase();
+                if (!guess || guess.length !== 5 || !/^[A-Z]+$/.test(guess)) {
+                    await sock.sendMessage(sender, { text: '❌ Please enter a valid 5-letter word' });
+                    return;
+                }
+
+                const feedback = [];
+                const targetWord = game.word.split('');
+                const remainingLetters = [...targetWord];
+
+                // First pass: find correct letters in correct positions
+                for (let i = 0; i < 5; i++) {
+                    if (guess[i] === targetWord[i]) {
+                        feedback[i] = '🟩'; // Green
+                        remainingLetters[i] = null;
+                    }
+                }
+
+                // Second pass: find correct letters in wrong positions
+                for (let i = 0; i < 5; i++) {
+                    if (!feedback[i]) {
+                        const index = remainingLetters.indexOf(guess[i]);
+                        if (index !== -1) {
+                            feedback[i] = '🟨'; // Yellow
+                            remainingLetters[index] = null;
+                        } else {
+                            feedback[i] = '⬜'; // Gray
+                        }
+                    }
+                }
+
+                game.guesses.push({ word: guess, feedback: feedback.join('') });
+                global.wordleGames.set(gameId, game);
+
+                const display = game.guesses.map(g => `${g.feedback} ${g.word}`).join('\n');
+                const isWon = guess === game.word;
+                const isLost = game.guesses.length >= game.maxAttempts;
+
+                if (isWon) {
+                    await sock.sendMessage(sender, {
+                        text: `${display}\n\n🎉 Congratulations! You won in ${game.guesses.length} tries!`
+                    });
+                    global.wordleGames.delete(gameId);
+                } else if (isLost) {
+                    await sock.sendMessage(sender, {
+                        text: `${display}\n\n💀 Game Over! The word was: ${game.word}`
+                    });
+                    global.wordleGames.delete(gameId);
+                } else {
+                    await sock.sendMessage(sender, {
+                        text: `${display}\n\n${game.maxAttempts - game.guesses.length} attempts remaining`
+                    });
+                }
+            }
+        } catch (err) {
+            logger.error('Wordle error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
         }
-        // TODO: Implement Wordle game logic
-        await sock.sendMessage(sender, { text: 'Wordle game starting...' });
     },
 
     async trivia(sock, sender, args) {
-        const categories = ['general', 'science', 'history', 'movies', 'games'];
-        if (!args[0] || !categories.includes(args[0].toLowerCase())) {
-            await sock.sendMessage(sender, {
-                text: `📚 Available categories: ${categories.join(', ')}`
-            });
-            return;
+        try {
+            if (!global.triviaGames) global.triviaGames = new Map();
+
+            const gameId = sender;
+            let game = global.triviaGames.get(gameId);
+
+            const categories = {
+                general: [
+                    {
+                        question: "What is the capital of France?",
+                        options: ["London", "Berlin", "Paris", "Madrid"],
+                        correct: 2
+                    },
+                    {
+                        question: "Which planet is known as the Red Planet?",
+                        options: ["Venus", "Mars", "Jupiter", "Saturn"],
+                        correct: 1
+                    }
+                ],
+                science: [
+                    {
+                        question: "What is the chemical symbol for gold?",
+                        options: ["Ag", "Fe", "Au", "Cu"],
+                        correct: 2
+                    },
+                    {
+                        question: "What is the hardest natural substance on Earth?",
+                        options: ["Gold", "Iron", "Diamond", "Platinum"],
+                        correct: 2
+                    }
+                ],
+                history: [
+                    {
+                        question: "In which year did World War II end?",
+                        options: ["1943", "1944", "1945", "1946"],
+                        correct: 2
+                    },
+                    {
+                        question: "Who was the first President of the United States?",
+                        options: ["John Adams", "Thomas Jefferson", "George Washington", "Benjamin Franklin"],
+                        correct: 2
+                    }
+                ]
+            };
+
+            if (!args[0]) {
+                await sock.sendMessage(sender, {
+                    text: `📚 Available categories: ${Object.keys(categories).join(', ')}\nUse: !trivia [category] to start`
+                });
+                return;
+            }
+
+            const category = args[0].toLowerCase();
+            if (!categories[category]) {
+                await sock.sendMessage(sender, {
+                    text: `❌ Invalid category. Available categories: ${Object.keys(categories).join(', ')}`
+                });
+                return;
+            }
+
+            if (!game) {
+                // Start new game
+                game = {
+                    category: category,
+                    questions: [...categories[category]], // Create copy to shuffle
+                    currentQuestion: 0,
+                    score: 0,
+                    maxQuestions: categories[category].length
+                };
+
+                // Shuffle questions
+                for (let i = game.questions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [game.questions[i], game.questions[j]] = [game.questions[j], game.questions[i]];
+                }
+
+                global.triviaGames.set(gameId, game);
+
+                // Display first question
+                const question = game.questions[0];
+                const optionsText = question.options
+                    .map((opt, i) => `${i + 1}. ${opt}`)
+                    .join('\n');
+
+                await sock.sendMessage(sender, {
+                    text: `🎯 Trivia Game - ${category.toUpperCase()}\n\nQuestion 1/${game.maxQuestions}:\n${question.question}\n\n${optionsText}\n\nRespond with !answer [number]`
+                });
+                return;
+            }
+
+            // Handle answer
+            if (args[0].toLowerCase() === 'answer') {
+                const answer = parseInt(args[1]);
+                if (isNaN(answer) || answer < 1 || answer > 4) {
+                    await sock.sendMessage(sender, {
+                        text: '❌ Please provide a valid answer number (1-4)'
+                    });
+                    return;
+                }
+
+                const currentQ = game.questions[game.currentQuestion];
+                const isCorrect = (answer - 1) === currentQ.correct;
+                if (isCorrect) game.score++;
+
+                const feedbackText = isCorrect ? '✅ Correct!' : `❌ Wrong! The correct answer was: ${currentQ.options[currentQ.correct]}`;
+                game.currentQuestion++;
+
+                if (game.currentQuestion >= game.maxQuestions) {
+                    // Game over
+                    await sock.sendMessage(sender, {
+                        text: `${feedbackText}\n\n🎮 Game Over!\nFinal Score: ${game.score}/${game.maxQuestions}`
+                    });
+                    global.triviaGames.delete(gameId);
+                } else {
+                    // Next question
+                    const nextQ = game.questions[game.currentQuestion];
+                    const optionsText = nextQ.options
+                        .map((opt, i) => `${i + 1}. ${opt}`)
+                        .join('\n');
+
+                    await sock.sendMessage(sender, {
+                        text: `${feedbackText}\n\nQuestion ${game.currentQuestion + 1}/${game.maxQuestions}:\n${nextQ.question}\n\n${optionsText}\n\nRespond with !answer [number]`
+                    });
+                    global.triviaGames.set(gameId, game);
+                }
+            }
+
+        } catch (err) {
+            logger.error('Trivia error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            global.triviaGames.delete(gameId);
         }
-        // TODO: Implement trivia game with categories
-        await sock.sendMessage(sender, { text: 'Starting trivia game...' });
     },
 
     // Social Commands
@@ -431,7 +862,7 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
 
     async poker(sock, sender, args) {
         const bet = parseInt(args[0]) || 10;
-        const cards = ['A♠️', 'K♠️', 'Q♠️', 'J♠️', '10♠️'];
+        const cards = ['A♠️', '2♠️', '3♠️', '4♠️', '5♠️', '6♠️', '7♠️', '8♠️', '9♠️', '10♠️', 'J♠️', 'Q♠️', 'K♠️'];
         const playerCards = [
             cards[Math.floor(Math.random() * cards.length)],
             cards[Math.floor(Math.random() * cards.length)]
@@ -697,7 +1128,7 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
         const compliments = [
             "Your smile lights up the room! ✨",
             "You're amazing at making others feel special! 🌟",
-            "Your positive energy is contagious! 🌈",
+            "Your positive energy iscontagious! 🌈",
             "You have a heart of gold! 💝",
             "You make the world a better place! 🌍",
             "Your creativity knows no bounds! 🎨",
@@ -767,6 +1198,144 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
     }
 
 };
+
+function renderBoard(board) {
+    const cells = board.map((cell, i) => cell === ' ' ? (i + 1).toString() : cell);
+    return `${cells[0]} │ ${cells[1]} │ ${cells[2]}\n──┼───┼──\n${cells[3]} │ ${cells[4]} │ ${cells[5]}\n──┼───┼──\n${cells[6]} │ ${cells[7]} │ ${cells[8]}`;
+}
+
+function checkWinner(board) {
+    const winPatterns = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+        [0, 4, 8], [2, 4, 6]             // Diagonals
+    ];
+
+    for (const pattern of winPatterns) {
+        const [a, b, c] = pattern;
+        if (board[a] !== ' ' && board[a] === board[b] && board[b] === board[c]) {
+            return board[a];
+        }
+    }
+    return null;
+}
+
+function getBotMove(board) {
+    // First try to win
+    const move = findWinningMove(board, 'O');
+    if (move !== -1) return move;
+
+    // Then block player's winning move
+    const blockMove = findWinningMove(board, 'X');
+    if (blockMove !== -1) return blockMove;
+
+    // Take center if available
+    if (board[4] === ' ') return 4;
+
+    // Take any available corner
+    const corners = [0, 2, 6, 8];
+    const availableCorners = corners.filter(i => board[i] === ' ');
+    if (availableCorners.length > 0) {
+        return availableCorners[Math.floor(Math.random() * availableCorners.length)];
+    }
+
+    // Take any available side
+    const sides = [1, 3, 5, 7];
+    const availableSides = sides.filter(i => board[i] === ' ');
+    if (availableSides.length > 0) {
+        return availableSides[Math.floor(Math.random() * availableSides.length)];
+    }
+
+    return -1;
+}
+
+function findWinningMove(board, player) {
+    const winPatterns = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6]
+    ];
+
+    for (const pattern of winPatterns) {
+        const [a, b, c] = pattern;
+        const line = [board[a], board[b], board[c]];
+        const playerCount = line.filter(cell => cell === player).length;
+        const emptyCount = line.filter(cell => cell === ' ').length;
+
+        if (playerCount === 2 && emptyCount === 1) {
+            const emptyIndex = pattern[line.findIndex(cell => cell === ' ')];
+            return emptyIndex;
+        }
+    }
+    return -1;
+}
+
+function getHangmanDisplay(game) {
+    const stages = [
+        `
+  +---+
+  |   |
+      |
+      |
+      |
+      |
+=========`,
+        `
+  +---+
+  |   |
+  O   |
+      |
+      |
+      |
+=========`,
+        `
+  +---+
+  |   |
+  O   |
+  |   |
+      |
+      |
+=========`,
+        `
+  +---+
+  |   |
+  O   |
+ /|   |
+      |
+      |
+=========`,
+        `
+  +---+
+  |   |
+  O   |
+ /|\\  |
+      |
+      |
+=========`,
+        `
+  +---+
+  |   |
+  O   |
+ /|\\  |
+ /    |
+      |
+=========`,
+        `
+  +---+
+  |   |
+  O   |
+ /|\\  |
+ / \\  |
+      |
+=========`
+    ];
+
+    const wordDisplay = [...game.word]
+        .map(letter => game.guessed.has(letter) ? letter : '_')
+        .join(' ');
+
+    return `${stages[game.mistakes]}\n\nWord: ${wordDisplay}`;
+}
 
 module.exports = {
     commands: funCommands,
