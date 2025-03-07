@@ -27,11 +27,19 @@ const logger = pino({
             type: err.type || 'Error',
             message: err.message,
             stack: err.stack,
-            code: err.code
+            code: err.code,
+            details: err.details || {}
         })
     },
     // Add timestamp to all logs
-    timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`
+    timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`,
+    // Add module name to all logs
+    mixin: () => {
+        const stack = new Error().stack;
+        const caller = stack.split('\n')[2];
+        const match = caller.match(/[\/\\]([^\/\\]+)\.js/);
+        return { module: match ? match[1] : 'unknown' };
+    }
 });
 
 // Prevent unnecessary warnings
@@ -48,6 +56,23 @@ logger.moduleSuccess = (moduleName) => {
 
 logger.moduleError = (moduleName, error) => {
     logger.error(`❌ Error initializing ${moduleName} module: ${error.message}`);
+    logger.error('Stack trace:', error.stack);
+    if (error.details) {
+        logger.error('Additional details:', error.details);
+    }
+};
+
+// Add command execution logging
+logger.commandStart = (commandName, user) => {
+    logger.info(`🎯 Executing command: ${commandName} by ${user}`);
+};
+
+logger.commandSuccess = (commandName) => {
+    logger.info(`✅ Command ${commandName} executed successfully`);
+};
+
+logger.commandError = (commandName, error) => {
+    logger.error(`❌ Error executing command ${commandName}: ${error.message}`);
     logger.error('Stack trace:', error.stack);
 };
 
