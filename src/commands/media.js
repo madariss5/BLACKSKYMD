@@ -13,6 +13,7 @@ const yts = require('yt-search');
 const { getLyrics } = require('genius-lyrics-api');
 const webp = require('node-webpmux');
 
+// Helper function for audio queue management
 const playNextInQueue = async (sock, sender) => {
     const queue = audioQueue.get(sender);
     if (queue && queue.length > 0) {
@@ -31,6 +32,7 @@ const playNextInQueue = async (sock, sender) => {
     }
 };
 
+// Media command handlers
 const mediaCommands = {
     async play(sock, message, args) {
         try {
@@ -992,4 +994,25 @@ const mediaCommands = {
 
 };
 
-module.exports = mediaCommands;
+// Export the command handlers with new format
+module.exports = {
+    commands: mediaCommands,
+    category: 'media',
+    // Initialize any required state or configurations
+    async init() {
+        try {
+            // Ensure temp directory exists
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            // Verify required dependencies
+            if (!sharp) throw new Error('Sharp library not initialized');
+            if (!ytdl) throw new Error('YTDL library not initialized');
+
+            logger.info('Media command handler initialized successfully');
+        } catch (err) {
+            logger.error('Error initializing media command handler:', err);
+            throw err; // Re-throw to be handled by the command loader
+        }
+    }
+};

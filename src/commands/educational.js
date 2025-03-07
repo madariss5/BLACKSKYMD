@@ -1,17 +1,24 @@
 const logger = require('../utils/logger');
+const path = require('path');
+const fs = require('fs/promises');
 
 // Helper functions can go here if needed
 
 const educationalCommands = {
     async define(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const word = args.join(' ');
-        if (!word) {
-            await sock.sendMessage(remoteJid, { text: '📚 Please provide a word to define' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+            const word = args.join(' ');
+            if (!word) {
+                await sock.sendMessage(remoteJid, { text: '📚 Please provide a word to define' });
+                return;
+            }
+            // TODO: Implement dictionary API integration
+            await sock.sendMessage(remoteJid, { text: '📖 Looking up definition...' });
+        } catch (err) {
+            logger.error('Error in define command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Error looking up definition' });
         }
-        // TODO: Implement dictionary API integration
-        await sock.sendMessage(remoteJid, { text: '📖 Looking up definition...' });
     },
 
     async translate(sock, message, args) {
@@ -465,14 +472,24 @@ const educationalCommands = {
     }
 };
 
-// Export the command handlers with new format
+// Export the command handlers with enhanced format
 module.exports = {
     commands: educationalCommands,
     category: 'educational',
     // Initialize any required state or configurations
     async init() {
         try {
+            logger.info('Initializing educational command handler...');
+
+            // TODO: Initialize any required API clients or services
+            // TODO: Verify required dependencies are available
+
+            // Create necessary directories
+            const dataDir = path.join(__dirname, '../../data/educational');
+            await fs.mkdir(dataDir, { recursive: true });
+
             logger.info('Educational command handler initialized successfully');
+            return true;
         } catch (err) {
             logger.error('Error initializing educational command handler:', err);
             throw err; // Re-throw to be handled by the command loader

@@ -39,26 +39,36 @@ class CommandLoader {
 
             // Verify module structure
             if (!module || (typeof module !== 'object' && typeof module !== 'function')) {
-                throw new CommandError(`Invalid module format: Expected object or function, got ${typeof module}`);
+                throw new CommandError(`Invalid module format in ${file}: Expected object or function, got ${typeof module}`);
             }
 
-            // Initialize module if needed
-            if (module.init && typeof module.init === 'function') {
-                logger.info(`Initializing module ${file}...`);
-                await module.init();
+            // Check if module has commands property
+            if (module.commands && typeof module.commands === 'object') {
+                // Module uses new format with commands property
+                if (module.init && typeof module.init === 'function') {
+                    logger.info(`Initializing module ${file}...`);
+                    await module.init();
+                }
+                return {
+                    commands: module.commands,
+                    category: module.category
+                };
+            } else if (typeof module === 'object') {
+                // Module exports commands directly
+                return {
+                    commands: module,
+                    category: null
+                };
             }
 
-            // Get commands object
-            const commands = module.commands || module;
-            if (typeof commands !== 'object') {
-                throw new CommandError(`Invalid commands format: Expected object, got ${typeof commands}`);
-            }
-
-            return commands;
+            throw new CommandError(`Invalid module structure in ${file}: No valid commands found`);
         } catch (err) {
+            if (err instanceof CommandError) {
+                throw err;
+            }
             logger.error(`Failed to load module ${file}:`, err);
             logger.error('Stack trace:', err.stack);
-            throw err;
+            throw new CommandError(`Failed to load module ${file}`, null, err);
         }
     }
 
@@ -81,7 +91,7 @@ class CommandLoader {
                 files = await fs.readdir(commandsPath);
             } catch (err) {
                 logger.error('Error reading commands directory:', err);
-                throw err;
+                throw new CommandError('Failed to read commands directory', null, err);
             }
 
             const loadedHandlers = {};
@@ -94,12 +104,14 @@ class CommandLoader {
                 const modulePath = path.join(commandsPath, file);
 
                 try {
-                    const commands = await this.loadModuleSafely(modulePath, file);
+                    const moduleData = await this.loadModuleSafely(modulePath, file);
+                    const commands = moduleData.commands;
+                    const moduleCategory = moduleData.category || category;
 
                     for (const [name, handler] of Object.entries(commands)) {
                         try {
                             if (typeof handler !== 'function') {
-                                logger.warn(`Skipping ${name} in ${file} - not a function`);
+                                logger.warn(`Skipping ${name} in ${file} - not a function, got ${typeof handler}`);
                                 continue;
                             }
 
@@ -124,7 +136,7 @@ class CommandLoader {
                             this.commands.set(name, {
                                 execute: handler,
                                 config,
-                                category: commands.category || category
+                                category: moduleCategory
                             });
 
                             // Update or initialize cache
@@ -137,16 +149,16 @@ class CommandLoader {
                                 });
                             }
 
-                            loadedHandlers[category] = (loadedHandlers[category] || 0) + 1;
-                            logger.info(`✅ Registered command: ${name} from ${category}`);
+                            loadedHandlers[moduleCategory] = (loadedHandlers[moduleCategory] || 0) + 1;
+                            logger.info(`✅ Registered command: ${name} from ${moduleCategory}`);
                         } catch (err) {
-                            logger.error(`Failed to register handler for ${name} in ${file}:`, err);
-                            logger.error('Stack trace:', err.stack);
+                            logger.error(`Failed to register handler for ${name} in ${file}:`, err.toString());
+                            if (err.stack) logger.error('Stack trace:', err.stack);
                         }
                     }
                 } catch (err) {
-                    logger.error(`Error processing module ${file}:`, err);
-                    logger.error('Stack trace:', err.stack);
+                    logger.error(`Error processing module ${file}:`, err.toString());
+                    if (err.stack) logger.error('Stack trace:', err.stack);
                     continue;
                 }
             }
@@ -161,8 +173,8 @@ class CommandLoader {
             this.lastReload = Date.now();
             return this.commands.size > 0;
         } catch (err) {
-            logger.error('Critical error in loadCommandHandlers:', err);
-            logger.error('Stack trace:', err.stack);
+            logger.error('Critical error in loadCommandHandlers:', err.toString());
+            if (err.stack) logger.error('Stack trace:', err.stack);
             return false;
         }
     }

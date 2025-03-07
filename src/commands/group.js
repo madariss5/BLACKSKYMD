@@ -2418,3 +2418,31 @@ module.exports = {
         }
     }
 };
+
+// Export the command handlers with new format
+module.exports = {
+    commands: groupCommands,
+    category: 'group',
+    // Initialize any required state or configurations
+    async init() {
+        try {
+            // Initialize group settings storage
+            const groupSettings = new Map();
+            
+            // Verify required permissions module
+            if (!isAdmin || !isBotAdmin) {
+                throw new Error('Permissions module not initialized');
+            }
+
+            // Create backup directory if it doesn't exist
+            const backupDir = path.join(__dirname, '../../backups');
+            await fs.mkdir(backupDir, { recursive: true });
+
+            logger.info('Group command handler initialized successfully');
+            return true;
+        } catch (err) {
+            logger.error('Error initializing group command handler:', err);
+            throw err; // Re-throw to be handled by the command loader
+        }
+    }
+};
