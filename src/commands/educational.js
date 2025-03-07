@@ -2,7 +2,7 @@ const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
 
-// Helper functions can go here if needed
+// Helper functions
 const handleError = async (sock, jid, err, message) => {
     logger.error(`${message}:`, err.message);
     logger.error('Stack trace:', err.stack);
@@ -476,6 +476,7 @@ const educationalCommands = {
     }
 };
 
+// Export with proper structure and initialization
 module.exports = {
     commands: educationalCommands,
     category: 'educational',
@@ -483,13 +484,13 @@ module.exports = {
         try {
             logger.info('Initializing educational command handler...');
 
-            // Verify required dependencies
+            // Verify required modules
             const requiredDeps = {
-                path: path,
-                logger: logger
+                path,
+                logger
             };
 
-            // Check each dependency
+            // Check dependencies
             for (const [name, dep] of Object.entries(requiredDeps)) {
                 if (!dep) {
                     logger.error(`Missing educational dependency: ${name}`);
@@ -497,13 +498,13 @@ module.exports = {
                 }
             }
 
-            // Create necessary directories with error handling
+            // Create necessary directories
             const dataDir = path.join(__dirname, '../../data/educational');
             try {
                 await fs.mkdir(dataDir, { recursive: true });
                 logger.info(`Created directory: ${dataDir}`);
             } catch (err) {
-                logger.error('Failed to create data directory:', err);
+                logger.error(`Failed to create directory ${dataDir}:`, err);
                 throw err;
             }
 
@@ -512,7 +513,7 @@ module.exports = {
         } catch (err) {
             logger.error('Error initializing educational command handler:', err.message);
             logger.error('Stack trace:', err.stack);
-            throw err;
+            return false; // Return false instead of throwing to allow other modules to load
         }
     }
 };

@@ -72,6 +72,7 @@ const groupCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to kick user' });
         }
     },
+
     async add(sock, message, args) {
         // ... copy implementation
     },
@@ -146,7 +147,6 @@ const groupCommands = {
     }
 };
 
-// Export with enhanced format and proper initialization
 module.exports = {
     commands: groupCommands,
     category: 'group',
@@ -154,24 +154,24 @@ module.exports = {
         try {
             logger.info('Initializing group command handler...');
 
-            // Verify required modules with better error handling
+            // Verify required modules
             const requiredDeps = {
-                isAdmin: isAdmin,
-                isBotAdmin: isBotAdmin,
-                downloadMediaMessage: downloadMediaMessage,
-                fs: fs.promises,
-                path: path,
-                logger: logger
+                isAdmin,
+                isBotAdmin,
+                downloadMediaMessage,
+                path,
+                logger
             };
 
+            // Check dependencies
             for (const [name, dep] of Object.entries(requiredDeps)) {
                 if (!dep) {
-                    logger.error(`Missing dependency: ${name}`);
-                    throw new Error(`Required dependency '${name}' is not initialized`);
+                    logger.error(`Missing group dependency: ${name}`);
+                    throw new Error(`Required group dependency '${name}' is not initialized`);
                 }
             }
 
-            // Create necessary directories with error handling
+            // Create necessary directories
             const dataDir = path.join(__dirname, '../../data/groups');
             try {
                 await fs.mkdir(dataDir, { recursive: true });
@@ -189,7 +189,7 @@ module.exports = {
         } catch (err) {
             logger.error('Error initializing group command handler:', err.message);
             logger.error('Stack trace:', err.stack);
-            throw err;
+            return false; // Return false instead of throwing to allow other modules to load
         }
     }
 };

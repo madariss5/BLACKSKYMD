@@ -4,59 +4,35 @@ const { downloadMediaMessage } = require('../utils/helpers');
 const path = require('path');
 const fs = require('fs').promises;
 
-// Helper functions can go here
-function parseDuration(str) {
-    const match = str.match(/^(\d+)(s|m|h|d)$/);
-    if (!match) return null;
-
-    const num = parseInt(match[1]);
-    const unit = match[2];
-
-    switch (unit) {
-        case 's': return num;
-        case 'm': return num * 60;
-        case 'h': return num * 60 * 60;
-        case 'd': return num * 24 * 60 * 60;
-        default: return null;
-    }
-}
-
-function formatDuration(seconds) {
-    if (seconds < 60) return `${seconds} seconds`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours`;
-    return `${Math.floor(seconds / 86400)} days`;
-}
-
 // Group command handlers (empty for now, to be implemented)
-const groupCommands = {};
+const groupNewCommands = {};
 
 module.exports = {
-    commands: groupCommands,
-    category: 'group_new',
+    commands: groupNewCommands,
+    category: 'group_extended',  // Different category to avoid conflict
     async init() {
         try {
-            logger.info('Initializing group_new command handler...');
+            logger.info('Initializing extended group command handler...');
 
-            // Verify required modules with better error handling
+            // Verify required modules
             const requiredDeps = {
-                isAdmin: isAdmin,
-                isBotAdmin: isBotAdmin,
-                downloadMediaMessage: downloadMediaMessage,
-                fs: fs.promises,
-                path: path,
-                logger: logger
+                isAdmin,
+                isBotAdmin,
+                downloadMediaMessage,
+                path,
+                logger
             };
 
+            // Check dependencies
             for (const [name, dep] of Object.entries(requiredDeps)) {
                 if (!dep) {
-                    logger.error(`Missing dependency: ${name}`);
-                    throw new Error(`Required dependency '${name}' is not initialized`);
+                    logger.error(`Missing extended group dependency: ${name}`);
+                    throw new Error(`Required extended group dependency '${name}' is not initialized`);
                 }
             }
 
-            // Create necessary directories with error handling
-            const dataDir = path.join(__dirname, '../../data/groups');
+            // Create necessary directories
+            const dataDir = path.join(__dirname, '../../data/groups_extended');
             try {
                 await fs.mkdir(dataDir, { recursive: true });
                 logger.info(`Created directory: ${dataDir}`);
@@ -68,12 +44,12 @@ module.exports = {
             // Initialize settings storage
             const groupSettings = new Map();
 
-            logger.info('Group_new command handler initialized successfully');
+            logger.info('Extended group command handler initialized successfully');
             return true;
         } catch (err) {
-            logger.error('Error initializing group_new command handler:', err.message);
+            logger.error('Error initializing extended group command handler:', err.message);
             logger.error('Stack trace:', err.stack);
-            throw err;
+            return false; // Return false instead of throwing to allow other modules to load
         }
     }
 };

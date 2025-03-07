@@ -1002,16 +1002,17 @@ module.exports = {
         try {
             logger.info('Initializing media command handler...');
 
-            // Verify required dependencies with detailed error messages
+            // Verify required modules with better error handling
             const requiredDeps = {
-                sharp: sharp,
-                ytdl: ytdl,
-                axios: axios,
-                webp: webp,
-                yts: yts,
-                path: path,
-                FormData: FormData,
-                downloadMediaMessage: downloadMediaMessage
+                sharp,
+                ytdl,
+                axios,
+                webp,
+                yts,
+                path,
+                FormData,
+                downloadMediaMessage,
+                logger
             };
 
             // Check each dependency with better error handling
@@ -1022,7 +1023,7 @@ module.exports = {
                 }
             }
 
-            // Create necessary directories with error handling
+            // Create necessary directories with proper error handling
             const dirs = [
                 path.join(__dirname, '../../temp'),
                 path.join(__dirname, '../../temp/media'),
