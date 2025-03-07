@@ -28,6 +28,7 @@ function formatDuration(seconds) {
     return `${Math.floor(seconds / 86400)} days`;
 }
 
+// Group command handlers
 const groupCommands = {
     async kick(sock, message, args) {
         try {
