@@ -148,128 +148,15 @@ const utilityCommands = {
     },
 
     async poll(sock, sender, args) {
-        try {
-            const [question, ...options] = args.join(' ').split('|').map(item => item.trim());
-            if (!question || options.length < 2) {
-                await sock.sendMessage(sender, { 
-                    text: 'Usage: !poll Question | Option1 | Option2 | ...' 
-                });
-                return;
-            }
-
-            const pollText = `📊 Poll: ${question}\n\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
-            await sock.sendMessage(sender, { text: pollText });
-        } catch (err) {
-            logger.error('Poll command error:', err);
-            await sock.sendMessage(sender, { text: 'Error creating poll. Please try again.' });
+        const [question, ...options] = args.join(' ').split('|').map(item => item.trim());
+        if (!question || options.length < 2) {
+            await sock.sendMessage(sender, { 
+                text: 'Usage: !poll Question | Option1 | Option2 | ...' 
+            });
+            return;
         }
-    },
-
-    async todo(sock, sender, args) {
-        try {
-            const [action, ...item] = args;
-            if (!action || !['add', 'remove', 'list'].includes(action)) {
-                await sock.sendMessage(sender, { 
-                    text: 'Usage: !todo <add|remove|list> [item]' 
-                });
-                return;
-            }
-
-            // Initialize todos if not exists
-            if (!global.todos) global.todos = new Map();
-            if (!global.todos.has(sender)) global.todos.set(sender, []);
-
-            const userTodos = global.todos.get(sender);
-
-            switch (action) {
-                case 'add':
-                    if (!item.length) {
-                        await sock.sendMessage(sender, { text: 'Please provide an item to add' });
-                        return;
-                    }
-                    userTodos.push(item.join(' '));
-                    await sock.sendMessage(sender, { text: 'Item added to your todo list' });
-                    break;
-
-                case 'remove':
-                    const index = parseInt(item[0]) - 1;
-                    if (isNaN(index) || index < 0 || index >= userTodos.length) {
-                        await sock.sendMessage(sender, { text: 'Invalid item number' });
-                        return;
-                    }
-                    userTodos.splice(index, 1);
-                    await sock.sendMessage(sender, { text: 'Item removed from your todo list' });
-                    break;
-
-                case 'list':
-                    if (userTodos.length === 0) {
-                        await sock.sendMessage(sender, { text: 'Your todo list is empty' });
-                        return;
-                    }
-                    const todoList = userTodos.map((todo, i) => `${i + 1}. ${todo}`).join('\n');
-                    await sock.sendMessage(sender, { text: `📝 Your Todo List:\n${todoList}` });
-                    break;
-            }
-        } catch (err) {
-            logger.error('Todo command error:', err);
-            await sock.sendMessage(sender, { text: 'Error managing todo list. Please try again.' });
-        }
-    },
-
-    async notes(sock, sender, args) {
-        try {
-            const [action, ...content] = args;
-            if (!action || !['add', 'view', 'delete'].includes(action)) {
-                await sock.sendMessage(sender, { 
-                    text: 'Usage: !notes <add|view|delete> [content/note_number]' 
-                });
-                return;
-            }
-
-            // Initialize notes if not exists
-            if (!global.notes) global.notes = new Map();
-            if (!global.notes.has(sender)) global.notes.set(sender, []);
-
-            const userNotes = global.notes.get(sender);
-
-            switch (action) {
-                case 'add':
-                    if (!content.length) {
-                        await sock.sendMessage(sender, { text: 'Please provide content for the note' });
-                        return;
-                    }
-                    userNotes.push({
-                        content: content.join(' '),
-                        timestamp: new Date().toISOString()
-                    });
-                    await sock.sendMessage(sender, { text: 'Note added successfully' });
-                    break;
-
-                case 'view':
-                    if (userNotes.length === 0) {
-                        await sock.sendMessage(sender, { text: 'You have no saved notes' });
-                        return;
-                    }
-                    const notesList = userNotes.map((note, i) => 
-                        `${i + 1}. [${new Date(note.timestamp).toLocaleString()}]\n${note.content}`
-                    ).join('\n\n');
-                    await sock.sendMessage(sender, { text: `📝 Your Notes:\n\n${notesList}` });
-                    break;
-
-                case 'delete':
-                    const index = parseInt(content[0]) - 1;
-                    if (isNaN(index) || index < 0 || index >= userNotes.length) {
-                        await sock.sendMessage(sender, { text: 'Invalid note number' });
-                        return;
-                    }
-                    userNotes.splice(index, 1);
-                    await sock.sendMessage(sender, { text: 'Note deleted successfully' });
-                    break;
-            }
-        } catch (err) {
-            logger.error('Notes command error:', err);
-            await sock.sendMessage(sender, { text: 'Error managing notes. Please try again.' });
-        }
+        const pollText = `📊 Poll: ${question}\n\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
+        await sock.sendMessage(sender, { text: pollText });
     },
 
     async news(sock, sender, args) {
@@ -512,167 +399,24 @@ const utilityCommands = {
     },
 
     async reminder(sock, sender, args) {
-        try {
-            if (args.length < 2) {
-                await sock.sendMessage(sender, { 
-                    text: 'Usage: !reminder [minutes] [message]\nExample: !reminder 30 Check laundry' 
-                });
-                return;
-            }
-
-            const minutes = parseInt(args[0]);
-            const message = args.slice(1).join(' ');
-
-            if (isNaN(minutes) || minutes <= 0 || minutes > 180) {
-                await sock.sendMessage(sender, { 
-                    text: 'Please provide a valid duration between 1 and 180 minutes' 
-                });
-                return;
-            }
-
-            // Initialize reminders if not exists
-            if (!global.reminders) global.reminders = new Map();
-
-            const reminderTime = new Date(Date.now() + minutes * 60000);
-            global.reminders.set(`${sender}_${Date.now()}`, {
-                message,
-                time: reminderTime,
-                notified: false
-            });
-
+        if (args.length < 2) {
             await sock.sendMessage(sender, { 
-                text: `⏰ Reminder set for "${message}" in ${minutes} minutes` 
+                text: 'Usage: !reminder [time] [message]\nExample: !reminder 30m Check laundry' 
             });
-
-            // Set reminder
-            setTimeout(async () => {
-                const reminder = global.reminders.get(`${sender}_${Date.now()}`);
-                if (reminder && !reminder.notified) {
-                    await sock.sendMessage(sender, { 
-                        text: `⏰ Reminder: ${message}` 
-                    });
-                    reminder.notified = true;
-                }
-            }, minutes * 60000);
-
-        } catch (err) {
-            logger.error('Reminder command error:', err);
-            await sock.sendMessage(sender, { text: 'Error setting reminder. Please try again.' });
+            return;
         }
+        // TODO: Implement reminder system
+        await sock.sendMessage(sender, { text: 'Setting reminder...' });
     },
 
     async countdown(sock, sender, args) {
-        try {
-            if (args.length < 2) {
-                await sock.sendMessage(sender, { 
-                    text: 'Usage: !countdown [event_name] [minutes]\nExample: !countdown "Meeting" 30' 
-                });
-                return;
-            }
-
-            const minutes = parseInt(args[args.length - 1]);
-            const eventName = args.slice(0, -1).join(' ');
-
-            if (isNaN(minutes) || minutes <= 0 || minutes > 180) {
-                await sock.sendMessage(sender, { 
-                    text: 'Please provide a valid duration between 1 and 180 minutes' 
-                });
-                return;
-            }
-
-            // Initialize countdowns if not exists
-            if (!global.countdowns) global.countdowns = new Map();
-
-            const endTime = new Date(Date.now() + minutes * 60000);
-            global.countdowns.set(`${sender}_${eventName}`, {
-                eventName,
-                endTime,
-                notified: false
-            });
-
-            await sock.sendMessage(sender, { 
-                text: `⏰ Countdown set for "${eventName}" - ${minutes} minutes\nI'll notify you when it's done!` 
-            });
-
-            // Start countdown check
-            setTimeout(async () => {
-                const countdown = global.countdowns.get(`${sender}_${eventName}`);
-                if (countdown && !countdown.notified) {
-                    await sock.sendMessage(sender, { 
-                        text: `⏰ Time's up! "${eventName}" countdown finished!` 
-                    });
-                    countdown.notified = true;
-                }
-            }, minutes * 60000);
-
-        } catch (err) {
-            logger.error('Countdown command error:', err);
-            await sock.sendMessage(sender, { text: 'Error setting countdown. Please try again.' });
+        const event = args.join(' ');
+        if (!event) {
+            await sock.sendMessage(sender, { text: 'Please provide an event name and date' });
+            return;
         }
-    },
-
-    async wordcount(sock, sender, args) {
-        try {
-            const text = args.join(' ');
-            if (!text) {
-                await sock.sendMessage(sender, { text: 'Please provide text to count' });
-                return;
-            }
-
-            const words = text.trim().split(/\s+/).length;
-            const chars = text.length;
-            const chars_no_space = text.replace(/\s+/g, '').length;
-
-            const result = `📊 Text Statistics:
-Words: ${words}
-Characters (with spaces): ${chars}
-Characters (no spaces): ${chars_no_space}`;
-
-            await sock.sendMessage(sender, { text: result });
-        } catch (err) {
-            logger.error('Wordcount command error:', err);
-            await sock.sendMessage(sender, { text: 'Error counting words. Please try again.' });
-        }
-    },
-
-    async format(sock, sender, args) {
-        try {
-            const [style, ...text] = args;
-            if (!style || !text.length) {
-                await sock.sendMessage(sender, { 
-                    text: 'Usage: !format [style] [text]\nStyles: upper, lower, title, sentence' 
-                });
-                return;
-            }
-
-            const input = text.join(' ');
-            let result;
-
-            switch (style.toLowerCase()) {
-                case 'upper':
-                    result = input.toUpperCase();
-                    break;
-                case 'lower':
-                    result = input.toLowerCase();
-                    break;
-                case 'title':
-                    result = input.split(' ')
-                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                        .join(' ');
-                    break;
-                case 'sentence':
-                    result = input.charAt(0).toUpperCase() + input.slice(1).toLowerCase();
-                    break;
-                default:
-                    await sock.sendMessage(sender, { text: 'Invalid format style. Available styles: upper, lower, title, sentence' });
-                    return;
-            }
-
-            await sock.sendMessage(sender, { text: result });
-        } catch (err) {
-            logger.error('Format command error:', err);
-            await sock.sendMessage(sender, { text: 'Error formatting text. Please try again.' });
-        }
+        // TODO: Implement countdown timer
+        await sock.sendMessage(sender, { text: 'Starting countdown...' });
     },
 
     async poll2(sock, sender, args) {
@@ -685,6 +429,30 @@ Characters (no spaces): ${chars_no_space}`;
         }
         // TODO: Implement poll creation
         await sock.sendMessage(sender, { text: 'Creating poll...' });
+    },
+
+    async todo(sock, sender, args) {
+        const [action, ...item] = args;
+        if (!action || !['add', 'remove', 'list'].includes(action)) {
+            await sock.sendMessage(sender, { 
+                text: 'Usage: !todo <add|remove|list> [item]' 
+            });
+            return;
+        }
+        // TODO: Implement todo list
+        await sock.sendMessage(sender, { text: 'Managing todo list...' });
+    },
+
+    async notes(sock, sender, args) {
+        const [action, ...content] = args;
+        if (!action || !['add', 'view', 'delete'].includes(action)) {
+            await sock.sendMessage(sender, { 
+                text: 'Usage: !notes <add|view|delete> [content]' 
+            });
+            return;
+        }
+        // TODO: Implement notes system
+        await sock.sendMessage(sender, { text: 'Managing notes...' });
     },
 
     async reverse(sock, sender, args) {

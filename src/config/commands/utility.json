@@ -2,18 +2,93 @@
   "category": "utility",
   "commands": [
     {
+      "name": "language",
+      "description": "Change the bot's language (en/de)",
+      "usage": ".language [language_code]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "weather",
+      "description": "Get weather information for a location",
+      "usage": ".weather [city]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "translate",
+      "description": "Translate text between languages",
+      "usage": ".translate [from] [to] [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
       "name": "calculate",
       "description": "Calculator with advanced mathematical functions",
       "usage": ".calculate [expression]",
-      "example": ".calculate 2 + 2 * 3",
       "cooldown": 3,
       "permissions": ["user"]
     },
     {
+      "name": "dictionary",
+      "description": "Look up word definitions and examples",
+      "usage": ".dictionary [word]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "covid",
+      "description": "Get COVID-19 statistics by country",
+      "usage": ".covid [country]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "currency",
+      "description": "Convert between currencies with live rates",
+      "usage": ".currency [amount] [from] [to]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "shortlink",
+      "description": "Shorten long URLs for easier sharing",
+      "usage": ".shortlink [url]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wiki",
+      "description": "Search and get Wikipedia article summaries",
+      "usage": ".wiki [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "poll",
+      "description": "Create interactive polls",
+      "usage": ".poll [question] | [option1] | [option2] ...",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "news",
+      "description": "Get latest news by category",
+      "usage": ".news [category]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "timezone",
+      "description": "Check time in different time zones",
+      "usage": ".timezone [city/country]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
       "name": "encode",
-      "description": "Encode text (base64, hex, binary)",
+      "description": "Encode text (base64, hex, etc)",
       "usage": ".encode [type] [text]",
-      "example": ".encode base64 Hello World",
       "cooldown": 5,
       "permissions": ["user"]
     },
@@ -21,104 +96,98 @@
       "name": "decode",
       "description": "Decode encoded text",
       "usage": ".decode [type] [text]",
-      "example": ".decode base64 SGVsbG8gV29ybGQ=",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
-      "name": "poll",
-      "description": "Create interactive polls",
-      "usage": ".poll [question] | [option1] | [option2] ...",
-      "example": ".poll Best color? | Red | Blue | Green",
+      "name": "qrread",
+      "description": "Read QR code from image",
+      "usage": ".qrread",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "qrgen",
+      "description": "Generate QR code from text",
+      "usage": ".qrgen [text]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "screenshot",
+      "description": "Take website screenshot",
+      "usage": ".screenshot [url]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wolfram",
+      "description": "Query Wolfram Alpha for complex calculations",
+      "usage": ".wolfram [query]",
       "cooldown": 30,
+      "permissions": ["premium"]
+    },
+    {
+      "name": "github",
+      "description": "Search GitHub repositories",
+      "usage": ".github [query]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "npm",
+      "description": "Search NPM packages",
+      "usage": ".npm [package]",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "color",
+      "description": "Get color information and conversions",
+      "usage": ".color [hex/rgb]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "crypto",
+      "description": "Check cryptocurrency prices and info",
+      "usage": ".crypto [coin]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "stocks",
+      "description": "Check stock market prices",
+      "usage": ".stocks [symbol]",
+      "cooldown": 30,
+      "permissions": ["user"]
+    },
+    {
+      "name": "reminder",
+      "description": "Set timed reminders",
+      "usage": ".reminder [time] [message]",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "countdown",
+      "description": "Create countdown timer",
+      "usage": ".countdown [event] [date]",
+      "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "todo",
       "description": "Manage personal todo list",
       "usage": ".todo <add|remove|list> [item]",
-      "example": ".todo add Buy groceries",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "notes",
       "description": "Manage personal notes",
-      "usage": ".notes <add|view|delete> [content/note_number]",
-      "example": ".notes add Remember to call mom",
+      "usage": ".notes <add|view|delete> [content]",
       "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "reverse",
-      "description": "Reverse provided text",
-      "usage": ".reverse [text]",
-      "example": ".reverse Hello World",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "mock",
-      "description": "Convert text to Spongebob mocking style",
-      "usage": ".mock [text]",
-      "example": ".mock hello there",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "roll",
-      "description": "Roll a dice with specified number of sides",
-      "usage": ".roll [sides]",
-      "example": ".roll 20",
-      "cooldown": 3,
-      "permissions": ["user"]
-    },
-    {
-      "name": "flip",
-      "description": "Flip a coin",
-      "usage": ".flip",
-      "example": ".flip",
-      "cooldown": 3,
-      "permissions": ["user"]
-    },
-    {
-      "name": "choose",
-      "description": "Choose randomly between provided options",
-      "usage": ".choose [option1] | [option2] | ...",
-      "example": ".choose Pizza | Burger | Salad",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "countdown",
-      "description": "Set a countdown timer",
-      "usage": ".countdown [event_name] [minutes]",
-      "example": ".countdown \"Team Meeting\" 30",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "wordcount",
-      "description": "Count words and characters in text",
-      "usage": ".wordcount [text]",
-      "example": ".wordcount This is a test message",
-      "cooldown": 3,
-      "permissions": ["user"]
-    },
-    {
-      "name": "format",
-      "description": "Format text in different styles",
-      "usage": ".format [style] [text]",
-      "example": ".format title hello world",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "reminder",
-      "description": "Set a reminder",
-      "usage": ".reminder [minutes] [message]",
-      "example": ".reminder 30 Check the laundry",
-      "cooldown": 10,
       "permissions": ["user"]
     }
   ]
