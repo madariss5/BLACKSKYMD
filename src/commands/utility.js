@@ -512,24 +512,167 @@ const utilityCommands = {
     },
 
     async reminder(sock, sender, args) {
-        if (args.length < 2) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !reminder [time] [message]\nExample: !reminder 30m Check laundry' 
+        try {
+            if (args.length < 2) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: !reminder [minutes] [message]\nExample: !reminder 30 Check laundry' 
+                });
+                return;
+            }
+
+            const minutes = parseInt(args[0]);
+            const message = args.slice(1).join(' ');
+
+            if (isNaN(minutes) || minutes <= 0 || minutes > 180) {
+                await sock.sendMessage(sender, { 
+                    text: 'Please provide a valid duration between 1 and 180 minutes' 
+                });
+                return;
+            }
+
+            // Initialize reminders if not exists
+            if (!global.reminders) global.reminders = new Map();
+
+            const reminderTime = new Date(Date.now() + minutes * 60000);
+            global.reminders.set(`${sender}_${Date.now()}`, {
+                message,
+                time: reminderTime,
+                notified: false
             });
-            return;
+
+            await sock.sendMessage(sender, { 
+                text: `⏰ Reminder set for "${message}" in ${minutes} minutes` 
+            });
+
+            // Set reminder
+            setTimeout(async () => {
+                const reminder = global.reminders.get(`${sender}_${Date.now()}`);
+                if (reminder && !reminder.notified) {
+                    await sock.sendMessage(sender, { 
+                        text: `⏰ Reminder: ${message}` 
+                    });
+                    reminder.notified = true;
+                }
+            }, minutes * 60000);
+
+        } catch (err) {
+            logger.error('Reminder command error:', err);
+            await sock.sendMessage(sender, { text: 'Error setting reminder. Please try again.' });
         }
-        // TODO: Implement reminder system
-        await sock.sendMessage(sender, { text: 'Setting reminder...' });
     },
 
     async countdown(sock, sender, args) {
-        const event = args.join(' ');
-        if (!event) {
-            await sock.sendMessage(sender, { text: 'Please provide an event name and date' });
-            return;
+        try {
+            if (args.length < 2) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: !countdown [event_name] [minutes]\nExample: !countdown "Meeting" 30' 
+                });
+                return;
+            }
+
+            const minutes = parseInt(args[args.length - 1]);
+            const eventName = args.slice(0, -1).join(' ');
+
+            if (isNaN(minutes) || minutes <= 0 || minutes > 180) {
+                await sock.sendMessage(sender, { 
+                    text: 'Please provide a valid duration between 1 and 180 minutes' 
+                });
+                return;
+            }
+
+            // Initialize countdowns if not exists
+            if (!global.countdowns) global.countdowns = new Map();
+
+            const endTime = new Date(Date.now() + minutes * 60000);
+            global.countdowns.set(`${sender}_${eventName}`, {
+                eventName,
+                endTime,
+                notified: false
+            });
+
+            await sock.sendMessage(sender, { 
+                text: `⏰ Countdown set for "${eventName}" - ${minutes} minutes\nI'll notify you when it's done!` 
+            });
+
+            // Start countdown check
+            setTimeout(async () => {
+                const countdown = global.countdowns.get(`${sender}_${eventName}`);
+                if (countdown && !countdown.notified) {
+                    await sock.sendMessage(sender, { 
+                        text: `⏰ Time's up! "${eventName}" countdown finished!` 
+                    });
+                    countdown.notified = true;
+                }
+            }, minutes * 60000);
+
+        } catch (err) {
+            logger.error('Countdown command error:', err);
+            await sock.sendMessage(sender, { text: 'Error setting countdown. Please try again.' });
         }
-        // TODO: Implement countdown timer
-        await sock.sendMessage(sender, { text: 'Starting countdown...' });
+    },
+
+    async wordcount(sock, sender, args) {
+        try {
+            const text = args.join(' ');
+            if (!text) {
+                await sock.sendMessage(sender, { text: 'Please provide text to count' });
+                return;
+            }
+
+            const words = text.trim().split(/\s+/).length;
+            const chars = text.length;
+            const chars_no_space = text.replace(/\s+/g, '').length;
+
+            const result = `📊 Text Statistics:
+Words: ${words}
+Characters (with spaces): ${chars}
+Characters (no spaces): ${chars_no_space}`;
+
+            await sock.sendMessage(sender, { text: result });
+        } catch (err) {
+            logger.error('Wordcount command error:', err);
+            await sock.sendMessage(sender, { text: 'Error counting words. Please try again.' });
+        }
+    },
+
+    async format(sock, sender, args) {
+        try {
+            const [style, ...text] = args;
+            if (!style || !text.length) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: !format [style] [text]\nStyles: upper, lower, title, sentence' 
+                });
+                return;
+            }
+
+            const input = text.join(' ');
+            let result;
+
+            switch (style.toLowerCase()) {
+                case 'upper':
+                    result = input.toUpperCase();
+                    break;
+                case 'lower':
+                    result = input.toLowerCase();
+                    break;
+                case 'title':
+                    result = input.split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                        .join(' ');
+                    break;
+                case 'sentence':
+                    result = input.charAt(0).toUpperCase() + input.slice(1).toLowerCase();
+                    break;
+                default:
+                    await sock.sendMessage(sender, { text: 'Invalid format style. Available styles: upper, lower, title, sentence' });
+                    return;
+            }
+
+            await sock.sendMessage(sender, { text: result });
+        } catch (err) {
+            logger.error('Format command error:', err);
+            await sock.sendMessage(sender, { text: 'Error formatting text. Please try again.' });
+        }
     },
 
     async poll2(sock, sender, args) {

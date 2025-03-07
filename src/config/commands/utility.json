@@ -88,6 +88,38 @@
       "example": ".choose Pizza | Burger | Salad",
       "cooldown": 5,
       "permissions": ["user"]
+    },
+    {
+      "name": "countdown",
+      "description": "Set a countdown timer",
+      "usage": ".countdown [event_name] [minutes]",
+      "example": ".countdown \"Team Meeting\" 30",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "wordcount",
+      "description": "Count words and characters in text",
+      "usage": ".wordcount [text]",
+      "example": ".wordcount This is a test message",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "format",
+      "description": "Format text in different styles",
+      "usage": ".format [style] [text]",
+      "example": ".format title hello world",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "reminder",
+      "description": "Set a reminder",
+      "usage": ".reminder [minutes] [message]",
+      "example": ".reminder 30 Check the laundry",
+      "cooldown": 10,
+      "permissions": ["user"]
     }
   ]
 }
