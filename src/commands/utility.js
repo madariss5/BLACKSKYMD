@@ -148,15 +148,128 @@ const utilityCommands = {
     },
 
     async poll(sock, sender, args) {
-        const [question, ...options] = args.join(' ').split('|').map(item => item.trim());
-        if (!question || options.length < 2) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !poll Question | Option1 | Option2 | ...' 
-            });
-            return;
+        try {
+            const [question, ...options] = args.join(' ').split('|').map(item => item.trim());
+            if (!question || options.length < 2) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: !poll Question | Option1 | Option2 | ...' 
+                });
+                return;
+            }
+
+            const pollText = `📊 Poll: ${question}\n\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
+            await sock.sendMessage(sender, { text: pollText });
+        } catch (err) {
+            logger.error('Poll command error:', err);
+            await sock.sendMessage(sender, { text: 'Error creating poll. Please try again.' });
         }
-        const pollText = `📊 Poll: ${question}\n\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
-        await sock.sendMessage(sender, { text: pollText });
+    },
+
+    async todo(sock, sender, args) {
+        try {
+            const [action, ...item] = args;
+            if (!action || !['add', 'remove', 'list'].includes(action)) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: !todo <add|remove|list> [item]' 
+                });
+                return;
+            }
+
+            // Initialize todos if not exists
+            if (!global.todos) global.todos = new Map();
+            if (!global.todos.has(sender)) global.todos.set(sender, []);
+
+            const userTodos = global.todos.get(sender);
+
+            switch (action) {
+                case 'add':
+                    if (!item.length) {
+                        await sock.sendMessage(sender, { text: 'Please provide an item to add' });
+                        return;
+                    }
+                    userTodos.push(item.join(' '));
+                    await sock.sendMessage(sender, { text: 'Item added to your todo list' });
+                    break;
+
+                case 'remove':
+                    const index = parseInt(item[0]) - 1;
+                    if (isNaN(index) || index < 0 || index >= userTodos.length) {
+                        await sock.sendMessage(sender, { text: 'Invalid item number' });
+                        return;
+                    }
+                    userTodos.splice(index, 1);
+                    await sock.sendMessage(sender, { text: 'Item removed from your todo list' });
+                    break;
+
+                case 'list':
+                    if (userTodos.length === 0) {
+                        await sock.sendMessage(sender, { text: 'Your todo list is empty' });
+                        return;
+                    }
+                    const todoList = userTodos.map((todo, i) => `${i + 1}. ${todo}`).join('\n');
+                    await sock.sendMessage(sender, { text: `📝 Your Todo List:\n${todoList}` });
+                    break;
+            }
+        } catch (err) {
+            logger.error('Todo command error:', err);
+            await sock.sendMessage(sender, { text: 'Error managing todo list. Please try again.' });
+        }
+    },
+
+    async notes(sock, sender, args) {
+        try {
+            const [action, ...content] = args;
+            if (!action || !['add', 'view', 'delete'].includes(action)) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: !notes <add|view|delete> [content/note_number]' 
+                });
+                return;
+            }
+
+            // Initialize notes if not exists
+            if (!global.notes) global.notes = new Map();
+            if (!global.notes.has(sender)) global.notes.set(sender, []);
+
+            const userNotes = global.notes.get(sender);
+
+            switch (action) {
+                case 'add':
+                    if (!content.length) {
+                        await sock.sendMessage(sender, { text: 'Please provide content for the note' });
+                        return;
+                    }
+                    userNotes.push({
+                        content: content.join(' '),
+                        timestamp: new Date().toISOString()
+                    });
+                    await sock.sendMessage(sender, { text: 'Note added successfully' });
+                    break;
+
+                case 'view':
+                    if (userNotes.length === 0) {
+                        await sock.sendMessage(sender, { text: 'You have no saved notes' });
+                        return;
+                    }
+                    const notesList = userNotes.map((note, i) => 
+                        `${i + 1}. [${new Date(note.timestamp).toLocaleString()}]\n${note.content}`
+                    ).join('\n\n');
+                    await sock.sendMessage(sender, { text: `📝 Your Notes:\n\n${notesList}` });
+                    break;
+
+                case 'delete':
+                    const index = parseInt(content[0]) - 1;
+                    if (isNaN(index) || index < 0 || index >= userNotes.length) {
+                        await sock.sendMessage(sender, { text: 'Invalid note number' });
+                        return;
+                    }
+                    userNotes.splice(index, 1);
+                    await sock.sendMessage(sender, { text: 'Note deleted successfully' });
+                    break;
+            }
+        } catch (err) {
+            logger.error('Notes command error:', err);
+            await sock.sendMessage(sender, { text: 'Error managing notes. Please try again.' });
+        }
     },
 
     async news(sock, sender, args) {
@@ -429,30 +542,6 @@ const utilityCommands = {
         }
         // TODO: Implement poll creation
         await sock.sendMessage(sender, { text: 'Creating poll...' });
-    },
-
-    async todo(sock, sender, args) {
-        const [action, ...item] = args;
-        if (!action || !['add', 'remove', 'list'].includes(action)) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !todo <add|remove|list> [item]' 
-            });
-            return;
-        }
-        // TODO: Implement todo list
-        await sock.sendMessage(sender, { text: 'Managing todo list...' });
-    },
-
-    async notes(sock, sender, args) {
-        const [action, ...content] = args;
-        if (!action || !['add', 'view', 'delete'].includes(action)) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !notes <add|view|delete> [content]' 
-            });
-            return;
-        }
-        // TODO: Implement notes system
-        await sock.sendMessage(sender, { text: 'Managing notes...' });
     },
 
     async reverse(sock, sender, args) {
