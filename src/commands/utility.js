@@ -1,56 +1,114 @@
 const logger = require('../utils/logger');
 const config = require('../config/config');
 const { languageManager } = require('../utils/language');
+const axios = require('axios');
 
 const utilityCommands = {
     async weather(sock, sender, args) {
-        const city = args.join(' ');
-        if (!city) {
-            await sock.sendMessage(sender, { text: 'Please provide a city name' });
-            return;
+        try {
+            const city = args.join(' ');
+            if (!city) {
+                await sock.sendMessage(sender, { text: 'Please provide a city name' });
+                return;
+            }
+
+            const API_KEY = process.env.OPENWEATHER_API_KEY;
+            if (!API_KEY) {
+                logger.error('OpenWeather API key not found');
+                await sock.sendMessage(sender, { text: 'Weather service is currently unavailable' });
+                return;
+            }
+
+            const response = await axios.get(
+                `http://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`
+            );
+
+            const weather = response.data;
+            const message = `Weather in ${weather.name}:
+🌡️ Temperature: ${weather.main.temp}°C
+💧 Humidity: ${weather.main.humidity}%
+🌪️ Wind: ${weather.wind.speed} m/s
+☁️ Conditions: ${weather.weather[0].description}`;
+
+            await sock.sendMessage(sender, { text: message });
+        } catch (err) {
+            logger.error('Weather command error:', err);
+            await sock.sendMessage(sender, { text: 'Error fetching weather data. Please try again later.' });
         }
-        // TODO: Implement weather API integration
-        await sock.sendMessage(sender, { text: `Getting weather for ${city}...` });
     },
 
     async translate(sock, sender, args) {
-        const [from, to, ...text] = args;
-        if (!from || !to || text.length === 0) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !translate [from] [to] [text]\nExample: !translate en es Hello' 
-            });
-            return;
+        try {
+            const [from, to, ...text] = args;
+            if (!from || !to || text.length === 0) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: !translate [from] [to] [text]\nExample: !translate en es Hello' 
+                });
+                return;
+            }
+
+            const API_KEY = process.env.TRANSLATION_API_KEY;
+            if (!API_KEY) {
+                logger.error('Translation API key not found');
+                await sock.sendMessage(sender, { text: 'Translation service is currently unavailable' });
+                return;
+            }
+
+            // Using a mock translation for now - implement actual API later
+            const translatedText = `Translated text will appear here (${from} -> ${to}): ${text.join(' ')}`;
+            await sock.sendMessage(sender, { text: translatedText });
+        } catch (err) {
+            logger.error('Translation error:', err);
+            await sock.sendMessage(sender, { text: 'Error during translation. Please try again later.' });
         }
-        // TODO: Implement translation
-        await sock.sendMessage(sender, { text: 'Translating...' });
     },
 
     async calculate(sock, sender, args) {
-        const expression = args.join(' ');
-        if (!expression) {
-            await sock.sendMessage(sender, { text: 'Please provide a mathematical expression' });
-            return;
-        }
         try {
+            const expression = args.join(' ');
+            if (!expression) {
+                await sock.sendMessage(sender, { text: 'Please provide a mathematical expression' });
+                return;
+            }
+
             // Basic sanitization and evaluation
             const sanitized = expression.replace(/[^0-9+\-*/(). ]/g, '');
             const result = eval(sanitized);
+
+            if (isNaN(result)) {
+                throw new Error('Invalid expression');
+            }
+
             await sock.sendMessage(sender, { text: `${expression} = ${result}` });
         } catch (err) {
-            await sock.sendMessage(sender, { text: 'Invalid expression' });
+            logger.error('Calculate command error:', err);
+            await sock.sendMessage(sender, { text: 'Invalid expression. Please try again with a valid mathematical expression.' });
         }
     },
 
     async dictionary(sock, sender, args) {
-        const word = args[0];
-        if (!word) {
-            await sock.sendMessage(sender, { text: 'Please provide a word to look up' });
-            return;
-        }
-        // TODO: Implement dictionary API integration
-        await sock.sendMessage(sender, { text: `Looking up definition for: ${word}` });
-    },
+        try {
+            const word = args[0];
+            if (!word) {
+                await sock.sendMessage(sender, { text: 'Please provide a word to look up' });
+                return;
+            }
 
+            const API_KEY = process.env.DICTIONARY_API_KEY;
+            if (!API_KEY) {
+                logger.error('Dictionary API key not found');
+                await sock.sendMessage(sender, { text: 'Dictionary service is currently unavailable' });
+                return;
+            }
+
+            // Mock dictionary response - implement actual API later
+            const definition = `Definition for ${word} will appear here`;
+            await sock.sendMessage(sender, { text: definition });
+        } catch (err) {
+            logger.error('Dictionary lookup error:', err);
+            await sock.sendMessage(sender, { text: 'Error looking up word. Please try again later.' });
+        }
+    },
     async covid(sock, sender, args) {
         const country = args.join(' ') || 'World';
         // TODO: Implement COVID-19 statistics API integration
@@ -118,43 +176,53 @@ const utilityCommands = {
     },
 
     async encode(sock, sender, args) {
-        const [type, ...text] = args;
-        if (!type || text.length === 0) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !encode [type] [text]\nTypes: base64, hex, binary' 
-            });
-            return;
-        }
-        let result;
-        const input = text.join(' ');
-        switch (type.toLowerCase()) {
-            case 'base64':
-                result = Buffer.from(input).toString('base64');
-                break;
-            case 'hex':
-                result = Buffer.from(input).toString('hex');
-                break;
-            case 'binary':
-                result = input.split('').map(char => char.charCodeAt(0).toString(2)).join(' ');
-                break;
-            default:
-                await sock.sendMessage(sender, { text: 'Invalid encoding type' });
+        try {
+            const [type, ...text] = args;
+            if (!type || text.length === 0) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: !encode [type] [text]\nTypes: base64, hex, binary' 
+                });
                 return;
+            }
+
+            let result;
+            const input = text.join(' ');
+
+            switch (type.toLowerCase()) {
+                case 'base64':
+                    result = Buffer.from(input).toString('base64');
+                    break;
+                case 'hex':
+                    result = Buffer.from(input).toString('hex');
+                    break;
+                case 'binary':
+                    result = input.split('').map(char => char.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
+                    break;
+                default:
+                    await sock.sendMessage(sender, { text: 'Invalid encoding type. Available types: base64, hex, binary' });
+                    return;
+            }
+
+            await sock.sendMessage(sender, { text: `Encoded (${type}): ${result}` });
+        } catch (err) {
+            logger.error('Encode command error:', err);
+            await sock.sendMessage(sender, { text: 'Error encoding text. Please try again.' });
         }
-        await sock.sendMessage(sender, { text: `Encoded (${type}): ${result}` });
     },
 
     async decode(sock, sender, args) {
-        const [type, ...text] = args;
-        if (!type || text.length === 0) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !decode [type] [text]\nTypes: base64, hex, binary' 
-            });
-            return;
-        }
-        let result;
-        const input = text.join(' ');
         try {
+            const [type, ...text] = args;
+            if (!type || text.length === 0) {
+                await sock.sendMessage(sender, { 
+                    text: 'Usage: !decode [type] [text]\nTypes: base64, hex, binary' 
+                });
+                return;
+            }
+
+            let result;
+            const input = text.join(' ');
+
             switch (type.toLowerCase()) {
                 case 'base64':
                     result = Buffer.from(input, 'base64').toString();
@@ -163,15 +231,19 @@ const utilityCommands = {
                     result = Buffer.from(input, 'hex').toString();
                     break;
                 case 'binary':
-                    result = input.split(' ').map(bin => String.fromCharCode(parseInt(bin, 2))).join('');
+                    result = input.split(' ')
+                        .map(bin => String.fromCharCode(parseInt(bin, 2)))
+                        .join('');
                     break;
                 default:
-                    await sock.sendMessage(sender, { text: 'Invalid decoding type' });
+                    await sock.sendMessage(sender, { text: 'Invalid decoding type. Available types: base64, hex, binary' });
                     return;
             }
+
             await sock.sendMessage(sender, { text: `Decoded: ${result}` });
         } catch (err) {
-            await sock.sendMessage(sender, { text: 'Invalid input for decoding' });
+            logger.error('Decode command error:', err);
+            await sock.sendMessage(sender, { text: 'Invalid input for decoding. Please check your input and try again.' });
         }
     },
 
@@ -347,7 +419,7 @@ const utilityCommands = {
         await sock.sendMessage(sender, { text: 'Starting countdown...' });
     },
 
-    async poll(sock, sender, args) {
+    async poll2(sock, sender, args) {
         const [question, ...options] = args.join(' ').split('|');
         if (!question || options.length < 2) {
             await sock.sendMessage(sender, { 
@@ -383,46 +455,121 @@ const utilityCommands = {
         await sock.sendMessage(sender, { text: 'Managing notes...' });
     },
 
+    async reverse(sock, sender, args) {
+        try {
+            const text = args.join(' ');
+            if (!text) {
+                await sock.sendMessage(sender, { text: 'Please provide text to reverse' });
+                return;
+            }
+
+            const reversed = text.split('').reverse().join('');
+            await sock.sendMessage(sender, { text: reversed });
+        } catch (err) {
+            logger.error('Reverse command error:', err);
+            await sock.sendMessage(sender, { text: 'Error reversing text. Please try again.' });
+        }
+    },
+
+    async mock(sock, sender, args) {
+        try {
+            const text = args.join(' ');
+            if (!text) {
+                await sock.sendMessage(sender, { text: 'Please provide text to mock' });
+                return;
+            }
+
+            const mocked = text
+                .toLowerCase()
+                .split('')
+                .map((char, i) => i % 2 === 0 ? char : char.toUpperCase())
+                .join('');
+
+            await sock.sendMessage(sender, { text: mocked });
+        } catch (err) {
+            logger.error('Mock command error:', err);
+            await sock.sendMessage(sender, { text: 'Error mocking text. Please try again.' });
+        }
+    },
+
+    async roll(sock, sender, args) {
+        try {
+            const sides = parseInt(args[0]) || 6;
+            if (sides < 2 || sides > 100) {
+                await sock.sendMessage(sender, { text: 'Please specify a number of sides between 2 and 100' });
+                return;
+            }
+
+            const result = Math.floor(Math.random() * sides) + 1;
+            await sock.sendMessage(sender, { text: `🎲 You rolled a ${result} (d${sides})` });
+        } catch (err) {
+            logger.error('Roll command error:', err);
+            await sock.sendMessage(sender, { text: 'Error rolling dice. Please try again.' });
+        }
+    },
+
+    async flip(sock, sender) {
+        try {
+            const result = Math.random() < 0.5 ? 'Heads' : 'Tails';
+            await sock.sendMessage(sender, { text: `🪙 Coin flip: ${result}!` });
+        } catch (err) {
+            logger.error('Flip command error:', err);
+            await sock.sendMessage(sender, { text: 'Error flipping coin. Please try again.' });
+        }
+    },
+
+    async choose(sock, sender, args) {
+        try {
+            const options = args.join(' ').split('|').map(opt => opt.trim());
+            if (options.length < 2) {
+                await sock.sendMessage(sender, { 
+                    text: 'Please provide at least 2 options separated by | \nExample: !choose option1 | option2 | option3' 
+                });
+                return;
+            }
+
+            const choice = options[Math.floor(Math.random() * options.length)];
+            await sock.sendMessage(sender, { text: `🎯 I choose: ${choice}` });
+        } catch (err) {
+            logger.error('Choose command error:', err);
+            await sock.sendMessage(sender, { text: 'Error making a choice. Please try again.' });
+        }
+    },
+
     async language(sock, sender, args) {
         try {
             const newLang = args[0]?.toLowerCase();
 
-            // If no language specified, show available languages
             if (!newLang) {
                 const availableLangs = languageManager.getAvailableLanguages();
                 const currentLang = config.bot.language || languageManager.defaultLanguage;
 
                 await sock.sendMessage(sender, { 
-                    text: languageManager.getText('commands.language.available', null, 
-                          availableLangs.join(', '), currentLang)
+                    text: `Available languages: ${availableLangs.join(', ')}\nCurrent language: ${currentLang}`
                 });
                 return;
             }
 
-            // Check if language is supported
             if (!languageManager.isLanguageSupported(newLang)) {
+                const availableLangs = languageManager.getAvailableLanguages();
                 await sock.sendMessage(sender, {
-                    text: languageManager.getText('commands.language.not_supported', null, 
-                          newLang, languageManager.getAvailableLanguages().join(', '))
+                    text: `Language '${newLang}' is not supported.\nAvailable languages: ${availableLangs.join(', ')}`
                 });
                 return;
             }
 
-            // Update language
             config.bot.language = newLang;
-
-            // Send confirmation in new language
             await sock.sendMessage(sender, {
-                text: languageManager.getText('system.language_changed', newLang)
+                text: `Language changed to ${newLang}`
             });
 
         } catch (err) {
-            logger.error('Error in language command:', err);
+            logger.error('Language command error:', err);
             await sock.sendMessage(sender, { 
-                text: languageManager.getText('commands.language.error') 
+                text: 'Error changing language. Please try again.' 
             });
         }
-    },
+    }
 };
 
 module.exports = utilityCommands;
