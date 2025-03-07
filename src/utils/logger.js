@@ -1,32 +1,54 @@
 const pino = require('pino');
 
+// Create a consistent logger instance with enhanced configuration
 const logger = pino({
-    level: process.env.NODE_ENV === 'production' ? 'warn' : 'warn', // Set to warn by default
+    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
     transport: {
         target: 'pino-pretty',
         options: {
             colorize: true,
-            translateTime: false, // Disable timestamp
-            ignore: 'pid,hostname,time',
-            messageFormat: '{msg}', // Simplified format
-            levelFirst: false, // Hide level
-            hideObject: true // Hide object dumps
+            translateTime: 'SYS:standard',
+            ignore: 'pid,hostname',
+            messageFormat: '{msg}',
+            levelFirst: true,
+            customLevels: 'error:99,warn:98,info:97,debug:96'
         }
     },
     formatters: {
         level: (label) => {
-            return {}; // Hide level in output
+            return {
+                level: label
+            };
         }
     },
-    // Minimal serializers
+    // Enhanced serializers for better error handling
     serializers: {
         err: (err) => ({
-            message: err.message
+            type: err.type || 'Error',
+            message: err.message,
+            stack: err.stack,
+            code: err.code
         })
-    }
+    },
+    // Add timestamp to all logs
+    timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`
 });
 
-// Prevent pino from throwing unnecessary warnings
+// Prevent unnecessary warnings
 process.removeAllListeners('warning');
+
+// Add custom methods for module loading
+logger.moduleInit = (moduleName) => {
+    logger.info(`🔄 Initializing ${moduleName} module...`);
+};
+
+logger.moduleSuccess = (moduleName) => {
+    logger.info(`✅ ${moduleName} module initialized successfully`);
+};
+
+logger.moduleError = (moduleName, error) => {
+    logger.error(`❌ Error initializing ${moduleName} module: ${error.message}`);
+    logger.error('Stack trace:', error.stack);
+};
 
 module.exports = logger;

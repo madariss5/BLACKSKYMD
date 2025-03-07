@@ -994,36 +994,47 @@ const mediaCommands = {
 
 };
 
-// Export the command handlers with enhanced format
 module.exports = {
     commands: mediaCommands,
     category: 'media',
     async init() {
         try {
-            logger.info('Initializing media command handler...');
+            logger.moduleInit('Media');
 
-            // Verify required modules with better error handling
-            const requiredDeps = {
+            // Check core dependencies first
+            const coreDeps = {
                 sharp,
-                ytdl,
-                axios,
-                webp,
-                yts,
+                fs: fs.promises,
                 path,
-                FormData,
-                downloadMediaMessage,
                 logger
             };
 
-            // Check each dependency with better error handling
-            for (const [name, dep] of Object.entries(requiredDeps)) {
+            for (const [name, dep] of Object.entries(coreDeps)) {
                 if (!dep) {
-                    logger.error(`Missing media dependency: ${name}`);
-                    throw new Error(`Required media dependency '${name}' is not initialized`);
+                    logger.error(`❌ Core media dependency '${name}' is not initialized`);
+                    return false;
+                }
+                logger.info(`✓ Core media dependency '${name}' verified`);
+            }
+
+            // Check optional media dependencies
+            const mediaDeps = {
+                ytdl,
+                yts,
+                webp,
+                axios,
+                FormData
+            };
+
+            for (const [name, dep] of Object.entries(mediaDeps)) {
+                if (!dep) {
+                    logger.warn(`⚠️ Optional media dependency '${name}' is not available`);
+                } else {
+                    logger.info(`✓ Media dependency '${name}' verified`);
                 }
             }
 
-            // Create necessary directories with proper error handling
+            // Ensure required directories exist
             const dirs = [
                 path.join(__dirname, '../../temp'),
                 path.join(__dirname, '../../temp/media'),
@@ -1033,22 +1044,26 @@ module.exports = {
             for (const dir of dirs) {
                 try {
                     await fs.mkdir(dir, { recursive: true });
-                    logger.info(`Created directory: ${dir}`);
+                    const stats = await fs.stat(dir);
+                    if (!stats.isDirectory()) {
+                        throw new Error(`Path exists but is not a directory: ${dir}`);
+                    }
+                    logger.info(`✓ Directory verified: ${dir}`);
                 } catch (err) {
-                    logger.error(`Failed to create directory ${dir}:`, err);
-                    throw err;
+                    logger.error(`❌ Directory creation failed for ${dir}:`, err);
+                    return false;
                 }
             }
 
-            // Initialize media queues and caches
+            // Initialize queues
             audioQueue.clear();
+            logger.info('✓ Audio queue initialized');
 
-            logger.info('Media command handler initialized successfully');
+            logger.moduleSuccess('Media');
             return true;
         } catch (err) {
-            logger.error('Error initializing media command handler:', err.message);
-            logger.error('Stack trace:', err.stack);
-            throw err;
+            logger.moduleError('Media', err);
+            return false;
         }
     }
 };

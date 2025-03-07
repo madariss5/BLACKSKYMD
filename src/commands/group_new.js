@@ -12,44 +12,61 @@ module.exports = {
     category: 'group_extended',  // Different category to avoid conflict
     async init() {
         try {
-            logger.info('Initializing extended group command handler...');
+            logger.moduleInit('Group Extended');
 
-            // Verify required modules
-            const requiredDeps = {
+            // Check core dependencies first
+            const coreDeps = {
                 isAdmin,
                 isBotAdmin,
-                downloadMediaMessage,
                 path,
-                logger
+                logger,
+                fs: fs.promises
             };
 
-            // Check dependencies
-            for (const [name, dep] of Object.entries(requiredDeps)) {
+            for (const [name, dep] of Object.entries(coreDeps)) {
                 if (!dep) {
-                    logger.error(`Missing extended group dependency: ${name}`);
-                    throw new Error(`Required extended group dependency '${name}' is not initialized`);
+                    logger.error(`❌ Core extended group dependency '${name}' is not initialized`);
+                    return false;
+                }
+                logger.info(`✓ Core extended group dependency '${name}' verified`);
+            }
+
+            // Check optional dependencies
+            const optionalDeps = {
+                downloadMediaMessage
+            };
+
+            for (const [name, dep] of Object.entries(optionalDeps)) {
+                if (!dep) {
+                    logger.warn(`⚠️ Optional extended group dependency '${name}' is not available`);
+                } else {
+                    logger.info(`✓ Optional extended group dependency '${name}' verified`);
                 }
             }
 
-            // Create necessary directories
+            // Ensure required directories exist
             const dataDir = path.join(__dirname, '../../data/groups_extended');
             try {
                 await fs.mkdir(dataDir, { recursive: true });
-                logger.info(`Created directory: ${dataDir}`);
+                const stats = await fs.stat(dataDir);
+                if (!stats.isDirectory()) {
+                    throw new Error('Path exists but is not a directory');
+                }
+                logger.info(`✓ Directory verified: ${dataDir}`);
             } catch (err) {
-                logger.error(`Failed to create directory ${dataDir}:`, err);
-                throw err;
+                logger.error(`❌ Directory creation failed for ${dataDir}:`, err);
+                return false;
             }
 
             // Initialize settings storage
             const groupSettings = new Map();
+            logger.info('✓ Extended group settings map initialized');
 
-            logger.info('Extended group command handler initialized successfully');
+            logger.moduleSuccess('Group Extended');
             return true;
         } catch (err) {
-            logger.error('Error initializing extended group command handler:', err.message);
-            logger.error('Stack trace:', err.stack);
-            return false; // Return false instead of throwing to allow other modules to load
+            logger.moduleError('Group Extended', err);
+            return false;
         }
     }
 };

@@ -476,44 +476,48 @@ const educationalCommands = {
     }
 };
 
-// Export with proper structure and initialization
 module.exports = {
     commands: educationalCommands,
     category: 'educational',
     async init() {
         try {
-            logger.info('Initializing educational command handler...');
+            logger.moduleInit('Educational');
 
-            // Verify required modules
-            const requiredDeps = {
+            // Check core dependencies first
+            const coreDeps = {
                 path,
-                logger
+                logger,
+                fs: fs.promises
             };
 
-            // Check dependencies
-            for (const [name, dep] of Object.entries(requiredDeps)) {
+            // Check each dependency with detailed logging
+            for (const [name, dep] of Object.entries(coreDeps)) {
                 if (!dep) {
-                    logger.error(`Missing educational dependency: ${name}`);
-                    throw new Error(`Required educational dependency '${name}' is not initialized`);
+                    logger.error(`❌ Core educational dependency '${name}' is not initialized`);
+                    return false;
                 }
+                logger.info(`✓ Core educational dependency '${name}' verified`);
             }
 
             // Create necessary directories
             const dataDir = path.join(__dirname, '../../data/educational');
             try {
                 await fs.mkdir(dataDir, { recursive: true });
-                logger.info(`Created directory: ${dataDir}`);
+                const stats = await fs.stat(dataDir);
+                if (!stats.isDirectory()) {
+                    throw new Error('Path exists but is not a directory');
+                }
+                logger.info(`✓ Directory verified: ${dataDir}`);
             } catch (err) {
-                logger.error(`Failed to create directory ${dataDir}:`, err);
-                throw err;
+                logger.error(`❌ Directory creation failed for ${dataDir}:`, err);
+                return false;
             }
 
-            logger.info('Educational command handler initialized successfully');
+            logger.moduleSuccess('Educational');
             return true;
         } catch (err) {
-            logger.error('Error initializing educational command handler:', err.message);
-            logger.error('Stack trace:', err.stack);
-            return false; // Return false instead of throwing to allow other modules to load
+            logger.moduleError('Educational', err);
+            return false;
         }
     }
 };

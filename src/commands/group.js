@@ -72,7 +72,6 @@ const groupCommands = {
             await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to kick user' });
         }
     },
-
     async add(sock, message, args) {
         // ... copy implementation
     },
@@ -149,47 +148,64 @@ const groupCommands = {
 
 module.exports = {
     commands: groupCommands,
-    category: 'group',
+    category: 'group_base', 
     async init() {
         try {
-            logger.info('Initializing group command handler...');
+            logger.moduleInit('Group Base');
 
-            // Verify required modules
-            const requiredDeps = {
+            // Check core dependencies first
+            const coreDeps = {
                 isAdmin,
                 isBotAdmin,
-                downloadMediaMessage,
                 path,
-                logger
+                logger,
+                fs: fs.promises
             };
 
-            // Check dependencies
-            for (const [name, dep] of Object.entries(requiredDeps)) {
+            for (const [name, dep] of Object.entries(coreDeps)) {
                 if (!dep) {
-                    logger.error(`Missing group dependency: ${name}`);
-                    throw new Error(`Required group dependency '${name}' is not initialized`);
+                    logger.error(`❌ Core group dependency '${name}' is not initialized`);
+                    return false;
+                }
+                logger.info(`✓ Core group dependency '${name}' verified`);
+            }
+
+            // Check optional dependencies
+            const optionalDeps = {
+                downloadMediaMessage
+            };
+
+            for (const [name, dep] of Object.entries(optionalDeps)) {
+                if (!dep) {
+                    logger.warn(`⚠️ Optional group dependency '${name}' is not available`);
+                } else {
+                    logger.info(`✓ Optional group dependency '${name}' verified`);
                 }
             }
 
-            // Create necessary directories
+            // Ensure required directories exist
             const dataDir = path.join(__dirname, '../../data/groups');
             try {
                 await fs.mkdir(dataDir, { recursive: true });
-                logger.info(`Created directory: ${dataDir}`);
+                const stats = await fs.stat(dataDir);
+                if (!stats.isDirectory()) {
+                    throw new Error('Path exists but is not a directory');
+                }
+                logger.info(`✓ Directory verified: ${dataDir}`);
             } catch (err) {
-                logger.error(`Failed to create directory ${dataDir}:`, err);
-                throw err;
+                logger.error(`❌ Directory creation failed for ${dataDir}:`, err);
+                return false;
             }
 
             // Initialize settings storage
             const groupSettings = new Map();
+            logger.info('✓ Group settings map initialized');
 
-            logger.info('Group command handler initialized successfully');
+            logger.moduleSuccess('Group Base');
             return true;
         } catch (err) {
-            logger.error('Error initializing group command handler:', err.message);
-            logger.error('Stack trace:', err.stack);
-            return false; // Return false instead of throwing to allow other modules to load
+            logger.moduleError('Group Base', err);
+            return false;
         }
     }
 };
