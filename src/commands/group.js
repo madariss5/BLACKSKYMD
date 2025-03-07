@@ -73,19 +73,165 @@ const groupCommands = {
         }
     },
     async add(sock, message, args) {
-        // ... copy implementation
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            if (!args[0]) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please provide the phone number to add' });
+                return;
+            }
+
+            const number = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+
+            await sock.groupParticipantsUpdate(remoteJid, [number], 'add');
+            await sock.sendMessage(remoteJid, { text: '✅ User has been added to the group' });
+
+        } catch (err) {
+            logger.error('Error in add command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to add user' });
+        }
     },
+
     async promote(sock, message, args) {
-        // ... copy implementation
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            let target;
+            if (message.message.extendedTextMessage?.contextInfo?.participant) {
+                target = message.message.extendedTextMessage.contextInfo.participant;
+            } else if (args[0]) {
+                target = args[0].replace('@', '') + '@s.whatsapp.net';
+            }
+
+            if (!target) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please mention a user to promote' });
+                return;
+            }
+
+            await sock.groupParticipantsUpdate(remoteJid, [target], 'promote');
+            await sock.sendMessage(remoteJid, { text: '✅ User has been promoted to admin' });
+
+        } catch (err) {
+            logger.error('Error in promote command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to promote user' });
+        }
     },
+
     async demote(sock, message, args) {
-        // ... copy implementation
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            let target;
+            if (message.message.extendedTextMessage?.contextInfo?.participant) {
+                target = message.message.extendedTextMessage.contextInfo.participant;
+            } else if (args[0]) {
+                target = args[0].replace('@', '') + '@s.whatsapp.net';
+            }
+
+            if (!target) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please mention a user to demote' });
+                return;
+            }
+
+            const isTargetOwner = await isAdmin(sock, remoteJid, target, true);
+            if (isTargetOwner) {
+                await sock.sendMessage(remoteJid, { text: '❌ Cannot demote the group owner' });
+                return;
+            }
+
+            await sock.groupParticipantsUpdate(remoteJid, [target], 'demote');
+            await sock.sendMessage(remoteJid, { text: '✅ User has been demoted from admin' });
+
+        } catch (err) {
+            logger.error('Error in demote command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to demote user' });
+        }
     },
+
     async mute(sock, message, args) {
-        // ... copy implementation
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            await sock.groupSettingUpdate(remoteJid, 'announcement');
+            await sock.sendMessage(remoteJid, { text: '🔇 Group has been muted' });
+
+        } catch (err) {
+            logger.error('Error in mute command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to mute group' });
+        }
     },
+
     async unmute(sock, message, args) {
-        // ... copy implementation
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            await sock.groupSettingUpdate(remoteJid, 'not_announcement');
+            await sock.sendMessage(remoteJid, { text: '🔊 Group has been unmuted' });
+
+        } catch (err) {
+            logger.error('Error in unmute command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to unmute group' });
+        }
     },
     async antispam(sock, message, args) {
         // ... copy implementation
@@ -148,7 +294,7 @@ const groupCommands = {
 
 module.exports = {
     commands: groupCommands,
-    category: 'group_base', 
+    category: 'group_base',
     async init() {
         try {
             logger.moduleInit('Group Base');
