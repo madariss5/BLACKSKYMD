@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs').promises;
 const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
+const handleGroupMessage = require('./handlers/groupMessageHandler');
+const handleGroupParticipantsUpdate = require('./handlers/groupParticipantHandler');
 
 let sock = null;
 let retryCount = 0;
@@ -243,11 +245,25 @@ async function startConnection() {
                     for (const msg of upsert.messages) {
                         if (!msg.message) continue;
                         try {
+                            // Check if message is from a group
+                            if (msg.key.remoteJid.endsWith('@g.us')) {
+                                await handleGroupMessage(sock, msg);
+                            }
                             await messageHandler(sock, msg);
                         } catch (err) {
                             logger.error('Message handling error:', err);
                         }
                     }
+                }
+            }
+
+            // Handle group participant updates (join/leave events)
+            if (events['group-participants.update']) {
+                const update = events['group-participants.update'];
+                try {
+                    await handleGroupParticipantsUpdate(sock, update);
+                } catch (err) {
+                    logger.error('Group participants update error:', err);
                 }
             }
         });

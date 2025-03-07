@@ -56,7 +56,15 @@ class CommandLoader {
                     const category = file.replace('.js', '');
                     try {
                         logger.info(`Loading commands from ${file}...`);
-                        const handlers = require(path.join(commandsPath, file));
+                        const module = require(path.join(commandsPath, file));
+
+                        // Initialize module if it has an init function
+                        if (module.init && typeof module.init === 'function') {
+                            await module.init();
+                        }
+
+                        // Handle both command formats
+                        const handlers = module.commands || module;
 
                         // Register each command with its configuration
                         for (const [name, handler] of Object.entries(handlers)) {
@@ -79,7 +87,7 @@ class CommandLoader {
                             this.commands.set(name, {
                                 execute: handler,
                                 config,
-                                category
+                                category: module.category || category
                             });
 
                             // Update cache

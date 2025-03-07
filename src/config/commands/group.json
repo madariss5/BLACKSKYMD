@@ -298,7 +298,7 @@
     },
     {
       "name": "lock",
-      "description": "Lock group chat",
+      "description": "Lock group chat (only admins can send messages)",
       "usage": "!lock",
       "cooldown": 10,
       "permissions": ["admin"]
@@ -311,115 +311,27 @@
       "permissions": ["admin"]
     },
     {
-      "name": "grouplinks",
-      "description": "Manage group invite links",
-      "usage": "!grouplinks <enable|disable|status>",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
       "name": "templink",
       "description": "Create temporary invite link",
       "usage": "!templink [duration]",
+      "example": "!templink 1h",
       "cooldown": 30,
       "permissions": ["admin"]
     },
     {
-      "name": "warn2",
-      "description": "Advanced warning system",
-      "usage": "!warn2 @user [level] [reason]",
+      "name": "blacklist",
+      "description": "Manage blacklisted users",
+      "usage": "!blacklist <add|remove|list> [user]",
+      "example": "!blacklist add @user",
       "cooldown": 10,
       "permissions": ["admin"]
     },
     {
-      "name": "autowarn",
-      "description": "Configure automatic warnings",
-      "usage": "!autowarn <add|remove|list> [trigger]",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "nickname",
-      "description": "Set user nickname",
-      "usage": "!nickname @user [nickname]",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "resetname",
-      "description": "Reset user nickname",
-      "usage": "!resetname @user",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "role",
-      "description": "Manage user roles",
-      "usage": "!role <add|remove|list> @user [role]",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "viewroles",
-      "description": "View available roles",
-      "usage": "!viewroles",
+      "name": "whitelist",
+      "description": "Manage whitelisted users",
+      "usage": "!whitelist <add|remove|list> [user]",
+      "example": "!whitelist add @user",
       "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
-      "name": "event",
-      "description": "Manage group events",
-      "usage": "!event <create|end|list> [details]",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "reminder",
-      "description": "Set group reminder",
-      "usage": "!reminder [time] [message]",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "autoreact",
-      "description": "Configure auto-reactions",
-      "usage": "!autoreact <on|off|list>",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "chatbot",
-      "description": "Configure group chatbot",
-      "usage": "!chatbot <on|off|config>",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "analytics",
-      "description": "View group analytics",
-      "usage": "!analytics <day|week|month>",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "activityrank",
-      "description": "View member activity rankings",
-      "usage": "!activityrank",
-      "cooldown": 30,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "filter",
-      "description": "Manage message filters",
-      "usage": "!filter <add|remove|list> [pattern]",
-      "cooldown": 10,
-      "permissions": ["admin"]
-    },
-    {
-      "name": "automod",
-      "description": "Configure auto-moderation",
-      "usage": "!automod <on|off|config> [level]",
-      "cooldown": 30,
       "permissions": ["admin"]
     }
   ]

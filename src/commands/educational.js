@@ -1,7 +1,8 @@
 const logger = require('../utils/logger');
 
+// Helper functions can go here if needed
+
 const educationalCommands = {
-    // Language Learning
     async define(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         const word = args.join(' ');
@@ -306,7 +307,6 @@ const educationalCommands = {
         await sock.sendMessage(remoteJid, { text: '🗺️ Managing mind map...' });
     },
 
-
     // Geography Commands
     async geography(sock, message, args) {
         const remoteJid = message.key.remoteJid;
@@ -465,4 +465,17 @@ const educationalCommands = {
     }
 };
 
-module.exports = educationalCommands;
+// Export the command handlers with new format
+module.exports = {
+    commands: educationalCommands,
+    category: 'educational',
+    // Initialize any required state or configurations
+    async init() {
+        try {
+            logger.info('Educational command handler initialized successfully');
+        } catch (err) {
+            logger.error('Error initializing educational command handler:', err);
+            throw err; // Re-throw to be handled by the command loader
+        }
+    }
+};

@@ -1,6 +1,32 @@
 const logger = require('../utils/logger');
-const { isAdmin } = require('../utils/permissions');
-const { downloadMediaMessage } = require('../utils/helpers'); // Add helper function
+const { isAdmin, isBotAdmin } = require('../utils/permissions');
+const { downloadMediaMessage } = require('../utils/helpers');
+const path = require('path');
+const fs = require('fs/promises');
+
+// Helper functions for duration parsing
+function parseDuration(str) {
+    const match = str.match(/^(\d+)(s|m|h|d)$/);
+    if (!match) return null;
+
+    const num = parseInt(match[1]);
+    const unit = match[2];
+
+    switch (unit) {
+        case 's': return num;
+        case 'm': return num * 60;
+        case 'h': return num * 60 * 60;
+        case 'd': return num * 24 * 60 * 60;
+        default: return null;
+    }
+}
+
+function formatDuration(seconds) {
+    if (seconds < 60) return `${seconds} seconds`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours`;
+    return `${Math.floor(seconds / 86400)} days`;
+}
 
 const groupCommands = {
     async kick(sock, message, args) {
@@ -197,47 +223,219 @@ const groupCommands = {
     },
     // Anti-spam and Security
     async antispam(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, limit] = args;
-        if (!action || !['on', 'off', 'status'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !antispam <on|off|status> [limit]' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const [action, limit] = args;
+            if (!action || !['on', 'off', 'status'].includes(action)) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '❌ Usage: !antispam <on|off|status> [messages/minute]' 
+                });
+                return;
+            }
+
+            // Get group metadata
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Initialize settings if not exists
+            if (!groupMetadata.settings) {
+                groupMetadata.settings = {};
+            }
+
+            if (action === 'status') {
+                const status = groupMetadata.settings.antispam ? 'enabled' : 'disabled';
+                const currentLimit = groupMetadata.settings.spamLimit || 10;
+                await sock.sendMessage(remoteJid, { 
+                    text: `🛡️ Anti-spam is currently ${status}\nLimit: ${currentLimit} messages/minute` 
+                });
+                return;
+            }
+
+            // Update settings
+            const spamLimit = parseInt(limit) || 10; // Default: 10 messages per minute
+            groupMetadata.settings.antispam = action === 'on';
+            groupMetadata.settings.spamLimit = spamLimit;
+
+            await sock.sendMessage(remoteJid, { 
+                text: `✅ Anti-spam has been ${action === 'on' ? 'enabled' : 'disabled'}\n` +
+                    (action === 'on' ? `Limit set to ${spamLimit} messages/minute` : '') 
+            });
+
+        } catch (err) {
+            logger.error('Error in antispam command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to update anti-spam setting' });
         }
-        // TODO: Implement anti-spam
-        await sock.sendMessage(remoteJid, { text: `🛡️ Anti-spam ${action}` });
     },
 
     async antilink(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action] = args;
-        if (!action || !['on', 'off', 'status'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !antilink <on|off|status>' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const [action] = args;
+            if (!action || !['on', 'off', 'status'].includes(action)) {
+                await sock.sendMessage(remoteJid, { text: '❌ Usage: !antilink <on|off|status>' });
+                return;
+            }
+
+            // Get group metadata
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Initialize settings if not exists
+            if (!groupMetadata.settings) {
+                groupMetadata.settings = {};
+            }
+
+            if (action === 'status') {
+                const status = groupMetadata.settings.antilink ? 'enabled' : 'disabled';
+                await sock.sendMessage(remoteJid, { text: `🔗 Anti-link is currently ${status}` });
+                return;
+            }
+
+            // Update setting
+            groupMetadata.settings.antilink = action === 'on';
+            await sock.sendMessage(remoteJid, { 
+                text: `✅ Anti-link has been ${action === 'on' ? 'enabled' : 'disabled'}` 
+            });
+
+        } catch (err) {
+            logger.error('Error in antilink command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to update anti-link setting' });
         }
-        // TODO: Implement anti-link
-        await sock.sendMessage(remoteJid, { text: `🔗 Anti-link ${action}` });
     },
 
     async antitoxic(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action] = args;
-        if (!action || !['on', 'off', 'status'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !antitoxic <on|off|status>' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const [action] = args;
+            if (!action || !['on', 'off', 'status'].includes(action)) {
+                await sock.sendMessage(remoteJid, { text: '❌ Usage: !antitoxic <on|off|status>' });
+                return;
+            }
+
+            // Get group metadata
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Initialize settings if not exists
+            if (!groupMetadata.settings) {
+                groupMetadata.settings = {};
+            }
+
+            if (action === 'status') {
+                const status = groupMetadata.settings.antitoxic ? 'enabled' : 'disabled';
+                await sock.sendMessage(remoteJid, { text: `🛡️ Anti-toxic is currently ${status}` });
+                return;
+            }
+
+            // Update setting
+            groupMetadata.settings.antitoxic = action === 'on';
+            await sock.sendMessage(remoteJid, { 
+                text: `✅ Anti-toxic has been ${action === 'on' ? 'enabled' : 'disabled'}` 
+            });
+
+        } catch (err) {
+            logger.error('Error in antitoxic command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to update anti-toxic setting' });
         }
-        // TODO: Implement anti-toxic
-        await sock.sendMessage(remoteJid, { text: `🚫 Anti-toxic ${action}` });
     },
 
     async antiraid(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action] = args;
-        if (!action || !['on', 'off', 'status'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !antiraid <on|off|status>' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const [action] = args;
+            if (!action || !['on', 'off', 'status'].includes(action)) {
+                await sock.sendMessage(remoteJid, { text: '❌ Usage: !antiraid <on|off|status>' });
+                return;
+            }
+
+            // Get group metadata
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Initialize settings if not exists
+            if (!groupMetadata.settings) {
+                groupMetadata.settings = {};
+            }
+
+            if (action === 'status') {
+                const status = groupMetadata.settings.antiraid ? 'enabled' : 'disabled';
+                const cooldown = groupMetadata.settings.raidCooldown || 60; // Default 60 seconds
+                await sock.sendMessage(remoteJid, { 
+                    text: `🛡️ Anti-raid is currently ${status}\nNew member join cooldown: ${cooldown} seconds` 
+                });
+                return;
+            }
+
+            // Update setting
+            groupMetadata.settings.antiraid = action === 'on';
+            groupMetadata.settings.raidCooldown = 60; // Default cooldown period
+            groupMetadata.settings.lastJoinTime = Date.now();
+            groupMetadata.settings.joinQueue = new Set();
+
+            await sock.sendMessage(remoteJid, { 
+                text: `✅ Anti-raid has been ${action === 'on' ? 'enabled' : 'disabled'}` 
+            });
+
+        } catch (err) {
+            logger.error('Error in antiraid command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to update anti-raid setting' });
         }
-        // TODO: Implement anti-raid
-        await sock.sendMessage(remoteJid, { text: `🛡️ Anti-raid ${action}` });
     },
 
     // Member Control
@@ -594,27 +792,207 @@ const groupCommands = {
         await sock.sendMessage(remoteJid, { text: '⏰ Announcement scheduled' });
     },
 
+    // Implement role management
+    async role(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const [action, userMention, roleName] = args;
+            if (!action || !['add', 'remove', 'list'].includes(action)) {
+                await sock.sendMessage(remoteJid, { text: '❌ Usage: !role <add|remove|list> @user [role]' });
+                return;
+            }
+
+            // Get group metadata
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Initialize roles if not exists
+            if (!groupMetadata.roles) {
+                groupMetadata.roles = new Map();
+            }
+
+            switch (action) {
+                case 'add':
+                    if (!userMention || !roleName) {
+                        await sock.sendMessage(remoteJid, { text: '❌ Please specify both user and role' });
+                        return;
+                    }
+
+                    const userToAdd = userMention.replace('@', '') + '@s.whatsapp.net';
+                    
+                    // Add role to user
+                    if (!groupMetadata.roles.has(userToAdd)) {
+                        groupMetadata.roles.set(userToAdd, new Set());
+                    }
+                    groupMetadata.roles.get(userToAdd).add(roleName);
+
+                    await sock.sendMessage(remoteJid, {
+                        text: `✅ Role "${roleName}" has been assigned to @${userToAdd.split('@')[0]}`,
+                        mentions: [userToAdd]
+                    });
+                    break;
+
+                case 'remove':
+                    if (!userMention || !roleName) {
+                        await sock.sendMessage(remoteJid, { text: '❌ Please specify both user and role' });
+                        return;
+                    }
+
+                    const userToRemove = userMention.replace('@', '') + '@s.whatsapp.net';
+                    
+                    // Remove role from user
+                    if (groupMetadata.roles.has(userToRemove)) {
+                        groupMetadata.roles.get(userToRemove).delete(roleName);
+                        if (groupMetadata.roles.get(userToRemove).size === 0) {
+                            groupMetadata.roles.delete(userToRemove);
+                        }
+                    }
+
+                    await sock.sendMessage(remoteJid, {
+                        text: `✅ Role "${roleName}" has been removed from @${userToRemove.split('@')[0]}`,
+                        mentions: [userToRemove]
+                    });
+                    break;
+
+                case 'list':
+                    if (userMention) {
+                        // List roles for specific user
+                        const user = userMention.replace('@', '') + '@s.whatsapp.net';
+                        const userRoles = groupMetadata.roles.get(user);
+                        
+                        if (!userRoles || userRoles.size === 0) {
+                            await sock.sendMessage(remoteJid, {
+                                text: `📋 @${user.split('@')[0]} has no roles assigned`,
+                                mentions: [user]
+                            });
+                        } else {
+                            await sock.sendMessage(remoteJid, {
+                                text: `📋 Roles for @${user.split('@')[0]}:\n${Array.from(userRoles).join('\n')}`,
+                                mentions: [user]
+                            });
+                        }
+                    } else {
+                        // List all role assignments
+                        let roleList = '*📋 Group Roles:*\n\n';
+                        for (const [user, roles] of groupMetadata.roles) {
+                            roleList += `@${user.split('@')[0]}: ${Array.from(roles).join(', ')}\n`;
+                        }
+
+                        if (groupMetadata.roles.size === 0) {
+                            roleList = '📋 No roles have been assigned';
+                        }
+
+                        await sock.sendMessage(remoteJid, {
+                            text: roleList,
+                            mentions: Array.from(groupMetadata.roles.keys())
+                        });
+                    }
+                    break;
+            }
+
+        } catch (err) {
+            logger.error('Error in role command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to manage roles' });
+        }
+    },
+
     // Welcome/Leave Settings
     async setwelcome(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const messageText = args.join(' ');
-        if (!messageText) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please provide a welcome message' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const welcomeMsg = args.join(' ');
+            if (!welcomeMsg) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please provide a welcome message' });
+                return;
+            }
+
+            // Get group metadata
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Initialize settings if not exists
+            if (!groupMetadata.settings) {
+                groupMetadata.settings = {};
+            }
+
+            // Update welcome message
+            groupMetadata.settings.welcomeMessage = welcomeMsg;
+            await sock.sendMessage(remoteJid, { text: '✅ Welcome message has been set' });
+
+        } catch (err) {
+            logger.error('Error in setwelcome command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to set welcome message' });
         }
-        // TODO: Implement welcome message
-        await sock.sendMessage(remoteJid, { text: '👋 Welcome message set' });
     },
 
     async setgoodbye(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const messageText = args.join(' ');
-        if (!messageText) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please provide a goodbye message' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const goodbyeMsg = args.join(' ');
+            if (!goodbyeMsg) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please provide a goodbye message' });
+                return;
+            }
+
+            // Get group metadata
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Initialize settings if not exists
+            if (!groupMetadata.settings) {
+                groupMetadata.settings = {};
+            }
+
+            // Update goodbye message
+            groupMetadata.settings.goodbyeMessage = goodbyeMsg;
+            await sock.sendMessage(remoteJid, { text: '✅ Goodbye message has been set' });
+
+        } catch (err) {
+            logger.error('Error in setgoodbye command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to set goodbye message' });
         }
-        // TODO: Implement goodbye message
-        await sock.sendMessage(remoteJid, { text: '👋 Goodbye message set' });
     },
 
     // Group Statistics
@@ -652,7 +1030,127 @@ const groupCommands = {
         }
     },
 
-    async activity(sock, message) {
+    // Fix the purge command section
+    async purge(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const count = parseInt(args[0]);
+            if (isNaN(count) || count < 1 || count > 100) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '❌ Please provide a valid number of messages to delete (1-100)' 
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: `⏳ Deleting ${count} messages...` });
+
+            // Get message keys
+            const chat = await sock.groupFetchAllParticipating();
+            const messages = Object.values(chat[remoteJid].messages)
+                .filter(m => m.key.fromMe)
+                .slice(0, count);
+
+            // Delete messages
+            for (const msg of messages) {
+                await sock.sendMessage(remoteJid, { delete: msg.key });
+            }
+
+            await sock.sendMessage(remoteJid, { text: `✅ Deleted ${messages.length} messages` });
+
+        } catch (err) {
+            logger.error('Error in purge command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to purge messages' });
+        }
+    },
+
+    // Fix the lock command section
+    async lock(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Check if bot is admin
+            const isBotAdminInGroup = await isBotAdmin(sock, remoteJid);
+            if (!isBotAdminInGroup) {
+                await sock.sendMessage(remoteJid, { text: '❌ Bot must be admin to lock the group' });
+                return;
+            }
+
+            // Lock group (only admins can send messages)
+            await sock.groupSettingUpdate(remoteJid, 'announcement');
+            await sock.sendMessage(remoteJid, { text: '🔒 Group has been locked (only admins can send messages)' });
+
+        } catch (err) {
+            logger.error('Error in lock command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to lock group' });
+        }
+    },
+
+    async unlock(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Check if bot is admin
+            const isBotAdminInGroup = await isBotAdmin(sock, remoteJid);
+            if (!isBotAdminInGroup) {
+                await sock.sendMessage(remoteJid, { text: '❌ Bot must be admin to unlock the group' });
+                return;
+            }
+
+            // Unlock group
+            await sock.groupSettingUpdate(remoteJid, 'not_announcement');
+            await sock.sendMessage(remoteJid, { text: '🔓 Group has been unlocked' });
+
+        } catch (err) {
+            logger.error('Error in unlock command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to unlock group' });
+        }
+    },
+
+    // Group Information
+    async groupinfo(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
 
@@ -664,43 +1162,618 @@ const groupCommands = {
 
             // Get group metadata
             const groupMetadata = await sock.groupMetadata(remoteJid);
+            const { subject, desc, participants, owner } = groupMetadata;
 
-            // Initialize activity tracking if not exists
-            if (!groupMetadata.activity) {
-                groupMetadata.activity = {
-                    messageCount: 0,
-                    activeMembers: new Set(),
-                    lastReset: Date.now()
-                };
-            }
+            // Count admins and members
+            const adminCount = participants.filter(p => p.admin).length;
+            const memberCount = participants.length;
 
-            const activity = groupMetadata.activity;
-            const daysSinceReset = Math.floor((Date.now() - activity.lastReset) / (1000 * 60 * 60 * 24));
+            // Format creation date
+            const createdDate = new Date(groupMetadata.creation * 1000).toLocaleString();
 
-            const activityMessage = `*📈 Group Activity Report*\n\n` +
-                `*Messages Sent:* ${activity.messageCount}\n` +
-                `*Active Members:* ${activity.activeMembers.size}\n` +
-                `*Time Period:* Last ${daysSinceReset} days\n` +
-                `*Average Messages/Day:* ${Math.round(activity.messageCount / (daysSinceReset || 1))}`;
+            // Create info message
+            const infoMessage = `*📊 Group Information*\n\n` +
+                `*Name:* ${subject}\n` +
+                `*Created:* ${createdDate}\n` +
+                `*Members:* ${memberCount}\n` +
+                `*Admins:* ${adminCount}\n` +
+                `*Owner:* @${owner.split('@')[0]}\n\n` +
+                `*Description:*\n${desc || 'No description set'}`;
 
-            await sock.sendMessage(remoteJid, { text: activityMessage });
+            await sock.sendMessage(remoteJid, {
+                text: infoMessage,
+                mentions: [owner]
+            });
 
         } catch (err) {
-            logger.error('Error in activity command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to get activity report' });
+            logger.error('Error in groupinfo command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to get group information' });
         }
     },
 
-    async report(sock, message, args) {
+    async listmembers(sock, message) {
         const remoteJid = message.key.remoteJid;
-        const [type] = args;
-        const types = ['daily', 'weekly', 'monthly'];
-        if (!type || !types.includes(type)) {
-            await sock.sendMessage(remoteJid, { text: `📊 Available report types: ${types.join(', ')}` });
+        // TODO: Implement member list logic
+        await sock.sendMessage(remoteJid, { text: 'Members List:\n• [Member List]' });
+    },
+
+    async listadmins(sock, message) {
+        const remoteJid = message.key.remoteJid;
+        // TODO: Implement admin list logic
+        await sock.sendMessage(remoteJid, { text: 'Admins List:\n• [Admin List]' });
+    },
+
+    // Advanced Group Settings
+    async settings(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const validSettings = ['antilink', 'antispam', 'welcome', 'goodbye', 'moderation'];
+            const [setting, value] = args;
+
+            if (!setting || !validSettings.includes(setting)) {
+                await sock.sendMessage(remoteJid, {
+                    text: `*⚙️ Available Settings:*\n${validSettings.join('\n')}\n\nUsage: !settings [setting] [on/off]`
+                });
+                return;
+            }
+
+            if (!value || !['on', 'off'].includes(value)) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please specify either "on" or "off"' });
+                return;
+            }
+
+            // TODO: Implement settings storage
+            await sock.sendMessage(remoteJid, { text: `✅ ${setting} has been turned ${value}` });
+
+        } catch (err) {
+            logger.error('Error in settings command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to update settings' });
+        }
+    },
+
+
+    async group(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        if (!args[0]) {
+            await sock.sendMessage(remoteJid, {
+                text: 'Usage: !group <open|close|settings>'
+            });
             return;
         }
-        // TODO: Implement reporting
-        await sock.sendMessage(remoteJid, { text: '📑 Generating report...' });
+        // Implement group settings logic here
+        await sock.sendMessage(remoteJid, { text: 'Group settings updated' });
+    },
+
+    async groupname(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const name = args.join(' ');
+        if (!name) {
+            await sock.sendMessage(remoteJid, { text: 'Please specify a new group name' });
+            return;
+        }
+        // Implement group name change logic here
+        await sock.sendMessage(remoteJid, { text: `Group name changed to: ${name}` });
+    },
+
+    async groupdesc(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const desc = args.join(' ');
+        if (!desc) {
+            await sock.sendMessage(remoteJid, { text: 'Please specify a new group description' });
+            return;
+        }
+        // Implement group description change logic here
+        await sock.sendMessage(remoteJid, { text: 'Group description updated' });
+    },
+
+    async groupicon(sock, message) {
+        const remoteJid = message.key.remoteJid;
+        // Implement group icon change logic here
+        await sock.sendMessage(remoteJid, { text: 'Group icon updated' });
+    },
+
+    // Group Configuration Commands
+    async setprefix(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const prefix = args[0];
+        if (!prefix) {
+            await sock.sendMessage(remoteJid, { text: 'Please specify a new prefix' });
+            return;
+        }
+        // TODO: Implement prefix change
+        await sock.sendMessage(remoteJid, { text: `Group prefix set to: ${prefix}` });
+    },
+
+    async chatfilter(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const [action, word] = args;
+        if (!action || (action !== 'list' && !word)) {
+            await sock.sendMessage(remoteJid, {
+                text: 'Usage: !chatfilter <add|remove|list> [word]'
+            });
+            return;
+        }
+        // TODO: Implement chat filter
+        await sock.sendMessage(remoteJid, { text: `Chat filter ${action} command received` });
+    },
+
+    async slowmode(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const duration = args[0] || '10s';
+        // TODO: Implement slowmode
+        await sock.sendMessage(remoteJid, { text: `Slowmode set to ${duration}` });
+    },
+
+    async antisticker(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const status = args[0];
+        if (!status || !['on', 'off'].includes(status)) {
+            await sock.sendMessage(remoteJid, {
+                text: 'Usage: !antisticker <on|off>'
+            });
+            return;
+        }
+        // TODO: Implement anti-sticker
+        await sock.sendMessage(remoteJid, { text: `Anti-sticker ${status}` });
+    },
+
+    async grouplist(sock, message) {
+        const remoteJid = message.key.remoteJid;
+        // Implement group list logic here
+        await sock.sendMessage(remoteJid, { text: 'Groups List:\n• No groups yet' });
+    },
+
+    // Additional Group Security
+    async groupbackup(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '⏳ Creating group backup...' });
+
+            // Get group metadata
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Create backup object
+            const backup = {
+                id: remoteJid,
+                name: groupMetadata.subject,
+                description: groupMetadata.desc,
+                participants: groupMetadata.participants.map(p => ({
+                    id: p.id,
+                    admin: p.admin
+                })),
+                settings: groupMetadata.settings || {},
+                rules: groupMetadata.rules || [],
+                creation: groupMetadata.creation,
+                timestamp: Date.now()
+            };
+
+            // Save backup to file
+            const backupDir = path.join(__dirname, '../../backups');
+            await fs.mkdir(backupDir, { recursive: true });
+            const backupPath = path.join(backupDir, `group_${remoteJid.split('@')[0]}_${Date.now()}.json`);
+            await fs.writeFile(backupPath, JSON.stringify(backup, null, 2));
+
+            await sock.sendMessage(remoteJid, { text: '✅ Group backup created successfully' });
+
+        } catch (err) {
+            logger.error('Error in groupbackup command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to create group backup' });
+        }
+    },
+
+    async grouprestore(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const [backupId] = args;
+            if (!backupId) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please provide a backup ID' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '⏳ Restoring group from backup...' });
+
+            // Load backup file
+            const backupDir = path.join(__dirname, '../../backups');
+            const backupFiles = await fs.readdir(backupDir);
+            const backupFile = backupFiles.find(f => f.includes(backupId));
+
+            if (!backupFile) {
+                await sock.sendMessage(remoteJid, { text: '❌ Backup not found' });
+                return;
+            }
+
+            const backupPath = path.join(backupDir, backupFile);
+            const backup = JSON.parse(await fs.readFile(backupPath, 'utf8'));
+
+            // Restore group settings
+            if (backup.name) {
+                await sock.groupUpdateSubject(remoteJid, backup.name);
+            }
+            if (backup.description) {
+                await sock.groupUpdateDescription(remoteJid, backup.description);
+            }
+
+            // Restore participants (admins)
+            const currentMetadata = await sock.groupMetadata(remoteJid);
+            const currentAdmins = currentMetadata.participants.filter(p => p.admin).map(p => p.id);
+            const backupAdmins = backup.participants.filter(p => p.admin).map(p => p.id);
+
+            // Promote new admins
+            const adminsToPromote = backupAdmins.filter(id => !currentAdmins.includes(id));
+            if (adminsToPromote.length) {
+                await sock.groupParticipantsUpdate(remoteJid, adminsToPromote, 'promote');
+            }
+
+            await sock.sendMessage(remoteJid, { text: '✅ Group restored from backup' });
+
+        } catch (err) {
+            logger.error('Error in grouprestore command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to restore group' });
+        }
+    },
+
+    async antivirus(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const [action] = args;
+        if (!action || !['on', 'off', 'status'].includes(action)) {
+            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !antivirus <on|off|status>' });
+            return;
+        }
+        // TODO: Implement anti-virus protection
+        await sock.sendMessage(remoteJid, { text: `🛡️ Anti-virus ${action}` });
+    },
+
+    async antibadwords(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const [action, word] = args;
+        if (!action || !['add', 'remove', 'list'].includes(action)) {
+            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !antibadwords <add|remove|list> [word]' });
+            return;
+        }
+        // TODO: Implement bad words filter
+        await sock.sendMessage(remoteJid, { text: '🚫 Bad words filter updated' });
+    },
+
+    // Message Control
+    async purge(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const count = parseInt(args[0]);
+            if (isNaN(count) || count < 1 || count > 100) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '❌ Please provide a valid number of messages to delete (1-100)' 
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: `⏳ Deleting ${count} messages...` });
+
+            // Get message keys
+            const chat = await sock.groupFetchAllParticipating();
+            const messages = Object.values(chat[remoteJid].messages)
+                .filter(m => m.key.fromMe)
+                .slice(0, count);
+
+            // Delete messages
+            for (const msg of messages) {
+                await sock.sendMessage(remoteJid, { delete: msg.key });
+            }
+
+            await sock.sendMessage(remoteJid, { text: `✅ Deleted ${messages.length} messages` });
+
+        } catch (err) {
+            logger.error('Error in purge command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to purge messages' });
+        }
+    },
+
+    async lock(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Check if bot is admin
+            const isBotAdminInGroup = await isBotAdmin(sock, remoteJid);
+            if (!isBotAdminInGroup) {
+                await sock.sendMessage(remoteJid, { text: '❌ Bot must be admin to lock the group' });
+                return;
+            }
+
+            // Lock group (only admins can send messages)
+            await sock.groupSettingUpdate(remoteJid, 'announcement');
+            await sock.sendMessage(remoteJid, { text: '🔒 Group has been locked (only admins can send messages)' });
+
+        } catch (err) {
+            logger.error('Error in lock command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to lock group' });
+        }
+    },
+
+    async unlock(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Check if bot is admin
+            const isBotAdminInGroup = await isBotAdmin(sock, remoteJid);
+            if (!isBotAdminInGroup) {
+                await sock.sendMessage(remoteJid, { text: '❌ Bot must be admin to unlock the group' });
+                return;
+            }
+
+            // Unlock group
+            await sock.groupSettingUpdate(remoteJid, 'not_announcement');
+            await sock.sendMessage(remoteJid, { text: '🔓 Group has been unlocked' });
+
+        } catch (err) {
+            logger.error('Error in unlock command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to unlock group' });
+        }
+    },
+
+    // Member List Management
+    async blacklist(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const [action, ...userArgs] = args;
+            if (!action || !['add', 'remove', 'list'].includes(action)) {
+                await sock.sendMessage(remoteJid, { text: '❌ Usage: !blacklist <add|remove|list> [user]' });
+                return;
+            }
+
+            // Get group metadata for storing blacklist
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Initialize blacklist if not exists
+            if (!groupMetadata.blacklist) {
+                groupMetadata.blacklist = new Set();
+            }
+
+            switch (action) {
+                case 'add':
+                    if (!userArgs.length) {
+                        await sock.sendMessage(remoteJid, { text: '❌ Please specify a user to blacklist' });
+                        return;
+                    }
+
+                    const userToBlacklist = userArgs[0].replace('@', '') + '@s.whatsapp.net';
+
+                    // Check if user is admin
+                    const isTargetAdmin = await isAdmin(sock, remoteJid, userToBlacklist);
+                    if (isTargetAdmin) {
+                        await sock.sendMessage(remoteJid, { text: '❌ Cannot blacklist an admin' });
+                        return;
+                    }
+
+                    groupMetadata.blacklist.add(userToBlacklist);
+                    await sock.sendMessage(remoteJid, { text: '✅ User has been added to blacklist' });
+                    break;
+
+                case 'remove':
+                    if (!userArgs.length) {
+                        await sock.sendMessage(remoteJid, { text: '❌ Please specify a user to remove from blacklist' });
+                        return;
+                    }
+
+                    const userToRemove = userArgs[0].replace('@', '') + '@s.whatsapp.net';
+                    groupMetadata.blacklist.delete(userToRemove);
+                    await sock.sendMessage(remoteJid, { text: '✅ User has been removed from blacklist' });
+                    break;
+
+                case 'list':
+                    if (groupMetadata.blacklist.size === 0) {
+                        await sock.sendMessage(remoteJid, { text: '📋 Blacklist is empty' });
+                        return;
+                    }
+
+                    const blacklistedUsers = Array.from(groupMetadata.blacklist);
+                    const mentions = blacklistedUsers.map(user => ({
+                        tag: user,
+                        mention: user.split('@')[0]
+                    }));
+
+                    let listMessage = '*📋 Blacklisted Users:*\n\n';
+                    mentions.forEach(({ mention }) => {
+                        listMessage += `@${mention}\n`;
+                    });
+
+                    await sock.sendMessage(remoteJid, {
+                        text: listMessage,
+                        mentions: blacklistedUsers
+                    });
+                    break;
+            }
+
+        } catch (err) {
+            logger.error('Error in blacklist command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to manage blacklist' });
+        }
+    },
+
+    async whitelist(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const [action, ...userArgs] = args;
+            if (!action || !['add', 'remove', 'list'].includes(action)) {
+                await sock.sendMessage(remoteJid, { text: '❌ Usage: !whitelist <add|remove|list> [user]' });
+                return;
+            }
+
+            // Get group metadata for storing whitelist
+            const groupMetadata = await sock.groupMetadata(remoteJid);
+
+            // Initialize whitelist if not exists
+            if (!groupMetadata.whitelist) {
+                groupMetadata.whitelist = new Set();
+            }
+
+            switch (action) {
+                case 'add':
+                    if (!userArgs.length) {
+                        await sock.sendMessage(remoteJid, { text: '❌ Please specify a user to whitelist' });
+                        return;
+                    }
+
+                    const userToWhitelist = userArgs[0].replace('@', '') + '@s.whatsapp.net';
+                    groupMetadata.whitelist.add(userToWhitelist);
+                    await sock.sendMessage(remoteJid, { text: '✅ User has been added to whitelist' });
+                    break;
+
+                case 'remove':
+                    if (!userArgs.length) {
+                        await sock.sendMessage(remoteJid, { text: '❌ Please specify a user to remove from whitelist' });
+                        return;
+                    }
+
+                    const userToRemove = userArgs[0].replace('@', '') + '@s.whatsapp.net';
+                    groupMetadata.whitelist.delete(userToRemove);
+                    await sock.sendMessage(remoteJid, { text: '✅ User has been removed from whitelist' });
+                    break;
+
+                case 'list':
+                    if (groupMetadata.whitelist.size === 0) {
+                        await sock.sendMessage(remoteJid, { text: '📋 Whitelist is empty' });
+                        return;
+                    }
+
+                    const whitelistedUsers = Array.from(groupMetadata.whitelist);
+                    const mentions = whitelistedUsers.map(user => ({
+                        tag: user,
+                        mention: user.split('@')[0]
+                    }));
+
+                    let listMessage = '*📋 Whitelisted Users:*\n\n';
+                    mentions.forEach(({ mention }) => {
+                        listMessage += `@${mention}\n`;
+                    });
+
+                    await sock.sendMessage(remoteJid, {
+                        text: listMessage,
+                        mentions: whitelistedUsers
+                    });
+                    break;
+            }
+
+        } catch (err) {
+            logger.error('Error in whitelist command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to manage whitelist' });
+        }
     },
 
     // Group Rules Management
@@ -917,85 +1990,8 @@ const groupCommands = {
         }
     },
 
-    // Member List Management
-    async blacklist(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, user] = args;
-        if (!action || !['add', 'remove', 'list'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !blacklist <add|remove|list` [user]' });
-            return;
-        }
-        // TODO: Implement blacklist
-        await sock.sendMessage(remoteJid, { text: '⚫ Blacklist updated' });
-    },
-
-    async whitelist(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, user] = args;
-        if (!action || !['add', 'remove', 'list'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !whitelist <add|remove|list> [user]' });
-            return;
-        }
-        // TODO: Implement whitelist
-        await sock.sendMessage(remoteJid, { text: '⚪ Whitelist updated' });
-    },
-
-    // Group Information
-    async groupinfo(sock, message) {
-        try {
-            const remoteJid = message.key.remoteJid;
-
-            // Check if command is used in a group
-            if (!remoteJid.endsWith('@g.us')) {
-                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
-                return;
-            }
-
-            // Get group metadata
-            const groupMetadata = await sock.groupMetadata(remoteJid);
-            const { subject, desc, participants, owner } = groupMetadata;
-
-            // Count admins and members
-            const adminCount = participants.filter(p => p.admin).length;
-            const memberCount = participants.length;
-
-            // Format creation date
-            const createdDate = new Date(groupMetadata.creation * 1000).toLocaleString();
-
-            // Create info message
-            const infoMessage = `*📊 Group Information*\n\n` +
-                `*Name:* ${subject}\n` +
-                `*Created:* ${createdDate}\n` +
-                `*Members:* ${memberCount}\n` +
-                `*Admins:* ${adminCount}\n` +
-                `*Owner:* @${owner.split('@')[0]}\n\n` +
-                `*Description:*\n${desc || 'No description set'}`;
-
-            await sock.sendMessage(remoteJid, {
-                text: infoMessage,
-                mentions: [owner]
-            });
-
-        } catch (err) {
-            logger.error('Error in groupinfo command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to get group information' });
-        }
-    },
-
-    async listmembers(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // TODO: Implement member list logic
-        await sock.sendMessage(remoteJid, { text: 'Members List:\n• [Member List]' });
-    },
-
-    async listadmins(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // TODO: Implement admin list logic
-        await sock.sendMessage(remoteJid, { text: 'Admins List:\n• [Admin List]' });
-    },
-
-    // Advanced Group Settings
-    async settings(sock, message, args) {
+    // Advanced Group Security
+    async groupbackup(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
 
@@ -1013,139 +2009,104 @@ const groupCommands = {
                 return;
             }
 
-            const validSettings = ['antilink', 'antispam', 'welcome', 'goodbye', 'moderation'];
-            const [setting, value] = args;
+            await sock.sendMessage(remoteJid, { text: '⏳ Creating group backup...' });
 
-            if (!setting || !validSettings.includes(setting)) {
-                await sock.sendMessage(remoteJid, {
-                    text: `*⚙️ Available Settings:*\n${validSettings.join('\n')}\n\nUsage: !settings [setting] [on/off]`
-                });
-                return;
-            }
+            // Get group metadata
+            const groupMetadata = await sock.groupMetadata(remoteJid);
 
-            if (!value || !['on', 'off'].includes(value)) {
-                await sock.sendMessage(remoteJid, { text: '❌ Please specify either "on" or "off"' });
-                return;
-            }
+            // Create backup object
+            const backup = {
+                id: remoteJid,
+                name: groupMetadata.subject,
+                description: groupMetadata.desc,
+                participants: groupMetadata.participants.map(p => ({
+                    id: p.id,
+                    admin: p.admin
+                })),
+                settings: groupMetadata.settings || {},
+                rules: groupMetadata.rules || [],
+                creation: groupMetadata.creation,
+                timestamp: Date.now()
+            };
 
-            // TODO: Implement settings storage
-            await sock.sendMessage(remoteJid, { text: `✅ ${setting} has been turned ${value}` });
+            // Save backup to file
+            const backupDir = path.join(__dirname, '../../backups');
+            await fs.mkdir(backupDir, { recursive: true });
+            const backupPath = path.join(backupDir, `group_${remoteJid.split('@')[0]}_${Date.now()}.json`);
+            await fs.writeFile(backupPath, JSON.stringify(backup, null, 2));
+
+            await sock.sendMessage(remoteJid, { text: '✅ Group backup created successfully' });
 
         } catch (err) {
-            logger.error('Error in settings command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to update settings' });
+            logger.error('Error in groupbackup command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to create group backup' });
         }
-    }
-
-
-    ,
-    async group(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        if (!args[0]) {
-            await sock.sendMessage(remoteJid, {
-                text: 'Usage: !group <open|close|settings>'
-            });
-            return;
-        }
-        // Implement group settings logic here
-        await sock.sendMessage(remoteJid, { text: 'Group settings updated' });
-    },
-
-    async groupname(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const name = args.join(' ');
-        if (!name) {
-            await sock.sendMessage(remoteJid, { text: 'Please specify a new group name' });
-            return;
-        }
-        // Implement group name change logic here
-        await sock.sendMessage(remoteJid, { text: `Group name changed to: ${name}` });
-    },
-
-    async groupdesc(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const desc = args.join(' ');
-        if (!desc) {
-            await sock.sendMessage(remoteJid, { text: 'Please specify a new group description' });
-            return;
-        }
-        // Implement group description change logic here
-        await sock.sendMessage(remoteJid, { text: 'Group description updated' });
-    },
-
-    async groupicon(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // Implement group icon change logic here
-        await sock.sendMessage(remoteJid, { text: 'Group icon updated' });
-    },
-
-    // Group Configuration Commands
-    async setprefix(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const prefix = args[0];
-        if (!prefix) {
-            await sock.sendMessage(remoteJid, { text: 'Please specify a new prefix' });
-            return;
-        }
-        // TODO: Implement prefix change
-        await sock.sendMessage(remoteJid, { text: `Group prefix set to: ${prefix}` });
-    },
-
-    async chatfilter(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, word] = args;
-        if (!action || (action !== 'list' && !word)) {
-            await sock.sendMessage(remoteJid, {
-                text: 'Usage: !chatfilter <add|remove|list> [word]'
-            });
-            return;
-        }
-        // TODO: Implement chat filter
-        await sock.sendMessage(remoteJid, { text: `Chat filter ${action} command received` });
-    },
-
-    async slowmode(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const duration = args[0] || '10s';
-        // TODO: Implement slowmode
-        await sock.sendMessage(remoteJid, { text: `Slowmode set to ${duration}` });
-    },
-
-    async antisticker(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const status = args[0];
-        if (!status || !['on', 'off'].includes(status)) {
-            await sock.sendMessage(remoteJid, {
-                text: 'Usage: !antisticker <on|off>'
-            });
-            return;
-        }
-        // TODO: Implement anti-sticker
-        await sock.sendMessage(remoteJid, { text: `Anti-sticker ${status}` });
-    },
-
-    async grouplist(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // Implement group list logic here
-        await sock.sendMessage(remoteJid, { text: 'Groups List:\n• No groups yet' });
-    },
-
-    // Additional Group Security
-    async groupbackup(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // TODO: Implement group backup
-        await sock.sendMessage(remoteJid, { text: '💾 Creating group backup...' });
     },
 
     async grouprestore(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [backupId] = args;
-        if (!backupId) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please specify backup ID' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const [backupId] = args;
+            if (!backupId) {
+                await sock.sendMessage(remoteJid, { text: '❌ Please provide a backup ID' });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '⏳ Restoring group from backup...' });
+
+            // Load backup file
+            const backupDir = path.join(__dirname, '../../backups');
+            const backupFiles = await fs.readdir(backupDir);
+            const backupFile = backupFiles.find(f => f.includes(backupId));
+
+            if (!backupFile) {
+                await sock.sendMessage(remoteJid, { text: '❌ Backup not found' });
+                return;
+            }
+
+            const backupPath = path.join(backupDir, backupFile);
+            const backup = JSON.parse(await fs.readFile(backupPath, 'utf8'));
+
+            // Restore group settings
+            if (backup.name) {
+                await sock.groupUpdateSubject(remoteJid, backup.name);
+            }
+            if (backup.description) {
+                await sock.groupUpdateDescription(remoteJid, backup.description);
+            }
+
+            // Restore participants (admins)
+            const currentMetadata = await sock.groupMetadata(remoteJid);
+            const currentAdmins = currentMetadata.participants.filter(p => p.admin).map(p => p.id);
+            const backupAdmins = backup.participants.filter(p => p.admin).map(p => p.id);
+
+            // Promote new admins
+            const adminsToPromote = backupAdmins.filter(id => !currentAdmins.includes(id));
+            if (adminsToPromote.length) {
+                await sock.groupParticipantsUpdate(remoteJid, adminsToPromote, 'promote');
+            }
+
+            await sock.sendMessage(remoteJid, { text: '✅ Group restored from backup' });
+
+        } catch (err) {
+            logger.error('Error in grouprestore command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to restore group' });
         }
-        // TODO: Implement group restore
-        await sock.sendMessage(remoteJid, { text: '🔄 Restoring group...' });
     },
 
     async antivirus(sock, message, args) {
@@ -1172,49 +2133,120 @@ const groupCommands = {
 
     // Message Control
     async purge(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [count] = args;
-        if (!count || isNaN(count)) {
-            await sock.sendMessage(remoteJidJid, { text: '⚠️ Usage: !purge [number]' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            const count = parseInt(args[0]);
+            if (isNaN(count) || count < 1 || count > 100) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '❌ Please provide a valid number of messages to delete (1-100)' 
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: `⏳ Deleting ${count} messages...` });
+
+            // Get message keys
+            const chat = await sock.groupFetchAllParticipating();
+            const messages = Object.values(chat[remoteJid].messages)
+                .filter(m => m.key.fromMe)
+                .slice(0, count);
+
+            // Delete messages
+            for (const msg of messages) {
+                await sock.sendMessage(remoteJid, { delete: msg.key });
+            }
+
+            await sock.sendMessage(remoteJid, { text: `✅ Deleted ${messages.length} messages` });
+
+        } catch (err) {
+            logger.error('Error in purge command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to purge messages' });
         }
-        // TODO: Implement message purge
-        await sock.sendMessage(remoteJid, { text: `🗑️ Purged ${count} messages` });
     },
 
     async lock(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // TODO: Implement chat lock
-        await sock.sendMessage(remoteJid, { text: '🔒 Group chat locked' });
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Check if bot is admin
+            const isBotAdminInGroup = await isBotAdmin(sock, remoteJid);
+            if (!isBotAdminInGroup) {
+                await sock.sendMessage(remoteJid, { text: '❌ Bot must be admin to lock the group' });
+                return;
+            }
+
+            // Lock group (only admins can send messages)
+            await sock.groupSettingUpdate(remoteJid, 'announcement');
+            await sock.sendMessage(remoteJid, { text: '🔒 Group has been locked (only admins can send messages)' });
+
+        } catch (err) {
+            logger.error('Error in lock command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to lock group' });
+        }
     },
 
     async unlock(sock, message) {
-        const remoteJid = message.key.remoteJid;
-        // TODO: Implement chat unlock
-        await sock.sendMessage(remoteJid, { text: '🔓 Group chat unlocked' });
-    },
+        try {
+            const remoteJid = message.key.remoteJid;
 
-    // Group Links
-    async grouplinks(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action] = args;
-        if (!action || !['enable', 'disable', 'status'].includes(action)) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !grouplinks <enable|disable|status>' });
-            return;
-        }
-        // TODO: Implement group links control
-        await sock.sendMessage(remoteJid, { text: `🔗 Group links ${action}d` });
-    },
+            // Check if command is used in a group
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
 
-    async templink(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [duration] = args;
-        if (!duration) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !templink [duration]' });
-            return;
+            // Check if sender is admin
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Check if bot is admin
+            const isBotAdminInGroup = await isBotAdmin(sock, remoteJid);
+            if (!isBotAdminInGroup) {
+                await sock.sendMessage(remoteJid, { text: '❌ Bot must be admin to unlock the group' });
+                return;
+            }
+
+            // Unlock group
+            await sock.groupSettingUpdate(remoteJid, 'not_announcement');
+            await sock.sendMessage(remoteJid, { text: '🔓 Group has been unlocked' });
+
+        } catch (err) {
+            logger.error('Error in unlock command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to unlock group' });
         }
-        // TODO: Implement temporary link
-        await sock.sendMessage(remoteJid, { text: `🔗 Temporary link created for ${duration}` });
     },
 
     // Advanced Moderation
@@ -1249,7 +2281,7 @@ const groupCommands = {
             return;
         }
         // TODO: Implement nickname setting
-        await sock.sendMessage(remoteJJid, { text: '📝 Nickname updated' });
+        await sock.sendMessage(remoteJid, { text: '📝 Nickname updated' });
     },
 
     async resetname(sock, message, args) {
@@ -1270,8 +2302,7 @@ const groupCommands = {
         if (!action || !['add', 'remove', 'list'].includes(action)) {
             await sock.sendMessage(remoteJid, { text: '⚠️ Usage: !role <add|remove|list> @user [role]' });
             return;
-        }
-        // TODO: Implement role management
+        }        // TODO: Implement role management
         await sock.sendMessage(remoteJid, { text: '👥 Role updated' });
     },
 
@@ -1369,28 +2400,20 @@ const groupCommands = {
     }
 };
 
-// Helper functions for duration parsing
-function parseDuration(str) {
-    const match = str.match(/^(\d+)(s|m|h|d)$/);
-    if (!match) return null;
-
-    const num = parseInt(match[1]);
-    const unit = match[2];
-
-    switch (unit) {
-        case 's': return num;
-        case 'm': return num * 60;
-        case 'h': return num * 60 * 60;
-        case 'd': return num * 24 * 60 * 60;
-        default: return null;
+// Export the command handlers
+module.exports = {
+    commands: groupCommands,
+    category: 'group',
+    // Initialize any required state or configurations
+    async init() {
+        try {
+            // Create backup directory if it doesn't exist
+            const backupDir = path.join(__dirname, '../../backups');
+            await fs.mkdir(backupDir, { recursive: true });
+            logger.info('Group command handler initialized successfully');
+        } catch (err) {
+            logger.error('Error initializing group command handler:', err);
+            throw err; // Re-throw to be handled by the command loader
+        }
     }
-}
-
-function formatDuration(seconds) {
-    if (seconds < 60) return `${seconds} seconds`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours`;
-    return `${Math.floor(seconds / 86400)} days`;
-}
-
-module.exports = groupCommands;
+};
