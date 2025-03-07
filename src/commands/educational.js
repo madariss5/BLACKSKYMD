@@ -1,8 +1,13 @@
 const logger = require('../utils/logger');
 const path = require('path');
-const fs = require('fs/promises');
+const fs = require('fs').promises;
 
 // Helper functions can go here if needed
+const handleError = async (sock, jid, err, message) => {
+    logger.error(`${message}:`, err.message);
+    logger.error('Stack trace:', err.stack);
+    await sock.sendMessage(jid, { text: `❌ ${message}` });
+};
 
 const educationalCommands = {
     async define(sock, message, args) {
@@ -16,8 +21,7 @@ const educationalCommands = {
             // TODO: Implement dictionary API integration
             await sock.sendMessage(remoteJid, { text: '📖 Looking up definition...' });
         } catch (err) {
-            logger.error('Error in define command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '❌ Error looking up definition' });
+            await handleError(sock, message.key.remoteJid, err, 'Error looking up definition');
         }
     },
 
@@ -89,7 +93,7 @@ const educationalCommands = {
             const result = eval(expression.replace(/[^0-9+\-*/(). ]/g, ''));
             await sock.sendMessage(remoteJid, { text: `🧮 Result: ${result}` });
         } catch (err) {
-            await sock.sendMessage(remoteJid, { text: '❌ Invalid expression' });
+            await handleError(sock, remoteJid, err, 'Invalid expression');
         }
     },
 
@@ -472,27 +476,43 @@ const educationalCommands = {
     }
 };
 
-// Export the command handlers with enhanced format
 module.exports = {
     commands: educationalCommands,
     category: 'educational',
-    // Initialize any required state or configurations
     async init() {
         try {
             logger.info('Initializing educational command handler...');
 
-            // TODO: Initialize any required API clients or services
-            // TODO: Verify required dependencies are available
+            // Verify required dependencies
+            const requiredDeps = {
+                path: path,
+                logger: logger
+            };
 
-            // Create necessary directories
+            // Check each dependency
+            for (const [name, dep] of Object.entries(requiredDeps)) {
+                if (!dep) {
+                    logger.error(`Missing educational dependency: ${name}`);
+                    throw new Error(`Required educational dependency '${name}' is not initialized`);
+                }
+            }
+
+            // Create necessary directories with error handling
             const dataDir = path.join(__dirname, '../../data/educational');
-            await fs.mkdir(dataDir, { recursive: true });
+            try {
+                await fs.mkdir(dataDir, { recursive: true });
+                logger.info(`Created directory: ${dataDir}`);
+            } catch (err) {
+                logger.error('Failed to create data directory:', err);
+                throw err;
+            }
 
             logger.info('Educational command handler initialized successfully');
             return true;
         } catch (err) {
-            logger.error('Error initializing educational command handler:', err);
-            throw err; // Re-throw to be handled by the command loader
+            logger.error('Error initializing educational command handler:', err.message);
+            logger.error('Stack trace:', err.stack);
+            throw err;
         }
     }
 };

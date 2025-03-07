@@ -865,7 +865,7 @@ const mediaCommands = {
 
             await sharp(buffer)
                 .flip(direction === 'vertical')
-                .flop(direction === 'horizontal')
+                .flop(direction=== 'horizontal')
                 .toFile(outputPath);
 
             await sock.sendMessage(remoteJid, {
@@ -994,25 +994,60 @@ const mediaCommands = {
 
 };
 
-// Export the command handlers with new format
+// Export the command handlers with enhanced format
 module.exports = {
     commands: mediaCommands,
     category: 'media',
-    // Initialize any required state or configurations
     async init() {
         try {
-            // Ensure temp directory exists
-            const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            logger.info('Initializing media command handler...');
 
-            // Verify required dependencies
-            if (!sharp) throw new Error('Sharp library not initialized');
-            if (!ytdl) throw new Error('YTDL library not initialized');
+            // Verify required dependencies with detailed error messages
+            const requiredDeps = {
+                sharp: sharp,
+                ytdl: ytdl,
+                axios: axios,
+                webp: webp,
+                yts: yts,
+                path: path,
+                FormData: FormData,
+                downloadMediaMessage: downloadMediaMessage
+            };
+
+            // Check each dependency with better error handling
+            for (const [name, dep] of Object.entries(requiredDeps)) {
+                if (!dep) {
+                    logger.error(`Missing media dependency: ${name}`);
+                    throw new Error(`Required media dependency '${name}' is not initialized`);
+                }
+            }
+
+            // Create necessary directories with error handling
+            const dirs = [
+                path.join(__dirname, '../../temp'),
+                path.join(__dirname, '../../temp/media'),
+                path.join(__dirname, '../../temp/stickers')
+            ];
+
+            for (const dir of dirs) {
+                try {
+                    await fs.mkdir(dir, { recursive: true });
+                    logger.info(`Created directory: ${dir}`);
+                } catch (err) {
+                    logger.error(`Failed to create directory ${dir}:`, err);
+                    throw err;
+                }
+            }
+
+            // Initialize media queues and caches
+            audioQueue.clear();
 
             logger.info('Media command handler initialized successfully');
+            return true;
         } catch (err) {
-            logger.error('Error initializing media command handler:', err);
-            throw err; // Re-throw to be handled by the command loader
+            logger.error('Error initializing media command handler:', err.message);
+            logger.error('Stack trace:', err.stack);
+            throw err;
         }
     }
 };
