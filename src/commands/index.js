@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 
+// Import all command modules
 const ownerCommands = require('./owner');
 const groupCommands = require('./group');
 const userCommands = require('./user');
@@ -11,32 +12,62 @@ const nsfwCommands = require('./nsfw');
 const reactionCommands = require('./reactions');
 const utilityCommands = require('./utility');
 
-// Combine all commands
+// Log module loading attempts
+logger.info('\nLoading command modules...');
+
+// Helper function to safely load commands
+function loadCommandsFromModule(module, name) {
+    try {
+        if (module && module.commands) {
+            logger.info(`✅ Successfully loaded ${name} module`);
+            return module.commands;
+        } else if (typeof module === 'object') {
+            logger.info(`✅ Successfully loaded ${name} module (legacy format)`);
+            return module;
+        }
+        logger.warn(`⚠️ Invalid module format for ${name}`);
+        return {};
+    } catch (err) {
+        logger.error(`❌ Error loading ${name} module:`, err);
+        return {};
+    }
+}
+
+// Combine all commands with proper error handling
 const commands = {
     // Basic commands
-    ...basicCommands,
+    ...loadCommandsFromModule(basicCommands, 'basic'),
 
     // Owner commands
-    ...ownerCommands,
+    ...loadCommandsFromModule(ownerCommands, 'owner'),
 
     // Group commands
-    ...groupCommands,
+    ...loadCommandsFromModule(groupCommands, 'group'),
 
     // User commands
-    ...userCommands,
+    ...loadCommandsFromModule(userCommands, 'user'),
 
     // Fun commands
-    ...funCommands,
+    ...loadCommandsFromModule(funCommands, 'fun'),
+
     // Media commands
-    ...mediaCommands,
+    ...loadCommandsFromModule(mediaCommands, 'media'),
+
     // Educational commands
-    ...educationalCommands,
+    ...loadCommandsFromModule(educationalCommands, 'educational'),
+
     // NSFW commands
-    ...nsfwCommands,
+    ...loadCommandsFromModule(nsfwCommands, 'nsfw'),
+
     // Reaction commands
-    ...reactionCommands,
+    ...loadCommandsFromModule(reactionCommands, 'reactions'),
+
     // Utility commands
-    ...utilityCommands
+    ...loadCommandsFromModule(utilityCommands, 'utility')
 };
+
+// Log total number of commands loaded
+const commandCount = Object.keys(commands).length;
+logger.info(`\nTotal commands loaded: ${commandCount}`);
 
 module.exports = commands;
