@@ -498,4 +498,22 @@ Special thanks to everyone who helped make this bot possible!
     }
 };
 
-module.exports = basicCommands;
+module.exports = {
+    commands: basicCommands,
+    category: 'basic',
+    async init() {
+        try {
+            logger.info('Initializing basic command handler...');
+
+            if (!proto) {
+                throw new Error('Baileys proto not initialized');
+            }
+
+            logger.info('Basic command handler initialized successfully');
+            return true;
+        } catch (err) {
+            logger.error('Error initializing basic command handler:', err);
+            throw err;
+        }
+    }
+};

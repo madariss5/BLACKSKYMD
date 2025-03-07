@@ -1,4 +1,6 @@
 const logger = require('../utils/logger');
+const path = require('path');
+const fs = require('fs').promises;
 
 const funCommands = {
     // Text Fun
@@ -709,268 +711,6 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
         });
     },
 
-    // RPG Game System
-    async rpgstart(sock, sender) {
-        // TODO: Implement RPG game initialization
-        await sock.sendMessage(sender, { text: 'RPG game system coming soon!' });
-    },
-
-    async rpgadventure(sock, sender) {
-        const adventures = [
-            "You found a mysterious cave!",
-            "A dragon appears in your path!",
-            "You discovered an ancient treasure!"
-        ];
-        const adventure = adventures[Math.floor(Math.random() * adventures.length)];
-        await sock.sendMessage(sender, { text: adventure });
-    },
-
-    async rpgbattle(sock, sender) {
-        // TODO: Implement RPG battle system
-        await sock.sendMessage(sender, { text: 'RPG battle system coming soon!' });
-    },
-
-    // Mini Games
-    async typingrace(sock, sender) {
-        const words = [
-            "The quick brown fox jumps over the lazy dog",
-            "Pack my box with five dozen liquor jugs",
-            "How vexingly quick daft zebras jump"
-        ];
-        const challenge = words[Math.floor(Math.random() * words.length)];
-        await sock.sendMessage(sender, {
-            text: `⌨️ Typing Race:\nType this as fast as you can:\n${challenge}`
-        });
-    },
-
-    async mathquiz(sock, sender) {
-        const operators = ['+', '-', '*'];
-        const operator = operators[Math.floor(Math.random() * operators.length)];
-        const num1 = Math.floor(Math.random() * 10) + 1;
-        const num2 = Math.floor(Math.random() * 10) + 1;
-
-        await sock.sendMessage(sender, {
-            text: `🔢 Math Quiz:\nWhat is ${num1} ${operator} ${num2}?`
-        });
-    },
-
-    async triviachallenge(sock, sender) {
-        const questions = [
-            { q: "What is the capital of France?", a: "Paris" },
-            { q: "Which planet is known as the Red Planet?", a: "Mars" },
-            { q: "What is the largest mammal?", a: "Blue Whale" }
-        ];
-        const question = questions[Math.floor(Math.random() * questions.length)];
-        await sock.sendMessage(sender, {
-            text: `🎯 Trivia Challenge:\n${question.q}`
-        });
-    },
-
-    // Card Games
-    async poker(sock, sender) {
-        // TODO: Implement poker game
-        await sock.sendMessage(sender, { text: 'Poker game coming soon!' });
-    },
-
-    async blackjack(sock, sender) {
-        // TODO: Implement blackjack game
-        await sock.sendMessage(sender, { text: 'Blackjack game coming soon!' });
-    },
-
-    // Social Games
-    async confess(sock, sender, args) {
-        if (!args.length) {
-            return await sock.sendMessage(sender, {
-                text: '⚠️ Please provide your confession!'
-            });
-        }
-
-        const confession = args.join(' ');
-        await sock.sendMessage(sender, {
-            text: `Anonymous Confession:\n${confession}`
-        });
-    },
-
-    async matchmaking(sock, sender, args) {
-        if (args.length < 2) {
-            return await sock.sendMessage(sender, {
-                text: 'Please mention two users for matchmaking!'
-            });
-        }
-
-        const compatibility = Math.floor(Math.random() * 101);
-        await sock.sendMessage(sender, {
-            text: `💘 Matchmaking Results:\n${args[0]} + ${args[1]} = ${compatibility}% compatible!`
-        });
-    },
-
-    async madlibs(sock, sender, args) {
-        const stories = [
-            {
-                template: "Once upon a time, there was a {adj1} {noun1} who loved to {verb1}. One day, they found a {adj2} {noun2} and decided to {verb2} with it. The end was very {adj3}!",
-                words: ['adj1', 'noun1', 'verb1', 'adj2', 'noun2', 'verb2', 'adj3']
-            },
-            {
-                template: "In a {adj1} kingdom, a {noun1} decided to {verb1} across the {adj2} {noun2}. Along the way, they met a {adj3} {noun3} who taught them to {verb2}.",
-                words: ['adj1', 'noun1', 'verb1', 'adj2', 'noun2', 'adj3', 'noun3', 'verb2']
-            }
-        ];
-
-        if (!args.length) {
-            const story = stories[Math.floor(Math.random() * stories.length)];
-            await sock.sendMessage(sender, {
-                text: `🎲 Madlibs Game!\nProvide words for: ${story.words.join(', ')}`
-            });
-            return;
-        }
-
-        const story = stories[Math.floor(Math.random() * stories.length)];
-        const words = args.slice(0, story.words.length);
-
-        if (words.length < story.words.length) {
-            await sock.sendMessage(sender, {
-                text: `Need more words! Still need: ${story.words.slice(words.length).join(', ')}`
-            });
-            return;
-        }
-
-        let filledStory = story.template;
-        story.words.forEach((word, i) => {
-            filledStory = filledStory.replace(`{${word}}`, words[i]);
-        });
-
-        await sock.sendMessage(sender, { text: `📖 Your Story:\n${filledStory}` });
-    },
-
-    async charades(sock, sender, args) {
-        const categories = ['animals', 'movies', 'food', 'sports'];
-        const words = {
-            animals: ['elephant', 'penguin', 'giraffe', 'kangaroo', 'dolphin'],
-            movies: ['avatar', 'titanic', 'frozen', 'jaws', 'inception'],
-            food: ['pizza', 'sushi', 'burger', 'taco', 'pasta'],
-            sports: ['soccer', 'basketball', 'tennis', 'swimming', 'volleyball']
-        };
-
-        const [action, category] = args;
-        if (!action || !['start', 'guess'].includes(action.toLowerCase())) {
-            await sock.sendMessage(sender, {
-                text: `🎭 Charades Game!\nCommands:\n!charades start [${categories.join('|')}]\n!charades guess [word]`
-            });
-            return;
-        }
-
-        if (action.toLowerCase() === 'start') {
-            if (!category || !categories.includes(category.toLowerCase())) {
-                await sock.sendMessage(sender, {
-                    text: `Please choose a category: ${categories.join(', ')}`
-                });
-                return;
-            }
-            const word = words[category][Math.floor(Math.random() * words[category].length)];
-            // TODO: Store active game word in database
-            await sock.sendMessage(sender, {
-                text: `🎭 New game started! Category: ${category}\nGuess the word using !charades guess [word]`
-            });
-            return;
-        }
-
-        if (action.toLowerCase() === 'guess') {
-            const guess = args[1]?.toLowerCase();
-            if (!guess) {
-                await sock.sendMessage(sender, { text: 'Please provide your guess!' });
-                return;
-            }
-            // TODO: Implement guess checking against stored word
-            await sock.sendMessage(sender, {
-                text: `You guessed: ${guess}\nGuess checking coming soon!`
-            });
-        }
-    },
-
-    async scavenger(sock, sender, args) {
-        const [action] = args;
-        if (!action || !['start', 'found'].includes(action.toLowerCase())) {
-            await sock.sendMessage(sender, {
-                text: '🔍 Scavenger Hunt\nCommands:\n!scavenger start\n!scavenger found [item]'
-            });
-            return;
-        }
-
-        if (action.toLowerCase() === 'start') {
-            const items = [
-                'Something blue',
-                'A round object',
-                'Something soft',
-                'Something that makes noise',
-                'Something shiny'
-            ];
-            // TODO: Store hunt items in database
-            await sock.sendMessage(sender, {
-                text: `🔍 Scavenger Hunt Started!\nFind these items:\n${items.map((item, i) => `${i + 1}. ${item}`).join('\n')}\n\nMark items as found with !scavenger found [item number]`
-            });
-            return;
-        }
-
-        if (action.toLowerCase() === 'found') {
-            const itemNumber = parseInt(args[1]);
-            if (!itemNumber || itemNumber < 1 || itemNumber > 5) {
-                await sock.sendMessage(sender, {
-                    text: 'Please specify a valid item number (1-5)'
-                });
-                return;
-            }
-            // TODO: Implement found item checking
-            await sock.sendMessage(sender, {
-                text: `Marked item ${itemNumber} as found! Keep hunting!`
-            });
-        }
-    },
-
-    async compliment(sock, sender, args) {
-        const target = args[0];
-        if (!target) {
-            await sock.sendMessage(sender, { text: 'Please mention someone to compliment!' });
-            return;
-        }
-
-        const compliments = [
-            "Your smile lights up the room! ✨",
-            "You're amazing at making others feel special! 🌟",
-            "Your positive energy is contagious! 🌈",
-            "You have a heart of gold! 💝",
-            "You make the world a better place! 🌍",
-            "Your creativity knows no bounds! 🎨",
-            "You're stronger than you know! 💪",
-            "Your kindness is inspiring! 🤗"
-        ];
-
-        const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
-        await sock.sendMessage(sender, {
-            text: `To ${target}:\n${randomCompliment}`
-        });
-    },
-
-    async roast(sock, sender, args) {
-        const target = args[0];
-        if (!target) {
-            await sock.sendMessage(sender, { text: 'Please mention someone to roast!' });
-            return;
-        }
-
-        const roasts = [
-            "You're so slow, you could win a race against a statue! 🐌",
-            "Your jokes are so bad, even dad jokes feel embarrassed! 😅",
-            "You're about as useful as a screen door on a submarine! 🚪",
-            "I'd agree with you but then we'd both be wrong! 🤷",
-            "Your fashion sense is like a randomizer gone wrong! 👕",
-            "You're the reason why we have instructions on shampoo! 📝"
-        ];
-
-        const randomRoast = roasts[Math.floor(Math.random() * roasts.length)];
-        await sock.sendMessage(sender, {
-            text: `To ${target}:\n${randomRoast}`
-        });
-    },
     async animegif(sock, sender, args) {
         const category = args[0]?.toLowerCase();
         const categories = ['action', 'romance', 'comedy', 'drama'];
@@ -1028,4 +768,25 @@ ${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'
 
 };
 
-module.exports = funCommands;
+module.exports = {
+    commands: funCommands,
+    category: 'fun',
+    async init() {
+        try {
+            logger.info('Initializing fun command handler...');
+
+            // Create required directories
+            const tempDir = path.join(__dirname, '../../temp/fun');
+            await fs.mkdir(tempDir, { recursive: true });
+
+            // Initialize game state storage
+            const gameStates = new Map();
+
+            logger.info('Fun command handler initialized successfully');
+            return true;
+        } catch (err) {
+            logger.error('Error initializing fun command handler:', err);
+            throw err;
+        }
+    }
+};
