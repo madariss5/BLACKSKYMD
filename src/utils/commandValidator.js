@@ -30,10 +30,23 @@ async function validateGroupCommands(sock, groupJid) {
 
         // Verify extended commands
         const extendedCommands = require('../commands/group_new').commands;
-        if (Object.keys(extendedCommands).length > 0) {
-            logger.info('✓ Extended group commands loaded');
+        const requiredExtendedCommands = ['pin', 'unpin', 'pins'];
+
+        const missingExtendedCommands = requiredExtendedCommands.filter(cmd => !extendedCommands[cmd]);
+        if (missingExtendedCommands.length > 0) {
+            logger.warn('⚠️ Missing extended group commands:', missingExtendedCommands);
         } else {
-            logger.warn('⚠️ No extended group commands found');
+            logger.info('✓ All required extended group commands are present');
+        }
+
+        // Verify group settings structure
+        const settingsKeys = ['warnings', 'antispam', 'antilink', 'antitoxic', 'antiraid', 'raidThreshold', 'polls', 'scheduled', 'pinnedMessages'];
+        const missingKeys = settingsKeys.filter(key => !(key in settings));
+
+        if (missingKeys.length > 0) {
+            logger.warn('⚠️ Missing group settings keys:', missingKeys);
+        } else {
+            logger.info('✓ Group settings structure is valid');
         }
 
         logger.info('✅ Group command validation completed');
