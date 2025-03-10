@@ -486,13 +486,45 @@ const funCommands = {
     },
 
     async riddle(sock, sender) {
-        const riddles = [
-            "What has keys, but no locks; space, but no room; and you can enter, but not go in? A keyboard!",
-            "What gets wetter and wetter the more it dries? A towel!",
-            "What has a head and a tail that will never meet? A coin!"
-        ];
-        const randomRiddle = riddles[Math.floor(Math.random() * riddles.length)];
-        await sock.sendMessage(sender, { text: `🤔 Riddle:\n${randomRiddle}` });
+        try {
+            const riddles = [
+                {
+                    question: "What has keys, but no locks; space, but no room; and you can enter, but not go in?",
+                    answer: "A keyboard!"
+                },
+                {
+                    question: "What gets wetter and wetter the more it dries?",
+                    answer: "A towel!"
+                },
+                {
+                    question: "What has a head and a tail that will never meet?",
+                    answer: "A coin!"
+                },
+                {
+                    question: "What has cities, but no houses; forests, but no trees; and rivers, but no water?",
+                    answer: "A map!"
+                },
+                {
+                    question: "The more you take, the more you leave behind. What am I?",
+                    answer: "Footsteps!"
+                }
+            ];
+            const randomRiddle = riddles[Math.floor(Math.random() * riddles.length)];
+            await sock.sendMessage(sender, { 
+                text: `🤔 Here's a riddle for you:\n\n${randomRiddle.question}\n\n(Answer will be revealed in 10 seconds...)`
+            });
+
+            // Send answer after a delay
+            setTimeout(async () => {
+                await sock.sendMessage(sender, { 
+                    text: `✨ The answer is: ${randomRiddle.answer}`
+                });
+            }, 10000);
+
+        } catch (err) {
+            logger.error('Riddle error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching the riddle.' });
+        }
     },
 
     // Horoscope and Fortune
@@ -510,13 +542,31 @@ const funCommands = {
     },
 
     async fortune(sock, sender) {
-        const fortunes = [
-            "A beautiful, smart, and loving person will be coming into your life.",
-            "A dubious friend may be an enemy in camouflage.",
-            "A faithful friend is a strong defense."
-        ];
-        const randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];
-        await sock.sendMessage(sender, { text: `🔮 Your fortune:\n${randomFortune}` });
+        try {
+            const fortunes = [
+                "A beautiful, smart, and loving person will be coming into your life.",
+                "A dubious friend may be an enemy in camouflage.",
+                "A faithful friend is a strong defense.",
+                "A fresh start will put you on your way.",
+                "A golden egg of opportunity falls into your lap this month.",
+                "A good friendship is often more important than a passionate romance.",
+                "A lifetime friend shall soon be made.",
+                "A light heart carries you through all the hard times.",
+                "A new perspective will come with the new year.",
+                "Adventure can be real happiness."
+            ];
+
+            const emojis = ['🔮', '🎯', '⭐', '🍀', '🎲'];
+            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+            const randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+
+            await sock.sendMessage(sender, { 
+                text: `${randomEmoji} Your fortune tells me...\n\n"${randomFortune}"\n\nMay luck be on your side!`
+            });
+        } catch (err) {
+            logger.error('Fortune error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred while reading your fortune.' });
+        }
     },
 
     // Game Commands
@@ -785,7 +835,7 @@ Result: ${result}
                     await sock.sendMessage(sender, {
                         text: `${display}\n\n💀 Game Over! The word was: ${game.word}`
                     });
-                    global.wordleGames.delete(gameId);
+                                        global.wordleGames.delete(gameId);
                 } else {
                     await sock.sendMessage(sender, {
                         text: `${display}\n\n${game.maxAttempts - game.guesses.length} attempts remaining`
@@ -840,7 +890,7 @@ Result: ${result}
                         question: "Who was the first President of the United States?",
                         options: ["John Adams", "Thomas Jefferson", "George Washington", "Benjamin Franklin"],
                         correct: 2
-                                        }
+                    }
                 ]
             };
 
@@ -1711,7 +1761,7 @@ function isKingInCheck(board, color) {
 
     // Find the king
     for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
+        for (let j= 0; j < 8; j++) {
             const piece = board[i][j];
             if (piece && piece.type === 'king' && piece.color === color) {
                 kingPos = [i, j];
