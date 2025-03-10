@@ -2,6 +2,14 @@
   "category": "fun",
   "commands": [
     {
+      "name": "chess",
+      "description": "Play chess against the bot",
+      "usage": ".chess <start|move> [from] [to]",
+      "example": ".chess start",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
       "name": "tictactoe",
       "description": "Play Tic-tac-toe against the bot",
       "usage": ".tictactoe <start|move> [1-9]",

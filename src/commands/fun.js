@@ -409,14 +409,107 @@ Result: ${result}
     },
 
     async chess(sock, sender, args) {
-        if (!args[0]) {
-            await sock.sendMessage(sender, {
-                text: 'Usage: !chess [start|move] [position]'
-            });
-            return;
+        try {
+            if (!global.chessGames) global.chessGames = new Map();
+
+            const gameId = sender;
+            let game = global.chessGames.get(gameId);
+
+            if (!args[0]) {
+                await sock.sendMessage(sender, {
+                    text: 'Usage:\n!chess start - Start new game\n!chess move [from] [to] - Make a move (e.g., e2 e4)'
+                });
+                return;
+            }
+
+            const action = args[0].toLowerCase();
+
+            if (action === 'start') {
+                if (game) {
+                    await sock.sendMessage(sender, { text: '❌ A game is already in progress!' });
+                    return;
+                }
+
+                game = {
+                    board: initializeChessBoard(),
+                    currentPlayer: 'white',
+                    moves: []
+                };
+
+                global.chessGames.set(gameId, game);
+
+                const boardDisplay = renderChessBoard(game.board);
+                await sock.sendMessage(sender, {
+                    text: `♟️ Chess Game Started!\n\n${boardDisplay}\n\nMake a move using: !chess move [from] [to]\nExample: !chess move e2 e4`
+                });
+                return;
+            }
+
+            if (action === 'move') {
+                if (!game) {
+                    await sock.sendMessage(sender, { text: '❌ No game in progress. Start with !chess start' });
+                    return;
+                }
+
+                const [from, to] = args.slice(1);
+                if (!from || !to || !isValidPosition(from) || !isValidPosition(to)) {
+                    await sock.sendMessage(sender, { text: '❌ Invalid move format! Use algebraic notation (e.g., e2 e4)' });
+                    return;
+                }
+
+                const [fromRow, fromCol] = convertPosition(from);
+                const [toRow, toCol] = convertPosition(to);
+                const piece = game.board[fromRow][fromCol];
+
+                if (!piece || piece.color !== game.currentPlayer) {
+                    await sock.sendMessage(sender, { text: '❌ Invalid piece selection!' });
+                    return;
+                }
+
+                if (!isValidMove(game.board, fromRow, fromCol, toRow, toCol)) {
+                    await sock.sendMessage(sender, { text: '❌ Invalid move!' });
+                    return;
+                }
+
+                // Make the move
+                game.board[toRow][toCol] = piece;
+                game.board[fromRow][fromCol] = null;
+                game.moves.push({ from, to });
+
+                // Check for check/checkmate (simplified)
+                const isCheck = isKingInCheck(game.board, game.currentPlayer === 'white' ? 'black' : 'white');
+
+                const boardDisplay = renderChessBoard(game.board);
+                if (isCheck) {
+                    await sock.sendMessage(sender, {
+                        text: `${boardDisplay}\n\n⚔️ Check!`
+                    });
+                } else {
+                    await sock.sendMessage(sender, {
+                        text: `${boardDisplay}\n\nYour move!`
+                    });
+                }
+
+                // Bot's move (simplified)
+                const botMove = getBestMove(game.board);
+                if (botMove) {
+                    game.board[botMove.toRow][botMove.toCol] = game.board[botMove.fromRow][botMove.fromCol];
+                    game.board[botMove.fromRow][botMove.fromCol] = null;
+
+                    const boardDisplay = renderChessBoard(game.board);
+                    await sock.sendMessage(sender, {
+                        text: `${boardDisplay}\n\nYour turn!`
+                    });
+                }
+
+                game.currentPlayer = game.currentPlayer === 'white' ? 'black' : 'white';
+                global.chessGames.set(gameId, game);
+            }
+
+        } catch (err) {
+            logger.error('Chess error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
         }
-        // TODO: Implement chess game logic
-        await sock.sendMessage(sender, { text: 'Chess game feature coming soon!' });
     },
 
     async wordle(sock, sender, args) {
@@ -785,7 +878,7 @@ Result: ${result}
 
     // Virtual Marriage System
     async marry(sock, sender, args) {
-        if (!args[0]) {
+        if(!args[0]) {
             await sock.sendMessage(sender, { text: 'Please mention someone to marry' });
             return;
         }
@@ -1335,6 +1428,160 @@ function getHangmanDisplay(game) {
         .join(' ');
 
     return `${stages[game.mistakes]}\n\nWord: ${wordDisplay}`;
+}
+
+function initializeChessBoard() {
+    const board = Array(8).fill(null).map(() => Array(8).fill(null));
+
+    // Set up pawns
+    for (let i = 0; i < 8; i++) {
+        board[1][i] = { type: 'pawn', color: 'white' };
+        board[6][i] = { type: 'pawn', color: 'black' };
+    }
+
+    // Set up other pieces
+    const pieces = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook'];
+    pieces.forEach((piece, i) => {
+        board[0][i] = { type: piece, color: 'white' };
+        board[7][i] = { type: piece, color: 'black' };
+    });
+
+    return board;
+}
+
+function renderChessBoard(board) {
+    const pieces = {
+        'white': {
+            'pawn': '♙',
+            'rook': '♖',
+            'knight': '♘',
+            'bishop': '♗',
+            'queen': '♕',
+            'king': '♔'
+        },
+        'black': {
+            'pawn': '♟',
+            'rook': '♜',
+            'knight': '♞',
+            'bishop': '♝',
+            'queen': '♛',
+            'king': '♚'
+        }
+    };
+
+    let display = '  a b c d e f g h\n';
+    for (let i = 7; i >= 0; i--) {
+        display += (i + 1) + ' ';
+        for (let j = 0; j < 8; j++) {
+            const piece = board[i][j];
+            if (piece) {
+                display += pieces[piece.color][piece.type] + ' ';
+            } else {
+                display += (i + j) % 2 === 0 ? '□ ' : '■ ';
+            }
+        }
+        display += (i + 1) + '\n';
+    }
+    display += '  a b c d e f g h';
+
+    return display;
+}
+
+function isValidPosition(pos) {
+    return /^[a-h][1-8]$/.test(pos);
+}
+
+function convertPosition(pos) {
+    const col = pos.charCodeAt(0) - 'a'.charCodeAt(0);
+    const row = parseInt(pos[1]) - 1;
+    return [row, col];
+}
+
+function isValidMove(board, fromRow, fromCol, toRow, toCol) {
+    // Simplified move validation
+    const piece = board[fromRow][fromCol];
+    if (!piece) return false;
+
+    // Basic movement patterns (simplified)
+    switch (piece.type) {
+        case 'pawn':
+            if (piece.color === 'white') {
+                return toRow === fromRow + 1 && toCol === fromCol;
+            } else {
+                return toRow === fromRow - 1 && toCol === fromCol;
+            }
+        case 'rook':
+            return fromRow === toRow || fromCol === toCol;
+        case 'bishop':
+            return Math.abs(toRow - fromRow) === Math.abs(toCol - fromCol);
+        case 'knight':
+            return (Math.abs(toRow - fromRow) === 2 && Math.abs(toCol - fromCol) === 1) ||
+                   (Math.abs(toRow - fromRow) === 1 && Math.abs(toCol - fromCol) === 2);
+        case 'queen':
+            return fromRow === toRow || fromCol === toCol ||
+                   Math.abs(toRow - fromRow) === Math.abs(toCol - fromCol);
+        case 'king':
+            return Math.abs(toRow - fromRow) <= 1 && Math.abs(toCol - fromCol) <= 1;
+        default:
+            return false;
+    }
+}
+
+function isKingInCheck(board, color) {
+    // Simplified check detection
+    let kingPos = null;
+
+    // Find the king
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            const piece = board[i][j];
+            if (piece && piece.type === 'king' && piece.color === color) {
+                kingPos = [i, j];
+                break;
+            }
+        }
+        if (kingPos) break;
+    }
+
+    if (!kingPos) return false;
+
+    // Check if any opponent piece can capture the king
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            const piece = board[i][j];
+            if (piece && piece.color !== color) {
+                if (isValidMove(board, i, j, kingPos[0], kingPos[1])) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+function getBestMove(board) {
+    // Simplified AI: Make a random valid move
+    const moves = [];
+    const color = 'black'; // AI plays as black
+
+    for (let fromRow = 0; fromRow < 8; fromRow++) {
+        for (let fromCol = 0; fromCol < 8; fromCol++) {
+            const piece = board[fromRow][fromCol];
+            if (piece && piece.color === color) {
+                for (let toRow = 0; toRow < 8; toRow++) {
+                    for (let toCol = 0; toCol < 8; toCol++) {
+                        if (isValidMove(board, fromRow, fromCol, toRow, toCol)) {
+                            moves.push({ fromRow, fromCol, toRow, toCol });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (moves.length === 0) return null;
+    return moves[Math.floor(Math.random() * moves.length)];
 }
 
 module.exports = {
