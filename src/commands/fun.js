@@ -5,23 +5,47 @@ const fs = require('fs').promises;
 const funCommands = {
     // Text Fun
     async quote(sock, sender) {
-        const quotes = [
-            "Be yourself; everyone else is already taken. - Oscar Wilde",
-            "Two things are infinite: the universe and human stupidity; and I'm not sure about the universe. - Albert Einstein",
-            "Be the change that you wish to see in the world. - Mahatma Gandhi"
-        ];
-        const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-        await sock.sendMessage(sender, { text: randomQuote });
+        try {
+            const quotes = [
+                "Be yourself; everyone else is already taken. - Oscar Wilde",
+                "Two things are infinite: the universe and human stupidity; and I'm not sure about the universe. - Albert Einstein",
+                "Be the change that you wish to see in the world. - Mahatma Gandhi",
+                "In three words I can sum up everything I've learned about life: it goes on. - Robert Frost",
+                "Life is what happens when you're busy making other plans. - John Lennon",
+                "Success is not final, failure is not fatal: it is the courage to continue that counts. - Winston Churchill",
+                "The only way to do great work is to love what you do. - Steve Jobs",
+                "If you want to live a happy life, tie it to a goal, not to people or things. - Albert Einstein",
+                "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
+                "It does not matter how slowly you go as long as you do not stop. - Confucius"
+            ];
+            const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+            await sock.sendMessage(sender, { text: `📜 Quote of the moment:\n\n${randomQuote}` });
+        } catch (err) {
+            logger.error('Quote error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching the quote.' });
+        }
     },
 
     async joke(sock, sender) {
-        const jokes = [
-            "Why don't scientists trust atoms? Because they make up everything!",
-            "What do you call a bear with no teeth? A gummy bear!",
-            "Why did the scarecrow win an award? Because he was outstanding in his field!"
-        ];
-        const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
-        await sock.sendMessage(sender, { text: randomJoke });
+        try {
+            const jokes = [
+                "Why don't scientists trust atoms? Because they make up everything!",
+                "What do you call a bear with no teeth? A gummy bear!",
+                "Why did the scarecrow win an award? Because he was outstanding in his field!",
+                "What do you call a fish wearing a bowtie? So-fish-ticated!",
+                "What did the grape say when it got stepped on? Nothing, it just let out a little wine!",
+                "Why don't eggs tell jokes? They'd crack up!",
+                "What do you call a can opener that doesn't work? A can't opener!",
+                "Why did the math book look so sad? Because it had too many problems!",
+                "What do you call a fake noodle? An impasta!",
+                "Why did the cookie go to the doctor? Because it was feeling crumbly!"
+            ];
+            const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
+            await sock.sendMessage(sender, { text: `😄 Here's a joke for you:\n\n${randomJoke}` });
+        } catch (err) {
+            logger.error('Joke error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching the joke.' });
+        }
     },
 
     async meme(sock, sender) {
@@ -242,12 +266,147 @@ const funCommands = {
         }
     },
 
-    async quiz(sock, sender) {
-        // TODO: Implement quiz game logic here
-        await sock.sendMessage(sender, { text: '❓ Quiz starting...' });
+    async quiz(sock, sender, args) {
+        try {
+            if (!global.quizGames) global.quizGames = new Map();
+
+            const gameId = sender;
+            let game = global.quizGames.get(gameId);
+
+            const subjects = {
+                math: [
+                    {
+                        question: "What is the result of 3² × 4²?",
+                        options: ["36", "81", "144", "225"],
+                        correct: 0,
+                        explanation: "3² = 9, 4² = 16, 9 × 16 = 36"
+                    },
+                    {
+                        question: "What is the value of π (pi) to 2 decimal places?",
+                        options: ["3.14", "3.16", "3.12", "3.18"],
+                        correct: 0,
+                        explanation: "π ≈ 3.14159..."
+                    }
+                ],
+                science: [
+                    {
+                        question: "Which planet is known as the 'Morning Star'?",
+                        options: ["Mars", "Venus", "Mercury", "Jupiter"],
+                        correct: 1,
+                        explanation: "Venus appears bright in the morning sky"
+                    },
+                    {
+                        question: "What is the atomic number of Carbon?",
+                        options: ["12", "14", "6", "8"],
+                        correct: 2,
+                        explanation: "Carbon has 6 protons in its nucleus"
+                    }
+                ],
+                english: [
+                    {
+                        question: "Which of these is a synonym for 'benevolent'?",
+                        options: ["Kind", "Harsh", "Lazy", "Quick"],
+                        correct: 0,
+                        explanation: "'Benevolent' means kind and generous"
+                    },
+                    {
+                        question: "What type of word is 'quickly'?",
+                        options: ["Adjective", "Adverb", "Noun", "Verb"],
+                        correct: 1,
+                        explanation: "It describes how an action is performed"
+                    }
+                ]
+            };
+
+            if (!args[0]) {
+                await sock.sendMessage(sender, {
+                    text: `📚 Available subjects: ${Object.keys(subjects).join(', ')}\nUse: !quiz [subject] to start`
+                });
+                return;
+            }
+
+            const subject = args[0].toLowerCase();
+            if (!subjects[subject]) {
+                await sock.sendMessage(sender, {
+                    text: `❌ Invalid subject. Available subjects: ${Object.keys(subjects).join(', ')}`
+                });
+                return;
+            }
+
+            if (!game) {
+                // Start new game
+                game = {
+                    subject: subject,
+                    questions: [...subjects[subject]], // Create copy to shuffle
+                    currentQuestion: 0,
+                    score: 0,
+                    maxQuestions: subjects[subject].length
+                };
+
+                // Shuffle questions
+                for (let i = game.questions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [game.questions[i], game.questions[j]] = [game.questions[j], game.questions[i]];
+                }
+
+                global.quizGames.set(gameId, game);
+
+                // Display first question
+                const question = game.questions[0];
+                const optionsText = question.options
+                    .map((opt, i) => `${i + 1}. ${opt}`)
+                    .join('\n');
+
+                await sock.sendMessage(sender, {
+                    text: `📝 Quiz - ${subject.toUpperCase()}\n\nQuestion 1/${game.maxQuestions}:\n${question.question}\n\n${optionsText}\n\nRespond with !answer [number]`
+                });
+                return;
+            }
+
+            // Handle answer
+            if (args[0].toLowerCase() === 'answer') {
+                const answer = parseInt(args[1]);
+                if (isNaN(answer) || answer < 1 || answer > game.questions[game.currentQuestion].options.length) {
+                    await sock.sendMessage(sender, {
+                        text: '❌ Please provide a valid answer number'
+                    });
+                    return;
+                }
+
+                const currentQ = game.questions[game.currentQuestion];
+                const isCorrect = (answer - 1) === currentQ.correct;
+                if (isCorrect) game.score++;
+
+                const feedbackText = `${isCorrect ? '✅ Correct!' : '❌ Wrong!'}\n${currentQ.explanation}`;
+                game.currentQuestion++;
+
+                if (game.currentQuestion >= game.maxQuestions) {
+                    // Game over
+                    await sock.sendMessage(sender, {
+                        text: `${feedbackText}\n\n🎮 Quiz Complete!\nFinal Score: ${game.score}/${game.maxQuestions}`
+                    });
+                    global.quizGames.delete(gameId);
+                } else {
+                    // Next question
+                    const nextQ = game.questions[game.currentQuestion];
+                    const optionsText = nextQ.options
+                        .map((opt, i) => `${i + 1}. ${opt}`)
+                        .join('\n');
+
+                    await sock.sendMessage(sender, {
+                        text: `${feedbackText}\n\nQuestion ${game.currentQuestion + 1}/${game.maxQuestions}:\n${nextQ.question}\n\n${optionsText}\n\nRespond with !answer [number]`
+                    });
+                    global.quizGames.set(gameId, game);
+                }
+            }
+
+        } catch (err) {
+            logger.error('Quiz error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the quiz.' });
+            global.quizGames.delete(gameId);
+        }
     },
 
-    // Fun Text Transformations
     async mock(sock, sender, args) {
         const text = args.join(' ');
         if (!text) {
@@ -305,13 +464,25 @@ const funCommands = {
 
     // Fun Facts and Trivia
     async fact(sock, sender) {
-        const facts = [
-            "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly good to eat.",
-            "A day on Venus is longer than its year. Venus takes 243 Earth days to rotate on its axis but only 225 Earth days to orbit the Sun.",
-            "The average person spends 6 months of their lifetime waiting for red lights to turn green."
-        ];
-        const randomFact = facts[Math.floor(Math.random() * facts.length)];
-        await sock.sendMessage(sender, { text: `📚 Did you know?\n${randomFact}` });
+        try {
+            const facts = [
+                "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly good to eat.",
+                "A day on Venus is longer than its year. Venus takes 243 Earth days to rotate on its axis but only 225 Earth days to orbit the Sun.",
+                "The average person spends 6 months of their lifetime waiting for red lights to turn green.",
+                "The shortest war in history was between Britain and Zanzibar on August 27, 1896. Zanzibar surrendered after just 38 minutes.",
+                "A bolt of lightning is five times hotter than the surface of the sun.",
+                "Bananas are berries, but strawberries aren't.",
+                "The first oranges weren't orange; they were green.",
+                "The inventor of the Pringles can was buried in a Pringles can at his request.",
+                "Astronauts can't cry in space because tears don't fall in zero gravity.",
+                "A group of flamingos is called a 'flamboyance'."
+            ];
+            const randomFact = facts[Math.floor(Math.random() * facts.length)];
+            await sock.sendMessage(sender, { text: `📚 Did you know?\n${randomFact}` });
+        } catch (err) {
+            logger.error('Fact error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching the fact.' });
+        }
     },
 
     async riddle(sock, sender) {
@@ -350,17 +521,24 @@ const funCommands = {
 
     // Game Commands
     async slot(sock, sender, args) {
-        const bet = parseInt(args[0]) || 10;
-        const symbols = ['🍎', '🍊', '🍇', '🍒', '💎', '7️⃣'];
-        const result = Array(3).fill().map(() => symbols[Math.floor(Math.random() * symbols.length)]);
+        try {
+            const bet = parseInt(args[0]) || 10;
+            const symbols = ['🍎', '🍊', '🍇', '🍒', '💎', '7️⃣'];
+            const result = Array(3).fill().map(() => symbols[Math.floor(Math.random() * symbols.length)]);
 
-        const resultText = `
+            const resultText = `
 🎰 Slot Machine
-${result.join(' | ')}
-${result[0] === result[1] && result[1] === result[2] ? 'You won!' : 'Try again!'}
-        `.trim();
+═════════
+║ ${result[0]} │ ${result[1]} │ ${result[2]} ║
+═════════
+${result[0] === result[1] && result[1] === result[2] ? '🎉 Jackpot! You won!' : '😢 Try again!'}
+`.trim();
 
-        await sock.sendMessage(sender, { text: resultText });
+            await sock.sendMessage(sender, { text: resultText });
+        } catch (err) {
+            logger.error('Slot machine error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred while playing slots.' });
+        }
     },
 
     async rps(sock, sender, args) {
@@ -662,7 +840,7 @@ Result: ${result}
                         question: "Who was the first President of the United States?",
                         options: ["John Adams", "Thomas Jefferson", "George Washington", "Benjamin Franklin"],
                         correct: 2
-                    }
+                                        }
                 ]
             };
 
@@ -1591,12 +1769,17 @@ module.exports = {
         try {
             logger.info('Initializing fun command handler...');
 
+            // Initialize any required global state
+            if (!global.games) global.games = new Map();
+            if (!global.hangmanGames) global.hangmanGames = new Map();
+            if (!global.wordleGames) global.wordleGames = new Map();
+            if (!global.chessGames) global.chessGames = new Map();
+            if (!global.quizGames) global.quizGames = new Map();
+            if (!global.triviaGames) global.triviaGames = new Map();
+
             // Create required directories
             const tempDir = path.join(__dirname, '../../temp/fun');
             await fs.mkdir(tempDir, { recursive: true });
-
-            // Initialize game state storage
-            const gameStates = new Map();
 
             logger.info('Fun command handler initialized successfully');
             return true;

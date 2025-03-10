@@ -42,11 +42,27 @@
       "permissions": ["user"]
     },
     {
+      "name": "quiz",
+      "description": "Test your knowledge in specific subjects",
+      "usage": ".quiz [subject]",
+      "example": ".quiz math",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
       "name": "rps",
       "description": "Play Rock Paper Scissors against the bot",
       "usage": ".rps <rock|paper|scissors>",
       "example": ".rps rock",
       "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "slot",
+      "description": "Play the slot machine game",
+      "usage": ".slot [bet]",
+      "example": ".slot 10",
+      "cooldown": 5,
       "permissions": ["user"]
     },
     {
