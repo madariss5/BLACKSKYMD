@@ -234,31 +234,32 @@ async function startConnection() {
                     console.log('✅ Successfully connected to WhatsApp!\n');
 
                     try {
+                        // Initialize credential tracking
+                        initialCredsSent = true;
+                        lastCredsSentTime = Date.now();
+                        logger.info('Connection initialized and credentials tracking set up');
+                        
+                        // Try to send a notification to owner if the number is set
                         let ownerNumber = process.env.OWNER_NUMBER;
                         if (!ownerNumber) {
-                            logger.warn('OWNER_NUMBER environment variable is not set');
-                            return;
-                        }
+                            logger.warn('OWNER_NUMBER environment variable is not set - skipping notification');
+                        } else {
+                            try {
+                                if (!ownerNumber.includes('@s.whatsapp.net')) {
+                                    ownerNumber = ownerNumber.replace(/[^\d]/g, '');
+                                    if (!ownerNumber.startsWith('1') && !ownerNumber.startsWith('91')) {
+                                        ownerNumber = '1' + ownerNumber;
+                                    }
+                                    ownerNumber = `${ownerNumber}@s.whatsapp.net`;
+                                }
 
-                        if (!ownerNumber.includes('@s.whatsapp.net')) {
-                            ownerNumber = ownerNumber.replace(/[^\d]/g, '');
-                            if (!ownerNumber.startsWith('1') && !ownerNumber.startsWith('91')) {
-                                ownerNumber = '1' + ownerNumber;
+                                await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
+                                logger.info('Connection notification sent successfully to: ' + ownerNumber);
+                            } catch (notifyErr) {
+                                // Don't let this error stop the bot from working
+                                logger.error('Failed to send owner notification:', notifyErr.message);
+                                logger.info('Bot will continue to operate normally despite notification failure');
                             }
-                            ownerNumber = `${ownerNumber}@s.whatsapp.net`;
-                        }
-
-                        await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
-                        logger.info('Connection notification sent successfully');
-                        
-                        // Initial credential tracking (disabled sending to prevent spamming)
-                        try {
-                            // Mark as initialized and update timestamp
-                            initialCredsSent = true;
-                            lastCredsSentTime = Date.now();
-                            logger.info('Skipping initial credentials send as this feature is disabled');
-                        } catch (credsErr) {
-                            logger.error('Failed to track initial credentials:', credsErr.message);
                         }
                     } catch (err) {
                         logger.error('Failed to send connection notification:', err.message);
