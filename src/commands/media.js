@@ -58,6 +58,12 @@ const mediaCommands = {
     async play(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!args.length) {
                 await sock.sendMessage(remoteJid, { text: '*📝 Usage:* Reply with audio or provide a YouTube URL/search term' });
                 return;
@@ -100,6 +106,12 @@ const mediaCommands = {
     async sticker(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!message.message?.imageMessage && !message.message?.videoMessage) {
                 await sock.sendMessage(remoteJid, { text: '*📝 Usage:* Reply to an image/video with .sticker' });
                 return;
@@ -142,6 +154,12 @@ const mediaCommands = {
     async toimg(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!message.message?.stickerMessage) {
                 await sock.sendMessage(remoteJid, { text: '*📝 Usage:* Reply to a sticker with .toimg' });
                 return;
@@ -175,6 +193,12 @@ const mediaCommands = {
     async ytmp3(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!args[0]) {
                 await sock.sendMessage(remoteJid, { text: '*📝 Usage:* .ytmp3 [YouTube URL]' });
                 return;
@@ -203,6 +227,12 @@ const mediaCommands = {
     async ytmp4(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!args[0]) {
                 await sock.sendMessage(remoteJid, { text: '*📝 Usage:* .ytmp4 [YouTube URL]' });
                 return;
@@ -230,6 +260,12 @@ const mediaCommands = {
     async enhance(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!message.message?.imageMessage) {
                 await sock.sendMessage(remoteJid, {
                     text: '*📝 Usage:* Reply to an image with .enhance'
@@ -281,6 +317,12 @@ const mediaCommands = {
     async sharpen(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!message.message?.imageMessage) {
                 await sock.sendMessage(remoteJid, {
                     text: '*📝 Usage:* .sharpen [level]\n\n*Example:* .sharpen 5'
