@@ -245,7 +245,7 @@ class SessionManager {
             const credentials = JSON.parse(decodedCreds);
 
             // Save backup with timestamp and ensure it's in one line without spaces
-            await this.saveSession(this.backupSessionID, credentials);
+            await this.saveSession(this.sessionId + "_backup", credentials);
 
             logger.info(`Credentials backup saved successfully. Timestamp: ${data.timestamp}`);
             return true;
@@ -257,19 +257,74 @@ class SessionManager {
 
     async restoreFromBackup() {
         try {
-            // Load the backup session
-            const backup = await this.loadSession(this.backupSessionID);
-            if (!backup) {
-                throw new Error('No backup found');
+            let backup = null;
+            
+            // For Heroku, try to find a session-specific backup first
+            if (this.isHeroku) {
+                try {
+                    const herokuBackupPath = path.join(this.sessionsDir, `${this.sessionId}_backup.json`);
+                    logger.info(`Attempting to restore from Heroku backup: ${herokuBackupPath}`);
+                    const backupData = await fs.readFile(herokuBackupPath, 'utf8');
+                    backup = JSON.parse(backupData);
+                    logger.info(`Found Heroku-specific backup for session: ${this.sessionId}`);
+                } catch (herokuErr) {
+                    logger.warn(`No Heroku backup found for session: ${this.sessionId}`);
+                    
+                    // Try emergency backup
+                    try {
+                        const emergencyPath = path.join(this.sessionsDir, `${this.sessionId}_emergency.json`);
+                        const emergencyData = await fs.readFile(emergencyPath, 'utf8');
+                        backup = JSON.parse(emergencyData);
+                        logger.info(`Restored from emergency backup for session: ${this.sessionId}`);
+                    } catch (emergencyErr) {
+                        logger.warn('No emergency backup found either');
+                    }
+                }
             }
-
+            
+            // If no Heroku-specific backup, try the regular backup
+            if (!backup) {
+                try {
+                    backup = await this.loadSession(this.sessionId);
+                    if (backup) {
+                        logger.info(`Restored from regular backup for session: ${this.sessionId}`);
+                    }
+                } catch (legacyErr) {
+                    logger.warn('No regular backup found');
+                }
+            }
+            
+            // If still no backup, try to find any backup file
+            if (!backup) {
+                try {
+                    const files = await fs.readdir(this.sessionsDir);
+                    const backupFiles = files.filter(file => file.includes('backup') || file.includes('emergency'));
+                    
+                    if (backupFiles.length > 0) {
+                        // Sort to get the latest backup
+                        backupFiles.sort().reverse();
+                        const latestBackup = path.join(this.sessionsDir, backupFiles[0]);
+                        const backupData = await fs.readFile(latestBackup, 'utf8');
+                        backup = JSON.parse(backupData);
+                        logger.info(`Restored from latest available backup: ${backupFiles[0]}`);
+                    }
+                } catch (anyErr) {
+                    logger.error('Error searching for backup files:', anyErr);
+                }
+            }
+            
+            if (!backup) {
+                logger.warn('No backup found, will need to generate new QR code');
+                return false;
+            }
+            
             // Write back to credentials file in one line without spaces
             await fs.writeFile(
                 this.credentialsFile,
                 JSON.stringify(backup).replace(/\s+/g, ''),
                 'utf8'
             );
-
+            
             logger.info('Credentials restored from backup successfully');
             return true;
         } catch (err) {

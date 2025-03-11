@@ -33,6 +33,24 @@
       "description": "Environment mode",
       "value": "production"
     },
+    "HEROKU_APP_NAME": {
+      "description": "The name of your Heroku app for keep-alive pings",
+      "required": true
+    },
+    "APP_URL": {
+      "description": "Custom URL for your app if not using the default Heroku domain (optional)",
+      "required": false
+    },
+    "KEEP_ALIVE": {
+      "description": "Set to false to disable keep-alive pings (default: true)",
+      "required": false,
+      "value": "true"
+    },
+    "BACKUP_INTERVAL": {
+      "description": "Interval in minutes between session backups (default: 15)",
+      "required": false,
+      "value": "15"
+    },
     "OPENWEATHERMAP_API_KEY": {
       "description": "API key for weather commands (from openweathermap.org)",
       "required": false
@@ -47,6 +65,14 @@
     },
     "NEWS_API_KEY": {
       "description": "API key for news commands",
+      "required": false
+    },
+    "SPOTIFY_CLIENT_ID": {
+      "description": "Spotify Developer client ID for music-related functions",
+      "required": false
+    },
+    "SPOTIFY_CLIENT_SECRET": {
+      "description": "Spotify Developer client secret for music-related functions",
       "required": false
     },
     "LOG_LEVEL": {

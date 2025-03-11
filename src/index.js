@@ -132,6 +132,56 @@ async function main() {
                 logger.error('Memory cleanup error:', memErr);
             }
         }, MEMORY_CLEANUP_INTERVAL);
+        
+        // Implement Heroku keep-alive mechanism
+        if (process.env.DYNO) {
+            logger.info('Running on Heroku, setting up session management');
+            
+            // Check if keep-alive is enabled (default: true)
+            const keepAliveEnabled = process.env.KEEP_ALIVE !== 'false';
+            
+            if (keepAliveEnabled && process.env.HEROKU_APP_NAME) {
+                logger.info('Keep-alive ping enabled for Heroku');
+                
+                // Set up a self-ping every 25 minutes to prevent Heroku from sleeping
+                // Only needed for free dynos, but harmless on paid ones
+                const KEEP_ALIVE_INTERVAL = 25 * 60 * 1000; // 25 minutes
+                
+                const appUrl = process.env.APP_URL || `https://${process.env.HEROKU_APP_NAME}.herokuapp.com`;
+                logger.info(`Keep-alive URL set to: ${appUrl}`);
+                
+                setInterval(() => {
+                    try {
+                        // Use the built-in http module to avoid adding dependencies
+                        const https = require('https');
+                        https.get(appUrl, (res) => {
+                            logger.debug(`Keep-alive ping sent. Status: ${res.statusCode}`);
+                        }).on('error', (err) => {
+                            logger.error('Keep-alive ping failed:', err.message);
+                        });
+                    } catch (pingErr) {
+                        logger.error('Error sending keep-alive ping:', pingErr);
+                    }
+                }, KEEP_ALIVE_INTERVAL);
+            } else {
+                logger.info('Keep-alive ping disabled or HEROKU_APP_NAME not set');
+            }
+            
+            // Also implement session backup on Heroku dyno cycling
+            const { sessionManager } = require('./utils/sessionManager');
+            
+            // First backup on startup
+            sessionManager.backupCredentials()
+                .then(() => logger.info('Initial Heroku session backup complete'))
+                .catch(err => logger.error('Initial Heroku backup failed:', err));
+                
+            // Schedule regular backups
+            setInterval(() => {
+                sessionManager.backupCredentials()
+                    .then(() => logger.debug('Scheduled Heroku backup complete'))
+                    .catch(err => logger.error('Scheduled Heroku backup failed:', err));
+            }, 15 * 60 * 1000); // Every 15 minutes
+        }
 
     } catch (err) {
         console.error('Fatal error starting bot:', err);
