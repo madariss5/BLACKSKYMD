@@ -130,8 +130,9 @@ async function messageHandler(sock, message) {
                 activityType = 'command';
             }
             
-            // Add XP and check for level up
-            const levelUpData = levelingSystem.addXP(userId, activityType);
+            // Add XP and check for level up (pass group JID if in a group)
+            const groupJid = isGroup ? sender : null;
+            const levelUpData = await levelingSystem.addXP(userId, activityType, groupJid);
             
             // Handle level up event if it occurred
             if (levelUpData) {

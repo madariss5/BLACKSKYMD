@@ -1,7 +1,7 @@
 const logger = require('../utils/logger');
 const { isAdmin, isBotAdmin } = require('../utils/permissions');
 const { downloadMediaMessage } = require('../utils/helpers');
-const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
+const { getGroupSettings, saveGroupSettings, isFeatureEnabled, setFeatureEnabled, getFeatureSettings } = require('../utils/groupSettings');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -953,6 +953,82 @@ const groupCommands = {
             logger.error('Error in setppic command:', err);
             await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to update group profile picture' });
         }
+    },
+
+    async feature(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (!isUserAdmin) {
+                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                return;
+            }
+
+            // Get all available features if no arguments provided
+            if (args.length === 0) {
+                const features = await getFeatureSettings(remoteJid);
+                const featureList = Object.entries(features)
+                    .map(([feature, enabled]) => `${feature}: ${enabled ? '✅ Enabled' : '❌ Disabled'}`)
+                    .join('\n');
+                
+                await sock.sendMessage(remoteJid, { 
+                    text: `*Group Features*\n\n${featureList}\n\nUse '.feature <name> <on/off>' to change settings` 
+                });
+                return;
+            }
+
+            // Handle feature toggle
+            const [featureName, action] = args;
+            
+            if (!featureName) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '❌ Usage: .feature <name> <on/off> or .feature to see all features' 
+                });
+                return;
+            }
+
+            // Just show status of a specific feature if no action provided
+            if (!action) {
+                const isEnabled = await isFeatureEnabled(remoteJid, featureName);
+                await sock.sendMessage(remoteJid, { 
+                    text: `Feature "${featureName}" is currently: ${isEnabled ? '✅ Enabled' : '❌ Disabled'}` 
+                });
+                return;
+            }
+
+            // Validate action
+            if (!['on', 'off'].includes(action.toLowerCase())) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '❌ Action must be either "on" or "off"' 
+                });
+                return;
+            }
+
+            // Update feature setting
+            const enabled = action.toLowerCase() === 'on';
+            const success = await setFeatureEnabled(remoteJid, featureName, enabled);
+            
+            if (success) {
+                await sock.sendMessage(remoteJid, { 
+                    text: `✅ Feature "${featureName}" has been ${enabled ? 'enabled' : 'disabled'}` 
+                });
+            } else {
+                await sock.sendMessage(remoteJid, { 
+                    text: `❌ Failed to update feature "${featureName}"` 
+                });
+            }
+
+        } catch (err) {
+            logger.error('Error in feature command:', err);
+            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to manage feature settings' });
+        }
     }
 
 };
@@ -972,7 +1048,10 @@ module.exports = {
                 logger,
                 fs: fs.promises,
                 getGroupSettings,
-                saveGroupSettings
+                saveGroupSettings,
+                isFeatureEnabled,
+                setFeatureEnabled,
+                getFeatureSettings
             };
 
             for (const [name, dep] of Object.entries(coreDeps)) {
