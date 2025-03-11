@@ -176,11 +176,15 @@ async function main() {
                 .catch(err => logger.error('Initial Heroku backup failed:', err));
                 
             // Schedule regular backups
+            const backupIntervalMinutes = parseInt(process.env.BACKUP_INTERVAL || '15', 10);
+            const backupIntervalMs = backupIntervalMinutes * 60 * 1000;
+            logger.info(`Scheduling Heroku backups every ${backupIntervalMinutes} minutes`);
+            
             setInterval(() => {
                 sessionManager.backupCredentials()
                     .then(() => logger.debug('Scheduled Heroku backup complete'))
                     .catch(err => logger.error('Scheduled Heroku backup failed:', err));
-            }, 15 * 60 * 1000); // Every 15 minutes
+            }, backupIntervalMs);
         }
 
     } catch (err) {

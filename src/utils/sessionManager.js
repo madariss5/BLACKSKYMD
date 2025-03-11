@@ -114,16 +114,15 @@ class SessionManager {
             }
 
             const credsData = await fs.readFile(this.credentialsFile, 'utf8');
-            const backupPath = path.join(this.sessionsDir, `creds_backup_${Date.now()}.json`);
             
-            // Save backup file
-            await fs.writeFile(backupPath, credsData, 'utf8');
+            // Save a timestamped backup - useful for recovery if needed
+            await fs.writeFile(this._getBackupPath('timestamp'), credsData, 'utf8');
             
-            // For Heroku, also save a standard backup file that we can find later
+            // For Heroku or any environment, save a standard backup file that we can find later
+            await fs.writeFile(this._getBackupPath('standard'), credsData, 'utf8');
+            
             if (this.isHeroku) {
-                const herokuBackupPath = path.join(this.sessionsDir, `${this.sessionId}_backup.json`);
-                await fs.writeFile(herokuBackupPath, credsData, 'utf8');
-                logger.info(`Heroku persistent backup saved as ${this.sessionId}_backup.json`);
+                logger.info(`Heroku persistent backup saved for session: ${this.sessionId}`);
                 
                 // If owner number is set, create a safety backup by sending to owner
                 if (process.env.OWNER_NUMBER) {
@@ -133,6 +132,31 @@ class SessionManager {
                     } catch (backupErr) {
                         logger.error('Failed to send backup to owner:', backupErr);
                     }
+                }
+                
+                // Limit the number of backup files to avoid filling up the filesystem
+                try {
+                    const files = await fs.readdir(this.sessionsDir);
+                    const backupFiles = files.filter(file => 
+                        file.includes('backup') && 
+                        file.includes(this.sessionId) && 
+                        file.includes('_backup_')
+                    );
+                    
+                    // If we have more than 5 backup files, remove the oldest ones
+                    if (backupFiles.length > 5) {
+                        // Sort by creation time (timestamp in filename)
+                        backupFiles.sort();
+                        
+                        // Remove the oldest files, keeping only the 5 newest
+                        for (let i = 0; i < backupFiles.length - 5; i++) {
+                            const fileToRemove = path.join(this.sessionsDir, backupFiles[i]);
+                            await fs.unlink(fileToRemove);
+                            logger.debug(`Removed old backup file: ${backupFiles[i]}`);
+                        }
+                    }
+                } catch (cleanupErr) {
+                    logger.warn('Error during backup file cleanup:', cleanupErr);
                 }
             }
             
@@ -146,15 +170,40 @@ class SessionManager {
 
     async emergencyCredsSave(state) {
         try {
+            // Always save a timestamped emergency backup
             const timestamp = Date.now();
-            const emergencyPath = path.join(this.sessionsDir, `emergency_creds_${timestamp}.json`);
-            await fs.writeFile(emergencyPath, JSON.stringify(state), 'utf8');
+            const timestampEmergencyPath = path.join(this.sessionsDir, `emergency_creds_${timestamp}.json`);
+            await fs.writeFile(timestampEmergencyPath, JSON.stringify(state), 'utf8');
             
-            // For Heroku, also save with the session ID for easier recovery
+            // Also save using our consistent path helper
+            await fs.writeFile(this._getBackupPath('emergency'), JSON.stringify(state), 'utf8');
+            
             if (this.isHeroku) {
-                const herokuEmergencyPath = path.join(this.sessionsDir, `${this.sessionId}_emergency.json`);
-                await fs.writeFile(herokuEmergencyPath, JSON.stringify(state), 'utf8');
                 logger.info(`Heroku emergency backup saved with session ID: ${this.sessionId}`);
+                
+                // Clean up old emergency files to avoid filesystem clutter
+                try {
+                    const files = await fs.readdir(this.sessionsDir);
+                    const emergencyFiles = files.filter(file => 
+                        file.includes('emergency_creds_') && 
+                        !file.includes(this.sessionId)
+                    );
+                    
+                    // If we have more than 3 emergency files, remove the oldest ones
+                    if (emergencyFiles.length > 3) {
+                        // Sort by timestamp
+                        emergencyFiles.sort();
+                        
+                        // Remove the oldest files, keeping only the 3 newest
+                        for (let i = 0; i < emergencyFiles.length - 3; i++) {
+                            const fileToRemove = path.join(this.sessionsDir, emergencyFiles[i]);
+                            await fs.unlink(fileToRemove);
+                            logger.debug(`Removed old emergency file: ${emergencyFiles[i]}`);
+                        }
+                    }
+                } catch (cleanupErr) {
+                    logger.warn('Error during emergency file cleanup:', cleanupErr);
+                }
             }
             
             logger.info('Emergency credentials save successful');
@@ -183,6 +232,19 @@ class SessionManager {
         delete sanitized.macKey;
 
         return sanitized;
+    }
+    
+    // Helper to get consistent backup paths based on session ID
+    _getBackupPath(type = 'standard') {
+        switch(type) {
+            case 'emergency':
+                return path.join(this.sessionsDir, `${this.sessionId}_emergency.json`);
+            case 'timestamp':
+                return path.join(this.sessionsDir, `${this.sessionId}_backup_${Date.now()}.json`);
+            case 'standard':
+            default:
+                return path.join(this.sessionsDir, `${this.sessionId}_backup.json`);
+        }
     }
 
     async createBackupSchedule() {
@@ -259,54 +321,70 @@ class SessionManager {
         try {
             let backup = null;
             
-            // For Heroku, try to find a session-specific backup first
-            if (this.isHeroku) {
+            // Try standard backup first
+            try {
+                const standardBackupPath = this._getBackupPath('standard');
+                logger.info(`Attempting to restore from standard backup: ${standardBackupPath}`);
+                const backupData = await fs.readFile(standardBackupPath, 'utf8');
+                backup = JSON.parse(backupData);
+                logger.info(`Found standard backup for session: ${this.sessionId}`);
+            } catch (standardErr) {
+                logger.warn(`No standard backup found for session: ${this.sessionId}`);
+                
+                // Try emergency backup
                 try {
-                    const herokuBackupPath = path.join(this.sessionsDir, `${this.sessionId}_backup.json`);
-                    logger.info(`Attempting to restore from Heroku backup: ${herokuBackupPath}`);
-                    const backupData = await fs.readFile(herokuBackupPath, 'utf8');
-                    backup = JSON.parse(backupData);
-                    logger.info(`Found Heroku-specific backup for session: ${this.sessionId}`);
-                } catch (herokuErr) {
-                    logger.warn(`No Heroku backup found for session: ${this.sessionId}`);
-                    
-                    // Try emergency backup
-                    try {
-                        const emergencyPath = path.join(this.sessionsDir, `${this.sessionId}_emergency.json`);
-                        const emergencyData = await fs.readFile(emergencyPath, 'utf8');
-                        backup = JSON.parse(emergencyData);
-                        logger.info(`Restored from emergency backup for session: ${this.sessionId}`);
-                    } catch (emergencyErr) {
-                        logger.warn('No emergency backup found either');
-                    }
+                    const emergencyPath = this._getBackupPath('emergency');
+                    logger.info(`Attempting to restore from emergency backup: ${emergencyPath}`);
+                    const emergencyData = await fs.readFile(emergencyPath, 'utf8');
+                    backup = JSON.parse(emergencyData);
+                    logger.info(`Restored from emergency backup for session: ${this.sessionId}`);
+                } catch (emergencyErr) {
+                    logger.warn('No emergency backup found either');
                 }
             }
             
-            // If no Heroku-specific backup, try the regular backup
+            // If no specific backup found, try the regular session
             if (!backup) {
                 try {
                     backup = await this.loadSession(this.sessionId);
                     if (backup) {
-                        logger.info(`Restored from regular backup for session: ${this.sessionId}`);
+                        logger.info(`Restored from regular session data for: ${this.sessionId}`);
                     }
                 } catch (legacyErr) {
-                    logger.warn('No regular backup found');
+                    logger.warn('No regular session data found');
                 }
             }
             
-            // If still no backup, try to find any backup file
+            // If still no backup, try to find any backup file with our session ID
             if (!backup) {
                 try {
                     const files = await fs.readdir(this.sessionsDir);
-                    const backupFiles = files.filter(file => file.includes('backup') || file.includes('emergency'));
+                    const backupFiles = files.filter(file => 
+                        (file.includes('backup') || file.includes('emergency')) &&
+                        file.includes(this.sessionId)
+                    );
                     
                     if (backupFiles.length > 0) {
-                        // Sort to get the latest backup
+                        // Sort by timestamp (newest first)
                         backupFiles.sort().reverse();
                         const latestBackup = path.join(this.sessionsDir, backupFiles[0]);
                         const backupData = await fs.readFile(latestBackup, 'utf8');
                         backup = JSON.parse(backupData);
                         logger.info(`Restored from latest available backup: ${backupFiles[0]}`);
+                    } else {
+                        // If still nothing, try any backup file
+                        const anyBackupFiles = files.filter(file => 
+                            file.includes('backup') || file.includes('emergency')
+                        );
+                        
+                        if (anyBackupFiles.length > 0) {
+                            // Sort by timestamp (newest first)
+                            anyBackupFiles.sort().reverse();
+                            const latestAnyBackup = path.join(this.sessionsDir, anyBackupFiles[0]);
+                            const anyBackupData = await fs.readFile(latestAnyBackup, 'utf8');
+                            backup = JSON.parse(anyBackupData);
+                            logger.info(`Restored from latest available backup (any session): ${anyBackupFiles[0]}`);
+                        }
                     }
                 } catch (anyErr) {
                     logger.error('Error searching for backup files:', anyErr);
