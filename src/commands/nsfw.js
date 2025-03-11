@@ -846,20 +846,21 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: 'Fetching GIF...' });
             
-            // For this endpoint, we'll use a substitute
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/ass`);
+            // Use the appropriate endpoint for GIFs
+            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/pgif`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch GIF. Please try again later.' });
                 return;
             }
             
-            // Send as video for better compatibility
+            // Send as video with gifPlayback for better compatibility
             await sock.sendMessage(sender, {
-                image: { url: response.url },
-                caption: '🔞 Ass Image'
+                video: { url: response.url },
+                caption: '🔞 Ass GIF',
+                gifPlayback: true
             });
             
-            logger.info(`NSFW image sent to ${sender}`);
+            logger.info(`NSFW GIF sent to ${sender}`);
         } catch (err) {
             logger.error('Error in gifass:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch GIF.' });
@@ -938,19 +939,32 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: 'Fetching GIF...' });
             
+            // Use an endpoint known to return GIFs
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/blowjob`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch GIF. Please try again later.' });
                 return;
             }
             
-            // Send as image if it's not animated
-            await sock.sendMessage(sender, {
-                image: { url: response.url },
-                caption: '🔞 Blowjob'
-            });
+            // Try to determine if it's a GIF or static image
+            const fileType = response.url.toLowerCase().endsWith('.gif') ? 'gif' : 'image';
             
-            logger.info(`NSFW image sent to ${sender}`);
+            if (fileType === 'gif') {
+                // Send as video with gifPlayback for better compatibility
+                await sock.sendMessage(sender, {
+                    video: { url: response.url },
+                    caption: '🔞 Blowjob GIF',
+                    gifPlayback: true
+                });
+                logger.info(`NSFW GIF sent to ${sender}`);
+            } else {
+                // Send as image if it's not animated
+                await sock.sendMessage(sender, {
+                    image: { url: response.url },
+                    caption: '🔞 Blowjob'
+                });
+                logger.info(`NSFW image sent to ${sender}`);
+            }
         } catch (err) {
             logger.error('Error in gifblowjob:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch GIF.' });

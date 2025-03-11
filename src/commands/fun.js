@@ -1614,8 +1614,42 @@ Result: ${result}
             });
             return;
         }
-        // TODO: Implement anime GIF fetching
-        await sock.sendMessage(sender, { text: `🎭 Getting ${category} anime GIF...` });
+        
+        // Check if games and fun commands are enabled for the group
+        if (sender.endsWith('@g.us') && !await areGamesEnabled(sock, sender)) {
+            await sock.sendMessage(sender, { 
+                text: '⚠️ Fun commands are disabled in this group. Ask an admin to enable them with !feature games on' 
+            });
+            return;
+        }
+        
+        try {
+            await sock.sendMessage(sender, { text: `🎭 Getting ${category} anime GIF...` });
+            
+            // Map the categories to appropriate API endpoints
+            const apiEndpoints = {
+                action: 'https://api.waifu.pics/sfw/kick',
+                romance: 'https://api.waifu.pics/sfw/hug',
+                comedy: 'https://api.waifu.pics/sfw/smile',
+                drama: 'https://api.waifu.pics/sfw/cry'
+            };
+            
+            // Fetch the GIF from the appropriate endpoint
+            const response = await axios.get(apiEndpoints[category]);
+            if (!response.data || !response.data.url) {
+                await sock.sendMessage(sender, { text: `Failed to fetch ${category} anime GIF. Please try again later.` });
+                return;
+            }
+            
+            // Send the GIF
+            await sock.sendMessage(sender, {
+                image: { url: response.data.url },
+                caption: `🎭 ${category.charAt(0).toUpperCase() + category.slice(1)} anime GIF`
+            });
+        } catch (error) {
+            console.error(`Error fetching anime GIF for category ${category}:`, error);
+            await sock.sendMessage(sender, { text: `Failed to fetch ${category} anime GIF. Please try again later.` });
+        }
     },
 
     async waifu(sock, sender, args) {
