@@ -107,4 +107,4 @@ async function handleGroupParticipantsUpdate(sock, { id, participants, action })
     }
 }
 
-module.exports = handleGroupParticipantsUpdate;
+module.exports = { handleGroupParticipantsUpdate };

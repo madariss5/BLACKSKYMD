@@ -158,4 +158,4 @@ async function handleGroupMessage(sock, message) {
     }
 }
 
-module.exports = handleGroupMessage;
+module.exports = { handleGroupMessage };

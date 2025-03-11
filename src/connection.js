@@ -5,8 +5,8 @@ const path = require('path');
 const fs = require('fs').promises;
 const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
-const handleGroupMessage = require('./handlers/groupMessageHandler');
-const handleGroupParticipantsUpdate = require('./handlers/groupParticipantHandler');
+const { handleGroupMessage } = require('./handlers/groupMessageHandler');
+const { handleGroupParticipantsUpdate } = require('./handlers/groupParticipantHandler');
 const { sessionManager } = require('./utils/sessionManager');
 
 let sock = null;
