@@ -244,27 +244,35 @@ async function startConnection() {
                         lastCredsSentTime = Date.now();
                         logger.info('Connection initialized and credentials tracking set up');
                         
-                        // Try to send a notification to owner if the number is set
-                        let ownerNumber = process.env.OWNER_NUMBER;
-                        if (!ownerNumber) {
-                            logger.warn('OWNER_NUMBER environment variable is not set - skipping notification');
-                        } else {
-                            try {
-                                if (!ownerNumber.includes('@s.whatsapp.net')) {
-                                    ownerNumber = ownerNumber.replace(/[^\d]/g, '');
-                                    if (!ownerNumber.startsWith('1') && !ownerNumber.startsWith('91')) {
-                                        ownerNumber = '1' + ownerNumber;
+                        // Check if we've already notified and avoid sending duplicate notifications
+                        if (!global.connectionNotified) {
+                            // Set a flag to track notification status
+                            global.connectionNotified = true;
+                            
+                            // Try to send a notification to owner if the number is set
+                            let ownerNumber = process.env.OWNER_NUMBER;
+                            if (!ownerNumber) {
+                                logger.warn('OWNER_NUMBER environment variable is not set - skipping notification');
+                            } else {
+                                try {
+                                    if (!ownerNumber.includes('@s.whatsapp.net')) {
+                                        ownerNumber = ownerNumber.replace(/[^\d]/g, '');
+                                        if (!ownerNumber.startsWith('1') && !ownerNumber.startsWith('91')) {
+                                            ownerNumber = '1' + ownerNumber;
+                                        }
+                                        ownerNumber = `${ownerNumber}@s.whatsapp.net`;
                                     }
-                                    ownerNumber = `${ownerNumber}@s.whatsapp.net`;
-                                }
 
-                                await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
-                                logger.info('Connection notification sent successfully to: ' + ownerNumber);
-                            } catch (notifyErr) {
-                                // Don't let this error stop the bot from working
-                                logger.error('Failed to send owner notification:', notifyErr.message);
-                                logger.info('Bot will continue to operate normally despite notification failure');
+                                    await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
+                                    logger.info('Connection notification sent successfully to: ' + ownerNumber);
+                                } catch (notifyErr) {
+                                    // Don't let this error stop the bot from working
+                                    logger.error('Failed to send owner notification:', notifyErr.message);
+                                    logger.info('Bot will continue to operate normally despite notification failure');
+                                }
                             }
+                        } else {
+                            logger.info('Connection notification already sent, skipping to avoid spam');
                         }
                     } catch (err) {
                         logger.error('Failed to send connection notification:', err.message);
