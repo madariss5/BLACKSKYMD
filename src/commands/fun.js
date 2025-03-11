@@ -915,55 +915,6 @@ Result: ${result}
     },
 
     // Enhanced RPS game with better validation and error handling
-    async rps(sock, sender, args) {
-        try {
-            const choices = ['rock', 'paper', 'scissors'];
-            const userChoice = args[0]?.toLowerCase();
-
-            if (!userChoice || !choices.includes(userChoice)) {
-                await sock.sendMessage(sender, {
-                    text: '🎮 Rock Paper Scissors\nUsage: !rps <rock|paper|scissors>\nExample: !rps rock'
-                });
-                return;
-            }
-
-            const botChoice = choices[Math.floor(Math.random() * choices.length)];
-            let result;
-
-            // Determine winner using clear logic
-            if (userChoice === botChoice) {
-                result = "It's a tie! 🤝";
-            } else if (
-                (userChoice === 'rock' && botChoice === 'scissors') ||
-                (userChoice === 'paper' && botChoice === 'rock') ||
-                (userChoice === 'scissors' && botChoice === 'paper')
-            ) {
-                result = 'You win! 🎉';
-            } else {
-                result = 'Bot wins! 🤖';
-            }
-
-            const emojis = {
-                rock: '🪨',
-                paper: '📄',
-                scissors: '✂️'
-            };
-
-            const message = `
-🎮 Rock Paper Scissors
-You: ${emojis[userChoice]} ${userChoice}
-Bot: ${emojis[botChoice]} ${botChoice}
-Result: ${result}
-        `.trim();
-
-            await sock.sendMessage(sender, { text: message });
-        } catch (err) {
-            logger.error('RPS game error:', err);
-            await sock.sendMessage(sender, { 
-                text: '❌ An error occurred during the game. Please try again.'
-            });
-        }
-    },
 
     async chess(sock, sender, args) {
         try {
