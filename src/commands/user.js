@@ -38,8 +38,11 @@ const colorThemes = {
     green: { primary: '#2ecc71', secondary: '#27ae60', text: '#ffffff', background: '#2c3e50' },
     purple: { primary: '#9b59b6', secondary: '#8e44ad', text: '#ffffff', background: '#2c3e50' },
     orange: { primary: '#e67e22', secondary: '#d35400', text: '#ffffff', background: '#2c3e50' },
-    pink: { primary: '#e84393', secondary: '#fd79a8', text: '#ffffff', background: '#2c3e50' },
-    teal: { primary: '#1abc9c', secondary: '#16a085', text: '#ffffff', background: '#2c3e50' }
+    blue: { primary: '#3498db', secondary: '#2980b9', text: '#ffffff', background: '#1a2530' },
+    pink: { primary: '#ff79c6', secondary: '#bd93f9', text: '#ffffff', background: '#282a36' },
+    gaming: { primary: '#ff3e3e', secondary: '#7289da', text: '#ffffff', background: '#23272a' },
+    teal: { primary: '#1abc9c', secondary: '#16a085', text: '#ffffff', background: '#2c3e50' },
+    neon: { primary: '#00ff00', secondary: '#ff00ff', text: '#ffffff', background: '#000000' }
 };
 
 // Define job list
@@ -203,9 +206,11 @@ function toRoman(num) {
 }
 
 // Create a visually appealing profile card image
-async function createProfileCard(profile, theme = 'default') {
+async function createProfileCard(profile, theme = null) {
     try {
-        const colors = colorThemes[theme] || colorThemes.default;
+        // Use provided theme, user's preferred theme, or default
+        const selectedTheme = theme || profile.theme || 'default';
+        const colors = colorThemes[selectedTheme] || colorThemes.default;
         const width = 800;
         const height = 400;
         
@@ -226,28 +231,88 @@ async function createProfileCard(profile, theme = 'default') {
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, width, 100);
         
-        // Draw circular profile picture placeholder
+        // Avatar circle position
         const circleX = 120;
         const circleY = 170;
         const radius = 80;
         
-        // Draw circle for profile picture
-        ctx.beginPath();
-        ctx.arc(circleX, circleY, radius, 0, Math.PI * 2, false);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fill();
-        ctx.strokeStyle = colors.primary;
-        ctx.lineWidth = 5;
-        ctx.stroke();
+        // Draw profile picture or placeholder
+        if (profile.profilePic && await fs.access(profile.profilePic).then(() => true).catch(() => false)) {
+            try {
+                // Load the profile picture
+                const img = await loadImage(profile.profilePic);
+                
+                // Create circular clipping path
+                ctx.beginPath();
+                ctx.arc(circleX, circleY, radius, 0, Math.PI * 2, false);
+                ctx.closePath();
+                ctx.clip();
+                
+                // Calculate dimensions to maintain aspect ratio and cover the circle
+                const aspectRatio = img.width / img.height;
+                let drawWidth, drawHeight, drawX, drawY;
+                
+                if (aspectRatio >= 1) {
+                    // Image is wider than tall
+                    drawHeight = radius * 2;
+                    drawWidth = drawHeight * aspectRatio;
+                    drawX = circleX - (drawWidth / 2);
+                    drawY = circleY - radius;
+                } else {
+                    // Image is taller than wide
+                    drawWidth = radius * 2;
+                    drawHeight = drawWidth / aspectRatio;
+                    drawX = circleX - radius;
+                    drawY = circleY - (drawHeight / 2);
+                }
+                
+                // Draw the image
+                ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                
+                // Reset clipping and draw border
+                ctx.restore();
+                ctx.save();
+                
+                // Draw circle border
+                ctx.beginPath();
+                ctx.arc(circleX, circleY, radius, 0, Math.PI * 2, false);
+                ctx.strokeStyle = colors.primary;
+                ctx.lineWidth = 5;
+                ctx.stroke();
+                
+            } catch (err) {
+                logger.error('Error loading profile picture:', err);
+                // If there's an error loading the image, fall back to the placeholder
+                drawPlaceholderAvatar();
+            }
+        } else {
+            // No profile pic, draw placeholder
+            drawPlaceholderAvatar();
+        }
         
-        // Draw placeholder avatar (can be replaced with actual profile picture)
-        ctx.font = '90px Arial';
-        ctx.fillStyle = colors.primary;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(profile.name.charAt(0).toUpperCase(), circleX, circleY);
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
+        // Function to draw placeholder avatar
+        function drawPlaceholderAvatar() {
+            // Draw circle for profile picture
+            ctx.beginPath();
+            ctx.arc(circleX, circleY, radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            ctx.strokeStyle = colors.primary;
+            ctx.lineWidth = 5;
+            ctx.stroke();
+            
+            // Draw text avatar with first letter of name
+            ctx.font = '90px Arial';
+            ctx.fillStyle = colors.primary;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(profile.name.charAt(0).toUpperCase(), circleX, circleY);
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+        }
+        
+        // Save context state for further drawing
+        ctx.save();
         
         // Draw name
         ctx.fillStyle = '#FFFFFF';
@@ -406,7 +471,8 @@ const userCommands = {
                 achievements: ['New Arrival'], // First achievement for registering
                 customTitle: '',
                 warnings: 0,
-                profilePic: null
+                profilePic: null,
+                theme: 'default' // Default theme
             };
 
             // Add to user database
@@ -489,6 +555,7 @@ ${rankText}
 *🏆 Achievements:* ${profile.achievements.length}
 *📝 Bio:* ${profile.bio || 'No bio set'}
 *👑 Title:* ${profile.customTitle || 'No title set'}
+*🎨 Theme:* ${profile.theme || 'default'}
 
 *Progress:* ${progress.progressBar}
 *🕒 Registered:* ${new Date(profile.registeredAt).toLocaleDateString()}`;
@@ -582,6 +649,135 @@ ${rankText}
 
         profile.customTitle = title;
         await sock.sendMessage(sender, { text: '✅ Title updated successfully!' });
+    },
+    
+    async settheme(sock, message, args) {
+        try {
+            const sender = message.key.remoteJid;
+            const profile = userDatabase.getUserProfile(sender);
+            
+            if (!profile) {
+                await sock.sendMessage(sender, { 
+                    text: '*❌ Error:* You need to register first! Use .register [name] [age]' 
+                });
+                return;
+            }
+            
+            const [theme] = args;
+            
+            // If no theme provided, list available themes
+            if (!theme) {
+                const availableThemes = Object.keys(colorThemes).join(', ');
+                await sock.sendMessage(sender, { 
+                    text: `*🎨 Available Themes:*\n${availableThemes}\n\n*Usage:* .settheme [theme]\n*Example:* .settheme blue` 
+                });
+                return;
+            }
+            
+            // Check if theme exists
+            if (!colorThemes[theme]) {
+                const availableThemes = Object.keys(colorThemes).join(', ');
+                await sock.sendMessage(sender, { 
+                    text: `*❌ Error:* Invalid theme!\n\n*Available Themes:*\n${availableThemes}` 
+                });
+                return;
+            }
+            
+            // Update user profile
+            profile.theme = theme;
+            userDatabase.updateUserProfile(sender, { theme: theme });
+            
+            // Send success message
+            await sock.sendMessage(sender, { 
+                text: `*✅ Success:* Profile theme set to *${theme}*!` 
+            });
+            
+            // Generate and send a preview of the profile card with the new theme
+            try {
+                const cardPath = await createProfileCard(profile, theme);
+                if (cardPath) {
+                    await sock.sendMessage(sender, {
+                        image: { url: cardPath },
+                        caption: `🎨 Here's a preview of your profile card with the *${theme}* theme!`
+                    });
+                }
+            } catch (err) {
+                logger.error('Error generating theme preview:', err);
+                // Continue execution even if preview generation fails
+            }
+        } catch (err) {
+            logger.error('Error in settheme command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '*❌ Error:* Failed to set theme. Please try again.'
+            });
+        }
+    },
+    
+    async setprofilepic(sock, message, args) {
+        try {
+            const sender = message.key.remoteJid;
+            const profile = userDatabase.getUserProfile(sender);
+            
+            if (!profile) {
+                await sock.sendMessage(sender, { 
+                    text: '*❌ Error:* You need to register first! Use .register [name] [age]' 
+                });
+                return;
+            }
+            
+            // Check if the message contains an image
+            const quoted = message.message.imageMessage || 
+                           message.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+            
+            if (!quoted) {
+                await sock.sendMessage(sender, { 
+                    text: '*📝 Usage:* Send or reply to an image with .setprofilepic\n\n*Example:* Reply to an image with .setprofilepic' 
+                });
+                return;
+            }
+            
+            try {
+                // Ensure temp directory exists
+                await fs.mkdir(TEMP_DIR, { recursive: true });
+                
+                // Download image
+                const media = await sock.downloadAndSaveMediaMessage(quoted, path.join(TEMP_DIR, `profile_pic_${sender.split('@')[0]}`));
+                
+                // Update user profile
+                profile.profilePic = media;
+                userDatabase.updateUserProfile(sender, { profilePic: media });
+                
+                // Send success message
+                await sock.sendMessage(sender, { 
+                    text: '*✅ Success:* Profile picture updated successfully!' 
+                });
+                
+                // Generate and send a new profile card with the picture
+                try {
+                    const cardPath = await createProfileCard(profile);
+                    if (cardPath) {
+                        await sock.sendMessage(sender, {
+                            image: { url: cardPath },
+                            caption: '🎭 Here\'s your updated profile card!'
+                        });
+                    }
+                } catch (err) {
+                    logger.error('Error generating profile card:', err);
+                    // Continue execution even if card generation fails
+                }
+                
+            } catch (err) {
+                logger.error('Error downloading profile picture:', err);
+                await sock.sendMessage(sender, { 
+                    text: '*❌ Error:* Failed to download and save profile picture. Please try again.' 
+                });
+            }
+        } catch (err) {
+            logger.error('Error in setprofilepic command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '*❌ Error:* Failed to update profile picture. Please try again.'
+            });
+        }
     },
 
     async level(sock, sender) {
