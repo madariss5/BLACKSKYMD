@@ -10,14 +10,15 @@ const handleGroupParticipantsUpdate = require('./handlers/groupParticipantHandle
 
 let sock = null;
 let retryCount = 0;
-const MAX_RETRIES = 10;
-const RETRY_INTERVAL = 10000;
+const MAX_RETRIES = 999999; // Virtually unlimited retries for 24/7 operation
+const RETRY_INTERVAL = 5000; // Faster initial retry interval
 const AUTH_DIR = path.join(process.cwd(), 'auth_info');
 let isConnected = false;
 let qrDisplayed = false;
 let connectionAttempts = 0;
-const MAX_STREAM_ATTEMPTS = 5;
+const MAX_STREAM_ATTEMPTS = 10; // Increased stream retry attempts
 let streamRetryCount = 0;
+let lastRestartTime = 0; // Track last restart time
 
 async function validateSession() {
     try {
@@ -104,28 +105,28 @@ async function startConnection() {
             browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
             qrTimeout: 40000,
-            defaultQueryTimeoutMs: 20000,
-            keepAliveIntervalMs: 15000,
-            retryRequestDelayMs: 2000,
+            defaultQueryTimeoutMs: 10000, // Reduced for faster operations
+            keepAliveIntervalMs: 10000, // Reduced for more frequent keepalive
+            retryRequestDelayMs: 1000, // Reduced for faster retries
             emitOwnEvents: true,
-            maxRetries: 5,
+            maxRetries: 10, // Increased retries
             markOnlineOnConnect: true,
             fireInitQueries: true,
-            generateHighQualityLinkPreview: true,
+            generateHighQualityLinkPreview: false, // Set to false for faster operation
             syncFullHistory: false,
             msgRetryCounterCache: {
-                max: 1000,
-                ttl: 60000
+                max: 2000, // Increased cache size
+                ttl: 120000 // Increased time-to-live
             },
             patchMessageBeforeSending: (message) => {
                 return message;
             },
             options: {
-                timeout: 30000,
-                noAckTimeout: 60000,
+                timeout: 20000, // Reduced timeout
+                noAckTimeout: 30000, // Reduced noAck timeout
                 retryOnNetworkError: true,
                 retryOnStreamError: true,
-                maxRetryAttempts: 5
+                maxRetryAttempts: 10 // Increased retry attempts
             },
             getMessage: async (key) => {
                 try {

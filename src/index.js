@@ -104,6 +104,34 @@ async function main() {
 
         process.on('SIGTERM', () => cleanup('SIGTERM'));
         process.on('SIGINT', () => cleanup('SIGINT'));
+        
+        // Implement periodic memory cleanup to keep the bot running smoothly 24/7
+        const MEMORY_CLEANUP_INTERVAL = 3600000; // 1 hour
+        setInterval(() => {
+            try {
+                if (global.gc) {
+                    global.gc();
+                    logger.info('Performed garbage collection to free memory');
+                }
+                
+                // Check for possible memory leaks
+                const memoryUsage = process.memoryUsage();
+                logger.info('Memory usage stats:', {
+                    rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
+                    heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`, 
+                    heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`
+                });
+                
+                // If memory usage is too high, implement more aggressive cleanup
+                if (memoryUsage.heapUsed > 1024 * 1024 * 500) { // 500MB threshold
+                    logger.warn('High memory usage detected, performing additional cleanup');
+                    // Clear command cache to free memory
+                    commandLoader.reloadCommands();
+                }
+            } catch (memErr) {
+                logger.error('Memory cleanup error:', memErr);
+            }
+        }, MEMORY_CLEANUP_INTERVAL);
 
     } catch (err) {
         console.error('Fatal error starting bot:', err);
