@@ -119,8 +119,9 @@ const menuCommands = {
             const uptime = process.uptime();
             const uptimeStr = moment.duration(uptime, 'seconds').humanize();
             
-            // Check if category was specified
+            // Check if category was specified or if "long" mode was requested
             const category = args[0]?.toLowerCase();
+            const isLongMode = category === "long" || args.includes("long");
             
             // Get all commands from all files
             const allCommands = {};
@@ -171,8 +172,8 @@ const menuCommands = {
                 }
             }
             
-            // If a specific category was requested
-            if (category && categories[category]) {
+            // If a specific category was requested (and it's not "long")
+            if (category && categories[category] && !isLongMode) {
                 // Display only the requested category
                 const commands = allCommands[category] || [];
                 
@@ -200,7 +201,57 @@ const menuCommands = {
                 return;
             }
             
-            // Main menu header
+            // If long mode was requested, show detailed list of all commands
+            if (isLongMode) {
+                // Create a comprehensive list of all commands
+                let longMenuText = `┏━━⟪ *${config.bot.name} - ALL COMMANDS* ⟫━━┓\n\n`;
+                longMenuText += `${themes.info} *User:* ${username}\n`;
+                longMenuText += `${themes.info} *Time:* ${currentTime}\n`;
+                longMenuText += `${themes.info} *Date:* ${currentDate}\n`;
+                longMenuText += `${themes.info} *Uptime:* ${uptimeStr}\n\n`;
+                
+                // Bot info
+                longMenuText += `${generateHeader('BOT INFO')}\n\n`;
+                longMenuText += `${themes.primary} *Bot Name:* ${config.bot.name}\n`;
+                longMenuText += `${themes.primary} *Version:* ${config.bot.version}\n`;
+                longMenuText += `${themes.primary} *Prefix:* ${config.bot.prefix}\n`;
+                longMenuText += `${themes.primary} *Language:* ${config.bot.language}\n\n`;
+                
+                let totalCommands = 0;
+                
+                // List all categories with their commands
+                for (const [cat, commands] of Object.entries(allCommands)) {
+                    if (categories[cat] && commands.length > 0) {
+                        longMenuText += `${fancyLine(40, '•')}\n`;
+                        longMenuText += `${generateHeader(categories[cat])}\n\n`;
+                        
+                        // List each command on its own line with description if available
+                        for (const cmd of commands.sort()) {
+                            longMenuText += `${themes.light} ${config.bot.prefix}${cmd}\n`;
+                            totalCommands++;
+                        }
+                        
+                        longMenuText += `\n`;
+                    }
+                }
+                
+                // Footer
+                longMenuText += `${fancyLine(40, '•')}\n`;
+                longMenuText += `${themes.info} Total Commands: ${totalCommands}\n`;
+                longMenuText += `${themes.info} Use ${config.bot.prefix}help <command> for details\n`;
+                longMenuText += `${fancyLine(40, '•')}\n\n`;
+                
+                // Signature
+                longMenuText += `┗━━⟪ *${config.bot.name} ${config.bot.version}* ⟫━━┛`;
+                
+                await sock.sendMessage(sender, {
+                    text: longMenuText,
+                    quoted: message
+                });
+                return;
+            }
+            
+            // Main menu header (default view)
             let menuText = `┏━━━━━━━━━━━━━━━━━━━┓\n`;
             menuText += `┃  *${config.bot.name}*  ┃\n`;
             menuText += `┗━━━━━━━━━━━━━━━━━━━┛\n\n`;
@@ -231,6 +282,11 @@ const menuCommands = {
                     totalCommands += commands.length;
                 }
             }
+            
+            // Special menu options
+            menuText += `${generateHeader('SPECIAL MENU OPTIONS')}\n\n`;
+            menuText += `${themes.primary} *${config.bot.prefix}menu long*\n`;
+            menuText += `  └ Show all commands in detail\n\n`;
             
             // Footer
             menuText += `${fancyLine(40, '•')}\n`;

@@ -1244,4 +1244,18 @@ NSFW Statistics:
     }
 };
 
-module.exports = nsfwCommands;
+module.exports = {
+    commands: nsfwCommands,
+    category: 'nsfw',
+    async init() {
+        try {
+            logger.moduleInit('NSFW');
+            await initDirectories();
+            logger.moduleSuccess('NSFW');
+            return true;
+        } catch (err) {
+            logger.error('NSFW module initialization error:', err);
+            return false;
+        }
+    }
+};
