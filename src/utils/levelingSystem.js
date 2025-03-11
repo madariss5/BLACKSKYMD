@@ -7,6 +7,7 @@ const path = require('path');
 const { createCanvas, loadImage } = require('canvas');
 const userDatabase = require('./userDatabase');
 const logger = require('./logger');
+const { isFeatureEnabled } = require('./groupSettings');
 
 // XP gain settings
 const XP_SETTINGS = {
@@ -88,9 +89,19 @@ function calculateRequiredXP(level) {
  * Add XP to a user for an activity
  * @param {string} userId User's unique identifier 
  * @param {string} activityType Type of activity (message, command, media, voice, daily)
- * @returns {Object|null} Level up data if user leveled up, null otherwise
+ * @param {string} groupJid Group JID (if in a group context)
+ * @returns {Promise<Object|null>} Level up data if user leveled up, null otherwise
  */
-function addXP(userId, activityType = 'message') {
+async function addXP(userId, activityType = 'message', groupJid = null) {
+    // If this is a group message, check if leveling is enabled for this group
+    if (groupJid) {
+        const levelingEnabled = await isFeatureEnabled(groupJid, 'leveling');
+        if (!levelingEnabled) {
+            logger.debug(`Leveling is disabled for group ${groupJid}, not adding XP`);
+            return null;
+        }
+    }
+    
     // Check if on cooldown (except for daily and command types)
     if (activityType !== 'daily' && activityType !== 'command') {
         const lastUpdate = xpCooldowns.get(userId);
