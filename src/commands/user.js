@@ -1082,4 +1082,17 @@ ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty
     }
 };
 
-module.exports = userCommands;
+module.exports = {
+    commands: userCommands,
+    category: 'user',
+    async init() {
+        try {
+            logger.info('Initializing user command handler...');
+            await initDirectories();
+            return true;
+        } catch (err) {
+            logger.error('Failed to initialize user command handler:', err);
+            return false;
+        }
+    }
+};
