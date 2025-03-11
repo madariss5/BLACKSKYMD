@@ -145,13 +145,25 @@ const menuCommands = {
                 if (file.endsWith('.js') && file !== 'index.js' && file !== 'menu.js') {
                     const categoryName = file.replace('.js', '');
                     try {
-                        const commands = require(`./${file}`);
-                        const commandNames = Object.keys(commands).filter(cmd => 
-                            cmd !== 'init' && typeof commands[cmd] === 'function'
+                        // Try to load using modern format (module.exports.commands)
+                        const moduleData = require(`./${file}`);
+                        let commandsObject;
+                        
+                        if (moduleData.commands) {
+                            // Modern format: { commands: {...}, category: '...', init: ... }
+                            commandsObject = moduleData.commands;
+                        } else {
+                            // Legacy format: direct export of commands object
+                            commandsObject = moduleData;
+                        }
+                        
+                        const commandNames = Object.keys(commandsObject).filter(cmd => 
+                            cmd !== 'init' && typeof commandsObject[cmd] === 'function'
                         );
                         
                         if (commandNames.length > 0) {
                             allCommands[categoryName] = commandNames;
+                            logger.info(`Loaded ${commandNames.length} commands from ${file}`);
                         }
                     } catch (err) {
                         logger.error(`Error loading commands from ${file}:`, err);
@@ -275,11 +287,25 @@ const menuCommands = {
 
             for (const file of commandFiles) {
                 if (file.endsWith('.js') && file !== 'index.js') {
-                    const commands = require(`./${file}`);
-                    if (commands[commandName] && typeof commands[commandName] === 'function') {
-                        foundCommand = commands[commandName];
-                        foundIn = file.replace('.js', '');
-                        break;
+                    try {
+                        const moduleData = require(`./${file}`);
+                        let commandsObject;
+                        
+                        if (moduleData.commands) {
+                            // Modern format: { commands: {...}, category: '...', init: ... }
+                            commandsObject = moduleData.commands;
+                        } else {
+                            // Legacy format: direct export of commands object
+                            commandsObject = moduleData;
+                        }
+                        
+                        if (commandsObject[commandName] && typeof commandsObject[commandName] === 'function') {
+                            foundCommand = commandsObject[commandName];
+                            foundIn = file.replace('.js', '');
+                            break;
+                        }
+                    } catch (loadErr) {
+                        logger.error(`Error loading ${file} for help command:`, loadErr);
                     }
                 }
             }
@@ -339,4 +365,17 @@ const menuCommands = {
     }
 };
 
-module.exports = menuCommands;
+module.exports = {
+    commands: menuCommands,
+    category: 'menu',
+    async init() {
+        try {
+            logger.moduleInit('Menu');
+            logger.moduleSuccess('Menu');
+            return true;
+        } catch (err) {
+            logger.error('Menu module initialization error:', err);
+            return false;
+        }
+    }
+};

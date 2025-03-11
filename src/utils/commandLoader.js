@@ -45,30 +45,63 @@ class CommandLoader {
             // Check if module has commands property
             if (module.commands && typeof module.commands === 'object') {
                 // Module uses new format with commands property
-                if (module.init && typeof module.init === 'function') {
-                    logger.info(`Initializing module ${file}...`);
-                    await module.init();
+                if (Object.keys(module.commands).length === 0) {
+                    logger.warn(`Module ${file} has empty commands object`);
                 }
+                
+                // Initialize module if it has an init function
+                if (module.init && typeof module.init === 'function') {
+                    try {
+                        logger.info(`Initializing module ${file}...`);
+                        await module.init();
+                    } catch (initError) {
+                        logger.error(`Error initializing module ${file}:`, initError);
+                        // Continue loading even if initialization fails
+                    }
+                }
+                
                 return {
                     commands: module.commands,
-                    category: module.category
+                    category: module.category || file.replace('.js', '')
                 };
             } else if (typeof module === 'object') {
-                // Module exports commands directly
-                return {
-                    commands: module,
-                    category: null
-                };
+                // Check if the module has any function properties that might be commands
+                const possibleCommands = Object.entries(module)
+                    .filter(([key, value]) => typeof value === 'function' && key !== 'init')
+                    .map(([key]) => key);
+                
+                if (possibleCommands.length > 0) {
+                    logger.info(`Module ${file} using legacy format with ${possibleCommands.length} commands`);
+                    return {
+                        commands: module,
+                        category: file.replace('.js', '')
+                    };
+                } else {
+                    logger.warn(`Module ${file} has no valid commands`);
+                    return {
+                        commands: {},
+                        category: file.replace('.js', '')
+                    };
+                }
             }
 
-            throw new CommandError(`Invalid module structure in ${file}: No valid commands found`);
+            logger.error(`Invalid module structure in ${file}: No valid commands found`);
+            return {
+                commands: {},
+                category: file.replace('.js', '')
+            };
         } catch (err) {
             if (err instanceof CommandError) {
                 throw err;
             }
             logger.error(`Failed to load module ${file}:`, err);
             logger.error('Stack trace:', err.stack);
-            throw new CommandError(`Failed to load module ${file}`, null, err);
+            
+            // Return empty commands object to prevent the entire module loading from failing
+            return {
+                commands: {},
+                category: file.replace('.js', '')
+            };
         }
     }
 
