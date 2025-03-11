@@ -12,6 +12,27 @@ const ytdl = require('ytdl-core');
 const yts = require('yt-search');
 const { getLyrics } = require('genius-lyrics-api');
 const webp = require('node-webpmux');
+const { isFeatureEnabled } = require('../utils/groupSettings');
+
+/**
+ * Helper function to check if media commands are enabled for a group
+ * @param {Object} sock WhatsApp socket
+ * @param {string} remoteJid Group or sender JID
+ * @returns {Promise<boolean>} Whether media commands are enabled
+ */
+async function areMediaCommandsEnabled(sock, remoteJid) {
+    // If it's a group, check if media feature is enabled
+    if (remoteJid.endsWith('g.us')) {
+        const mediaEnabled = await isFeatureEnabled(remoteJid, 'media');
+        if (!mediaEnabled) {
+            await sock.sendMessage(remoteJid, { 
+                text: '❌ Media commands are disabled in this group. Ask an admin to enable them with *.feature media on*' 
+            });
+            return false;
+        }
+    }
+    return true;
+}
 
 // Helper function for audio queue management
 const playNextInQueue = async (sock, sender) => {

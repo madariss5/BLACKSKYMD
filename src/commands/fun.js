@@ -1,6 +1,27 @@
 const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
+const { isFeatureEnabled } = require('../utils/groupSettings');
+
+/**
+ * Helper function to check if games are enabled for a group
+ * @param {Object} sock WhatsApp socket
+ * @param {string} remoteJid Group or sender JID
+ * @returns {Promise<boolean>} Whether games are enabled
+ */
+async function areGamesEnabled(sock, remoteJid) {
+    // If it's a group, check if games feature is enabled
+    if (remoteJid.endsWith('g.us')) {
+        const gamesEnabled = await isFeatureEnabled(remoteJid, 'games');
+        if (!gamesEnabled) {
+            await sock.sendMessage(remoteJid, { 
+                text: '❌ Games are disabled in this group. Ask an admin to enable them with *.feature games on*' 
+            });
+            return false;
+        }
+    }
+    return true;
+}
 
 const funCommands = {
     // Text Fun
@@ -56,6 +77,11 @@ const funCommands = {
     // Games
     async tictactoe(sock, sender, args) {
         try {
+            // Check if games are enabled for this group
+            if (!(await areGamesEnabled(sock, sender))) {
+                return;
+            }
+            
             if (!global.games) global.games = new Map();
 
             const gameId = sender;
@@ -174,6 +200,11 @@ const funCommands = {
 
     async hangman(sock, sender, args) {
         try {
+            // Check if games are enabled for this group
+            if (!(await areGamesEnabled(sock, sender))) {
+                return;
+            }
+            
             if (!global.hangmanGames) global.hangmanGames = new Map();
 
             const gameId = sender;
@@ -268,6 +299,11 @@ const funCommands = {
 
     async quiz(sock, sender, args) {
         try {
+            // Check if games are enabled for this group
+            if (!(await areGamesEnabled(sock, sender))) {
+                return;
+            }
+            
             if (!global.quizGames) global.quizGames = new Map();
 
             const gameId = sender;
