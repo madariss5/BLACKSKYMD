@@ -137,6 +137,15 @@ async function main() {
         if (process.env.DYNO) {
             logger.info('Running on Heroku, setting up session management');
             
+            // Ensure we have a SESSION_ID for Heroku - generate one if not provided
+            if (!process.env.SESSION_ID) {
+                process.env.SESSION_ID = `heroku_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 5)}`;
+                logger.warn(`No SESSION_ID provided, generated temporary ID: ${process.env.SESSION_ID}`);
+                logger.warn('This ID will change on restart. Set SESSION_ID in config vars for persistence.');
+            } else {
+                logger.info(`Using configured SESSION_ID: ${process.env.SESSION_ID}`);
+            }
+            
             // Check if keep-alive is enabled (default: true)
             const keepAliveEnabled = process.env.KEEP_ALIVE !== 'false';
             

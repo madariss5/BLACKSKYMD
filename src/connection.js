@@ -7,30 +7,72 @@ const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
 const handleGroupMessage = require('./handlers/groupMessageHandler');
 const handleGroupParticipantsUpdate = require('./handlers/groupParticipantHandler');
+const { sessionManager } = require('./utils/sessionManager');
 
 let sock = null;
 let retryCount = 0;
-const MAX_RETRIES = 999999; // Virtually unlimited retries for 24/7 operation
-const RETRY_INTERVAL = 5000; // Faster initial retry interval
+// Set higher retry values for production/Heroku environments
+const isProduction = process.env.NODE_ENV === 'production';
+const isHeroku = !!process.env.DYNO;
+
+// Configure retry settings based on environment
+const MAX_RETRIES = isProduction ? 999999 : 10; // Virtually unlimited retries in production
+const RETRY_INTERVAL_BASE = isProduction ? 5000 : 10000; // Faster initial retry in production
+const MAX_RETRY_INTERVAL = isProduction ? 300000 : 60000; // Max 5 minutes between retries in production
+const STREAM_ERROR_COOLDOWN = isProduction ? 30000 : 15000; // Longer cooldown for stream errors in production
+const RESTART_COOLDOWN = isProduction ? 60000 : 30000; // Cooldown period before full restart
+const MAX_STREAM_ATTEMPTS = isProduction ? 20 : 10; // More stream retry attempts in production
+
+// Auth directory setup - accommodate Heroku's ephemeral filesystem
 const AUTH_DIR = path.join(process.cwd(), 'auth_info');
+
+// Connection state tracking
 let isConnected = false;
 let qrDisplayed = false;
 let connectionAttempts = 0;
-const MAX_STREAM_ATTEMPTS = 10; // Increased stream retry attempts
 let streamRetryCount = 0;
 let lastRestartTime = 0; // Track last restart time
+let lastLogTime = 0; // Rate limit repeated log messages
 
 async function validateSession() {
     try {
         const credentialsPath = path.join(AUTH_DIR, 'creds.json');
-        const exists = await fs.access(credentialsPath)
+        let exists = await fs.access(credentialsPath)
             .then(() => true)
             .catch(() => false);
+
+        // If we're on Heroku and credentials don't exist, try to restore from backup
+        if (!exists && isHeroku) {
+            logger.info('Running on Heroku with no credentials file - attempting restore from backup');
+            const restored = await sessionManager.restoreFromBackup();
+            if (restored) {
+                logger.info('Successfully restored credentials from backup');
+                exists = true;
+            } else {
+                logger.warn('Could not restore credentials from backup, will need to scan QR code');
+            }
+        }
 
         if (!exists) return false;
 
         const creds = JSON.parse(await fs.readFile(credentialsPath, 'utf8'));
-        return !!creds?.me?.id;
+        const valid = !!creds?.me?.id;
+        
+        if (valid) {
+            logger.info('Session validated successfully');
+            
+            // On Heroku, make a backup after successful validation
+            if (isHeroku) {
+                try {
+                    logger.info('Creating post-validation backup on Heroku');
+                    await sessionManager.backupCredentials();
+                } catch (backupErr) {
+                    logger.error('Error creating post-validation backup:', backupErr);
+                }
+            }
+        }
+        
+        return valid;
     } catch (err) {
         logger.error('Session validation error:', err);
         return false;
@@ -218,17 +260,54 @@ async function startConnection() {
                     logger.info(`Connection closed. Status code: ${statusCode}`);
                     logger.info(`Last disconnect reason: ${JSON.stringify(lastDisconnect?.error || {})}`);
 
+                    // Implement an exponential backoff strategy with different behavior for different environments
                     if (shouldReconnect && retryCount < MAX_RETRIES) {
                         retryCount++;
-                        const delay = Math.min(RETRY_INTERVAL * Math.pow(1.5, retryCount - 1), 300000);
-                        logger.info(`🔄 Reconnecting in ${Math.floor(delay / 1000)} seconds...`);
-                        setTimeout(startConnection, delay);
+                        
+                        // Calculate delay with exponential backoff but cap at maximum interval
+                        const delay = Math.min(
+                            RETRY_INTERVAL_BASE * Math.pow(1.5, retryCount - 1), 
+                            MAX_RETRY_INTERVAL
+                        );
+                        
+                        // For Heroku, we implement more persistent reconnection behavior
+                        if (isHeroku) {
+                            // Rate limit logging to avoid log spam
+                            const now = Date.now();
+                            if (now - lastLogTime > 30000) {
+                                lastLogTime = now;
+                                logger.info(`🔄 Heroku environment: Reconnection attempt ${retryCount}/${MAX_RETRIES} in ${Math.floor(delay / 1000)} seconds`);
+                            }
+                            
+                            // On Heroku, we'll try more aggressive recovery for specific error codes
+                            if (statusCode === DisconnectReason.connectionClosed ||
+                                statusCode === DisconnectReason.connectionLost ||
+                                statusCode === DisconnectReason.connectionReplaced) {
+                                
+                                logger.info('Using aggressive recovery for connection issues on Heroku');
+                                // Shorter delay for network-related issues
+                                setTimeout(startConnection, Math.min(delay, 10000));
+                            } else {
+                                setTimeout(startConnection, delay);
+                            }
+                        } else {
+                            // Standard environment behavior
+                            logger.info(`🔄 Reconnecting in ${Math.floor(delay / 1000)} seconds...`);
+                            setTimeout(startConnection, delay);
+                        }
                     } else {
                         if (!shouldReconnect) {
+                            // Session is no longer valid, clean state and restart
                             console.log('\n❌ Session expired. A new QR code will be generated.\n');
                             await cleanAuthState();
                             startConnection();
+                        } else if (isHeroku && retryCount >= MAX_RETRIES) {
+                            // For Heroku, we never give up - reset the counter and try again after a longer delay
+                            logger.warn(`Hit maximum retry count ${MAX_RETRIES}, but continuing on Heroku with reset counter`);
+                            retryCount = Math.floor(MAX_RETRIES / 2); // Reset to half the max to maintain some backoff
+                            setTimeout(startConnection, RESTART_COOLDOWN);
                         } else {
+                            // Standard environment, maximum retries reached
                             console.log('\n❌ Maximum retry attempts reached. Please restart the bot.\n');
                             process.exit(1);
                         }
@@ -292,8 +371,29 @@ async function startConnection() {
         logger.error('Connection error:', err);
         if (retryCount < MAX_RETRIES) {
             retryCount++;
-            const delay = Math.min(RETRY_INTERVAL * Math.pow(1.5, retryCount - 1), 300000);
-            setTimeout(startConnection, delay);
+            // Calculate delay with exponential backoff but cap at maximum interval
+            const delay = Math.min(
+                RETRY_INTERVAL_BASE * Math.pow(1.5, retryCount - 1), 
+                MAX_RETRY_INTERVAL
+            );
+            
+            if (isHeroku) {
+                // Rate limit logging and use more persistent retries on Heroku
+                const now = Date.now();
+                if (now - lastLogTime > 30000) {
+                    lastLogTime = now;
+                    logger.info(`🔄 Heroku environment: Recovery attempt ${retryCount}/${MAX_RETRIES} in ${Math.floor(delay / 1000)} seconds`);
+                }
+                setTimeout(startConnection, delay);
+            } else {
+                logger.warn(`Connection attempt failed (${retryCount}/${MAX_RETRIES}), retrying in ${Math.floor(delay / 1000)} seconds...`);
+                setTimeout(startConnection, delay);
+            }
+        } else if (isHeroku) {
+            // On Heroku, we reset counter instead of giving up
+            logger.warn('Maximum retry attempts reached, but continuing on Heroku with reset counter');
+            retryCount = Math.floor(MAX_RETRIES / 2); // Reset to half the max
+            setTimeout(startConnection, RESTART_COOLDOWN);
         } else {
             throw err;
         }
