@@ -202,72 +202,135 @@ function toRoman(num) {
     return roman;
 }
 
-// Create a basic card image
+// Create a visually appealing profile card image
 async function createProfileCard(profile, theme = 'default') {
     try {
         const colors = colorThemes[theme] || colorThemes.default;
-        const width = 600;
-        const height = 300;
+        const width = 800;
+        const height = 400;
         
         // Create canvas
         const canvas = createCanvas(width, height);
         const ctx = canvas.getContext('2d');
         
-        // Draw background
+        // Draw rounded background with gradient
         ctx.fillStyle = colors.background;
         ctx.fillRect(0, 0, width, height);
         
-        // Draw header
-        ctx.fillStyle = colors.primary;
-        ctx.fillRect(0, 0, width, 70);
+        // Create a gradient for the header
+        const gradient = ctx.createLinearGradient(0, 0, width, 0);
+        gradient.addColorStop(0, colors.primary);
+        gradient.addColorStop(1, colors.secondary);
         
-        // Draw user info section
-        ctx.fillStyle = colors.secondary;
-        ctx.fillRect(20, 90, 560, 190);
+        // Draw header with gradient
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, 100);
+        
+        // Draw circular profile picture placeholder
+        const circleX = 120;
+        const circleY = 170;
+        const radius = 80;
+        
+        // Draw circle for profile picture
+        ctx.beginPath();
+        ctx.arc(circleX, circleY, radius, 0, Math.PI * 2, false);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+        ctx.strokeStyle = colors.primary;
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        
+        // Draw placeholder avatar (can be replaced with actual profile picture)
+        ctx.font = '90px Arial';
+        ctx.fillStyle = colors.primary;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(profile.name.charAt(0).toUpperCase(), circleX, circleY);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
         
         // Draw name
-        ctx.fillStyle = colors.text;
-        ctx.font = 'bold 36px Arial';
-        ctx.fillText(profile.name, 30, 45);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 48px Arial';
+        ctx.fillText(profile.name, 220, 60);
         
-        // Draw level badge
+        // Draw user title if available
+        if (profile.customTitle) {
+            ctx.font = 'italic 24px Arial';
+            ctx.fillText(profile.customTitle, 220, 90);
+        }
+        
+        // Draw user info section - right side panel
         ctx.fillStyle = colors.secondary;
-        ctx.beginPath();
-        ctx.arc(width - 40, 40, 25, 0, 2 * Math.PI);
-        ctx.fill();
-        
-        ctx.fillStyle = colors.text;
-        ctx.font = 'bold 24px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(profile.level, width - 40, 48);
-        ctx.textAlign = 'left';
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(220, 120, 560, 260);
+        ctx.globalAlpha = 1.0;
         
         // Draw profile details
-        ctx.fillStyle = colors.text;
-        ctx.font = '18px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 24px Arial';
         
-        let y = 120;
-        ctx.fillText(`XP: ${profile.xp}/${levelThresholds[profile.level]}`, 40, y); y += 30;
-        ctx.fillText(`Coins: ${formatNumber(profile.coins)}`, 40, y); y += 30;
+        let y = 160;
+        
+        // Stats section
+        ctx.fillText(`📈 Level: ${profile.level}`, 240, y); y += 40;
+        
+        // Calculate level progress
+        const currentLevelXP = profile.level > 1 ? levelThresholds[profile.level - 1] : 0;
+        const nextLevelXP = levelThresholds[profile.level];
+        const progressXP = profile.xp - currentLevelXP;
+        const totalNeededXP = nextLevelXP - currentLevelXP;
+        const progressPercent = Math.min(100, Math.floor((progressXP / totalNeededXP) * 100));
+        
+        // Display XP
+        ctx.fillText(`⭐ XP: ${profile.xp}/${nextLevelXP}`, 240, y); y += 40;
+        
+        // Draw progress bar
+        const progressBarX = 240;
+        const progressBarY = y;
+        const progressBarWidth = 500;
+        const progressBarHeight = 20;
+        
+        // Progress bar background
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(progressBarX, progressBarY, progressBarWidth, progressBarHeight);
+        
+        // Progress bar fill
+        ctx.fillStyle = colors.primary;
+        ctx.fillRect(progressBarX, progressBarY, progressBarWidth * (progressPercent / 100), progressBarHeight);
+        
+        // Progress text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${progressPercent}%`, progressBarX + progressBarWidth/2, progressBarY + 15);
+        ctx.textAlign = 'left';
+        
+        y += 40;
+        
+        // Other stats
+        ctx.font = '24px Arial';
+        ctx.fillText(`💰 Coins: ${formatNumber(profile.coins)}`, 240, y); y += 40;
+        ctx.fillText(`🎯 Age: ${profile.age}`, 240, y); y += 40;
+        ctx.fillText(`🏆 Achievements: ${profile.achievements?.length || 0}`, 240, y); y += 40;
         
         // Draw bio if available
         if (profile.bio) {
-            const bioLines = wrapText(ctx, profile.bio, 520, 18);
-            for (let i = 0; i < Math.min(bioLines.length, 3); i++) {
-                ctx.fillText(bioLines[i], 40, y);
-                y += 24;
-            }
+            y = 340;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'italic 18px Arial';
+            ctx.fillText(`"${wrapText(ctx, profile.bio, 520, 18)[0]}"`, 240, y);
         }
         
         // Draw registration date
-        ctx.font = '12px Arial';
-        ctx.fillText(`Registered: ${moment(profile.registeredAt).format('MMM DD, YYYY')}`, 40, y + 20);
+        ctx.font = '16px Arial';
+        ctx.fillText(`Registered: ${moment(profile.registeredAt).format('MMM DD, YYYY')}`, 20, height - 20);
         
         // Save image
         const filename = `profile_${Date.now()}.png`;
         const outputPath = path.join(TEMP_DIR, filename);
         
-        const buffer = canvas.toBuffer();
+        const buffer = canvas.toBuffer('image/png');
         await fs.writeFile(outputPath, buffer);
         
         return outputPath;
@@ -301,11 +364,14 @@ const userCommands = {
     async register(sock, message, args) {
         try {
             const sender = message.key.remoteJid;
-            const [name, age] = args;
+            
+            // Extract name and age from arguments
+            const name = args.slice(0, -1).join(' ') || args[0];
+            const age = args[args.length - 1];
 
             if (!name || !age || isNaN(age)) {
                 await sock.sendMessage(sender, { 
-                    text: '*📝 Registration Usage:*\n.register [name] [age]\n\n*Example:* .register John 25' 
+                    text: '*📝 Registration Usage:*\n.register [name] [age]\n\n*Examples:*\n.register John 25\n.register John Doe 25' 
                 });
                 return;
             }
@@ -317,28 +383,68 @@ const userCommands = {
                 return;
             }
 
+            // Validate age
+            const ageInt = parseInt(age);
+            if (ageInt < 13 || ageInt > 120) {
+                await sock.sendMessage(sender, { 
+                    text: '*❌ Error:* Please enter a valid age between 13 and 120.' 
+                });
+                return;
+            }
+
+            // Create new user profile with achievements
             const newProfile = {
                 name: name,
-                age: parseInt(age),
+                age: ageInt,
                 xp: 0,
                 level: 1,
-                coins: 0,
+                coins: 100, // Starting coins
                 bio: '',
                 registeredAt: new Date().toISOString(),
                 lastDaily: null,
                 inventory: [],
-                achievements: [],
+                achievements: ['New Arrival'], // First achievement for registering
                 customTitle: '',
-                warnings: 0
+                warnings: 0,
+                profilePic: null
             };
 
-            userProfiles.set(sender, newProfile);
+            // Add to user database
+            userDatabase.updateUserProfile(sender, newProfile);
+
+            // Create welcome message
+            const welcomeMsg = `*✅ Registration Successful!*\n
+*👤 Name:* ${name}
+*🎯 Age:* ${ageInt}
+*📊 Level:* 1
+*⭐ XP:* 0/100
+*💰 Coins:* 100
+
+*🏆 Achievement Unlocked:* New Arrival
+*🎮 Commands to try:*
+• .profile - See your profile
+• .daily - Claim daily rewards
+• .level - Check your level progress`;
 
             await sock.sendMessage(sender, { 
-                text: `*✅ Registration Successful!*\n\n*👤 Name:* ${name}\n*🎯 Age:* ${age}\n*📊 Level:* 1\n*⭐ XP:* 0` 
+                text: welcomeMsg
             });
+            
+            // Generate and send a profile card
+            try {
+                const cardPath = await createProfileCard(newProfile);
+                if (cardPath) {
+                    await sock.sendMessage(sender, {
+                        image: { url: cardPath },
+                        caption: '🎉 Here\'s your new profile card!'
+                    });
+                }
+            } catch (err) {
+                logger.error('Error generating new profile card:', err);
+                // Continue even if card generation fails
+            }
 
-            logger.info(`New user registered: ${sender}`);
+            logger.info(`New user registered: ${sender} (${name}, ${ageInt})`);
         } catch (err) {
             logger.error('Error in register command:', err);
             await sock.sendMessage(message.key.remoteJid, {
@@ -351,32 +457,69 @@ const userCommands = {
         try {
             const sender = message.key.remoteJid;
             const targetUser = args[0]?.replace(/[^0-9]/g, '') || sender;
-            const profile = userProfiles.get(targetUser);
+            const profile = userDatabase.getUserProfile(targetUser);
 
             if (!profile) {
                 await sock.sendMessage(sender, { 
                     text: targetUser === sender ? 
-                        '*❌ Error:* You are not registered! Use .register to create a profile.' :
+                        '*❌ Error:* You are not registered! Use .register [name] [age] to create a profile.' :
                         '*❌ Error:* User not found!'
                 });
                 return;
             }
 
+            // Get level progress
+            const progress = levelingSystem.getLevelProgress(targetUser);
+            
+            // Calculate rank if available
+            const leaderboard = levelingSystem.getLeaderboard(100);
+            const rank = leaderboard.findIndex(u => u.id === targetUser) + 1;
+            const rankText = rank > 0 ? `*🏆 Rank:* #${rank}` : '';
+
+            // Create detailed profile text
             const profileText = `
 *📊 User Profile*
 
 *👤 Name:* ${profile.name}
 *📈 Level:* ${profile.level}
-*⭐ XP:* ${profile.xp}/${levelThresholds[profile.level]}
-*💰 Coins:* ${profile.coins}
+*⭐ XP:* ${profile.xp}/${progress.requiredXP}
+*💰 Coins:* ${formatNumber(profile.coins)}
 *🎯 Age:* ${profile.age}
+${rankText}
 *🏆 Achievements:* ${profile.achievements.length}
 *📝 Bio:* ${profile.bio || 'No bio set'}
 *👑 Title:* ${profile.customTitle || 'No title set'}
 
+*Progress:* ${progress.progressBar}
 *🕒 Registered:* ${new Date(profile.registeredAt).toLocaleDateString()}`;
 
+            // Send profile text
             await sock.sendMessage(sender, { text: profileText.trim() });
+            
+            // Generate and send profile card
+            try {
+                // First try to generate a custom profile card
+                let cardPath = await createProfileCard(profile);
+                
+                // If that fails, fall back to level card
+                if (!cardPath) {
+                    cardPath = await levelingSystem.generateLevelCard(targetUser, profile);
+                }
+                
+                if (cardPath) {
+                    const caption = targetUser === sender ? 
+                        '🎭 Your Profile Card' : 
+                        `🎭 Profile Card: ${profile.name}`;
+                        
+                    await sock.sendMessage(sender, {
+                        image: { url: cardPath },
+                        caption: caption
+                    });
+                }
+            } catch (err) {
+                logger.error('Error generating profile card:', err);
+                // Continue execution even if card generation fails
+            }
         } catch (err) {
             logger.error('Error in profile command:', err);
             await sock.sendMessage(message.key.remoteJid, {
