@@ -61,19 +61,83 @@ async function main() {
         server = await startServer(sock);
 
         // Listen for messages with enhanced error handling
-        sock.ev.on('messages.upsert', async ({ messages }) => {
-            const m = messages[0];
-            if (!m.message) return;
-
-            try {
-                await messageHandler(sock, m);
-            } catch (err) {
-                logger.error('Error handling message:', {
-                    error: err.message,
-                    stack: err.stack,
-                    messageId: m.key?.id,
-                    from: m.key?.remoteJid
-                });
+        sock.ev.process(async (events) => {
+            // Process incoming messages
+            if (events['messages.upsert']) {
+                const upsert = events['messages.upsert'];
+                console.log('Received message type:', upsert.type);
+                
+                // For debugging: log the entire event structure
+                console.log('Full message event:', JSON.stringify(upsert, null, 2));
+                
+                // Process new messages - 'notify' is for new messages
+                if (upsert.type === 'notify') {
+                    for (const msg of upsert.messages) {
+                        // Full message debug for first few messages (to avoid log flooding)
+                        console.log('Message content:', JSON.stringify(msg, null, 2));
+                        
+                        if (!msg.message) {
+                            console.log('Skipping message with no content');
+                            continue; // Skip if no message content
+                        }
+                        
+                        // Log the message details for debugging
+                        logger.info(`Processing message from ${msg.key.remoteJid}`, {
+                            messageType: Object.keys(msg.message || {})[0],
+                            messageKeys: Object.keys(msg.message || {}),
+                            fromMe: msg.key.fromMe,
+                            isGroup: msg.key.remoteJid?.endsWith('@g.us')
+                        });
+                        
+                        // Extract the text content for debug purposes
+                        const msgText = msg.message?.conversation || 
+                                       msg.message?.extendedTextMessage?.text ||
+                                       msg.message?.imageMessage?.caption ||
+                                       msg.message?.videoMessage?.caption || 
+                                       "No text content";
+                        console.log(`Message text: "${msgText}"`);
+                        
+                        try {
+                            // Handle group messages via group handler
+                            if (msg.key.remoteJid?.endsWith('@g.us')) {
+                                await handleGroupMessage(sock, msg);
+                            }
+                            
+                            // Process all messages through the main handler
+                            await messageHandler(sock, msg);
+                            
+                            // Send acknowledgment for text messages explicitly
+                            if (msgText && !msg.key.fromMe) {
+                                console.log('Sending explicit welcome message...');
+                                try {
+                                    await sock.sendMessage(msg.key.remoteJid, {
+                                        text: `I received your message: "${msgText}"\nType .help to see available commands.`
+                                    });
+                                } catch (sendErr) {
+                                    console.error('Error sending welcome message:', sendErr);
+                                }
+                            }
+                        } catch (err) {
+                            logger.error('Error handling message:', {
+                                error: err.message,
+                                stack: err.stack,
+                                messageId: msg.key?.id,
+                                from: msg.key?.remoteJid
+                            });
+                        }
+                    }
+                } else {
+                    console.log('Ignoring non-notify message type:', upsert.type);
+                }
+            }
+            
+            // Handle group participant updates
+            if (events['group-participants.update']) {
+                try {
+                    await handleGroupParticipantsUpdate(sock, events['group-participants.update']);
+                } catch (err) {
+                    logger.error('Error handling group participants update:', err);
+                }
             }
         });
 
