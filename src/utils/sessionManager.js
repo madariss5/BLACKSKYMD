@@ -8,6 +8,16 @@ class SessionManager {
         this.sessionsDir = path.join(process.cwd(), 'sessions');
         this.authDir = path.join(process.cwd(), 'auth_info');
         this.credentialsFile = path.join(this.authDir, 'creds.json');
+        this.isHeroku = process.env.DYNO ? true : false;
+        this.sessionId = process.env.SESSION_ID || 'default-session';
+        
+        // Create temp directories for Heroku if needed
+        if (this.isHeroku) {
+            this.sessionsDir = path.join('/tmp', 'whatsapp-sessions');
+            this.authDir = path.join('/tmp', 'whatsapp-auth');
+            this.credentialsFile = path.join(this.authDir, 'creds.json');
+            logger.info('Running on Heroku, using temporary filesystem paths');
+        }
     }
 
     async initialize() {
@@ -16,7 +26,19 @@ class SessionManager {
             await fs.mkdir(this.sessionsDir, { recursive: true });
             await fs.mkdir(this.authDir, { recursive: true });
 
-            logger.info('Session directories initialized');
+            if (this.isHeroku) {
+                logger.info(`Initialized Heroku session with ID: ${this.sessionId}`);
+                // On Heroku, we need to restore from a backup or regenerate session
+                const backupExists = await this.restoreFromBackup();
+                if (backupExists) {
+                    logger.info('Successfully restored session from backup');
+                } else {
+                    logger.info('No session backup found, will generate new QR code');
+                }
+            } else {
+                logger.info('Local session directories initialized');
+            }
+            
             return true;
         } catch (err) {
             logger.error('Failed to initialize session directories:', err);
@@ -27,6 +49,11 @@ class SessionManager {
     async clearSession() {
         try {
             logger.info('Clearing session data...');
+
+            // Backup before clearing if on Heroku
+            if (this.isHeroku) {
+                await this.backupCredentials();
+            }
 
             // Clear auth directory
             await fs.rm(this.authDir, { recursive: true, force: true });
@@ -88,10 +115,28 @@ class SessionManager {
 
             const credsData = await fs.readFile(this.credentialsFile, 'utf8');
             const backupPath = path.join(this.sessionsDir, `creds_backup_${Date.now()}.json`);
-
+            
+            // Save backup file
             await fs.writeFile(backupPath, credsData, 'utf8');
+            
+            // For Heroku, also save a standard backup file that we can find later
+            if (this.isHeroku) {
+                const herokuBackupPath = path.join(this.sessionsDir, `${this.sessionId}_backup.json`);
+                await fs.writeFile(herokuBackupPath, credsData, 'utf8');
+                logger.info(`Heroku persistent backup saved as ${this.sessionId}_backup.json`);
+                
+                // If owner number is set, create a safety backup by sending to owner
+                if (process.env.OWNER_NUMBER) {
+                    try {
+                        // TODO: Implement sending backup to owner via WhatsApp when needed
+                        logger.info('Backup notification would be sent to owner');
+                    } catch (backupErr) {
+                        logger.error('Failed to send backup to owner:', backupErr);
+                    }
+                }
+            }
+            
             logger.info('Credentials backup created successfully');
-
             return true;
         } catch (err) {
             logger.error('Error backing up credentials:', err);
@@ -101,8 +146,17 @@ class SessionManager {
 
     async emergencyCredsSave(state) {
         try {
-            const emergencyPath = path.join(this.sessionsDir, `emergency_creds_${Date.now()}.json`);
+            const timestamp = Date.now();
+            const emergencyPath = path.join(this.sessionsDir, `emergency_creds_${timestamp}.json`);
             await fs.writeFile(emergencyPath, JSON.stringify(state), 'utf8');
+            
+            // For Heroku, also save with the session ID for easier recovery
+            if (this.isHeroku) {
+                const herokuEmergencyPath = path.join(this.sessionsDir, `${this.sessionId}_emergency.json`);
+                await fs.writeFile(herokuEmergencyPath, JSON.stringify(state), 'utf8');
+                logger.info(`Heroku emergency backup saved with session ID: ${this.sessionId}`);
+            }
+            
             logger.info('Emergency credentials save successful');
             return true;
         } catch (err) {
