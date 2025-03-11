@@ -34,6 +34,11 @@ let streamRetryCount = 0;
 let lastRestartTime = 0; // Track last restart time
 let lastLogTime = 0; // Rate limit repeated log messages
 
+// Credentials tracking to prevent spamming
+let initialCredsSent = false;
+let lastCredsSentTime = 0;
+const CREDS_SEND_COOLDOWN = 300000; // 5 minutes cooldown between credential sends
+
 async function validateSession() {
     try {
         const credentialsPath = path.join(AUTH_DIR, 'creds.json');
@@ -248,23 +253,32 @@ async function startConnection() {
                         
                         // Send creds.json file to the bot itself (using its own JID)
                         try {
-                            // Get bot's own JID from sock object
-                            const botJid = sock.user.id;
-                            if (botJid) {
-                                const fs = require('fs');
-                                const credPath = path.join(AUTH_DIR, 'creds.json');
-                                if (fs.existsSync(credPath)) {
-                                    const credsData = fs.readFileSync(credPath, 'utf8');
-                                    // Convert to one-line JSON without spaces
-                                    const compactJson = JSON.stringify(JSON.parse(credsData));
-                                    
-                                    await sock.sendMessage(botJid, { 
-                                        text: `*creds.json file:*\n\`\`\`${compactJson}\`\`\`` 
-                                    });
-                                    logger.info('Credentials file sent to bot itself');
+                            // Only send if we haven't sent before during this session
+                            if (!initialCredsSent) {
+                                // Get bot's own JID from sock object
+                                const botJid = sock.user.id;
+                                if (botJid) {
+                                    const fs = require('fs');
+                                    const credPath = path.join(AUTH_DIR, 'creds.json');
+                                    if (fs.existsSync(credPath)) {
+                                        const credsData = fs.readFileSync(credPath, 'utf8');
+                                        // Convert to one-line JSON without spaces
+                                        const compactJson = JSON.stringify(JSON.parse(credsData));
+                                        
+                                        await sock.sendMessage(botJid, { 
+                                            text: `*creds.json file:*\n\`\`\`${compactJson}\`\`\`` 
+                                        });
+                                        logger.info('Initial credentials file sent to bot itself');
+                                        
+                                        // Mark as sent and update timestamp
+                                        initialCredsSent = true;
+                                        lastCredsSentTime = Date.now();
+                                    }
+                                } else {
+                                    logger.warn('Could not determine bot JID for sending credentials');
                                 }
                             } else {
-                                logger.warn('Could not determine bot JID for sending credentials');
+                                logger.info('Skipping initial credentials send as they were already sent');
                             }
                         } catch (credsErr) {
                             logger.error('Failed to send credentials file to bot:', credsErr.message);
@@ -362,30 +376,52 @@ async function startConnection() {
                 try {
                     // Get bot's own JID from sock object
                     const botJid = sock.user.id;
-                    if (botJid) {
-                        // Use fs instead of fs.promises to ensure synchronous read
-                        const fs = require('fs');
-                        const credPath = path.join(AUTH_DIR, 'creds.json');
-                        if (fs.existsSync(credPath)) {
-                            // Wait a short time to ensure file is fully written
-                            setTimeout(async () => {
-                                try {
-                                    const credsData = fs.readFileSync(credPath, 'utf8');
-                                    // Convert to one-line JSON without spaces
-                                    const compactJson = JSON.stringify(JSON.parse(credsData));
-                                    
-                                    await sock.sendMessage(botJid, { 
-                                        text: `*Updated creds.json file:*\n\`\`\`${compactJson}\`\`\`` 
-                                    });
-                                    logger.info('Updated credentials file sent to bot itself');
-                                } catch (err) {
-                                    logger.error('Failed to send updated credentials file:', err.message);
-                                }
-                            }, 1000); // Wait 1 second to ensure file is written
-                        }
-                    } else {
+                    const now = Date.now();
+                    
+                    if (!botJid) {
                         logger.warn('Could not determine bot JID for sending updated credentials');
+                        return;
                     }
+                    
+                    // Skip if it's too soon after initial credentials were sent
+                    if (initialCredsSent && (now - lastCredsSentTime) < 5000) {
+                        logger.info('Skipping credential update as initial credentials were just sent');
+                        return;
+                    }
+                    
+                    // Skip if we're in cooldown period
+                    if (initialCredsSent && (now - lastCredsSentTime) < CREDS_SEND_COOLDOWN) {
+                        logger.info(`Skipping credentials send due to cooldown (${Math.floor((now - lastCredsSentTime) / 1000)}s elapsed of ${CREDS_SEND_COOLDOWN / 1000}s cooldown)`);
+                        return;
+                    }
+                    
+                    // Use fs instead of fs.promises to ensure synchronous read
+                    const fs = require('fs');
+                    const credPath = path.join(AUTH_DIR, 'creds.json');
+                    
+                    if (!fs.existsSync(credPath)) {
+                        logger.warn('Credentials file does not exist, cannot send update');
+                        return;
+                    }
+                    
+                    // Wait a short time to ensure file is fully written
+                    setTimeout(async () => {
+                        try {
+                            const credsData = fs.readFileSync(credPath, 'utf8');
+                            // Convert to one-line JSON without spaces
+                            const compactJson = JSON.stringify(JSON.parse(credsData));
+                            
+                            await sock.sendMessage(botJid, { 
+                                text: `*Updated creds.json file:*\n\`\`\`${compactJson}\`\`\`` 
+                            });
+                            logger.info('Updated credentials file sent to bot itself');
+                            
+                            // Update timestamp
+                            lastCredsSentTime = now;
+                        } catch (err) {
+                            logger.error('Failed to send updated credentials file:', err.message);
+                        }
+                    }, 1000); // Wait 1 second to ensure file is written
                 } catch (sendErr) {
                     logger.error('Error sending updated credentials:', sendErr);
                 }
