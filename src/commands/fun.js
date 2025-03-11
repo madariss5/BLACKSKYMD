@@ -510,13 +510,13 @@ const funCommands = {
                 }
             ];
             const randomRiddle = riddles[Math.floor(Math.random() * riddles.length)];
-            await sock.sendMessage(sender, { 
+            await sock.sendMessage(sender, {
                 text: `🤔 Here's a riddle for you:\n\n${randomRiddle.question}\n\n(Answer will be revealed in 10 seconds...)`
             });
 
             // Send answer after a delay
             setTimeout(async () => {
-                await sock.sendMessage(sender, { 
+                await sock.sendMessage(sender, {
                     text: `✨ The answer is: ${randomRiddle.answer}`
                 });
             }, 10000);
@@ -529,16 +529,95 @@ const funCommands = {
 
     // Horoscope and Fortune
     async horoscope(sock, sender, args) {
-        const signs = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
-            'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
-        if (!args[0] || !signs.includes(args[0].toLowerCase())) {
+        try {
+            const signs = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+                'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
+
+            if (!args[0] || !signs.includes(args[0].toLowerCase())) {
+                await sock.sendMessage(sender, {
+                    text: `⭐ Available zodiac signs: ${signs.join(', ')}\nUsage: !horoscope [sign]`
+                });
+                return;
+            }
+
+            const sign = args[0].toLowerCase();
+            const horoscopes = {
+                aries: [
+                    "Today is perfect for starting new projects. Your energy is high!",
+                    "Someone special may enter your life soon.",
+                    "Focus on personal growth and development."
+                ],
+                taurus: [
+                    "Financial opportunities are heading your way.",
+                    "Your patience will be rewarded soon.",
+                    "Take time to appreciate the simple pleasures."
+                ],
+                gemini: [
+                    "Communication is key today. Express yourself clearly.",
+                    "New learning opportunities are on the horizon.",
+                    "Your adaptability will serve you well."
+                ],
+                cancer: [
+                    "Trust your intuition in important decisions.",
+                    "Family matters take center stage today.",
+                    "Your emotional strength is your greatest asset."
+                ],
+                leo: [
+                    "Your creative energy is at its peak.",
+                    "Leadership opportunities await you.",
+                    "Time to shine and showcase your talents."
+                ],
+                virgo: [
+                    "Focus on organization and planning today.",
+                    "Your attention to detail will be appreciated.",
+                    "Health and wellness should be priorities."
+                ],
+                libra: [
+                    "Balance in all things brings harmony today.",
+                    "Relationships flourish under your diplomatic touch.",
+                    "Artistic endeavors are favored."
+                ],
+                scorpio: [
+                    "Trust your instincts in personal matters.",
+                    "Transformation and change bring positive results.",
+                    "Deep connections form easily today."
+                ],
+                sagittarius: [
+                    "Adventure and travel are highlighted.",
+                    "Your optimism attracts good fortune.",
+                    "Educational pursuits are favored."
+                ],
+                capricorn: [
+                    "Career goals move forward steadily.",
+                    "Your practical approach yields results.",
+                    "Long-term planning brings success."
+                ],
+                aquarius: [
+                    "Innovation and originality are your strengths.",
+                    "Social connections bring unexpected opportunities.",
+                    "Your humanitarian side shines today."
+                ],
+                pisces: [
+                    "Your intuition guides you correctly.",
+                    "Artistic inspiration flows freely.",
+                    "Spiritual connections deepen today."
+                ]
+            };
+
+            const randomHoroscope = horoscopes[sign][Math.floor(Math.random() * horoscopes[sign].length)];
+            const zodiacEmojis = {
+                aries: '♈', taurus: '♉', gemini: '♊', cancer: '♋',
+                leo: '♌', virgo: '♍', libra: '♎', scorpio: '♏',
+                sagittarius: '♐', capricorn: '♑', aquarius: '♒', pisces: '♓'
+            };
+
             await sock.sendMessage(sender, {
-                text: `⭐ Available signs: ${signs.join(', ')}`
+                text: `${zodiacEmojis[sign]} ${sign.charAt(0).toUpperCase() + sign.slice(1)} Horoscope:\n\n${randomHoroscope}\n\n✨ The stars have spoken!`
             });
-            return;
+        } catch (err) {
+            logger.error('Horoscope error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred while reading your horoscope.' });
         }
-        // TODO: Implement horoscope logic here
-        await sock.sendMessage(sender, { text: 'Reading your horoscope...' });
     },
 
     async fortune(sock, sender) {
@@ -560,7 +639,7 @@ const funCommands = {
             const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
             const randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];
 
-            await sock.sendMessage(sender, { 
+            await sock.sendMessage(sender, {
                 text: `${randomEmoji} Your fortune tells me...\n\n"${randomFortune}"\n\nMay luck be on your side!`
             });
         } catch (err) {
@@ -769,7 +848,8 @@ Result: ${result}
                 ];
 
                 game = {
-                    word: words[Math.floor(Math.random() * words.length)],
+                    word: words[Math.floor```javascript
+random() * words.length)],
                     guesses: [],
                     maxAttempts: 6
                 };
@@ -794,30 +874,7 @@ Result: ${result}
                     return;
                 }
 
-                const feedback = [];
-                const targetWord = game.word.split('');
-                const remainingLetters = [...targetWord];
-
-                // First pass: find correct letters in correct positions
-                for (let i = 0; i < 5; i++) {
-                    if (guess[i] === targetWord[i]) {
-                        feedback[i] = '🟩'; // Green
-                        remainingLetters[i] = null;
-                    }
-                }
-
-                // Second pass: find correct letters in wrong positions
-                for (let i = 0; i < 5; i++) {
-                    if (!feedback[i]) {
-                        const index = remainingLetters.indexOf(guess[i]);
-                        if (index !== -1) {
-                            feedback[i] = '🟨'; // Yellow
-                            remainingLetters[index] = null;
-                        } else {
-                            feedback[i] = '⬜'; // Gray
-                        }
-                    }
-                }
+                const feedback = handleWordleGame(sock, sender, args, game);
 
                 game.guesses.push({ word: guess, feedback: feedback.join('') });
                 global.wordleGames.set(gameId, game);
@@ -833,9 +890,9 @@ Result: ${result}
                     global.wordleGames.delete(gameId);
                 } else if (isLost) {
                     await sock.sendMessage(sender, {
-                        text: `${display}\n\n💀 Game Over! The word was: ${game.word}`
+                        text: `${display}\n\n\n💀 Game Over! The word was: ${game.word}`
                     });
-                                        global.wordleGames.delete(gameId);
+                    global.wordleGames.delete(gameId);
                 } else {
                     await sock.sendMessage(sender, {
                         text: `${display}\n\n${game.maxAttempts - game.guesses.length} attempts remaining`
@@ -1106,7 +1163,7 @@ Result: ${result}
 
     // Virtual Marriage System
     async marry(sock, sender, args) {
-        if(!args[0]) {
+        if (!args[0]) {
             await sock.sendMessage(sender, { text: 'Please mention someone to marry' });
             return;
         }
@@ -1449,7 +1506,7 @@ Result: ${result}
         const compliments = [
             "Your smile lights up the room! ✨",
             "You're amazing at making others feel special! 🌟",
-            "Your positive energy iscontagious! 🌈",
+            "Your positive energy is contagious! 🌈",
             "You have a heart of gold! 💝",
             "You make the world a better place! 🌍",
             "Your creativity knows no bounds! 🎨",
@@ -1755,13 +1812,14 @@ function isValidMove(board, fromRow, fromCol, toRow, toCol) {
     }
 }
 
+// Fix the syntax in the chess king detection loop
 function isKingInCheck(board, color) {
-    // Simplified check detection
+    // Find the king
     let kingPos = null;
 
-    // Find the king
+    // Find the king position
     for (let i = 0; i < 8; i++) {
-        for (let j= 0; j < 8; j++) {
+        for (let j = 0; j < 8; j++) {
             const piece = board[i][j];
             if (piece && piece.type === 'king' && piece.color === color) {
                 kingPos = [i, j];
@@ -1788,28 +1846,35 @@ function isKingInCheck(board, color) {
     return false;
 }
 
-function getBestMove(board) {
-    // Simplified AI: Make a random valid move
-    const moves = [];
-    const color = 'black'; // AI plays as black
+// Fix Wordle game indentation and structure
+async function handleWordleGame(sock, sender, args, game) {
+    const guess = args[1]?.toUpperCase();
+    const feedback = [];
+    const targetWord = game.word.split('');
+    const remainingLetters = [...targetWord];
 
-    for (let fromRow = 0; fromRow < 8; fromRow++) {
-        for (let fromCol = 0; fromCol < 8; fromCol++) {
-            const piece = board[fromRow][fromCol];
-            if (piece && piece.color === color) {
-                for (let toRow = 0; toRow < 8; toRow++) {
-                    for (let toCol = 0; toCol < 8; toCol++) {
-                        if (isValidMove(board, fromRow, fromCol, toRow, toCol)) {
-                            moves.push({ fromRow, fromCol, toRow, toCol });
-                        }
-                    }
-                }
+    // First pass: find correct letters in correct positions
+    for (let i = 0; i < 5; i++) {
+        if (guess[i] === targetWord[i]) {
+            feedback[i] = '🟩'; // Green
+            remainingLetters[i] = null;
+        }
+    }
+
+    // Second pass: find correct letters in wrong positions
+    for (let i = 0; i < 5; i++) {
+        if (!feedback[i]) {
+            const index = remainingLetters.indexOf(guess[i]);
+            if (index !== -1) {
+                feedback[i] = '🟨'; // Yellow
+                remainingLetters[index] = null;
+            } else {
+                feedback[i] = '⬜'; // Gray
             }
         }
     }
 
-    if (moves.length === 0) return null;
-    return moves[Math.floor(Math.random() * moves.length)];
+    return feedback;
 }
 
 module.exports = {
@@ -1819,13 +1884,13 @@ module.exports = {
         try {
             logger.info('Initializing fun command handler...');
 
-            // Initialize any required global state
-            if (!global.games) global.games = new Map();
-            if (!global.hangmanGames) global.hangmanGames = new Map();
-            if (!global.wordleGames) global.wordleGames = new Map();
-            if (!global.chessGames) global.chessGames = new Map();
-            if (!global.quizGames) global.quizGames = new Map();
-            if (!global.triviaGames) global.triviaGames = new Map();
+            // Initialize global state
+            global.games = global.games || new Map();
+            global.hangmanGames = global.hangmanGames || new Map();
+            global.wordleGames = global.wordleGames || new Map();
+            global.chessGames = global.chessGames || new Map();
+            global.quizGames = global.quizGames || new Map();
+            global.triviaGames = global.triviaGames || new Map();
 
             // Create required directories
             const tempDir = path.join(__dirname, '../../temp/fun');
@@ -1835,7 +1900,7 @@ module.exports = {
             return true;
         } catch (err) {
             logger.error('Error initializing fun command handler:', err);
-            throw err;
+            return false;
         }
     }
 };
