@@ -28,6 +28,153 @@
       "usage": "!nsfwstats",
       "cooldown": 30,
       "permissions": ["admin"]
+    },
+    {
+      "name": "verify",
+      "description": "Verify your age to access NSFW content",
+      "usage": "!verify <your_age>",
+      "cooldown": 60,
+      "permissions": []
+    },
+    {
+      "name": "nsfwhelp",
+      "description": "Show available NSFW commands",
+      "usage": "!nsfwhelp",
+      "cooldown": 10,
+      "permissions": []
+    },
+    {
+      "name": "waifu",
+      "description": "Get NSFW waifu image",
+      "usage": "!waifu",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "neko",
+      "description": "Get NSFW neko image",
+      "usage": "!neko",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "hentai",
+      "description": "Get hentai image",
+      "usage": "!hentai",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "boobs",
+      "description": "Get breast image",
+      "usage": "!boobs",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "ass",
+      "description": "Get butt image",
+      "usage": "!ass",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "pussy",
+      "description": "Get vagina image",
+      "usage": "!pussy",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "blowjob",
+      "description": "Get oral act image",
+      "usage": "!blowjob",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "anal",
+      "description": "Get anal act image",
+      "usage": "!anal",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "feet",
+      "description": "Get feet image",
+      "usage": "!feet",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "gifboobs",
+      "description": "Get breast animation",
+      "usage": "!gifboobs",
+      "cooldown": 45,
+      "permissions": []
+    },
+    {
+      "name": "gifass",
+      "description": "Get butt animation",
+      "usage": "!gifass",
+      "cooldown": 45,
+      "permissions": []
+    },
+    {
+      "name": "gifhentai",
+      "description": "Get hentai animation",
+      "usage": "!gifhentai",
+      "cooldown": 45,
+      "permissions": []
+    },
+    {
+      "name": "gifblowjob",
+      "description": "Get oral animation",
+      "usage": "!gifblowjob",
+      "cooldown": 45,
+      "permissions": []
+    },
+    {
+      "name": "uniform",
+      "description": "Get school/work uniform image",
+      "usage": "!uniform",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "thighs",
+      "description": "Get thigh image",
+      "usage": "!thighs",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "femdom",
+      "description": "Get female dominance image",
+      "usage": "!femdom",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "tentacle",
+      "description": "Get tentacle genre image",
+      "usage": "!tentacle",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "pantsu",
+      "description": "Get underwear image",
+      "usage": "!pantsu",
+      "cooldown": 30,
+      "permissions": []
+    },
+    {
+      "name": "kitsune",
+      "description": "Get fox girl image",
+      "usage": "!kitsune",
+      "cooldown": 30,
+      "permissions": []
     }
   ]
 }

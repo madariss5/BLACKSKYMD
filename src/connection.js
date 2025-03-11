@@ -317,6 +317,22 @@ async function startConnection() {
 
             if (events['creds.update']) {
                 await saveCreds();
+                
+                // When credentials are updated and we're on Heroku, create a backup
+                if (isHeroku) {
+                    try {
+                        logger.info('Credentials updated, creating Heroku backup...');
+                        await sessionManager.backupCredentials();
+                        
+                        // Also create an emergency backup for important credential updates
+                        if (events['creds.update'].me) {
+                            logger.info('Critical credentials update detected, creating emergency backup');
+                            await sessionManager.emergencyCredsSave(events['creds.update']);
+                        }
+                    } catch (backupErr) {
+                        logger.error('Failed to create backup after credentials update:', backupErr);
+                    }
+                }
             }
 
             if (events['messages.upsert']) {
@@ -352,9 +368,27 @@ async function startConnection() {
             if (sock) {
                 try {
                     logger.info(`Received ${signal}, cleaning up...`);
+                    
+                    // On Heroku, try to create a final backup before shutting down
+                    if (isHeroku && isConnected) {
+                        try {
+                            logger.info('Creating final backup before shutdown...');
+                            await sessionManager.backupCredentials();
+                            logger.info('Final backup completed');
+                        } catch (backupErr) {
+                            logger.error('Final backup failed:', backupErr);
+                        }
+                    }
+                    
+                    // Perform normal cleanup
                     await sock.logout();
                     await sock.end();
-                    await cleanAuthState();
+                    
+                    // Only clean auth state if not on Heroku (preserve files for backup)
+                    if (!isHeroku) {
+                        await cleanAuthState();
+                    }
+                    
                     logger.info('Cleanup completed');
                 } catch (err) {
                     logger.error('Cleanup error:', err);
