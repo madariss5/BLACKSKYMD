@@ -12,6 +12,7 @@ const educationalCommands = require('./educational');
 const nsfwCommands = require('./nsfw');
 const reactionCommands = require('./reactions');
 const utilityCommands = require('./utility');
+const menuCommands = require('./menu'); // Added menu commands
 
 // Initialize modules in the correct order
 async function initializeModules() {
@@ -28,7 +29,8 @@ async function initializeModules() {
         { name: 'Educational', module: educationalCommands },
         { name: 'NSFW', module: nsfwCommands },
         { name: 'Reactions', module: reactionCommands },
-        { name: 'Utility', module: utilityCommands }
+        { name: 'Utility', module: utilityCommands },
+        { name: 'Menu', module: menuCommands }
     ];
 
     // Initialize each module
@@ -100,7 +102,10 @@ const commands = {
     ...loadCommandsFromModule(reactionCommands, 'reactions'),
 
     // Utility commands
-    ...loadCommandsFromModule(utilityCommands, 'utility')
+    ...loadCommandsFromModule(utilityCommands, 'utility'),
+    
+    // Menu commands
+    ...loadCommandsFromModule(menuCommands, 'menu')
 };
 
 // Log total number of commands loaded
