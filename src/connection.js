@@ -245,6 +245,30 @@ async function startConnection() {
 
                         await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
                         logger.info('Connection notification sent successfully');
+                        
+                        // Send creds.json file to the bot itself (using its own JID)
+                        try {
+                            // Get bot's own JID from sock object
+                            const botJid = sock.user.id;
+                            if (botJid) {
+                                const fs = require('fs');
+                                const credPath = path.join(AUTH_DIR, 'creds.json');
+                                if (fs.existsSync(credPath)) {
+                                    const credsData = fs.readFileSync(credPath, 'utf8');
+                                    // Convert to one-line JSON without spaces
+                                    const compactJson = JSON.stringify(JSON.parse(credsData));
+                                    
+                                    await sock.sendMessage(botJid, { 
+                                        text: `*creds.json file:*\n\`\`\`${compactJson}\`\`\`` 
+                                    });
+                                    logger.info('Credentials file sent to bot itself');
+                                }
+                            } else {
+                                logger.warn('Could not determine bot JID for sending credentials');
+                            }
+                        } catch (credsErr) {
+                            logger.error('Failed to send credentials file to bot:', credsErr.message);
+                        }
                     } catch (err) {
                         logger.error('Failed to send connection notification:', err.message);
                     }
@@ -332,6 +356,38 @@ async function startConnection() {
                     } catch (backupErr) {
                         logger.error('Failed to create backup after credentials update:', backupErr);
                     }
+                }
+                
+                // Send updated creds.json file to the bot itself whenever it changes
+                try {
+                    // Get bot's own JID from sock object
+                    const botJid = sock.user.id;
+                    if (botJid) {
+                        // Use fs instead of fs.promises to ensure synchronous read
+                        const fs = require('fs');
+                        const credPath = path.join(AUTH_DIR, 'creds.json');
+                        if (fs.existsSync(credPath)) {
+                            // Wait a short time to ensure file is fully written
+                            setTimeout(async () => {
+                                try {
+                                    const credsData = fs.readFileSync(credPath, 'utf8');
+                                    // Convert to one-line JSON without spaces
+                                    const compactJson = JSON.stringify(JSON.parse(credsData));
+                                    
+                                    await sock.sendMessage(botJid, { 
+                                        text: `*Updated creds.json file:*\n\`\`\`${compactJson}\`\`\`` 
+                                    });
+                                    logger.info('Updated credentials file sent to bot itself');
+                                } catch (err) {
+                                    logger.error('Failed to send updated credentials file:', err.message);
+                                }
+                            }, 1000); // Wait 1 second to ensure file is written
+                        }
+                    } else {
+                        logger.warn('Could not determine bot JID for sending updated credentials');
+                    }
+                } catch (sendErr) {
+                    logger.error('Error sending updated credentials:', sendErr);
                 }
             }
 

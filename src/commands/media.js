@@ -377,6 +377,12 @@ const mediaCommands = {
     async reverse(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!message.message?.videoMessage) {
                 await sock.sendMessage(remoteJid, {
                     text: '*📝 Usage:* Reply to a video with .reverse'
@@ -427,6 +433,12 @@ const mediaCommands = {
     async ttp(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             const text = args.join(' ');
             if (!text) {
                 await sock.sendMessage(remoteJid, { text: '*📝 Usage:* .ttp [text]' });
@@ -475,6 +487,12 @@ const mediaCommands = {
     async attp(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             const text = args.join(' ');
             if (!text) {
                 await sock.sendMessage(remoteJid, { text: '*📝 Usage:* .attp [text]' });
@@ -540,6 +558,12 @@ const mediaCommands = {
     async emojimix(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             const emojis = args.join('').split('+');
 
             if (emojis.length !== 2) {
@@ -585,6 +609,12 @@ const mediaCommands = {
     async tovideo(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!message.message?.stickerMessage || !message.message.stickerMessage.isAnimated) {
                 await sock.sendMessage(remoteJid, { text: '*📝 Usage:* Reply to an animated sticker with .tovideo' });
                 return;
@@ -631,6 +661,12 @@ const mediaCommands = {
     async trim(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!message.message?.videoMessage || args.length !== 2) {
                 await sock.sendMessage(remoteJid, { 
                     text: '*📝 Usage:* Reply to a video with .trim [start_time] [end_time]\nExample: .trim 0:10 0:30' 
@@ -682,6 +718,12 @@ const mediaCommands = {
     async speed(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
+            
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+            
             if (!message.message?.videoMessage || !args[0]) {
                 await sock.sendMessage(remoteJid, { 
                     text: '*📝 Usage:* Reply to a video with .speed [factor]\nExample: .speed 2 (2x faster) or .speed 0.5 (2x slower)' 
