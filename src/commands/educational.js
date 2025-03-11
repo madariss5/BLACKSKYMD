@@ -1,6 +1,7 @@
 const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
+const axios = require('axios');
 
 // Helper functions
 const handleError = async (sock, jid, err, message) => {
@@ -18,23 +19,72 @@ const educationalCommands = {
                 await sock.sendMessage(remoteJid, { text: '📚 Please provide a word to define' });
                 return;
             }
-            // TODO: Implement dictionary API integration
+
             await sock.sendMessage(remoteJid, { text: '📖 Looking up definition...' });
+
+            // Free Dictionary API integration
+            const response = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+
+            if (response.data && response.data.length > 0) {
+                const entry = response.data[0];
+                let definition = `📚 *${entry.word}*\n\n`;
+
+                if (entry.phonetic) {
+                    definition += `Pronunciation: ${entry.phonetic}\n\n`;
+                }
+
+                entry.meanings.forEach((meaning, index) => {
+                    definition += `*${meaning.partOfSpeech}*\n`;
+                    meaning.definitions.slice(0, 2).forEach((def, i) => {
+                        definition += `${i + 1}. ${def.definition}\n`;
+                        if (def.example) {
+                            definition += `   Example: "${def.example}"\n`;
+                        }
+                    });
+                    definition += '\n';
+                });
+
+                await sock.sendMessage(remoteJid, { text: definition });
+            } else {
+                await sock.sendMessage(remoteJid, { text: '❌ No definition found for this word.' });
+            }
         } catch (err) {
             await handleError(sock, message.key.remoteJid, err, 'Error looking up definition');
         }
     },
 
     async translate(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        if (args.length < 2) {
-            await sock.sendMessage(remoteJid, { 
-                text: '🌐 Usage: !translate [target_language] [text]' 
+        try {
+            const remoteJid = message.key.remoteJid;
+            if (args.length < 2) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '🌐 Usage: !translate [target_language] [text]\nExample: !translate es Hello world' 
+                });
+                return;
+            }
+
+            const targetLang = args[0].toLowerCase();
+            const text = args.slice(1).join(' ');
+
+            // Using LibreTranslate API (self-hosted or public instance)
+            const response = await axios.post('https://libretranslate.de/translate', {
+                q: text,
+                source: 'auto',
+                target: targetLang
             });
-            return;
+
+            if (response.data && response.data.translatedText) {
+                await sock.sendMessage(remoteJid, { 
+                    text: `🔄 Translation:\n${response.data.translatedText}` 
+                });
+            } else {
+                await sock.sendMessage(remoteJid, { 
+                    text: '❌ Could not translate the text. Please check the language code and try again.' 
+                });
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error translating text');
         }
-        // TODO: Implement translation API integration
-        await sock.sendMessage(remoteJid, { text: '🔄 Translating...' });
     },
 
     async grammar(sock, message, args) {
