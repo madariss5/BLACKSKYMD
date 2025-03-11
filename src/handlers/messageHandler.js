@@ -106,22 +106,20 @@ async function messageHandler(sock, message) {
         const sender = message.key.remoteJid;
         const isGroup = sender.endsWith('@g.us');
         const prefix = config.bot.prefix || '.';
-        const fromMe = message.key.fromMe;
-        
-        // Skip processing messages from self
-        if (fromMe) return;
         
         // Get user ID - for groups, we need participant (sender)
         let userId = sender;
         if (isGroup && message.participant) {
             userId = message.participant;
+        } else if (isGroup && message.key.participant) {
+            userId = message.key.participant;
         }
         
         // Get user profile for the sender if they are registered
         const userData = userDatabase.getUserProfile(userId);
         
         // Track activity and award XP if user is registered
-        if (userData && !fromMe) {
+        if (userData) {
             // Determine activity type
             let activityType = getMessageType(message);
             
@@ -138,7 +136,7 @@ async function messageHandler(sock, message) {
             if (levelUpData) {
                 await handleLevelUp(sock, userId, levelUpData, userData);
             }
-        } else if (!fromMe) {
+        } else {
             // Auto-register new users with minimal details so they can start earning XP
             userDatabase.initializeUserProfile(userId, {
                 name: 'User', // Default name, they can update it later
@@ -165,7 +163,7 @@ async function messageHandler(sock, message) {
                     });
                 }
             }
-        } else if (!isGroup && !fromMe) {
+        } else if (!isGroup) {
             // Check if we've sent a help message recently
             const now = Date.now();
             const lastHelpMessage = helpMessageCache.get(sender);

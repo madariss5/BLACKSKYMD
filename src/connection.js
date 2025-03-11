@@ -369,14 +369,30 @@ async function startConnection() {
                 if (upsert.type === 'notify') {
                     for (const msg of upsert.messages) {
                         if (!msg.message) continue;
+                        
+                        // Skip processing if message is from self (prevents loops)
+                        if (msg.key.fromMe) continue;
+                        
                         try {
-                            // Check if message is from a group
+                            // Process message based on context
                             if (msg.key.remoteJid.endsWith('@g.us')) {
-                                await handleGroupMessage(sock, msg);
+                                // Group message: handle group-specific features first
+                                try {
+                                    await handleGroupMessage(sock, msg);
+                                } catch (groupErr) {
+                                    logger.error('Group message handling error:', groupErr);
+                                }
                             }
+                            
+                            // Process the message through the main handler
                             await messageHandler(sock, msg);
                         } catch (err) {
-                            logger.error('Message handling error:', err);
+                            logger.error('Message handling error:', {
+                                error: err.message,
+                                stack: err.stack,
+                                messageType: msg.message ? Object.keys(msg.message)[0] : 'unknown',
+                                chat: msg.key.remoteJid
+                            });
                         }
                     }
                 }

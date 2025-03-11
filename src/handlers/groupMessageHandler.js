@@ -21,9 +21,29 @@ function containsLink(message) {
 // Function to check if a message contains toxic content
 function containsToxicContent(message) {
     try {
-        const toxicWords = ['toxic1', 'toxic2', 'toxic3']; // Add your toxic word list
-        const messageWords = message.toLowerCase().split(/\s+/);
-        return toxicWords.some(word => messageWords.includes(word.toLowerCase()));
+        // Common toxic/inappropriate words
+        const toxicWords = [
+            // Profanity/slurs (obscured to avoid encoding directly)
+            'f*ck', 'sh*t', 'b*tch', 'd*ck', 'a**hole', 'c*nt',
+            // Hate speech-related
+            'n*gger', 'f*ggot', 'r*tard',
+            // Threatening language
+            'kill yourself', 'kys', 'kill you', 'suicide',
+            // Sexual harassment
+            'r*pe', 'molest', 'sexual'
+        ];
+        
+        // Convert message to lowercase for comparison
+        const lowerMessage = message.toLowerCase();
+        
+        // Check for exact matches and partial matches with word boundaries
+        return toxicWords.some(word => {
+            // Remove the asterisks for regex pattern (replacing with wildcards)
+            const pattern = word.replace(/\*/g, '\\w*');
+            // Create regex with word boundaries
+            const regex = new RegExp(`\\b${pattern}\\b|\\b${pattern}s\\b|\\b${pattern}ing\\b`, 'i');
+            return regex.test(lowerMessage);
+        });
     } catch (err) {
         logger.error('Error in toxicity check:', err);
         return false;
@@ -76,21 +96,41 @@ async function handleGroupMessage(sock, message) {
             return;
         }
 
-        const sender = message.key.participant;
-        const messageText = message.message?.conversation || 
-                          message.message?.extendedTextMessage?.text || '';
-
-        logger.debug(`Processing group message from ${sender}`);
-
-        // Get group metadata and settings
-        const groupMetadata = await sock.groupMetadata(remoteJid);
-        const settings = groupMetadata.settings || {};
-
-        // Skip checks for admins
-        const isUserAdmin = await isAdmin(sock, remoteJid, sender);
-        if (isUserAdmin) {
-            logger.debug('Message from admin, skipping checks');
+        // Determine sender with fallback options
+        const sender = message.key.participant || message.participant;
+        if (!sender) {
+            logger.debug('Cannot identify sender in group message, skipping');
             return;
+        }
+        
+        // Extract message text with support for different message types
+        const messageText = message.message?.conversation || 
+                          message.message?.extendedTextMessage?.text || 
+                          message.message?.imageMessage?.caption ||
+                          message.message?.videoMessage?.caption || '';
+
+        logger.debug(`Processing group message from ${sender} in ${remoteJid}`);
+
+        // Try to get group metadata and settings with error handling
+        let groupMetadata, settings = {};
+        try {
+            groupMetadata = await sock.groupMetadata(remoteJid);
+            settings = groupMetadata.settings || {};
+        } catch (metaErr) {
+            logger.error('Failed to fetch group metadata:', metaErr);
+            // Continue with default settings
+        }
+
+        // Skip moderation checks for admins
+        try {
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+            if (isUserAdmin) {
+                logger.debug('Message from admin, skipping moderation checks');
+                return;
+            }
+        } catch (adminErr) {
+            logger.error('Failed to check admin status:', adminErr);
+            // If we can't determine admin status, continue with moderation
         }
 
         // Anti-link check
