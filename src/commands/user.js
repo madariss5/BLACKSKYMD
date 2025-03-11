@@ -9,18 +9,22 @@ const randomstring = require('randomstring');
 const cryptoRandomString = require('crypto-random-string');
 const axios = require('axios');
 const { getCountry } = require('countries-list');
+const userDatabase = require('../utils/userDatabase');
+const levelingSystem = require('../utils/levelingSystem');
 
-// Simulated database for user profiles (should be replaced with actual database)
-const userProfiles = new Map();
-const userGames = new Map();
-const marriageData = new Map();
-const bankAccounts = new Map();
-const userJobs = new Map();
-const petData = new Map();
-const userAfk = new Map();
-const streakData = new Map();
-const checkinData = new Map();
-const lotteryParticipants = new Set();
+// Use the centralized userDatabase instead of separate maps
+const { 
+    userProfiles, 
+    userGames, 
+    marriageData, 
+    bankAccounts, 
+    userJobs, 
+    petData, 
+    userAfk, 
+    streakData, 
+    checkinData, 
+    lotteryParticipants 
+} = userDatabase;
 
 // Create temp directory for profile card images
 const TEMP_DIR = path.join(process.cwd(), 'temp', 'user');
@@ -438,35 +442,55 @@ const userCommands = {
     },
 
     async level(sock, sender) {
-        const profile = userProfiles.get(sender);
-        if (!profile) {
-            await sock.sendMessage(sender, { text: '❌ You need to register first!' });
-            return;
+        try {
+            // Use our userDatabase and levelingSystem
+            const profile = userDatabase.getUserProfile(sender);
+            if (!profile) {
+                await sock.sendMessage(sender, { text: '❌ You need to register first! Use .register to create a profile.' });
+                return;
+            }
+
+            const progress = levelingSystem.getLevelProgress(sender);
+            
+            // Create fancy level information text
+            const levelText = `
+*📊 Level Information*
+
+📈 Current Level: ${progress.currentLevel}
+⭐ Current XP: ${progress.currentXP}
+🎯 Next level at: ${progress.requiredXP} XP
+📉 Progress: ${progress.progressBar}
+            `.trim();
+
+            await sock.sendMessage(sender, { text: levelText });
+            
+            // Generate and send level card image
+            try {
+                const cardPath = await levelingSystem.generateLevelCard(sender, profile);
+                if (cardPath) {
+                    await sock.sendMessage(sender, {
+                        image: { url: cardPath },
+                        caption: `🏆 Your Level ${progress.currentLevel} Status Card`
+                    });
+                }
+            } catch (err) {
+                logger.error('Error generating level card in level command:', err);
+                // Continue execution even if card generation fails
+            }
+        } catch (err) {
+            logger.error('Error in level command:', err);
+            await sock.sendMessage(sender, { text: '❌ Error fetching level information.' });
         }
-
-        const nextLevel = levelThresholds[profile.level];
-        const progress = (profile.xp / nextLevel * 100).toFixed(1);
-
-        const levelText = `
-📊 Level Progress
-📈 Current Level: ${profile.level}
-⭐ XP: ${profile.xp}/${nextLevel}
-📏 Progress: ${progress}%
-
-🎯 Next level at: ${nextLevel} XP
-        `.trim();
-
-        await sock.sendMessage(sender, { text: levelText });
     },
 
     async daily(sock, message) {
         try {
             const sender = message.key.remoteJid;
-            const profile = userProfiles.get(sender);
+            const profile = userDatabase.getUserProfile(sender);
 
             if (!profile) {
                 await sock.sendMessage(sender, { 
-                    text: '*❌ Error:* You need to register first!' 
+                    text: '*❌ Error:* You need to register first! Use .register to create a profile.' 
                 });
                 return;
             }
@@ -474,7 +498,11 @@ const userCommands = {
             const now = new Date();
             const lastDaily = profile.lastDaily ? new Date(profile.lastDaily) : null;
 
-            if (lastDaily && now.getDate() === lastDaily.getDate()) {
+            // Check if already claimed today
+            if (lastDaily && now.getDate() === lastDaily.getDate() && 
+                now.getMonth() === lastDaily.getMonth() && 
+                now.getFullYear() === lastDaily.getFullYear()) {
+                
                 const nextReset = new Date(now);
                 nextReset.setDate(nextReset.getDate() + 1);
                 nextReset.setHours(0, 0, 0, 0);
@@ -489,25 +517,88 @@ const userCommands = {
                 return;
             }
 
-            const xpReward = Math.floor(Math.random() * 50) + 50;
-            const coinsReward = Math.floor(Math.random() * 100) + 100;
+            // Calculate streak (consecutive days)
+            let streak = profile.dailyStreak || 0;
+            
+            if (lastDaily) {
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                // Check if last claim was yesterday
+                if (lastDaily.getDate() === yesterday.getDate() && 
+                    lastDaily.getMonth() === yesterday.getMonth() && 
+                    lastDaily.getFullYear() === yesterday.getFullYear()) {
+                    streak++;
+                } else {
+                    streak = 1; // Reset streak if not consecutive
+                }
+            } else {
+                streak = 1; // First time claiming
+            }
+            
+            // Store the updated streak
+            profile.dailyStreak = streak;
+            
+            // Calculate rewards - more rewards for longer streaks
+            const baseXP = 100;
+            const baseCoins = 100;
+            const streakMultiplier = Math.min(2, 1 + (streak * 0.1)); // Max 2x multiplier for 10+ day streak
+            
+            const xpReward = Math.floor((Math.random() * 50 + baseXP) * streakMultiplier);
+            const coinsReward = Math.floor((Math.random() * 100 + baseCoins) * streakMultiplier);
 
-            profile.xp += xpReward;
+            // Update user profile
             profile.coins += coinsReward;
             profile.lastDaily = now.toISOString();
+            userDatabase.updateUserProfile(sender, { 
+                coins: profile.coins, 
+                lastDaily: profile.lastDaily,
+                dailyStreak: profile.dailyStreak
+            });
 
-            // Check for level up
-            while (profile.xp >= levelThresholds[profile.level]) {
-                profile.level++;
+            // Add XP and check for level up
+            const levelUpData = levelingSystem.addXP(sender, 'daily');
+            
+            // Create reward message
+            let rewardText = `*🎁 Daily Reward Claimed!*\n\n*⭐ XP:* +${xpReward}\n*💰 Coins:* +${coinsReward}\n*📅 Streak:* ${streak} day${streak !== 1 ? 's' : ''}`;
+
+            // Add streak bonus info if applicable
+            if (streak > 1) {
+                const bonusPercent = Math.floor((streakMultiplier - 1) * 100);
+                rewardText += `\n*🔥 Streak Bonus:* +${bonusPercent}%`;
             }
-
-            let rewardText = `*🎁 Daily Reward Claimed!*\n\n*⭐ XP:* +${xpReward}\n*💰 Coins:* +${coinsReward}`;
-
-            if (profile.level > 1) {
-                rewardText += `\n\n*🎉 Level Up!*\nYou are now level ${profile.level}!`;
+            
+            // Add level up info if leveled up
+            if (levelUpData) {
+                rewardText += `\n\n*🎉 Level Up!*\nYou are now level ${levelUpData.newLevel}!`;
             }
 
             await sock.sendMessage(sender, { text: rewardText });
+            
+            // Award achievements for streaks
+            if (streak >= 7) {
+                profile.achievements = profile.achievements || [];
+                if (!profile.achievements.includes('Weekly Streak')) {
+                    profile.achievements.push('Weekly Streak');
+                    userDatabase.updateUserProfile(sender, { achievements: profile.achievements });
+                    
+                    await sock.sendMessage(sender, { 
+                        text: `*🏆 Achievement Unlocked:* Weekly Streak\n\nYou've claimed daily rewards for 7 days in a row!` 
+                    });
+                }
+            }
+            
+            if (streak >= 30) {
+                profile.achievements = profile.achievements || [];
+                if (!profile.achievements.includes('Monthly Dedication')) {
+                    profile.achievements.push('Monthly Dedication');
+                    userDatabase.updateUserProfile(sender, { achievements: profile.achievements });
+                    
+                    await sock.sendMessage(sender, { 
+                        text: `*🏆 Achievement Unlocked:* Monthly Dedication\n\nYou've claimed daily rewards for 30 days in a row!` 
+                    });
+                }
+            }
         } catch (err) {
             logger.error('Error in daily command:', err);
             await sock.sendMessage(message.key.remoteJid, {
@@ -516,31 +607,69 @@ const userCommands = {
         }
     },
     async leaderboard(sock, sender, args) {
-        const [type = 'xp'] = args;
-        const validTypes = ['xp', 'coins', 'level'];
+        try {
+            const [type = 'xp'] = args;
+            const validTypes = ['xp', 'coins', 'level'];
 
-        if (!validTypes.includes(type)) {
+            if (!validTypes.includes(type)) {
+                await sock.sendMessage(sender, { 
+                    text: `*📊 Available Leaderboard Types:*\n${validTypes.join(', ')}` 
+                });
+                return;
+            }
+
+            // Use the leveling system's leaderboard function for XP leaderboard
+            let users;
+            
+            if (type === 'xp') {
+                users = levelingSystem.getLeaderboard(10);
+            } else {
+                // For other types, use the user database
+                users = Array.from(userProfiles.entries())
+                    .map(([id, profile]) => ({
+                        id,
+                        name: profile.name || 'User',
+                        value: profile[type] || 0
+                    }))
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, 10);
+            }
+
+            // Format the leaderboard nicely
+            const leaderboardText = `
+*🏆 ${type.toUpperCase()} Leaderboard*
+
+${users.map((user, i) => `${i + 1}. *${user.name}*: ${formatNumber(user.value)} ${type === 'xp' ? 'XP' : type === 'coins' ? '💰' : '📊'}`).join('\n')}
+            `.trim();
+
+            await sock.sendMessage(sender, { text: leaderboardText });
+            
+            // Send top user card if it's XP leaderboard
+            if (type === 'xp' && users.length > 0) {
+                try {
+                    const topUser = users[0];
+                    const topUserProfile = userDatabase.getUserProfile(topUser.id);
+                    
+                    if (topUserProfile) {
+                        const cardPath = await levelingSystem.generateLevelCard(topUser.id, topUserProfile);
+                        if (cardPath) {
+                            await sock.sendMessage(sender, {
+                                image: { url: cardPath },
+                                caption: `👑 Top user: ${topUser.name} (Level ${topUser.level})`
+                            });
+                        }
+                    }
+                } catch (err) {
+                    logger.error('Error generating top user card:', err);
+                    // Continue execution even if card generation fails
+                }
+            }
+        } catch (err) {
+            logger.error('Error in leaderboard command:', err);
             await sock.sendMessage(sender, { 
-                text: `📊 Available leaderboard types: ${validTypes.join(', ')}` 
+                text: '❌ Error fetching leaderboard data. Please try again.' 
             });
-            return;
         }
-
-        const users = Array.from(userProfiles.entries())
-            .map(([id, profile]) => ({
-                id,
-                name: profile.name,
-                value: profile[type]
-            }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 10);
-
-        const leaderboardText = `
-🏆 ${type.toUpperCase()} Leaderboard
-${users.map((user, i) => `${i + 1}. ${user.name}: ${user.value}`).join('\n')}
-        `.trim();
-
-        await sock.sendMessage(sender, { text: leaderboardText });
     },
 
     async achievements(sock, sender) {
