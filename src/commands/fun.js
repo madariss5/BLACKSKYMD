@@ -677,21 +677,24 @@ ${result[0] === result[1] && result[1] === result[2] ? '🎉 Jackpot! You won!' 
 
             if (!userChoice || !choices.includes(userChoice)) {
                 await sock.sendMessage(sender, {
-                    text: 'Usage: !rps <rock|paper|scissors>\nExample: !rps rock'
+                    text: '🎮 Rock Paper Scissors\nUsage: !rps <rock|paper|scissors>\nExample: !rps rock'
                 });
                 return;
             }
 
             const botChoice = choices[Math.floor(Math.random() * choices.length)];
-            let result = "It's a tie! 🤝";
+            let result;
 
-            if (
+            // Determine winner using clear logic
+            if (userChoice === botChoice) {
+                result = "It's a tie! 🤝";
+            } else if (
                 (userChoice === 'rock' && botChoice === 'scissors') ||
                 (userChoice === 'paper' && botChoice === 'rock') ||
                 (userChoice === 'scissors' && botChoice === 'paper')
             ) {
                 result = 'You win! 🎉';
-            } else if (userChoice !== botChoice) {
+            } else {
                 result = 'Bot wins! 🤖';
             }
 
@@ -706,12 +709,14 @@ ${result[0] === result[1] && result[1] === result[2] ? '🎉 Jackpot! You won!' 
 You: ${emojis[userChoice]} ${userChoice}
 Bot: ${emojis[botChoice]} ${botChoice}
 Result: ${result}
-            `.trim();
+        `.trim();
 
             await sock.sendMessage(sender, { text: message });
         } catch (err) {
             logger.error('RPS game error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await sock.sendMessage(sender, { 
+                text: '❌ An error occurred during the game. Please try again.'
+            });
         }
     },
 
@@ -842,14 +847,12 @@ Result: ${result}
                 }
 
                 const words = [
-                    'SWEET', 'BREAD', 'CLOUD', 'DREAM', 'HAPPY',
-                    'LIGHT', 'MUSIC', 'PEACE', 'SMILE', 'WORLD',
-                    'BEACH', 'CLEAN', 'DANCE', 'EARTH', 'FRESH'
+                    'SMILE', 'BEACH', 'DREAM', 'LIGHT', 'HAPPY',
+                    'CLOUD', 'FRESH', 'HEART', 'MUSIC', 'DANCE'
                 ];
 
                 game = {
-                    word: words[Math.floor```javascript
-random() * words.length)],
+                    word: words[Math.floor(Math.random() * words.length)],
                     guesses: [],
                     maxAttempts: 6
                 };
@@ -857,7 +860,7 @@ random() * words.length)],
                 global.wordleGames.set(gameId, game);
 
                 await sock.sendMessage(sender, {
-                    text: `🎮 Wordle Game Started!\nGuess the 5-letter word\nYou have ${game.maxAttempts} attempts.\n\n⬜⬜⬜⬜⬜\n\nUse: !wordle guess [word]`
+                    text: '🎮 Wordle Game Started!\nGuess the 5-letter word.\nYou have 6 attempts.\n\nUse: !wordle guess [word]'
                 });
                 return;
             }
@@ -870,41 +873,291 @@ random() * words.length)],
 
                 const guess = args[1]?.toUpperCase();
                 if (!guess || guess.length !== 5 || !/^[A-Z]+$/.test(guess)) {
-                    await sock.sendMessage(sender, { text: '❌ Please enter a valid 5-letter word' });
+                    await sock.sendMessage(sender, { text: '❌ Please provide a valid 5-letter word' });
                     return;
                 }
 
-                const feedback = handleWordleGame(sock, sender, args, game);
+                try {
+                    const feedback = handleWordleGuess(game.word, guess);
+                    game.guesses.push({ word: guess, feedback: feedback });
+                    global.wordleGames.set(gameId, game);
 
-                game.guesses.push({ word: guess, feedback: feedback.join('') });
-                global.wordleGames.set(gameId, game);
+                    const display = game.guesses.map(g => `${g.word} ${g.feedback}`).join('\n');
+                    const isWon = guess === game.word;
+                    const isLost = game.guesses.length >= game.maxAttempts;
 
-                const display = game.guesses.map(g => `${g.feedback} ${g.word}`).join('\n');
-                const isWon = guess === game.word;
-                const isLost = game.guesses.length >= game.maxAttempts;
-
-                if (isWon) {
-                    await sock.sendMessage(sender, {
-                        text: `${display}\n\n🎉 Congratulations! You won in ${game.guesses.length} tries!`
-                    });
+                    if (isWon) {
+                        await sock.sendMessage(sender, {
+                            text: `${display}\n\n🎉 Congratulations! You found the word!`
+                        });
+                        global.wordleGames.delete(gameId);
+                    } else if (isLost) {
+                        await sock.sendMessage(sender, {
+                            text: `${display}\n\n💀 Game Over! The word was: ${game.word}`
+                        });
+                        global.wordleGames.delete(gameId);
+                    } else {
+                        await sock.sendMessage(sender, {
+                            text: `${display}\n\n${game.maxAttempts - game.guesses.length} attempts remaining`
+                        });
+                    }
+                } catch (err) {
+                    logger.error('Error processing Wordle guess:', err);
+                    await sock.sendMessage(sender, { text: '❌ An error occurred while processing your guess.' });
                     global.wordleGames.delete(gameId);
-                } else if (isLost) {
-                    await sock.sendMessage(sender, {
-                        text: `${display}\n\n\n💀 Game Over! The word was: ${game.word}`
-                    });
-                    global.wordleGames.delete(gameId);
-                } else {
-                    await sock.sendMessage(sender, {
-                        text: `${display}\n\n${game.maxAttempts - game.guesses.length} attempts remaining`
-                    });
                 }
             }
         } catch (err) {
             logger.error('Wordle error:', err);
             await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            global.wordleGames.delete(gameId);
         }
     },
 
+    // Enhanced RPS game with better validation and error handling
+    async rps(sock, sender, args) {
+        try {
+            const choices = ['rock', 'paper', 'scissors'];
+            const userChoice = args[0]?.toLowerCase();
+
+            if (!userChoice || !choices.includes(userChoice)) {
+                await sock.sendMessage(sender, {
+                    text: '🎮 Rock Paper Scissors\nUsage: !rps <rock|paper|scissors>\nExample: !rps rock'
+                });
+                return;
+            }
+
+            const botChoice = choices[Math.floor(Math.random() * choices.length)];
+            let result;
+
+            // Determine winner using clear logic
+            if (userChoice === botChoice) {
+                result = "It's a tie! 🤝";
+            } else if (
+                (userChoice === 'rock' && botChoice === 'scissors') ||
+                (userChoice === 'paper' && botChoice === 'rock') ||
+                (userChoice === 'scissors' && botChoice === 'paper')
+            ) {
+                result = 'You win! 🎉';
+            } else {
+                result = 'Bot wins! 🤖';
+            }
+
+            const emojis = {
+                rock: '🪨',
+                paper: '📄',
+                scissors: '✂️'
+            };
+
+            const message = `
+🎮 Rock Paper Scissors
+You: ${emojis[userChoice]} ${userChoice}
+Bot: ${emojis[botChoice]} ${botChoice}
+Result: ${result}
+        `.trim();
+
+            await sock.sendMessage(sender, { text: message });
+        } catch (err) {
+            logger.error('RPS game error:', err);
+            await sock.sendMessage(sender, { 
+                text: '❌ An error occurred during the game. Please try again.'
+            });
+        }
+    },
+
+    async chess(sock, sender, args) {
+        try {
+            if (!global.chessGames) global.chessGames = new Map();
+
+            const gameId = sender;
+            let game = global.chessGames.get(gameId);
+
+            if (!args[0]) {
+                await sock.sendMessage(sender, {
+                    text: 'Usage:\n!chess start - Start new game\n!chess move [from] [to] - Make a move (e.g., e2 e4)'
+                });
+                return;
+            }
+
+            const action = args[0].toLowerCase();
+
+            if (action === 'start') {
+                if (game) {
+                    await sock.sendMessage(sender, { text: '❌ A game is already in progress!' });
+                    return;
+                }
+
+                game = {
+                    board: initializeChessBoard(),
+                    currentPlayer: 'white',
+                    moves: []
+                };
+
+                global.chessGames.set(gameId, game);
+
+                const boardDisplay = renderChessBoard(game.board);
+                await sock.sendMessage(sender, {
+                    text: `♟️ Chess Game Started!\n\n${boardDisplay}\n\nMake a move using: !chess move [from] [to]\nExample: !chess move e2 e4`
+                });
+                return;
+            }
+
+            if (action === 'move') {
+                if (!game) {
+                    await sock.sendMessage(sender, { text: '❌ No game in progress. Start with !chess start' });
+                    return;
+                }
+
+                const [from, to] = args.slice(1);
+                if (!from || !to || !isValidPosition(from) || !isValidPosition(to)) {
+                    await sock.sendMessage(sender, { text: '❌ Invalid move format! Use algebraic notation (e.g., e2 e4)' });
+                    return;
+                }
+
+                const [fromRow, fromCol] = convertPosition(from);
+                const [toRow, toCol] = convertPosition(to);
+                const piece = game.board[fromRow][fromCol];
+
+                if (!piece || piece.color !== game.currentPlayer) {
+                    await sock.sendMessage(sender, { text: '❌ Invalid piece selection!' });
+                    return;
+                }
+
+                if (!isValidMove(game.board, fromRow, fromCol, toRow, toCol)) {
+                    await sock.sendMessage(sender, { text: '❌ Invalid move!' });
+                    return;
+                }
+
+                // Make the move
+                game.board[toRow][toCol] = piece;
+                game.board[fromRow][fromCol] = null;
+                game.moves.push({ from, to });
+
+                // Check for check/checkmate (simplified)
+                const isCheck = isKingInCheck(game.board, game.currentPlayer === 'white' ? 'black' : 'white');
+
+                const boardDisplay = renderChessBoard(game.board);
+                if (isCheck) {
+                    await sock.sendMessage(sender, {
+                        text: `${boardDisplay}\n\n⚔️ Check!`
+                    });
+                } else {
+                    await sock.sendMessage(sender, {
+                        text: `${boardDisplay}\n\nYour move!`
+                    });
+                }
+
+                // Bot's move (simplified)
+                const botMove = getBestMove(game.board);
+                if (botMove) {
+                    game.board[botMove.toRow][botMove.toCol] = game.board[botMove.fromRow][botMove.fromCol];
+                    game.board[botMove.fromRow][botMove.fromCol] = null;
+
+                    const boardDisplay = renderChessBoard(game.board);
+                    await sock.sendMessage(sender, {
+                        text: `${boardDisplay}\n\nYour turn!`
+                    });
+                }
+
+                game.currentPlayer = game.currentPlayer === 'white' ? 'black' : 'white';
+                global.chessGames.set(gameId, game);
+            }
+
+        } catch (err) {
+            logger.error('Chess error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+        }
+    },
+
+    async wordle(sock, sender, args) {
+        try {
+            if (!global.wordleGames) global.wordleGames = new Map();
+
+            const gameId = sender;
+            let game = global.wordleGames.get(gameId);
+
+            if (!args[0]) {
+                await sock.sendMessage(sender, {
+                    text: 'Usage:\n!wordle start - Start new game\n!wordle guess [word] - Make a guess'
+                });
+                return;
+            }
+
+            const action = args[0].toLowerCase();
+
+            if (action === 'start') {
+                if (game) {
+                    await sock.sendMessage(sender, { text: '❌ A game is already in progress!' });
+                    return;
+                }
+
+                const words = [
+                    'SMILE', 'BEACH', 'DREAM', 'LIGHT', 'HAPPY',
+                    'CLOUD', 'FRESH', 'HEART', 'MUSIC', 'DANCE'
+                ];
+
+                game = {
+                    word: words[Math.floor(Math.random() * words.length)],
+                    guesses: [],
+                    maxAttempts: 6
+                };
+
+                global.wordleGames.set(gameId, game);
+
+                await sock.sendMessage(sender, {
+                    text: '🎮 Wordle Game Started!\nGuess the 5-letter word.\nYou have 6 attempts.\n\nUse: !wordle guess [word]'
+                });
+                return;
+            }
+
+            if (action === 'guess') {
+                if (!game) {
+                    await sock.sendMessage(sender, { text: '❌ No game in progress. Start with !wordle start' });
+                    return;
+                }
+
+                const guess = args[1]?.toUpperCase();
+                if (!guess || guess.length !== 5 || !/^[A-Z]+$/.test(guess)) {
+                    await sock.sendMessage(sender, { text: '❌ Please provide a valid 5-letter word' });
+                    return;
+                }
+
+                try {
+                    const feedback = handleWordleGuess(game.word, guess);
+                    game.guesses.push({ word: guess, feedback: feedback });
+                    global.wordleGames.set(gameId, game);
+
+                    const display = game.guesses.map(g => `${g.word} ${g.feedback}`).join('\n');
+                    const isWon = guess === game.word;
+                    const isLost = game.guesses.length >= game.maxAttempts;
+
+                    if (isWon) {
+                        await sock.sendMessage(sender, {
+                            text: `${display}\n\n🎉 Congratulations! You found the word!`
+                        });
+                        global.wordleGames.delete(gameId);
+                    } else if (isLost) {
+                        await sock.sendMessage(sender, {
+                            text: `${display}\n\n💀 Game Over! The word was: ${game.word}`
+                        });
+                        global.wordleGames.delete(gameId);
+                    } else {
+                        await sock.sendMessage(sender, {
+                            text: `${display}\n\n${game.maxAttempts - game.guesses.length} attempts remaining`
+                        });
+                    }
+                } catch (err) {
+                    logger.error('Error processing Wordle guess:', err);
+                    await sock.sendMessage(sender, { text: '❌ An error occurred while processing your guess.' });
+                    global.wordleGames.delete(gameId);
+                }
+            }
+        } catch (err) {
+            logger.error('Wordle error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            global.wordleGames.delete(gameId);
+        }
+    },
     async trivia(sock, sender, args) {
         try {
             if (!global.triviaGames) global.triviaGames = new Map();
@@ -1737,20 +1990,12 @@ function initializeChessBoard() {
 function renderChessBoard(board) {
     const pieces = {
         'white': {
-            'pawn': '♙',
-            'rook': '♖',
-            'knight': '♘',
-            'bishop': '♗',
-            'queen': '♕',
-            'king': '♔'
+            'pawn': '♙', 'rook': '♖', 'knight': '♘',
+            'bishop': '♗', 'queen': '♕', 'king': '♔'
         },
         'black': {
-            'pawn': '♟',
-            'rook': '♜',
-            'knight': '♞',
-            'bishop': '♝',
-            'queen': '♛',
-            'king': '♚'
+            'pawn': '♟', 'rook': '♜', 'knight': '♞',
+            'bishop': '♝', 'queen': '♛', 'king': '♚'
         }
     };
 
@@ -1846,11 +2091,10 @@ function isKingInCheck(board, color) {
     return false;
 }
 
-// Fix Wordle game indentation and structure
-async function handleWordleGame(sock, sender, args, game) {
-    const guess = args[1]?.toUpperCase();
+// Helper function for Wordle game
+function handleWordleGuess(word, guess) {
     const feedback = [];
-    const targetWord = game.word.split('');
+    const targetWord = word.split('');
     const remainingLetters = [...targetWord];
 
     // First pass: find correct letters in correct positions
@@ -1874,8 +2118,19 @@ async function handleWordleGame(sock, sender, args, game) {
         }
     }
 
-    return feedback;
+    return feedback.join('');
 }
+
+// Game state initialization
+function initializeGameState() {
+    global.games = global.games || new Map();
+    global.hangmanGames = global.hangmanGames || new Map();
+    global.wordleGames = global.wordleGames || new Map();
+    global.chessGames = global.chessGames || new Map();
+    global.quizGames = global.quizGames || new Map();
+    global.triviaGames = global.triviaGames || new Map();
+}
+
 
 module.exports = {
     commands: funCommands,
@@ -1884,13 +2139,7 @@ module.exports = {
         try {
             logger.info('Initializing fun command handler...');
 
-            // Initialize global state
-            global.games = global.games || new Map();
-            global.hangmanGames = global.hangmanGames || new Map();
-            global.wordleGames = global.wordleGames || new Map();
-            global.chessGames = global.chessGames || new Map();
-            global.quizGames = global.quizGames || new Map();
-            global.triviaGames = global.triviaGames || new Map();
+            initializeGameState();
 
             // Create required directories
             const tempDir = path.join(__dirname, '../../temp/fun');

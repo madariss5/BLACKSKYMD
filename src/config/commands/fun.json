@@ -34,18 +34,18 @@
       "permissions": ["user"]
     },
     {
-      "name": "trivia",
-      "description": "Play trivia quiz game",
-      "usage": ".trivia [category]",
-      "example": ".trivia general",
-      "cooldown": 10,
-      "permissions": ["user"]
-    },
-    {
       "name": "quiz",
       "description": "Test your knowledge in specific subjects",
       "usage": ".quiz [subject]",
       "example": ".quiz math",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "trivia",
+      "description": "Play trivia quiz game",
+      "usage": ".trivia [category]",
+      "example": ".trivia general",
       "cooldown": 10,
       "permissions": ["user"]
     },
@@ -63,41 +63,6 @@
       "usage": ".slot [bet]",
       "example": ".slot 10",
       "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "quote",
-      "description": "Get a random inspirational quote",
-      "usage": ".quote",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "joke",
-      "description": "Get a random joke",
-      "usage": ".joke",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "fact",
-      "description": "Get a random fun fact",
-      "usage": ".fact",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "riddle",
-      "description": "Get a random riddle",
-      "usage": ".riddle",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "fortune",
-      "description": "Get your fortune told",
-      "usage": ".fortune",
-      "cooldown": 10,
       "permissions": ["user"]
     },
     {
@@ -120,6 +85,57 @@
       "description": "Choose between multiple options",
       "usage": ".choose [option1] | [option2] | [option3]",
       "example": ".choose pizza | burger | salad",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "mock",
+      "description": "Convert text to alternating case",
+      "usage": ".mock [text]",
+      "example": ".mock Hello World",
+      "cooldown": 3,
+      "permissions": ["user"]
+    },
+    {
+      "name": "riddle",
+      "description": "Get a random riddle",
+      "usage": ".riddle",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "horoscope",
+      "description": "Get your daily horoscope",
+      "usage": ".horoscope [sign]",
+      "example": ".horoscope aries",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "fortune",
+      "description": "Get your fortune told",
+      "usage": ".fortune",
+      "cooldown": 10,
+      "permissions": ["user"]
+    },
+    {
+      "name": "quote",
+      "description": "Get a random inspirational quote",
+      "usage": ".quote",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "joke",
+      "description": "Get a random joke",
+      "usage": ".joke",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "fact",
+      "description": "Get a random fun fact",
+      "usage": ".fact",
       "cooldown": 5,
       "permissions": ["user"]
     }
