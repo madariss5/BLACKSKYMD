@@ -152,28 +152,33 @@ async function startConnection() {
             browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
             qrTimeout: 40000,
-            defaultQueryTimeoutMs: 10000, // Reduced for faster operations
-            keepAliveIntervalMs: 10000, // Reduced for more frequent keepalive
-            retryRequestDelayMs: 1000, // Reduced for faster retries
-            emitOwnEvents: true,
-            maxRetries: 10, // Increased retries
+            defaultQueryTimeoutMs: 20000, // Increased for better reliability
+            keepAliveIntervalMs: 5000, // More frequent keepalive for better stability
+            retryRequestDelayMs: 500, // Faster retries
+            emitOwnEvents: false, // Don't process messages from ourselves
+            maxRetries: 15, // More retries for better reliability
             markOnlineOnConnect: true,
             fireInitQueries: true,
             generateHighQualityLinkPreview: false, // Set to false for faster operation
             syncFullHistory: false,
             msgRetryCounterCache: {
-                max: 2000, // Increased cache size
-                ttl: 120000 // Increased time-to-live
+                max: 3000, // Increased cache size for better message handling
+                ttl: 300000 // Increased time-to-live (5 minutes)
             },
             patchMessageBeforeSending: (message) => {
+                // Add additional metadata or modify messages before sending if needed
                 return message;
             },
+            transactionOpts: {
+                maxCommitRetries: 10, // More retries for database operations
+                delayBetweenTriesMs: 500 // Faster retries
+            },
             options: {
-                timeout: 20000, // Reduced timeout
-                noAckTimeout: 30000, // Reduced noAck timeout
+                timeout: 30000, // Increased timeout for better reliability
+                noAckTimeout: 60000, // Increased noAck timeout
                 retryOnNetworkError: true,
                 retryOnStreamError: true,
-                maxRetryAttempts: 10 // Increased retry attempts
+                maxRetryAttempts: 15 // More retry attempts
             },
             getMessage: async (key) => {
                 try {
@@ -366,16 +371,45 @@ async function startConnection() {
 
             if (events['messages.upsert']) {
                 const upsert = events['messages.upsert'];
+                logger.info(`Received message event of type: ${upsert.type}`);
+                console.log('Full message event:', JSON.stringify(upsert, null, 2));
+                
                 if (upsert.type === 'notify') {
                     for (const msg of upsert.messages) {
-                        if (!msg.message) continue;
+                        // Log the full message structure for debugging
+                        console.log('Processing message:', JSON.stringify(msg, null, 2));
                         
-                        // Skip processing if message is from self (prevents loops)
-                        if (msg.key.fromMe) continue;
+                        if (!msg.message) {
+                            console.log('Skipping message with no content');
+                            continue;
+                        }
+                        
+                        // Debug log message origin
+                        if (msg.key.fromMe) {
+                            console.log('Message marked as fromMe, but processing anyway for testing');
+                            // We're NOT skipping messages from self during testing
+                            // This ensures all messages get processed while we debug
+                        }
+                        
+                        // Extract basic message info for logging
+                        const msgType = msg.message ? Object.keys(msg.message)[0] : 'unknown';
+                        const remoteJid = msg.key.remoteJid || 'unknown';
+                        const isGroup = remoteJid.endsWith('@g.us');
+                        
+                        logger.info(`Processing ${msgType} message from ${remoteJid} (group: ${isGroup})`);
                         
                         try {
+                            // Extract message content for debug logging
+                            const msgText = msg.message?.conversation || 
+                                msg.message?.extendedTextMessage?.text || 
+                                msg.message?.imageMessage?.caption || 
+                                msg.message?.videoMessage?.caption || 
+                                'No text content';
+                                
+                            console.log(`Message text: "${msgText}"`);
+                            
                             // Process message based on context
-                            if (msg.key.remoteJid.endsWith('@g.us')) {
+                            if (isGroup) {
                                 // Group message: handle group-specific features first
                                 try {
                                     await handleGroupMessage(sock, msg);
@@ -386,15 +420,34 @@ async function startConnection() {
                             
                             // Process the message through the main handler
                             await messageHandler(sock, msg);
+                            
+                            // Send a direct acknowledgment for testing
+                            if (!isGroup && msgText && !msgText.startsWith('.')) {
+                                console.log('Sending direct acknowledgment...');
+                                await sock.sendMessage(remoteJid, { 
+                                    text: `I received your message: "${msgText}"\nTo use commands, start with a dot (.) like .help` 
+                                });
+                            }
                         } catch (err) {
                             logger.error('Message handling error:', {
                                 error: err.message,
                                 stack: err.stack,
-                                messageType: msg.message ? Object.keys(msg.message)[0] : 'unknown',
-                                chat: msg.key.remoteJid
+                                messageType: msgType,
+                                chat: remoteJid
                             });
+                            
+                            // Try to notify the user about the error
+                            try {
+                                await sock.sendMessage(msg.key.remoteJid, { 
+                                    text: '❌ Sorry, there was an error processing your message. Please try again later.' 
+                                });
+                            } catch (notifyErr) {
+                                logger.error('Failed to send error notification:', notifyErr);
+                            }
                         }
                     }
+                } else {
+                    logger.info(`Ignoring non-notify message type: ${upsert.type}`);
                 }
             }
 

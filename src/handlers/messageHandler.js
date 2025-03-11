@@ -96,10 +96,10 @@ function getMessageType(message) {
 
 async function messageHandler(sock, message) {
     try {
-        // Skip messages from self
+        // Process messages even if they're marked as fromMe during testing
         if (message.key.fromMe) {
-            console.log('Skipping message from self');
-            return;
+            console.log('Message marked as fromMe, processing anyway for testing');
+            // We continue execution instead of returning
         }
 
         // Debug: Print message object structure for troubleshooting
