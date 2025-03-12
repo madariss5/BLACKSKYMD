@@ -9,13 +9,8 @@ const basicCommands = require('./basic');
 const funCommands = require('./fun');
 const mediaCommands = require('./media');
 const educationalCommands = require('./educational');
-// Temporarily disable NSFW module due to ESM compatibility issues with file-type package
-// const nsfwCommands = require('./nsfw');
-const nsfwCommands = { 
-  category: 'NSFW',
-  commands: {},
-  init: async () => true
-};
+// NSFW module now fixed with ESM compatibility for file-type package
+const nsfwCommands = require('./nsfw');
 const reactionCommands = require('./reactions');
 const utilityCommands = require('./utility');
 const menuCommands = require('./menu'); // Added menu commands

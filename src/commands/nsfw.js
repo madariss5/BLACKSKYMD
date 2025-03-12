@@ -4,12 +4,62 @@ const path = require('path');
 const axios = require('axios');
 const { promisify } = require('util');
 const exec = promisify(require('child_process').exec);
-const FileType = require('file-type');
+// file-type is now an ESM module, so we'll use dynamic import
+// const FileType = require('file-type');
 const FormData = require('form-data');
 const sharp = require('sharp');
-const fetch = require('node-fetch');
+// node-fetch is now an ESM module, so we'll use axios instead
+// const fetch = require('node-fetch');
 const ffmpeg = require('fluent-ffmpeg');
 const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
+
+// Helper function to dynamically import file-type (ESM module)
+async function getFileTypeFromBuffer(buffer) {
+    try {
+        // Dynamically import the ESM module
+        const FileType = await import('file-type');
+        // Use the fromBuffer method
+        return await FileType.fileTypeFromBuffer(buffer);
+    } catch (error) {
+        logger.error('Error importing or using file-type module:', error);
+        // Fallback: Try to determine type based on magic numbers
+        return detectFileTypeFromMagicNumbers(buffer);
+    }
+}
+
+// Simple utility to detect common file types from buffer magic numbers
+function detectFileTypeFromMagicNumbers(buffer) {
+    if (!buffer || buffer.length < 4) return null;
+    
+    // Check for JPEG: Starts with FF D8 FF
+    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+        return { ext: 'jpg', mime: 'image/jpeg' };
+    }
+    
+    // Check for PNG: Starts with 89 50 4E 47
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+        return { ext: 'png', mime: 'image/png' };
+    }
+    
+    // Check for GIF: Starts with 47 49 46 38
+    if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
+        return { ext: 'gif', mime: 'image/gif' };
+    }
+    
+    // Check for WebP: Starts with 52 49 46 46 (RIFF) and has WEBP at offset 8
+    if (buffer.length >= 12 && buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+        buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+        return { ext: 'webp', mime: 'image/webp' };
+    }
+    
+    // Check for MP4: Starts with 00 00 00 xx 66 74 79 70
+    if (buffer.length >= 8 && buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) {
+        return { ext: 'mp4', mime: 'video/mp4' };
+    }
+    
+    // Default to null if unknown
+    return null;
+}
 
 // Create temp directory for processing media
 const TEMP_DIR = path.join(process.cwd(), 'temp', 'nsfw');
@@ -119,7 +169,7 @@ async function downloadMedia(url) {
     try {
         const response = await axios.get(url, { responseType: 'arraybuffer' });
         const buffer = Buffer.from(response.data);
-        const fileType = await FileType.fromBuffer(buffer);
+        const fileType = await getFileTypeFromBuffer(buffer);
         
         if (!fileType) {
             logger.error('Could not determine file type');
