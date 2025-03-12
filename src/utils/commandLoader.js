@@ -35,7 +35,12 @@ class CommandLoader {
             delete require.cache[require.resolve(modulePath)];
 
             logger.info(`Loading module from ${file}...`);
+            console.log(`Attempting to load module: ${file}`);
             const module = require(modulePath);
+            console.log(`Module loaded successfully: ${file}, module type: ${typeof module}`);
+            if (module && typeof module === 'object') {
+                console.log(`Module keys: ${Object.keys(module).join(', ')}`);
+            }
 
             // Verify module structure
             if (!module || (typeof module !== 'object' && typeof module !== 'function')) {
@@ -140,6 +145,10 @@ class CommandLoader {
                     const moduleData = await this.loadModuleSafely(modulePath, file);
                     const commands = moduleData.commands;
                     const moduleCategory = moduleData.category || category;
+                    
+                    // Add more detailed logging for debugging
+                    console.log(`Module ${file} loaded: Category=${moduleCategory}, CommandsType=${typeof commands}, CommandCount=${Object.keys(commands).length}`);
+                    console.log(`First few commands: ${Object.keys(commands).slice(0, 3).join(', ')}`);
 
                     for (const [name, handler] of Object.entries(commands)) {
                         try {

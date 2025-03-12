@@ -2,7 +2,7 @@ const pino = require('pino');
 
 // Create a consistent logger instance with enhanced configuration
 const logger = pino({
-    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+    level: 'debug', // Force debug level for troubleshooting
     transport: {
         target: 'pino-pretty',
         options: {
