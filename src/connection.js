@@ -26,6 +26,31 @@ async function ensureAuthDir() {
     }
 }
 
+async function displayQR(qr) {
+    try {
+        // Clear console and add spacing
+        console.clear();
+        console.log('\n'.repeat(2));
+
+        logger.info('⚡ NEW QR CODE RECEIVED ⚡');
+        logger.info('Please scan this QR code with WhatsApp on your phone:');
+        console.log('\n'.repeat(1));
+
+        // Generate QR with custom size
+        qrcode.generate(qr, { small: false }, (qrResult) => {
+            console.log(qrResult);
+            console.log('\n'.repeat(1));
+            logger.info('Waiting for you to scan the QR code...');
+            logger.info('Note: QR code will refresh if not scanned soon.');
+        });
+    } catch (err) {
+        logger.error('Error displaying QR code:', err);
+        // Try alternative display method
+        console.log('\nQR CODE (if not visible, try resizing your terminal):\n');
+        qrcode.generate(qr, { small: true });
+    }
+}
+
 async function startConnection() {
     try {
         console.clear();
@@ -39,16 +64,15 @@ async function startConnection() {
         logger.info('Initializing WhatsApp connection...');
         sock = makeWASocket({
             auth: state,
-            printQRInTerminal: true,
-            browser: ['Chrome (Linux)', '', ''],
+            printQRInTerminal: false, // We'll handle QR display ourselves
+            browser: ['WhatsApp-MD', 'Chrome', '4.0.0'],
             logger: pino({ level: 'silent' }),
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 30000,
             emitOwnEvents: true,
             retryRequestDelayMs: 2000,
-            version: [2, 2323, 4],
-            browser: ['WhatsApp-MD', 'Chrome', '4.0.0'],
+            version: [2, 2323, 4]
         });
 
         // Handle connection updates
@@ -57,8 +81,8 @@ async function startConnection() {
             logger.info('Connection state update:', { connection, qr: !!qr });
 
             if(qr) {
-                logger.info('\nQR Code received, scan with WhatsApp to connect\n');
-                qrcode.generate(qr, {small: false});
+                logger.info('QR Code event received, displaying QR code...');
+                await displayQR(qr);
             }
 
             if (connection === 'connecting') {
