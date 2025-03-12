@@ -1,16 +1,69 @@
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const fsPromises = fs.promises;
 const pino = require('pino');
 const logger = require('./utils/logger');
+const express = require('express');
+const app = express();
 
 let sock = null;
 let retryCount = 0;
 const MAX_RETRIES = 5;
 const RETRY_INTERVAL = 5000;
 const RECONNECT_INTERVAL = 3000;
+let latestQR = null;
+
+// Set up Express server for QR code display
+app.get('/', (req, res) => {
+    res.send(`
+        <html>
+            <head>
+                <title>WhatsApp QR Code</title>
+                <style>
+                    body { 
+                        display: flex; 
+                        flex-direction: column;
+                        align-items: center; 
+                        justify-content: center; 
+                        height: 100vh; 
+                        margin: 0;
+                        font-family: Arial, sans-serif;
+                        background: #f0f2f5;
+                    }
+                    #qrcode {
+                        padding: 20px;
+                        background: white;
+                        border-radius: 10px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }
+                    h2 {
+                        color: #333;
+                        margin-bottom: 20px;
+                    }
+                    .status {
+                        margin-top: 20px;
+                        color: #666;
+                    }
+                </style>
+            </head>
+            <body>
+                <h2>Scan QR Code with WhatsApp</h2>
+                <div id="qrcode">
+                    ${latestQR ? `<img src="${latestQR}" alt="QR Code"/>` : 'Waiting for QR Code...'}
+                </div>
+                <p class="status">Please scan the QR code with WhatsApp to connect</p>
+                <script>
+                    // Auto-refresh the page every 5 seconds if no QR code is present
+                    if (!document.querySelector('#qrcode img')) {
+                        setTimeout(() => location.reload(), 5000);
+                    }
+                </script>
+            </body>
+        </html>
+    `);
+});
 
 async function ensureAuthDir() {
     try {
@@ -26,34 +79,21 @@ async function ensureAuthDir() {
 
 async function displayQR(qr) {
     try {
-        // Debug: Log QR data
-        console.log(`\nDEBUG: Received QR code of length: ${qr.length}`);
-
-        // Clear terminal completely and add spacing
-        process.stdout.write('\x1Bc');
-        console.log('\n\n');
-
-        // Display QR code with clear instructions
-        console.log('Please scan this QR code with WhatsApp:\n');
-        qrcode.generate(qr, { small: false }, (qrResult) => {
-            console.log(qrResult);
-            console.log('\nWaiting for scan...\n');
-            // Debug: Log after QR generation
-            console.log('DEBUG: QR code has been generated and displayed');
-        });
+        // Generate QR code as data URL
+        latestQR = await qrcode.toDataURL(qr);
+        console.log('\nQR Code ready! Visit http://localhost:5000 to scan\n');
     } catch (err) {
-        console.error('Failed to display QR code:', err);
+        console.error('Failed to generate QR code:', err);
         process.exit(1);
     }
 }
 
 async function startConnection() {
     try {
-        // Debug: Log connection start
-        console.log('DEBUG: Starting WhatsApp connection');
-
-        // Clear terminal
-        process.stdout.write('\x1Bc');
+        // Start Express server
+        app.listen(5000, '0.0.0.0', () => {
+            console.log('\nQR Code server running at http://localhost:5000\n');
+        });
 
         const authDir = await ensureAuthDir();
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
@@ -89,20 +129,13 @@ async function startConnection() {
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
-            // Debug: Log connection update
-            console.log('DEBUG: Connection update received:', { 
-                connection, 
-                hasQR: !!qr,
-                disconnectReason: lastDisconnect?.error?.output?.statusCode
-            });
-
             if(qr) {
                 await displayQR(qr);
             }
 
             if (connection === 'open') {
                 retryCount = 0;
-                process.stdout.write('\x1Bc');
+                latestQR = null; // Clear QR code once connected
                 await saveCreds();
                 logger.restoreLogging();
                 console.log('\nConnection established successfully!\n');
