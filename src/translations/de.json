@@ -158,6 +158,21 @@
       "description": "Findet alle Faktoren einer Zahl",
       "usage": ".factorize [Zahl]",
       "error": "Fehler bei der Faktorisierung"
+    },
+    "pronunciation": {
+      "description": "Zeigt die Aussprache eines Wortes",
+      "usage": ".pronunciation [Wort]",
+      "error": "Fehler beim Abrufen der Aussprache"
+    },
+    "functionAnalysis": {
+      "description": "Analysiert mathematische Funktionen",
+      "usage": ".functionAnalysis [Funktion]",
+      "error": "Fehler bei der Funktionsanalyse"
+    },
+    "studyMaterial": {
+      "description": "Zeigt Lernmaterialien für verschiedene Fächer",
+      "usage": ".studyMaterial [Fach] [Thema]",
+      "error": "Fehler beim Abrufen der Lernmaterialien"
     }
   }
 }

@@ -125,8 +125,8 @@ const educationalCommands = {
         try {
             const remoteJid = message.key.remoteJid;
             if (args.length < 2) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '🌐 Usage: !translate [target_language] [text]\nExample: !translate es Hello world' 
+                await sock.sendMessage(remoteJid, {
+                    text: '🌐 Usage: !translate [target_language] [text]\nExample: !translate es Hello world'
                 });
                 return;
             }
@@ -142,12 +142,12 @@ const educationalCommands = {
             });
 
             if (response.data && response.data.translatedText) {
-                await sock.sendMessage(remoteJid, { 
-                    text: `🔄 Translation:\n${response.data.translatedText}` 
+                await sock.sendMessage(remoteJid, {
+                    text: `🔄 Translation:\n${response.data.translatedText}`
                 });
             } else {
-                await sock.sendMessage(remoteJid, { 
-                    text: '❌ Could not translate the text. Please check the language code and try again.' 
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ Could not translate the text. Please check the language code and try again.'
                 });
             }
         } catch (err) {
@@ -169,8 +169,8 @@ const educationalCommands = {
     async conjugate(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         if (args.length < 2) {
-            await sock.sendMessage(remoteJid, { 
-                text: '📚 Usage: !conjugate [language] [verb]' 
+            await sock.sendMessage(remoteJid, {
+                text: '📚 Usage: !conjugate [language] [verb]'
             });
             return;
         }
@@ -276,8 +276,8 @@ const educationalCommands = {
     async geometry(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         if (!args[0]) {
-            await sock.sendMessage(remoteJid, { 
-                text: '📐 Usage: !geometry [area|perimeter|volume] [shape] [dimensions]' 
+            await sock.sendMessage(remoteJid, {
+                text: '📐 Usage: !geometry [area|perimeter|volume] [shape] [dimensions]'
             });
             return;
         }
@@ -291,8 +291,8 @@ const educationalCommands = {
             const equation = args.join(' ');
 
             if (!equation) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* .graph [equation]\nExample: .graph x^2 + 2*x + 1' 
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .graph [equation]\nExample: .graph x^2 + 2*x + 1'
                 });
                 return;
             }
@@ -347,8 +347,8 @@ const educationalCommands = {
     async physics(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         if (args.length < 2) {
-            await sock.sendMessage(remoteJid, { 
-                text: '🔬 Usage: !physics [formula] [values]' 
+            await sock.sendMessage(remoteJid, {
+                text: '🔬 Usage: !physics [formula] [values]'
             });
             return;
         }
@@ -371,8 +371,8 @@ const educationalCommands = {
     async code(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         if (args.length < 2) {
-            await sock.sendMessage(remoteJid, { 
-                text: '💻 Usage: !code [language] [code]' 
+            await sock.sendMessage(remoteJid, {
+                text: '💻 Usage: !code [language] [code]'
             });
             return;
         }
@@ -383,8 +383,8 @@ const educationalCommands = {
     async regex(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         if (args.length < 2) {
-            await sock.sendMessage(remoteJid, { 
-                text: '🔍 Usage: !regex [pattern] [text]' 
+            await sock.sendMessage(remoteJid, {
+                text: '🔍 Usage: !regex [pattern] [text]'
             });
             return;
         }
@@ -395,8 +395,8 @@ const educationalCommands = {
     async git(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         if (!args[0]) {
-            await sock.sendMessage(remoteJid, { 
-                text: '🔄 Usage: !git [command] (explains git commands)' 
+            await sock.sendMessage(remoteJid, {
+                text: '🔄 Usage: !git [command] (explains git commands)'
             });
             return;
         }
@@ -409,8 +409,8 @@ const educationalCommands = {
         const remoteJid = message.key.remoteJid;
         const [action, ...rest] = args;
         if (!action || !['create', 'review', 'list'].includes(action)) {
-            await sock.sendMessage(remoteJid, { 
-                text: '📇 Usage: !flashcards [create|review|list] [subject]' 
+            await sock.sendMessage(remoteJid, {
+                text: '📇 Usage: !flashcards [create|review|list] [subject]'
             });
             return;
         }
@@ -509,8 +509,8 @@ const educationalCommands = {
     async cite(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         if (args.length < 2) {
-            await sock.sendMessage(remoteJid, { 
-                text: '📝 Usage: !cite [style] [source details]' 
+            await sock.sendMessage(remoteJid, {
+                text: '📝 Usage: !cite [style] [source details]'
             });
             return;
         }
@@ -776,8 +776,8 @@ const educationalCommands = {
             const equation = args.join(' ');
 
             if (!equation) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* .mathsolve [equation]\nExample: .mathsolve 2x + 5 = 15' 
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .mathsolve [equation]\nExample: .mathsolve 2x + 5 = 15'
                 });
                 return;
             }
@@ -785,8 +785,8 @@ const educationalCommands = {
             await sock.sendMessage(remoteJid, { text: '*⚡ Solving:* Processing mathematical equation...' });
 
             const solution = mathjs.solve(equation);
-            await sock.sendMessage(remoteJid, { 
-                text: `*📊 Solution:*\n${solution.toString()}` 
+            await sock.sendMessage(remoteJid, {
+                text: `*📊 Solution:*\n${solution.toString()}`
             });
 
         } catch (err) {
@@ -802,8 +802,8 @@ const educationalCommands = {
             const expression = args.join(' ');
 
             if (!expression) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* .calc [expression]\nExample: .calc sin(45) * sqrt(16)' 
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .calc [expression]\nExample: .calc sin(45) * sqrt(16)'
                 });
                 return;
             }
@@ -1429,6 +1429,154 @@ const educationalCommands = {
             });
         } catch (err) {
             await handleError(sock, message.key.remoteJid, err, 'Error factorizing number');
+        }
+    },
+    // Adding new language learning commands
+    async pronunciation(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const word = args.join(' ');
+
+            if (!word) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🗣️ Usage:* .pronunciation [word]\nExample: .pronunciation hello'
+                });
+                return;
+            }
+
+            // Using FreeDictionaryAPI for pronunciation
+            const response = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+
+            if (response.data && response.data.length > 0) {
+                const entry = response.data[0];
+                let result = `*🔊 Pronunciation Guide:*\n\n`;
+                result += `Word: ${entry.word}\n`;
+
+                if (entry.phonetics && entry.phonetics.length > 0) {
+                    entry.phonetics.forEach(phonetic => {
+                        if (phonetic.text) result += `IPA: ${phonetic.text}\n`;
+                        if (phonetic.audio) result += `Audio: ${phonetic.audio}\n`;
+                    });
+                }
+
+                await sock.sendMessage(remoteJid, { text: result });
+            } else {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Pronunciation not found*'
+                });
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error getting pronunciation');
+        }
+    },
+
+    async functionAnalysis(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const expression = args.join(' ');
+
+            if (!expression) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📊 Usage:* .functionAnalysis [function]\nExample: .functionAnalysis x^2 + 2x + 1'
+                });
+                return;
+            }
+
+            // Analyze function using mathjs
+            const scope = { x: 0 };
+            const derivative = mathjs.derivative(expression, 'x').toString();
+            const integral = mathjs.integral(expression, 'x').toString();
+
+            // Find critical points
+            const criticalPoints = [];
+            for (let x = -10; x <= 10; x += 0.1) {
+                scope.x = x;
+                const dy = mathjs.evaluate(derivative, scope);
+                if (Math.abs(dy) < 0.1) {
+                    criticalPoints.push(x.toFixed(2));
+                }
+            }
+
+            let analysis = `*📈 Function Analysis:*\n\n`;
+            analysis += `Function: ${expression}\n`;
+            analysis += `Derivative: ${derivative}\n`;
+            analysis += `Integral: ${integral}\n`;
+            analysis += `Critical Points: ${criticalPoints.join(', ') || 'None found in range [-10, 10]'}\n`;
+
+            await sock.sendMessage(remoteJid, { text: analysis });
+
+            // Generate and send graph
+            const chartBuffer = await createMathChart(expression);
+            await sock.sendMessage(remoteJid, {
+                image: chartBuffer,
+                caption: `*Graph of:* ${expression}`
+            });
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error analyzing function');
+        }
+    },
+
+    async studyMaterial(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [subject, topic] = args;
+
+            if (!subject || !topic) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📚 Usage:* .studyMaterial [subject] [topic]\nExample: .studyMaterial physics mechanics'
+                });
+                return;
+            }
+
+            const materialsPath = path.join(__dirname, '../../data/educational/study_materials.json');
+            let materials = {};
+
+            try {
+                const data = await fs.promises.readFile(materialsPath, 'utf8');
+                materials = JSON.parse(data);
+            } catch (err) {
+                materials = {
+                    physics: {
+                        mechanics: {
+                            title: "Introduction to Mechanics",
+                            content: [
+                                "• Newton's Laws of Motion",
+                                "• Conservation of Energy",
+                                "• Momentum and Collisions",
+                                "• Rotational Motion"
+                            ],
+                            examples: [
+                                "1. A car accelerating on a straight road",
+                                "2. A pendulum swinging back and forth",
+                                "3. Two objects colliding elastically"
+                            ],
+                            practice: [
+                                "Q1: Calculate the force needed to accelerate a 2kg mass at 5 m/s²",
+                                "Q2: Find the potential energy of a 1kg mass at height 10m"
+                            ]
+                        }
+                    }
+                };
+                await fs.promises.writeFile(materialsPath, JSON.stringify(materials, null, 2));
+            }
+
+            if (!materials[subject] || !materials[subject][topic]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Study material not found for this subject and topic*'
+                });
+                return;
+            }
+
+            const material = materials[subject][topic];
+            let content = `*📚 ${material.title}*\n\n`;
+            content += `*Key Concepts:*\n${material.content.join('\n')}\n\n`;
+            content += `*Examples:*\n${material.examples.join('\n')}\n\n`;
+            content += `*Practice Problems:*\n${material.practice.join('\n')}`;
+
+            await sock.sendMessage(remoteJid, { text: content });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error fetching study material');
         }
     }
 };
