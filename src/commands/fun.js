@@ -1564,6 +1564,1044 @@ const funCommands = {
             await sock.sendMessage(sender, { text: '❌ An error occurred.' });
         }
     },
+    
+    // 21. Pickup Line
+    async pickupline(sock, sender) {
+        try {
+            const lines = [
+                "Are you a magician? Because whenever I look at you, everyone else disappears.",
+                "Do you have a map? I just got lost in your eyes.",
+                "I'm not a photographer, but I can picture us together.",
+                "Do you like raisins? How do you feel about a date?",
+                "If you were a vegetable, you'd be a cute-cumber.",
+                "Are you made of copper and tellurium? Because you're Cu-Te.",
+                "Is your name Google? Because you have everything I've been searching for.",
+                "Are you a bank loan? Because you have my interest.",
+                "Are you a time traveler? Because I see you in my future.",
+                "I must be a snowflake, because I've fallen for you."
+            ];
+            
+            const randomLine = lines[Math.floor(Math.random() * lines.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `💘 Pickup Line:\n\n${randomLine}` 
+            });
+        } catch (err) {
+            logger.error('Pickup Line error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 22. Dad Joke
+    async dadjoke(sock, sender) {
+        try {
+            const jokes = [
+                "I'm afraid for the calendar. Its days are numbered.",
+                "Why don't eggs tell jokes? They'd crack each other up.",
+                "I don't trust stairs. They're always up to something.",
+                "What do you call someone with no body and no nose? Nobody knows.",
+                "Did you hear about the mathematician who's afraid of negative numbers? He'll stop at nothing to avoid them.",
+                "Why couldn't the bicycle stand up by itself? It was two tired.",
+                "How do you make a tissue dance? You put a little boogie in it.",
+                "Why did the scarecrow win an award? Because he was outstanding in his field.",
+                "I used to be a baker, but I couldn't make enough dough.",
+                "I would avoid the sushi if I was you. It's a little fishy."
+            ];
+            
+            const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `👨 Dad Joke:\n\n${randomJoke}` 
+            });
+        } catch (err) {
+            logger.error('Dad Joke error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 23. Yo Mama Joke
+    async yomama(sock, sender) {
+        try {
+            const jokes = [
+                "Yo mama's so old, her birth certificate is in Roman numerals.",
+                "Yo mama's so old, she sat next to Jesus in school.",
+                "Yo mama's so tall, she tripped over in London and bumped her head in Paris.",
+                "Yo mama's so small, she uses a cheerio as a hula hoop.",
+                "Yo mama's so clever, she finished the puzzle box in 1 day when it said 2-4 years.",
+                "Yo mama's so clumsy, she got tangled up in a cordless phone.",
+                "Yo mama's so polite, she apologizes to Siri.",
+                "Yo mama's so nice, even her shadow waves back.",
+                "Yo mama's so generous, she gave away all her dad jokes.",
+                "Yo mama's so cool, penguins ask her for advice."
+            ];
+            
+            const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `😂 Yo Mama Joke:\n\n${randomJoke}` 
+            });
+        } catch (err) {
+            logger.error('Yo Mama Joke error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 24. Compliment
+    async compliment(sock, sender) {
+        try {
+            const compliments = [
+                "Your smile could light up even the darkest room.",
+                "You have a great sense of humor that brightens everyone's day.",
+                "Your kindness is like a warm blanket on a cold day.",
+                "You have an incredible way of making people feel valued and heard.",
+                "Your determination and perseverance are truly inspiring.",
+                "You bring out the best in those around you.",
+                "Your creativity and imagination know no bounds.",
+                "You have a gift for seeing the good in every situation.",
+                "Your positive energy is absolutely contagious.",
+                "You're the type of friend everyone wishes they had."
+            ];
+            
+            const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `✨ Compliment:\n\n${randomCompliment}` 
+            });
+        } catch (err) {
+            logger.error('Compliment error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 25. Random Emoji Story
+    async emojistory(sock, sender) {
+        try {
+            const stories = [
+                "🧙‍♂️✨🐉👑💎 - A wizard cast a spell on a dragon to protect the royal jewels.",
+                "🚗💨🌧️🌉🏙️ - Driving through the rain across the bridge into the city.",
+                "👩‍🍳🍕🔥😱💦 - The chef burned the pizza and had to put out the fire.",
+                "🐶🦴🐱😾🙀 - The dog found a bone but the cat wasn't happy about it.",
+                "👨‍💻📱🕹️🎮😴 - He worked on his phone and played games until he fell asleep.",
+                "🏃‍♀️🌳🐻😱🏃‍♀️💨 - She was running in the forest when she saw a bear and ran away quickly.",
+                "🧑‍🚀🚀🌕👽🤝 - The astronaut flew to the moon and made friends with an alien.",
+                "🏊‍♂️🌊🦈😱🏄‍♂️ - The swimmer saw a shark and climbed onto a surfboard.",
+                "👸💤🧙‍♀️🍎💋👨 - Sleeping Beauty, the witch, the poisoned apple, and the kiss.",
+                "🐸👑💋👸💖 - The frog prince was kissed by the princess and fell in love."
+            ];
+            
+            const randomStory = stories[Math.floor(Math.random() * stories.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `📖 Emoji Story:\n\n${randomStory}` 
+            });
+        } catch (err) {
+            logger.error('Emoji Story error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 26. Trivia questions with multiple choice
+    async quiztrivia(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.triviaQuizzes) global.triviaQuizzes = new Map();
+            
+            const quizId = sender;
+            let quiz = global.triviaQuizzes.get(quizId);
+            
+            if (!quiz) {
+                // Questions with multiple choice answers
+                const questions = [
+                    {
+                        question: "Which planet is known as the Red Planet?",
+                        options: ["Venus", "Mars", "Jupiter", "Saturn"],
+                        answer: "B"
+                    },
+                    {
+                        question: "Which animal is known as the 'King of the Jungle'?",
+                        options: ["Tiger", "Lion", "Elephant", "Gorilla"],
+                        answer: "B"
+                    },
+                    {
+                        question: "How many sides does a pentagon have?",
+                        options: ["4", "5", "6", "7"],
+                        answer: "B"
+                    },
+                    {
+                        question: "What is the capital of Japan?",
+                        options: ["Seoul", "Beijing", "Tokyo", "Bangkok"],
+                        answer: "C"
+                    },
+                    {
+                        question: "Which element has the chemical symbol 'O'?",
+                        options: ["Gold", "Silver", "Oxygen", "Osmium"],
+                        answer: "C"
+                    }
+                ];
+                
+                // Select a random question
+                const questionIndex = Math.floor(Math.random() * questions.length);
+                
+                quiz = {
+                    ...questions[questionIndex],
+                    asked: Date.now()
+                };
+                
+                global.triviaQuizzes.set(quizId, quiz);
+                
+                let message = `❓ Trivia Question:\n\n${quiz.question}\n\n`;
+                quiz.options.forEach((option, index) => {
+                    message += `${String.fromCharCode(65 + index)}) ${option}\n`;
+                });
+                
+                message += "\nReply with *!quiztrivia [letter]* (e.g., !quiztrivia A)";
+                
+                await sock.sendMessage(sender, { text: message });
+                return;
+            }
+            
+            // Process answer
+            const answer = args[0]?.toUpperCase();
+            
+            if (!answer || !['A', 'B', 'C', 'D'].includes(answer)) {
+                await sock.sendMessage(sender, { text: '❓ Please answer with A, B, C, or D!' });
+                return;
+            }
+            
+            const isCorrect = answer === quiz.answer;
+            const correctOption = quiz.options[quiz.answer.charCodeAt(0) - 65];
+            
+            if (isCorrect) {
+                await sock.sendMessage(sender, { 
+                    text: `✅ Correct! ${correctOption} is the right answer.\n\nTry another question with *!quiztrivia*` 
+                });
+            } else {
+                await sock.sendMessage(sender, { 
+                    text: `❌ Wrong! The correct answer is ${quiz.answer}: ${correctOption}.\n\nTry another question with *!quiztrivia*` 
+                });
+            }
+            
+            global.triviaQuizzes.delete(quizId);
+        } catch (err) {
+            logger.error('Quiz Trivia error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            global.triviaQuizzes.delete(sender);
+        }
+    },
+    
+    // 27. Horoscope
+    async horoscope(sock, sender, args) {
+        try {
+            const signs = [
+                "aries", "taurus", "gemini", "cancer", 
+                "leo", "virgo", "libra", "scorpio", 
+                "sagittarius", "capricorn", "aquarius", "pisces"
+            ];
+            
+            const sign = args[0]?.toLowerCase();
+            
+            if (!sign || !signs.includes(sign)) {
+                let message = "♈ Please specify your zodiac sign:\n\n";
+                signs.forEach(s => {
+                    message += `*!horoscope ${s}*\n`;
+                });
+                await sock.sendMessage(sender, { text: message });
+                return;
+            }
+            
+            const horoscopes = {
+                "aries": "Today is a day for boldness and initiative. Take the lead in a project or relationship that matters to you. Your energy is high, so channel it into productive pursuits. Avoid impulsive decisions regarding finances.",
+                "taurus": "Stability is highlighted today. Focus on building security in your work and home life. Your practical approach will be appreciated by others. Take time to enjoy simple pleasures and connect with nature.",
+                "gemini": "Communication flows easily today. It's a great time for meetings, conversations, and sharing ideas. Your curiosity leads you to interesting discoveries. Balance social interaction with some quiet reflection time.",
+                "cancer": "Emotional intelligence serves you well today. Trust your intuition, especially in family matters. Home improvements or changes will bring satisfaction. Practice self-care and set healthy boundaries.",
+                "leo": "Your creative energy shines today. Express yourself through art or leadership. Romance may blossom or deepen. Be generous but avoid excessive spending to impress others. Your natural charisma attracts positive attention.",
+                "virgo": "Details matter today. Your analytical skills help solve a persistent problem. Health routines established now will have lasting benefits. Don't be too critical of yourself or others - celebrate progress.",
+                "libra": "Harmony in relationships is highlighted today. Diplomatic approaches to conflict will succeed. Aesthetic pursuits bring joy - redecorate or update your wardrobe. Balance socializing with personal time.",
+                "scorpio": "Today brings opportunities for meaningful transformation. Research and investigation yield valuable insights. Financial matters require your attention and strategic thinking. Trust selectively and protect your energy.",
+                "sagittarius": "Adventure calls today. Explore new ideas, places, or philosophies. Teaching and learning bring fulfillment. Avoid overpromising - be honest about what you can deliver. Optimism attracts favorable circumstances.",
+                "capricorn": "Professional progress is likely today. Your disciplined approach earns recognition. Long-term planning pays off - stay the course. Make time for family despite work demands. Traditions bring comfort.",
+                "aquarius": "Innovation is your strength today. Unconventional solutions to problems will succeed. Connect with groups and communities that share your ideals. Technology upgrades improve efficiency. Balance intellectualism with emotional awareness.",
+                "pisces": "Intuition and imagination are powerful today. Creative and spiritual pursuits bring fulfillment. Help someone in need, but maintain healthy boundaries. Dreams contain important messages. Seek beauty in everyday moments."
+            };
+            
+            const emoji = {
+                "aries": "♈",
+                "taurus": "♉",
+                "gemini": "♊",
+                "cancer": "♋",
+                "leo": "♌",
+                "virgo": "♍",
+                "libra": "♎",
+                "scorpio": "♏",
+                "sagittarius": "♐",
+                "capricorn": "♑",
+                "aquarius": "♒",
+                "pisces": "♓"
+            };
+            
+            const capitalizedSign = sign.charAt(0).toUpperCase() + sign.slice(1);
+            
+            await sock.sendMessage(sender, { 
+                text: `${emoji[sign]} Horoscope for ${capitalizedSign}:\n\n${horoscopes[sign]}` 
+            });
+        } catch (err) {
+            logger.error('Horoscope error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 28. Fortune Teller
+    async predict(sock, sender, args) {
+        try {
+            if (!args.length) {
+                await sock.sendMessage(sender, { 
+                    text: '🔮 Ask me a yes/no question, and I shall reveal your destiny!' 
+                });
+                return;
+            }
+            
+            const responses = [
+                "It is certain.",
+                "It is decidedly so.",
+                "Without a doubt.",
+                "Yes, definitely.",
+                "You may rely on it.",
+                "As I see it, yes.",
+                "Most likely.",
+                "Outlook good.",
+                "Signs point to yes.",
+                "Reply hazy, try again.",
+                "Ask again later.",
+                "Better not tell you now.",
+                "Cannot predict now.",
+                "Concentrate and ask again.",
+                "Don't count on it.",
+                "My reply is no.",
+                "My sources say no.",
+                "Outlook not so good.",
+                "Very doubtful.",
+                "The stars are not aligned for this."
+            ];
+            
+            // Use a hash of the question to make predictions consistent for the same question
+            const hash = crypto.createHash('md5').update(args.join(' ')).digest('hex');
+            const hashValue = parseInt(hash.substring(0, 8), 16);
+            const responseIndex = hashValue % responses.length;
+            
+            const randomResponse = responses[responseIndex];
+            
+            await sock.sendMessage(sender, { 
+                text: `🔮 *The Fortune Teller says:*\n\n"${randomResponse}"` 
+            });
+        } catch (err) {
+            logger.error('Predict error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 29. Love Calculator
+    async lovecalc(sock, sender, args) {
+        try {
+            if (args.length < 2) {
+                await sock.sendMessage(sender, { 
+                    text: '❤️ Love Calculator\n\nPlease provide two names to calculate compatibility!\nUsage: *!lovecalc [name1] [name2]*' 
+                });
+                return;
+            }
+            
+            const name1 = args[0].toLowerCase();
+            const name2 = args[1].toLowerCase();
+            
+            // Use a hash of the names to make the score consistent for the same pair
+            const combinedNames = name1 + name2;
+            const hash = crypto.createHash('md5').update(combinedNames).digest('hex');
+            const hashValue = parseInt(hash.substring(0, 8), 16);
+            const score = hashValue % 101; // 0-100
+            
+            let message = `❤️ Love Calculator\n\n${args[0]} + ${args[1]} = ${score}%\n\n`;
+            
+            if (score < 20) {
+                message += "Not much chemistry here. Maybe you're better as friends?";
+            } else if (score < 40) {
+                message += "There's some potential, but you'll need to work at it.";
+            } else if (score < 60) {
+                message += "There's a decent connection. Worth exploring further!";
+            } else if (score < 80) {
+                message += "Great compatibility! You have a strong foundation for love.";
+            } else {
+                message += "Incredible match! The stars have aligned for this relationship.";
+            }
+            
+            await sock.sendMessage(sender, { text: message });
+        } catch (err) {
+            logger.error('Love Calculator error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 30. Random Character Generator
+    async character(sock, sender) {
+        try {
+            const races = ["Human", "Elf", "Dwarf", "Orc", "Halfling", "Gnome", "Tiefling", "Dragonborn"];
+            const classes = ["Warrior", "Mage", "Rogue", "Cleric", "Bard", "Ranger", "Paladin", "Warlock"];
+            const backgrounds = ["Noble", "Sailor", "Criminal", "Soldier", "Hermit", "Acolyte", "Merchant", "Orphan"];
+            const traits = ["Brave", "Cautious", "Curious", "Honorable", "Reckless", "Secretive", "Loyal", "Ambitious"];
+            const flaws = ["Greedy", "Arrogant", "Paranoid", "Impulsive", "Vengeful", "Cowardly", "Envious", "Stubborn"];
+            
+            const race = races[Math.floor(Math.random() * races.length)];
+            const characterClass = classes[Math.floor(Math.random() * classes.length)];
+            const background = backgrounds[Math.floor(Math.random() * backgrounds.length)];
+            const trait = traits[Math.floor(Math.random() * traits.length)];
+            const flaw = flaws[Math.floor(Math.random() * flaws.length)];
+            
+            const strength = Math.floor(Math.random() * 10) + 8;
+            const dexterity = Math.floor(Math.random() * 10) + 8;
+            const constitution = Math.floor(Math.random() * 10) + 8;
+            const intelligence = Math.floor(Math.random() * 10) + 8;
+            const wisdom = Math.floor(Math.random() * 10) + 8;
+            const charisma = Math.floor(Math.random() * 10) + 8;
+            
+            const message = `🎭 Random Character Generated:\n\n` +
+                            `*Race:* ${race}\n` +
+                            `*Class:* ${characterClass}\n` +
+                            `*Background:* ${background}\n\n` +
+                            `*Personality Trait:* ${trait}\n` +
+                            `*Flaw:* ${flaw}\n\n` +
+                            `*Stats:*\n` +
+                            `Strength: ${strength}\n` +
+                            `Dexterity: ${dexterity}\n` +
+                            `Constitution: ${constitution}\n` +
+                            `Intelligence: ${intelligence}\n` +
+                            `Wisdom: ${wisdom}\n` +
+                            `Charisma: ${charisma}\n\n` +
+                            `Use this character for your next game!`;
+            
+            await sock.sendMessage(sender, { text: message });
+        } catch (err) {
+            logger.error('Character Generator error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 31. Roast (gentle humor)
+    async roast(sock, sender) {
+        try {
+            const roasts = [
+                "Your fashion sense is so unique, you could probably make a trash bag look like it came from the thrift store.",
+                "You're so slow that internet explorer is embarrassed for you.",
+                "Your cooking is so bad, even the fire alarm cheers you on when you leave the kitchen.",
+                "You're the human version of a participation trophy.",
+                "You have the focusing ability of a goldfish with ADHD.",
+                "Your playlist is so bad, Spotify sends you apology emails.",
+                "You dance like you're trying to fight off a swarm of invisible bees.",
+                "Your jokes are so dry, they make the Sahara look like a water park.",
+                "If procrastination was an Olympic sport, you'd compete later.",
+                "Your room is so messy, even your dust bunnies have dust bunnies."
+            ];
+            
+            const randomRoast = roasts[Math.floor(Math.random() * roasts.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `🔥 Friendly Roast:\n\n${randomRoast}\n\n(All in good fun, of course!)` 
+            });
+        } catch (err) {
+            logger.error('Roast error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 32. Find Missing Number game
+    async findnumber(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.numberSequenceGames) global.numberSequenceGames = new Map();
+            
+            const gameId = sender;
+            let game = global.numberSequenceGames.get(gameId);
+            
+            if (!game) {
+                // Start a new game
+                const sequences = [
+                    {
+                        pattern: [2, 4, 6, 8, 10, '?', 14],
+                        answer: 12,
+                        rule: "Add 2 to each number"
+                    },
+                    {
+                        pattern: [1, 2, 4, 8, 16, '?', 64],
+                        answer: 32,
+                        rule: "Multiply by 2"
+                    },
+                    {
+                        pattern: [3, 6, 9, 12, '?', 18],
+                        answer: 15,
+                        rule: "Add 3 to each number"
+                    },
+                    {
+                        pattern: [1, 3, 6, 10, 15, '?'],
+                        answer: 21,
+                        rule: "Add increasing numbers (1, 2, 3, 4, 5, 6)"
+                    },
+                    {
+                        pattern: [2, 6, 12, 20, '?', 42],
+                        answer: 30,
+                        rule: "Add 4, then 6, then 8, etc."
+                    }
+                ];
+                
+                const randomSequence = sequences[Math.floor(Math.random() * sequences.length)];
+                
+                game = {
+                    pattern: randomSequence.pattern,
+                    answer: randomSequence.answer,
+                    rule: randomSequence.rule,
+                    attempts: 0,
+                    maxAttempts: 3
+                };
+                
+                global.numberSequenceGames.set(gameId, game);
+                
+                await sock.sendMessage(sender, {
+                    text: `🔢 Find the Missing Number\n\nWhat number should replace the '?' in this sequence?\n\n${game.pattern.join(', ')}\n\nGuess using *!findnumber [number]*`
+                });
+                return;
+            }
+            
+            // Process a guess
+            const guess = parseInt(args[0]);
+            if (isNaN(guess)) {
+                await sock.sendMessage(sender, { text: '❌ Please enter a valid number.' });
+                return;
+            }
+            
+            game.attempts++;
+            
+            if (guess === game.answer) {
+                await sock.sendMessage(sender, {
+                    text: `✅ Correct! ${guess} is the right answer.\n\nRule: ${game.rule}\n\nPlay again with *!findnumber*`
+                });
+                global.numberSequenceGames.delete(gameId);
+            } else if (game.attempts >= game.maxAttempts) {
+                await sock.sendMessage(sender, {
+                    text: `❌ Wrong! You've used all ${game.maxAttempts} attempts.\nThe correct answer was ${game.answer}.\n\nRule: ${game.rule}\n\nTry again with *!findnumber*`
+                });
+                global.numberSequenceGames.delete(gameId);
+            } else {
+                await sock.sendMessage(sender, {
+                    text: `❌ Wrong! Try again. Attempts: ${game.attempts}/${game.maxAttempts}`
+                });
+                global.numberSequenceGames.set(gameId, game);
+            }
+        } catch (err) {
+            logger.error('Find Number error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            global.numberSequenceGames.delete(sender);
+        }
+    },
+    
+    // 33. Random Video Game Fact
+    async gamefact(sock, sender) {
+        try {
+            const facts = [
+                "The first commercially successful video game was Pong, released by Atari in 1972.",
+                "Nintendo was founded in 1889 as a playing card company before eventually moving into video games.",
+                "The PlayStation 2 is the best-selling video game console of all time, with over 155 million units sold.",
+                "The term 'Easter Egg' in video games originated from the 1979 Atari game 'Adventure,' where developer Warren Robinett hid his name in a secret room.",
+                "Minecraft is the best-selling video game of all time, having sold over 238 million copies across all platforms.",
+                "The first video game 'Easter Egg' was in the 1979 Atari game 'Adventure'. When players found a hidden item, they could access a room with the creator's name.",
+                "Mario was originally called 'Jumpman' in the 1981 arcade game Donkey Kong. His profession was also changed from carpenter to plumber when Mario Bros. was released.",
+                "The highest-grossing video game of all time is not a console or PC game but the mobile game 'Honor of Kings' (also known as 'Arena of Valor').",
+                "The Game Boy's processor was so energy-efficient that one model survived a bombing during the Gulf War and still worked perfectly, only needing new batteries.",
+                "The term 'boss fight' originated from Big Boss in the game Final Fantasy, who was designed to be noticeably different from the normal enemies."
+            ];
+            
+            const randomFact = facts[Math.floor(Math.random() * facts.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `🎮 Video Game Fact:\n\n${randomFact}` 
+            });
+        } catch (err) {
+            logger.error('Game Fact error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 34. Hangman with Movie Titles
+    async moviehangman(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.movieHangmanGames) global.movieHangmanGames = new Map();
+            
+            const gameId = sender;
+            let game = global.movieHangmanGames.get(gameId);
+            
+            if (!game) {
+                // Start a new game with movie titles
+                const movies = [
+                    "THE GODFATHER",
+                    "STAR WARS",
+                    "PULP FICTION",
+                    "THE MATRIX",
+                    "FORREST GUMP",
+                    "THE DARK KNIGHT",
+                    "FIGHT CLUB",
+                    "INCEPTION",
+                    "JURASSIC PARK",
+                    "AVATAR",
+                    "TITANIC",
+                    "THE LION KING",
+                    "INTERSTELLAR",
+                    "THE AVENGERS",
+                    "BACK TO THE FUTURE"
+                ];
+                
+                const randomMovie = movies[Math.floor(Math.random() * movies.length)];
+                
+                game = {
+                    word: randomMovie,
+                    guessedLetters: [],
+                    maxWrongGuesses: 6
+                };
+                
+                global.movieHangmanGames.set(gameId, game);
+                
+                const hangmanDisplay = getHangmanDisplay(game);
+                await sock.sendMessage(sender, {
+                    text: `🎬 Movie Hangman\n${hangmanDisplay}\n\nGuess a letter using *!moviehangman [letter]*`
+                });
+                return;
+            }
+            
+            // Process a guess
+            const guess = args[0]?.toUpperCase();
+            if (!guess || guess.length !== 1 || !guess.match(/[A-Z]/)) {
+                await sock.sendMessage(sender, { text: '❌ Please guess a single letter (A-Z).' });
+                return;
+            }
+            
+            if (game.guessedLetters.includes(guess)) {
+                await sock.sendMessage(sender, { text: '❌ You already guessed that letter!' });
+                return;
+            }
+            
+            game.guessedLetters.push(guess);
+            global.movieHangmanGames.set(gameId, game);
+            
+            const wrongGuesses = game.guessedLetters.filter(letter => !game.word.includes(letter));
+            const displayWord = game.word.split('').map(letter => 
+                letter === ' ' ? ' ' : (game.guessedLetters.includes(letter) ? letter : '_')
+            ).join(' ');
+            
+            const isWon = game.word.split('').every(letter => letter === ' ' || game.guessedLetters.includes(letter));
+            const isLost = wrongGuesses.length >= game.maxWrongGuesses;
+            
+            const hangmanDisplay = getHangmanDisplay(game);
+            
+            if (isWon) {
+                await sock.sendMessage(sender, {
+                    text: `${hangmanDisplay}\n\n🎉 You win! The movie was: ${game.word}\n\nPlay again with *!moviehangman*`
+                });
+                global.movieHangmanGames.delete(gameId);
+            } else if (isLost) {
+                await sock.sendMessage(sender, {
+                    text: `${hangmanDisplay}\n\n💀 Game Over! The movie was: ${game.word}\n\nPlay again with *!moviehangman*`
+                });
+                global.movieHangmanGames.delete(gameId);
+            } else {
+                await sock.sendMessage(sender, {
+                    text: `${hangmanDisplay}\n\nGuess another letter using *!moviehangman [letter]*`
+                });
+            }
+        } catch (err) {
+            logger.error('Movie Hangman error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            global.movieHangmanGames.delete(sender);
+        }
+    },
+    
+    // 35. Movie Quote Quiz
+    async moviequiz(sock, sender) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            const quizzes = [
+                {
+                    quote: "I'll make him an offer he can't refuse.",
+                    movie: "The Godfather"
+                },
+                {
+                    quote: "May the Force be with you.",
+                    movie: "Star Wars"
+                },
+                {
+                    quote: "I'm the king of the world!",
+                    movie: "Titanic"
+                },
+                {
+                    quote: "There's no place like home.",
+                    movie: "The Wizard of Oz"
+                },
+                {
+                    quote: "Life is like a box of chocolates, you never know what you're gonna get.",
+                    movie: "Forrest Gump"
+                },
+                {
+                    quote: "I see dead people.",
+                    movie: "The Sixth Sense"
+                },
+                {
+                    quote: "Why so serious?",
+                    movie: "The Dark Knight"
+                },
+                {
+                    quote: "You're gonna need a bigger boat.",
+                    movie: "Jaws"
+                },
+                {
+                    quote: "Houston, we have a problem.",
+                    movie: "Apollo 13"
+                },
+                {
+                    quote: "To infinity and beyond!",
+                    movie: "Toy Story"
+                }
+            ];
+            
+            const randomQuiz = quizzes[Math.floor(Math.random() * quizzes.length)];
+            
+            await sock.sendMessage(sender, {
+                text: `🎬 Movie Quote Quiz\n\nGuess the movie from this famous quote:\n\n"${randomQuiz.quote}"\n\nSend your guess with *!movieanswer [movie name]*`
+            });
+            
+            // Store the quiz in global state
+            if (!global.movieQuizzes) global.movieQuizzes = new Map();
+            global.movieQuizzes.set(sender, randomQuiz);
+            
+        } catch (err) {
+            logger.error('Movie Quiz error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 36. Movie Answer - companion for Movie Quiz
+    async movieanswer(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.movieQuizzes || !global.movieQuizzes.has(sender)) {
+                await sock.sendMessage(sender, { 
+                    text: '❌ No active movie quiz found. Start a new quiz with *!moviequiz*' 
+                });
+                return;
+            }
+            
+            if (!args.length) {
+                await sock.sendMessage(sender, { 
+                    text: '❓ Please provide your guess!' 
+                });
+                return;
+            }
+            
+            const quiz = global.movieQuizzes.get(sender);
+            const guess = args.join(' ').toLowerCase().trim();
+            const correctAnswer = quiz.movie.toLowerCase();
+            
+            // Allow for some flexibility in the answer
+            if (guess === correctAnswer || correctAnswer.includes(guess) || guess.includes(correctAnswer)) {
+                await sock.sendMessage(sender, { 
+                    text: `🎉 Correct! "${quiz.quote}" is from the movie "${quiz.movie}"!\n\nTry another with *!moviequiz*` 
+                });
+                global.movieQuizzes.delete(sender);
+            } else {
+                await sock.sendMessage(sender, { 
+                    text: `❌ Incorrect! The quote "${quiz.quote}" is from the movie "${quiz.movie}".\n\nTry another with *!moviequiz*` 
+                });
+                global.movieQuizzes.delete(sender);
+            }
+        } catch (err) {
+            logger.error('Movie Answer error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 37. Word Chain game
+    async wordchain(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.wordChainGames) global.wordChainGames = new Map();
+            
+            const gameId = sender;
+            let game = global.wordChainGames.get(gameId);
+            
+            if (!game || args[0]?.toLowerCase() === 'restart') {
+                const startWords = ['apple', 'beach', 'castle', 'dolphin', 'elephant', 'forest', 'galaxy', 'house'];
+                
+                game = {
+                    lastWord: startWords[Math.floor(Math.random() * startWords.length)],
+                    words: [],
+                    score: 0
+                };
+                
+                global.wordChainGames.set(gameId, game);
+                
+                await sock.sendMessage(sender, {
+                    text: `🎮 Word Chain Game\n\nI'll start with: *${game.lastWord}*\n\nRespond with a word that starts with the last letter of my word using *!wordchain [word]*`
+                });
+                return;
+            }
+            
+            // Process player word
+            const word = args[0]?.toLowerCase();
+            
+            if (!word) {
+                await sock.sendMessage(sender, { text: '❓ Please provide a word!' });
+                return;
+            }
+            
+            // Word must start with the last letter of the previous word
+            const lastLetter = game.lastWord[game.lastWord.length - 1];
+            if (word[0] !== lastLetter) {
+                await sock.sendMessage(sender, { 
+                    text: `❌ Your word must start with the letter "${lastLetter.toUpperCase()}"!` 
+                });
+                return;
+            }
+            
+            // Word must not have been used before
+            if (game.words.includes(word) || game.lastWord === word) {
+                await sock.sendMessage(sender, { text: '❌ That word has already been used!' });
+                return;
+            }
+            
+            // Add player's word to the chain
+            game.words.push(word);
+            game.score++;
+            
+            // Bot's turn - find a word that starts with the last letter of player's word
+            const lastPlayerLetter = word[word.length - 1];
+            
+            // Simple dictionary (in a real bot, this would be more extensive)
+            const dictionary = {
+                'a': ['apple', 'animal', 'anchor', 'astronaut', 'arrow', 'airplane'],
+                'b': ['banana', 'book', 'bread', 'butterfly', 'beach', 'balloon'],
+                'c': ['cat', 'car', 'cow', 'chocolate', 'castle', 'camera'],
+                'd': ['dog', 'door', 'desk', 'diamond', 'dolphin', 'duck'],
+                'e': ['elephant', 'egg', 'eagle', 'earth', 'emerald', 'envelope'],
+                'f': ['fish', 'flower', 'fire', 'football', 'forest', 'feather'],
+                'g': ['goat', 'game', 'glass', 'garden', 'galaxy', 'gold'],
+                'h': ['house', 'hat', 'horse', 'heart', 'helicopter', 'honey'],
+                'i': ['ice', 'island', 'insect', 'igloo', 'idea', 'iron'],
+                'j': ['jacket', 'jar', 'jelly', 'jewelry', 'jungle', 'juice'],
+                'k': ['kite', 'key', 'king', 'kangaroo', 'kitchen', 'knife'],
+                'l': ['lamp', 'lion', 'leaf', 'lemon', 'ladder', 'lake'],
+                'm': ['monkey', 'moon', 'music', 'mountain', 'mouse', 'map'],
+                'n': ['nose', 'nail', 'night', 'nest', 'newspaper', 'neck'],
+                'o': ['orange', 'ocean', 'oil', 'oven', 'ostrich', 'office'],
+                'p': ['pen', 'paper', 'pizza', 'plant', 'penguin', 'present'],
+                'q': ['queen', 'question', 'quilt', 'quartz', 'quarter', 'quiet'],
+                'r': ['rabbit', 'rain', 'rock', 'rocket', 'rope', 'river'],
+                's': ['sun', 'star', 'sand', 'shoe', 'snake', 'spoon'],
+                't': ['table', 'tree', 'train', 'tiger', 'tooth', 'telephone'],
+                'u': ['umbrella', 'unicorn', 'universe', 'uniform', 'uncle', 'under'],
+                'v': ['violin', 'vase', 'volcano', 'video', 'vacation', 'voice'],
+                'w': ['water', 'window', 'wolf', 'whale', 'wizard', 'wallet'],
+                'x': ['xylophone', 'x-ray', 'xenon', 'xerox', 'xmas', 'xenophobia'],
+                'y': ['yellow', 'year', 'yoyo', 'yacht', 'yogurt', 'yard'],
+                'z': ['zebra', 'zero', 'zoo', 'zipper', 'zombie', 'zone']
+            };
+            
+            let possibleWords = dictionary[lastPlayerLetter] || [];
+            
+            // Filter out words that have already been used
+            possibleWords = possibleWords.filter(w => !game.words.includes(w) && w !== game.lastWord);
+            
+            // If no words available, player wins
+            if (possibleWords.length === 0) {
+                await sock.sendMessage(sender, {
+                    text: `🎉 You win! I can't think of a word that starts with "${lastPlayerLetter.toUpperCase()}".\nYour final score: ${game.score}\n\nPlay again with *!wordchain restart*`
+                });
+                global.wordChainGames.delete(gameId);
+                return;
+            }
+            
+            // Bot chooses a word
+            const botWord = possibleWords[Math.floor(Math.random() * possibleWords.length)];
+            game.words.push(botWord);
+            game.lastWord = botWord;
+            
+            await sock.sendMessage(sender, {
+                text: `✅ "${word}" is valid!\nMy word: *${botWord}*\nYour score: ${game.score}\n\nRespond with a word that starts with "${botWord[botWord.length - 1].toUpperCase()}" using *!wordchain [word]*`
+            });
+            
+            global.wordChainGames.set(gameId, game);
+        } catch (err) {
+            logger.error('Word Chain error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            global.wordChainGames.delete(sender);
+        }
+    },
+    
+    // 38. Personality Quiz
+    async personalityquiz(sock, sender, args) {
+        try {
+            if (!global.personalityQuizzes) global.personalityQuizzes = new Map();
+            
+            const quizId = sender;
+            let quiz = global.personalityQuizzes.get(quizId);
+            
+            if (!quiz) {
+                // Start a new quiz
+                quiz = {
+                    questions: [
+                        "Do you prefer spending time with many friends or a few close ones? (A: Many, B: Few)",
+                        "Do you make decisions based on logic or feelings? (A: Logic, B: Feelings)",
+                        "Are you more organized or spontaneous? (A: Organized, B: Spontaneous)",
+                        "Do you prefer outdoor adventures or cozy indoor activities? (A: Outdoor, B: Indoor)",
+                        "Are you an early bird or a night owl? (A: Early bird, B: Night owl)"
+                    ],
+                    personalities: {
+                        'AAAAA': 'The Logical Leader: You\'re analytical, organized, and thrive in structured environments. You make decisions based on facts and take charge naturally.',
+                        'AAAAB': 'The Strategic Thinker: You combine logical thinking with a preference for working late into the night on your plans and strategies.',
+                        'BBBBBB': 'The Empathetic Dreamer: You\'re intuitive, creative, and deeply connected to your emotions and the feelings of others.',
+                        'BABBA': 'The Social Butterfly: You love being around people and spontaneous adventures, while making decisions with your heart.',
+                        'ABBBA': 'The Practical Idealist: You value close relationships but approach problems logically, with a preference for spontaneity and night-time creativity.'
+                    },
+                    currentQuestion: 0,
+                    answers: []
+                };
+                
+                global.personalityQuizzes.set(quizId, quiz);
+                
+                await sock.sendMessage(sender, {
+                    text: `🧠 Personality Quiz\n\nQuestion 1: ${quiz.questions[0]}\n\nReply with *!personalityquiz A* or *!personalityquiz B*`
+                });
+                return;
+            }
+            
+            // Process answer
+            const answer = args[0]?.toUpperCase();
+            
+            if (answer !== 'A' && answer !== 'B') {
+                await sock.sendMessage(sender, { text: '❓ Please answer with A or B!' });
+                return;
+            }
+            
+            // Store answer
+            quiz.answers.push(answer);
+            quiz.currentQuestion++;
+            
+            // Check if quiz is complete
+            if (quiz.currentQuestion >= quiz.questions.length) {
+                // Determine personality type
+                const personalityCode = quiz.answers.join('');
+                
+                // Find exact match or default to closest
+                let personality = quiz.personalities[personalityCode] || 'The Balanced Individual: You have a mix of traits that make you adaptable to different situations and environments.';
+                
+                await sock.sendMessage(sender, {
+                    text: `🧠 Personality Quiz Results\n\n${personality}\n\nTake the quiz again with *!personalityquiz*`
+                });
+                
+                global.personalityQuizzes.delete(quizId);
+                return;
+            }
+            
+            // Ask next question
+            await sock.sendMessage(sender, {
+                text: `Question ${quiz.currentQuestion + 1}: ${quiz.questions[quiz.currentQuestion]}\n\nReply with *!personalityquiz A* or *!personalityquiz B*`
+            });
+            
+            global.personalityQuizzes.set(quizId, quiz);
+        } catch (err) {
+            logger.error('Personality Quiz error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the quiz.' });
+            global.personalityQuizzes.delete(sender);
+        }
+    },
+    
+    // 39. Math Challenge
+    async mathchallenge(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            // Generate a random math problem
+            const operations = ['+', '-', '*'];
+            const operation = operations[Math.floor(Math.random() * operations.length)];
+            
+            let num1, num2, answer;
+            
+            // Generate appropriate numbers based on operation
+            switch(operation) {
+                case '+':
+                    num1 = Math.floor(Math.random() * 100) + 1;
+                    num2 = Math.floor(Math.random() * 100) + 1;
+                    answer = num1 + num2;
+                    break;
+                case '-':
+                    num1 = Math.floor(Math.random() * 100) + 1;
+                    num2 = Math.floor(Math.random() * num1) + 1; // Ensure positive answer
+                    answer = num1 - num2;
+                    break;
+                case '*':
+                    num1 = Math.floor(Math.random() * 12) + 1;
+                    num2 = Math.floor(Math.random() * 12) + 1;
+                    answer = num1 * num2;
+                    break;
+            }
+            
+            // Store the answer for verification
+            if (!global.mathChallenges) global.mathChallenges = new Map();
+            global.mathChallenges.set(sender, answer);
+            
+            await sock.sendMessage(sender, {
+                text: `🧮 Math Challenge\n\nSolve: ${num1} ${operation} ${num2} = ?\n\nReply with *!mathanswer [your answer]*`
+            });
+        } catch (err) {
+            logger.error('Math Challenge error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 40. Math Answer
+    async mathanswer(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.mathChallenges || !global.mathChallenges.has(sender)) {
+                await sock.sendMessage(sender, {
+                    text: '❌ No active math challenge found. Start one with *!mathchallenge*'
+                });
+                return;
+            }
+            
+            const userAnswer = parseInt(args[0]);
+            if (isNaN(userAnswer)) {
+                await sock.sendMessage(sender, { text: '❌ Please provide a valid number as your answer.' });
+                return;
+            }
+            
+            const correctAnswer = global.mathChallenges.get(sender);
+            
+            if (userAnswer === correctAnswer) {
+                await sock.sendMessage(sender, {
+                    text: `✅ Correct! ${userAnswer} is the right answer.\n\nTry another challenge with *!mathchallenge*`
+                });
+            } else {
+                await sock.sendMessage(sender, {
+                    text: `❌ Wrong! The correct answer was ${correctAnswer}.\n\nTry another challenge with *!mathchallenge*`
+                });
+            }
+            
+            global.mathChallenges.delete(sender);
+        } catch (err) {
+            logger.error('Math Answer error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
 
     async _8ball(sock, sender, args) {
         try {
