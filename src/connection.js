@@ -121,6 +121,9 @@ async function handleStreamError(error, sock) {
 
 async function startConnection() {
     try {
+        // Reset QR flag at the start of each connection attempt
+        qrDisplayed = false;
+        
         await commandLoader.loadCommandHandlers();
         await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
 
@@ -219,15 +222,23 @@ async function startConnection() {
 
                 if (qr && !qrDisplayed) {
                     qrDisplayed = true;
+                    // Clear console before displaying new QR code
                     process.stdout.write('\x1Bc');
+                    console.log('📱 WhatsApp Bot - QR Code Connection');
+                    console.log('==========================================\n');
+                    
                     qrcode.generate(qr, {
                         small: true,
                         scale: 1
                     }, (qrcode) => {
                         console.log(qrcode);
                     });
-                    console.log('📱 Scan the QR code above with WhatsApp to start the bot');
+                    
+                    console.log('\n📱 Scan the QR code above with WhatsApp to start the bot');
                     console.log('⏳ QR code will refresh in 60 seconds if not scanned\n');
+                    
+                    // Log the QR display for debugging
+                    logger.info('QR code displayed - waiting for scan');
                 }
 
                 if (connection === 'open' && !isConnected) {
@@ -380,24 +391,25 @@ async function startConnection() {
             if (events['messages.upsert']) {
                 const upsert = events['messages.upsert'];
                 logger.info(`Received message event of type: ${upsert.type}`);
-                console.log('Full message event:', JSON.stringify(upsert, null, 2));
+                // Disable verbose logging to prevent console spam
+                // console.log('Full message event:', JSON.stringify(upsert, null, 2));
                 
                 if (upsert.type === 'notify') {
                     for (const msg of upsert.messages) {
-                        // Log the full message structure for debugging
-                        console.log('Processing message:', JSON.stringify(msg, null, 2));
+                        // Disable verbose logging to prevent console spam
+                        // console.log('Processing message:', JSON.stringify(msg, null, 2));
                         
                         if (!msg.message) {
-                            console.log('Skipping message with no content');
+                            // console.log('Skipping message with no content');
                             continue;
                         }
                         
-                        // Debug log message origin
-                        if (msg.key.fromMe) {
-                            console.log('Message marked as fromMe, but processing anyway for testing');
-                            // We're NOT skipping messages from self during testing
-                            // This ensures all messages get processed while we debug
-                        }
+                        // Disable debug logs for message origin
+                        // if (msg.key.fromMe) {
+                        //     console.log('Message marked as fromMe, but processing anyway for testing');
+                        //     // We're NOT skipping messages from self during testing
+                        //     // This ensures all messages get processed while we debug
+                        // }
                         
                         // Extract basic message info for logging
                         const msgType = msg.message ? Object.keys(msg.message)[0] : 'unknown';
@@ -414,7 +426,8 @@ async function startConnection() {
                                 msg.message?.videoMessage?.caption || 
                                 'No text content';
                                 
-                            console.log(`Message text: "${msgText}"`);
+                            // Disable verbose logging
+                            // console.log(`Message text: "${msgText}"`);
                             
                             // Process message based on context
                             if (isGroup) {
@@ -431,7 +444,8 @@ async function startConnection() {
                             
                             // Send a direct acknowledgment for testing
                             if (!isGroup && msgText && !msgText.startsWith('.')) {
-                                console.log('Sending direct acknowledgment...');
+                                // Disable verbose logging
+                                // console.log('Sending direct acknowledgment...');
                                 await sock.sendMessage(remoteJid, { 
                                     text: `I received your message: "${msgText}"\nTo use commands, start with a dot (.) like .help` 
                                 });
