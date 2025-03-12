@@ -33,9 +33,13 @@ async function startConnection() {
             console.log('Connection update:', update);
             if(update.qr){
                 console.log('\nQR Code received, attempting to display...\n');
-                qrcode.generate(update.qr, { small: true }, (qr) => {
+                // Add extra newlines for spacing
+                console.log('\n\n');
+                qrcode.generate(update.qr, {small: false}, (qr) => {
                     console.log(qr);
                 });
+                // Add instructions
+                console.log('\nScan this QR code with WhatsApp to connect\n');
             }
             if (update.connection === 'open') {
                 console.log('\nConnected to WhatsApp!\n');
