@@ -9,13 +9,27 @@ const config = require('./config/config');
 async function startServer(sock) {
     const app = express();
     app.use(express.json());
+    
+    // Store the sock instance for later use
+    if (sock) {
+        app.set('sock', sock);
+    }
 
     // Health check endpoint
     app.get('/', (req, res) => {
+        const currentSock = app.get('sock') || sock;
+        let commandCount = 0;
+        
+        try {
+            commandCount = commandLoader.getAllCommands().length;
+        } catch (err) {
+            // Commands not loaded yet
+        }
+        
         res.json({
-            status: sock ? 'connected' : 'disconnected',
+            status: currentSock ? 'connected' : 'initializing',
             message: 'WhatsApp Bot is active',
-            commands: commandLoader.getAllCommands().length,
+            commands: commandCount,
             uptime: process.uptime()
         });
     });
@@ -99,7 +113,7 @@ async function startServer(sock) {
         }
     });
 
-    // Always serve on port 5000 for Replit compatibility
+    // Use port 5000 for the API server (separate from QR code server)
     const PORT = 5000;
     const server = app.listen(PORT, '0.0.0.0')
         .on('error', (err) => {
@@ -117,8 +131,13 @@ async function main() {
     try {
         // Clear console first
         process.stdout.write('\x1Bc');
-
-        // Start WhatsApp connection first to show QR code
+        
+        // Start the API server immediately to make port 5000 available
+        console.log('Starting API server first...');
+        server = await startServer(null); // Pass null for sock for now
+        console.log('API server started on port 5000');
+        
+        // Start WhatsApp connection to show QR code
         try {
             sock = await startConnection();
         } catch (err) {
@@ -138,7 +157,19 @@ async function main() {
                 try {
                     await commandLoader.loadCommandHandlers();
                     await commandModules.initializeModules(sock);
-                    server = await startServer(sock);
+                    
+                    // Create a simple POST endpoint to handle messages from the server
+                    server._events.request._router.stack.forEach(layer => {
+                        if (layer.route && layer.route.path === '/') {
+                            const app = layer.route.stack[0].handle.toString().match(/app/);
+                            if (app) {
+                                // We found the app reference within express
+                                const expressApp = server._events.request;
+                                expressApp.set('sock', sock);
+                                console.log('Updated server with active WhatsApp connection');
+                            }
+                        }
+                    });
                 } catch (err) {
                     console.error('Error during initialization:', err);
                 } finally {

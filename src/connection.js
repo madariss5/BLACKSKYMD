@@ -6,7 +6,9 @@ const fsPromises = fs.promises;
 const pino = require('pino');
 const logger = require('./utils/logger');
 const express = require('express');
+const http = require('http');
 const app = express();
+const server = http.createServer(app);
 
 let sock = null;
 let retryCount = 0;
@@ -14,6 +16,7 @@ const MAX_RETRIES = 5;
 const RETRY_INTERVAL = 5000;
 const RECONNECT_INTERVAL = 3000;
 let latestQR = null;
+let qrPort = 5006; // Start with a high port number
 
 // Set up Express server for QR code display
 app.get('/', (req, res) => {
@@ -81,7 +84,7 @@ async function displayQR(qr) {
     try {
         // Generate QR code as data URL
         latestQR = await qrcode.toDataURL(qr);
-        console.log('\nQR Code ready! Visit http://localhost:5000 to scan\n');
+        console.log(`\nQR Code ready! Visit http://localhost:${qrPort} to scan\n`);
     } catch (err) {
         console.error('Failed to generate QR code:', err);
         process.exit(1);
@@ -91,8 +94,8 @@ async function displayQR(qr) {
 async function startConnection() {
     try {
         // Start Express server
-        app.listen(5000, '0.0.0.0', () => {
-            console.log('\nQR Code server running at http://localhost:5000\n');
+        server.listen(qrPort, '0.0.0.0', () => {
+            console.log(`\nQR Code server running at http://localhost:${qrPort}\n`);
         });
 
         const authDir = await ensureAuthDir();
