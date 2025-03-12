@@ -682,6 +682,888 @@ const funCommands = {
             await sock.sendMessage(sender, { text: '❌ An error occurred.' });
         }
     },
+    
+    // 1. Truth or Dare
+    async truthordare(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            const type = args[0]?.toLowerCase();
+            if (!type || (type !== 'truth' && type !== 'dare')) {
+                await sock.sendMessage(sender, { 
+                    text: '🎮 Truth or Dare\n\nChoose either *!truthordare truth* or *!truthordare dare*' 
+                });
+                return;
+            }
+            
+            const truths = [
+                "What's the most embarrassing thing you've ever done?",
+                "What's your biggest fear?",
+                "What's a secret you've never told anyone?",
+                "What's the worst thing you've ever done?",
+                "What's the craziest dream you've had?",
+                "What's your biggest regret?",
+                "What's the last lie you told?",
+                "What's something you're still hiding from your parents?",
+                "What's the most childish thing you still do?",
+                "What's the most embarrassing music you listen to?"
+            ];
+            
+            const dares = [
+                "Send the last photo you took",
+                "Send a screenshot of your most recent call history",
+                "Text your crush and say hi",
+                "Send a voice message singing your favorite song",
+                "Call someone and speak in a funny accent",
+                "Send a selfie with a funny face",
+                "Change your profile picture to a cartoon character for 24 hours",
+                "Send a message to your family group saying you need help with laundry",
+                "Video call the next person in your contacts for 10 seconds",
+                "Send 'I love you' to the 3rd person in your WhatsApp contacts"
+            ];
+            
+            const options = type === 'truth' ? truths : dares;
+            const randomOption = options[Math.floor(Math.random() * options.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `🎮 ${type.toUpperCase()}:\n\n${randomOption}` 
+            });
+        } catch (err) {
+            logger.error('Truth or Dare error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+        }
+    },
+    
+    // 2. Would You Rather
+    async wouldyourather(sock, sender) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            const questions = [
+                "Would you rather be able to fly or be invisible?",
+                "Would you rather be the best player on a losing team or the worst player on a winning team?",
+                "Would you rather lose all your memories or never be able to make new ones?",
+                "Would you rather be famous for something terrible or never be famous for something great?",
+                "Would you rather be able to speak every language or play every instrument?",
+                "Would you rather live without the internet or without AC and heating?",
+                "Would you rather be stuck on a broken ski lift or in a broken elevator?",
+                "Would you rather have unlimited battery life on devices or unlimited free WiFi wherever you go?",
+                "Would you rather never age physically or have a perfect memory?",
+                "Would you rather have 3 feet or 3 hands?"
+            ];
+            
+            const randomQuestion = questions[Math.floor(Math.random() * questions.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `🤔 Would You Rather:\n\n${randomQuestion}` 
+            });
+        } catch (err) {
+            logger.error('Would You Rather error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 3. Never Have I Ever
+    async neverhaveiever(sock, sender) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            const statements = [
+                "Never have I ever sent a text to the wrong person",
+                "Never have I ever pretended to be sick to avoid something",
+                "Never have I ever stayed up for more than 24 hours",
+                "Never have I ever forgotten someone's name while introducing them",
+                "Never have I ever broken a bone",
+                "Never have I ever been kicked out of a venue",
+                "Never have I ever gone a day without showering",
+                "Never have I ever lied in a job interview",
+                "Never have I ever been on TV",
+                "Never have I ever stolen something"
+            ];
+            
+            const randomStatement = statements[Math.floor(Math.random() * statements.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `🎮 Never Have I Ever:\n\n${randomStatement}\n\nRespond with 🍺 if you have, or 🙅‍♂️ if you haven't!` 
+            });
+        } catch (err) {
+            logger.error('Never Have I Ever error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 4. Fact
+    async fact(sock, sender) {
+        try {
+            const facts = [
+                "Bananas are berries, but strawberries aren't.",
+                "The shortest war in history was between Britain and Zanzibar on August 27, 1896. Zanzibar surrendered after 38 minutes.",
+                "A group of flamingos is called a 'flamboyance'.",
+                "The average person spends 6 months of their life waiting for red lights to turn green.",
+                "The fingerprints of koalas are so similar to humans that they have been confused at crime scenes.",
+                "A day on Venus is longer than a year on Venus. It takes 243 Earth days to rotate once on its axis and 225 Earth days to orbit the sun.",
+                "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly preserved.",
+                "The world's oldest known living tree is a Great Basin Bristlecone Pine, believed to have lived over 5,000 years.",
+                "Octopuses have three hearts, nine brains, and blue blood.",
+                "Cats have a specialized collarbone that allows them to always land on their feet when falling."
+            ];
+            
+            const randomFact = facts[Math.floor(Math.random() * facts.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `📚 Random Fact:\n\n${randomFact}` 
+            });
+        } catch (err) {
+            logger.error('Fact error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching a fact.' });
+        }
+    },
+    
+    // 5. Fortune Cookie
+    async fortune(sock, sender) {
+        try {
+            const fortunes = [
+                "A beautiful, smart, and loving person will be coming into your life.",
+                "Your ability to juggle many tasks will take you far.",
+                "A lifetime of happiness awaits you.",
+                "You will be traveling and coming into a fortune.",
+                "Now is the time to try something new.",
+                "The greatest risk is not taking one.",
+                "Your hard work is about to pay off. Remember, dreams are the seedlings of reality.",
+                "You will be successful in your work.",
+                "Your creative side will shine today.",
+                "Your life will be happy and peaceful."
+            ];
+            
+            const randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `🥠 Your Fortune:\n\n${randomFortune}` 
+            });
+        } catch (err) {
+            logger.error('Fortune error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching your fortune.' });
+        }
+    },
+    
+    // 6. Riddle
+    async riddle(sock, sender) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.riddles) global.riddles = new Map();
+            
+            // Clear any existing riddle
+            global.riddles.delete(sender);
+            
+            const riddles = [
+                {
+                    question: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?",
+                    answer: "echo"
+                },
+                {
+                    question: "You see a boat filled with people. It has not sunk, but when you look again you don't see a single person on the boat. Why?",
+                    answer: "all the people were married"
+                },
+                {
+                    question: "What is always in front of you but can't be seen?",
+                    answer: "future"
+                },
+                {
+                    question: "What can you break, even if you never pick it up or touch it?",
+                    answer: "promise"
+                },
+                {
+                    question: "What has many keys but can't open a single lock?",
+                    answer: "piano"
+                },
+                {
+                    question: "What gets wet while drying?",
+                    answer: "towel"
+                },
+                {
+                    question: "I have branches, but no fruit, trunk or leaves. What am I?",
+                    answer: "bank"
+                },
+                {
+                    question: "What can't talk but will reply when spoken to?",
+                    answer: "echo"
+                },
+                {
+                    question: "The more of this there is, the less you see. What is it?",
+                    answer: "darkness"
+                },
+                {
+                    question: "What has a head and a tail but no body?",
+                    answer: "coin"
+                }
+            ];
+            
+            const randomRiddle = riddles[Math.floor(Math.random() * riddles.length)];
+            
+            // Store the riddle for the user
+            global.riddles.set(sender, randomRiddle);
+            
+            await sock.sendMessage(sender, { 
+                text: `🧩 Riddle:\n\n${randomRiddle.question}\n\nGuess the answer using *!riddleguess [your answer]*` 
+            });
+        } catch (err) {
+            logger.error('Riddle error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 7. Riddleguess - companion command for Riddle
+    async riddleguess(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.riddles || !global.riddles.has(sender)) {
+                await sock.sendMessage(sender, { 
+                    text: '❌ No active riddle found. Start a new riddle with *!riddle*' 
+                });
+                return;
+            }
+            
+            if (!args.length) {
+                await sock.sendMessage(sender, { 
+                    text: '❓ Please provide your guess!' 
+                });
+                return;
+            }
+            
+            const riddle = global.riddles.get(sender);
+            const guess = args.join(' ').toLowerCase().trim();
+            
+            if (guess === riddle.answer.toLowerCase()) {
+                await sock.sendMessage(sender, { 
+                    text: '🎉 Correct! You solved the riddle!\n\nAsk for another with *!riddle*' 
+                });
+                global.riddles.delete(sender);
+            } else {
+                await sock.sendMessage(sender, { 
+                    text: '❌ Incorrect! Try again or use *!riddlehint* for a hint.' 
+                });
+            }
+        } catch (err) {
+            logger.error('Riddle guess error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 8. Riddlehint - hint for active riddle
+    async riddlehint(sock, sender) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.riddles || !global.riddles.has(sender)) {
+                await sock.sendMessage(sender, { 
+                    text: '❌ No active riddle found. Start a new riddle with *!riddle*' 
+                });
+                return;
+            }
+            
+            const riddle = global.riddles.get(sender);
+            const answer = riddle.answer;
+            
+            // Create hint by revealing random characters
+            let hint = '';
+            for (let i = 0; i < answer.length; i++) {
+                if (answer[i] === ' ') {
+                    hint += ' ';
+                } else if (Math.random() < 0.3) {
+                    hint += answer[i];
+                } else {
+                    hint += '_ ';
+                }
+            }
+            
+            await sock.sendMessage(sender, { 
+                text: `🔍 Hint: ${hint}` 
+            });
+        } catch (err) {
+            logger.error('Riddle hint error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 9. Word Scramble
+    async scramble(sock, sender) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.wordScramble) global.wordScramble = new Map();
+            
+            // Clear any existing game
+            global.wordScramble.delete(sender);
+            
+            const words = [
+                "apple", "banana", "chocolate", "diamond", "elephant", 
+                "giraffe", "hospital", "internet", "knowledge", "library"
+            ];
+            
+            const randomWord = words[Math.floor(Math.random() * words.length)];
+            
+            // Scramble the word
+            const scrambled = randomWord.split('').sort(() => 0.5 - Math.random()).join('');
+            
+            // Store the original word
+            global.wordScramble.set(sender, randomWord);
+            
+            await sock.sendMessage(sender, { 
+                text: `🔤 Unscramble this word: *${scrambled}*\n\nGuess using *!unscramble [your guess]*` 
+            });
+        } catch (err) {
+            logger.error('Word scramble error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 10. Unscramble - companion command for Word Scramble
+    async unscramble(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.wordScramble || !global.wordScramble.has(sender)) {
+                await sock.sendMessage(sender, { 
+                    text: '❌ No active word scramble found. Start a new game with *!scramble*' 
+                });
+                return;
+            }
+            
+            if (!args.length) {
+                await sock.sendMessage(sender, { 
+                    text: '❓ Please provide your guess!' 
+                });
+                return;
+            }
+            
+            const word = global.wordScramble.get(sender);
+            const guess = args[0].toLowerCase().trim();
+            
+            if (guess === word) {
+                await sock.sendMessage(sender, { 
+                    text: '🎉 Correct! You unscrambled the word!\n\nPlay again with *!scramble*' 
+                });
+                global.wordScramble.delete(sender);
+            } else {
+                await sock.sendMessage(sender, { 
+                    text: '❌ Incorrect! Try again or use *!scramblehint* for a hint.' 
+                });
+            }
+        } catch (err) {
+            logger.error('Unscramble error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 11. Scramblehint - hint for active word scramble
+    async scramblehint(sock, sender) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.wordScramble || !global.wordScramble.has(sender)) {
+                await sock.sendMessage(sender, { 
+                    text: '❌ No active word scramble found. Start a new game with *!scramble*' 
+                });
+                return;
+            }
+            
+            const word = global.wordScramble.get(sender);
+            
+            // Reveal the first and last letter
+            const hint = word[0] + '...' + word[word.length - 1];
+            
+            await sock.sendMessage(sender, { 
+                text: `🔍 Hint: The word starts with "${word[0]}" and ends with "${word[word.length - 1]}"` 
+            });
+        } catch (err) {
+            logger.error('Scramble hint error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 12. Akinator-like game
+    async akinator(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.akinator) global.akinator = new Map();
+            
+            const gameId = sender;
+            let game = global.akinator.get(gameId);
+            
+            // Reset or start game
+            if (!game || args[0]?.toLowerCase() === 'restart') {
+                game = {
+                    step: 0,
+                    character: '',
+                    questions: [
+                        "Is your character real (yes/no)?",
+                        "Is your character female (yes/no)?",
+                        "Is your character known for movies or TV (yes/no)?",
+                        "Is your character a musician (yes/no)?",
+                        "Is your character from a cartoon or anime (yes/no)?",
+                        "Is your character a historical figure (yes/no)?",
+                        "Is your character still alive (yes/no)?",
+                        "Is your character a political figure (yes/no)?",
+                        "Is your character associated with sports (yes/no)?",
+                        "Is your character from America (yes/no)?"
+                    ],
+                    answers: []
+                };
+                
+                global.akinator.set(gameId, game);
+                
+                await sock.sendMessage(sender, {
+                    text: `🔮 *Akinator Game*\n\nThink of a character, and I'll try to guess who it is!\n\nQuestion 1: ${game.questions[0]}\n\nReply with *!akinator yes* or *!akinator no*`
+                });
+                return;
+            }
+            
+            const answer = args[0]?.toLowerCase();
+            
+            if (answer !== 'yes' && answer !== 'no') {
+                await sock.sendMessage(sender, { 
+                    text: '❓ Please answer with *!akinator yes* or *!akinator no*.' 
+                });
+                return;
+            }
+            
+            // Store the answer
+            game.answers.push(answer);
+            game.step++;
+            
+            // Simple guessing logic (very simplified version of real Akinator)
+            if (game.step >= 5) {
+                // Make a guess based on the pattern of answers
+                const answerPattern = game.answers.join('');
+                
+                let guess = "I'm not sure who your character is.";
+                
+                // Very simplified guessing logic with a few examples
+                if (answerPattern.startsWith('yesno')) {
+                    guess = "Is it Marilyn Monroe?";
+                } else if (answerPattern.startsWith('yesyes')) {
+                    guess = "Is it Jennifer Lawrence?";
+                } else if (answerPattern.startsWith('noyes')) {
+                    guess = "Is it Wonder Woman?";
+                } else if (answerPattern.startsWith('nono')) {
+                    guess = "Is it Mario from Super Mario Bros?";
+                }
+                
+                await sock.sendMessage(sender, {
+                    text: `🔮 Based on your answers, I think...\n\n${guess}\n\nWas I right? Play again with *!akinator restart*!`
+                });
+                
+                // End the game
+                global.akinator.delete(gameId);
+            } else {
+                // Ask the next question
+                await sock.sendMessage(sender, {
+                    text: `Question ${game.step + 1}: ${game.questions[game.step]}\n\nReply with *!akinator yes* or *!akinator no*`
+                });
+                
+                // Update game state
+                global.akinator.set(gameId, game);
+            }
+        } catch (err) {
+            logger.error('Akinator error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            global.akinator.delete(sender);
+        }
+    },
+    
+    // 13. Number Guessing Game
+    async numbergame(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.numberGames) global.numberGames = new Map();
+            
+            const gameId = sender;
+            let game = global.numberGames.get(gameId);
+            
+            if (!game) {
+                // Start a new game
+                const max = 100;
+                game = {
+                    number: Math.floor(Math.random() * max) + 1,
+                    attempts: 0,
+                    maxAttempts: 10
+                };
+                
+                global.numberGames.set(gameId, game);
+                
+                await sock.sendMessage(sender, {
+                    text: `🔢 Number Guessing Game\n\nI'm thinking of a number between 1 and ${max}.\nYou have ${game.maxAttempts} attempts to guess it!\n\nMake a guess using *!numbergame [number]*`
+                });
+                return;
+            }
+            
+            // Process a guess
+            const guess = parseInt(args[0]);
+            if (isNaN(guess)) {
+                await sock.sendMessage(sender, { text: '❌ Please enter a valid number.' });
+                return;
+            }
+            
+            game.attempts++;
+            
+            if (guess === game.number) {
+                await sock.sendMessage(sender, {
+                    text: `🎉 Correct! The number was ${game.number}.\nYou guessed it in ${game.attempts} attempts!\n\nPlay again with *!numbergame*`
+                });
+                global.numberGames.delete(gameId);
+            } else if (game.attempts >= game.maxAttempts) {
+                await sock.sendMessage(sender, {
+                    text: `😢 Game Over! You've used all ${game.maxAttempts} attempts.\nThe number was ${game.number}.\n\nTry again with *!numbergame*`
+                });
+                global.numberGames.delete(gameId);
+            } else {
+                const hint = guess < game.number ? 'higher' : 'lower';
+                await sock.sendMessage(sender, {
+                    text: `❌ Wrong! The number is ${hint} than ${guess}.\nAttempts: ${game.attempts}/${game.maxAttempts}`
+                });
+                global.numberGames.set(gameId, game);
+            }
+        } catch (err) {
+            logger.error('Number game error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            global.numberGames.delete(sender);
+        }
+    },
+    
+    // 14. Coin flip with emoji
+    async coinflip(sock, sender) {
+        try {
+            const result = Math.random() < 0.5 ? 'heads' : 'tails';
+            const emoji = result === 'heads' ? '🪙' : '💰';
+            
+            await sock.sendMessage(sender, { 
+                text: `${emoji} Coin flip result: *${result.toUpperCase()}*!` 
+            });
+        } catch (err) {
+            logger.error('Coin flip error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 15. Dice roll
+    async diceroll(sock, sender, args) {
+        try {
+            // Parse number of dice to roll
+            const count = Math.min(4, Math.max(1, parseInt(args[0]) || 1));
+            
+            const results = [];
+            for (let i = 0; i < count; i++) {
+                results.push(Math.floor(Math.random() * 6) + 1);
+            }
+            
+            // Calculate total
+            const total = results.reduce((sum, val) => sum + val, 0);
+            
+            const diceEmojis = {
+                1: '⚀',
+                2: '⚁',
+                3: '⚂',
+                4: '⚃',
+                5: '⚄',
+                6: '⚅'
+            };
+            
+            const diceDisplay = results.map(r => diceEmojis[r]).join(' ');
+            
+            await sock.sendMessage(sender, {
+                text: `🎲 Dice roll: ${diceDisplay}\nValues: ${results.join(', ')}\nTotal: ${total}`
+            });
+        } catch (err) {
+            logger.error('Dice roll error:', err);
+            const result = Math.floor(Math.random() * 6) + 1;
+            await sock.sendMessage(sender, { text: `❌ An error occurred. Dice roll: ${result}` });
+        }
+    },
+    
+    // 16. Crack the code (mastermind-like game)
+    async crackthecode(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.codeGames) global.codeGames = new Map();
+            
+            const gameId = sender;
+            let game = global.codeGames.get(gameId);
+            
+            if (!game || args[0]?.toLowerCase() === 'restart') {
+                // Start a new game
+                game = {
+                    code: Array.from({length: 4}, () => Math.floor(Math.random() * 6) + 1),
+                    attempts: 0,
+                    maxAttempts: 10,
+                    guesses: []
+                };
+                
+                global.codeGames.set(gameId, game);
+                
+                await sock.sendMessage(sender, {
+                    text: `🔐 Crack the Code\n\nI've created a 4-digit code with numbers from 1-6.\nYou have ${game.maxAttempts} attempts to guess it!\n\nMake a guess using *!crackthecode 1234* (four digits from 1-6)\n\n🟢 = correct number in correct position\n🟡 = correct number in wrong position\n⚪ = number not in the code`
+                });
+                return;
+            }
+            
+            // Process a guess
+            const guess = args[0];
+            
+            if (!guess || !/^[1-6]{4}$/.test(guess)) {
+                await sock.sendMessage(sender, { 
+                    text: '❌ Please enter a valid 4-digit code using only numbers 1-6.' 
+                });
+                return;
+            }
+            
+            const guessArray = guess.split('').map(Number);
+            game.attempts++;
+            
+            // Evaluate guess
+            const feedback = [];
+            const codeCopy = [...game.code];
+            const guessCopy = [...guessArray];
+            
+            // Check for correct numbers in correct positions
+            for (let i = 0; i < 4; i++) {
+                if (guessArray[i] === game.code[i]) {
+                    feedback.push('🟢');
+                    codeCopy[i] = null;
+                    guessCopy[i] = null;
+                }
+            }
+            
+            // Check for correct numbers in wrong positions
+            for (let i = 0; i < 4; i++) {
+                if (guessCopy[i] !== null) {
+                    const idx = codeCopy.indexOf(guessCopy[i]);
+                    if (idx !== -1) {
+                        feedback.push('🟡');
+                        codeCopy[idx] = null;
+                    } else {
+                        feedback.push('⚪');
+                    }
+                }
+            }
+            
+            // Shuffle feedback to not give away positions
+            feedback.sort((a, b) => {
+                const order = {'🟢': 0, '🟡': 1, '⚪': 2};
+                return order[a] - order[b];
+            });
+            
+            // Store guess and feedback
+            game.guesses.push({
+                guess,
+                feedback: feedback.join('')
+            });
+            
+            // Check if they won
+            if (feedback.filter(f => f === '🟢').length === 4) {
+                await sock.sendMessage(sender, {
+                    text: `🎉 You cracked the code! It was ${game.code.join('')}.\nYou guessed it in ${game.attempts} attempts!\n\nPlay again with *!crackthecode restart*`
+                });
+                global.codeGames.delete(gameId);
+                return;
+            }
+            
+            // Check if game over
+            if (game.attempts >= game.maxAttempts) {
+                await sock.sendMessage(sender, {
+                    text: `😢 Game Over! You've used all ${game.maxAttempts} attempts.\nThe code was ${game.code.join('')}.\n\nTry again with *!crackthecode restart*`
+                });
+                global.codeGames.delete(gameId);
+                return;
+            }
+            
+            // Show game state
+            let message = `Attempt ${game.attempts}/${game.maxAttempts}:\n`;
+            
+            for (const {guess, feedback} of game.guesses) {
+                message += `\n${guess} - ${feedback}`;
+            }
+            
+            message += `\n\nYou have ${game.maxAttempts - game.attempts} attempts left.`;
+            
+            await sock.sendMessage(sender, { text: message });
+            global.codeGames.set(gameId, game);
+        } catch (err) {
+            logger.error('Crack the code error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            global.codeGames.delete(sender);
+        }
+    },
+    
+    // 17. Rock Paper Scissors Lizard Spock
+    async rpsls(sock, sender, args) {
+        try {
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            const choices = ['rock', 'paper', 'scissors', 'lizard', 'spock'];
+            const emojis = {
+                'rock': '🪨',
+                'paper': '📄',
+                'scissors': '✂️',
+                'lizard': '🦎',
+                'spock': '🖖'
+            };
+            
+            const rules = {
+                'rock': ['scissors', 'lizard'],
+                'paper': ['rock', 'spock'],
+                'scissors': ['paper', 'lizard'],
+                'lizard': ['paper', 'spock'],
+                'spock': ['rock', 'scissors']
+            };
+            
+            const explanations = {
+                'rock': { 'scissors': 'Rock crushes Scissors', 'lizard': 'Rock crushes Lizard' },
+                'paper': { 'rock': 'Paper covers Rock', 'spock': 'Paper disproves Spock' },
+                'scissors': { 'paper': 'Scissors cut Paper', 'lizard': 'Scissors decapitate Lizard' },
+                'lizard': { 'paper': 'Lizard eats Paper', 'spock': 'Lizard poisons Spock' },
+                'spock': { 'rock': 'Spock vaporizes Rock', 'scissors': 'Spock smashes Scissors' }
+            };
+            
+            if (!args.length) {
+                let message = '🎮 Rock Paper Scissors Lizard Spock\n\n';
+                message += 'Choose one of the following:\n\n';
+                
+                for (const choice of choices) {
+                    message += `${emojis[choice]} *!rpsls ${choice}*\n`;
+                }
+                
+                message += '\nRules:\n';
+                message += '- Rock crushes Scissors and Lizard\n';
+                message += '- Paper covers Rock and disproves Spock\n';
+                message += '- Scissors cut Paper and decapitate Lizard\n';
+                message += '- Lizard eats Paper and poisons Spock\n';
+                message += '- Spock vaporizes Rock and smashes Scissors';
+                
+                await sock.sendMessage(sender, { text: message });
+                return;
+            }
+            
+            const playerChoice = args[0].toLowerCase();
+            
+            if (!choices.includes(playerChoice)) {
+                await sock.sendMessage(sender, { 
+                    text: '❌ Invalid choice! Please choose rock, paper, scissors, lizard, or spock.' 
+                });
+                return;
+            }
+            
+            const botChoice = choices[Math.floor(Math.random() * choices.length)];
+            
+            let result;
+            let explanation = '';
+            
+            if (playerChoice === botChoice) {
+                result = "It's a tie!";
+            } else if (rules[playerChoice].includes(botChoice)) {
+                result = "You win!";
+                explanation = explanations[playerChoice][botChoice];
+            } else {
+                result = "I win!";
+                explanation = explanations[botChoice][playerChoice];
+            }
+            
+            const message = `🎮 Rock Paper Scissors Lizard Spock\n\n` +
+                            `You chose: ${emojis[playerChoice]} ${playerChoice}\n` +
+                            `I chose: ${emojis[botChoice]} ${botChoice}\n\n` +
+                            `${result}${explanation ? ' ' + explanation : ''}`;
+            
+            await sock.sendMessage(sender, { text: message });
+        } catch (err) {
+            logger.error('RPSLS error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+        }
+    },
+    
+    // 18. This or That
+    async thisorthat(sock, sender) {
+        try {
+            const pairs = [
+                "Coffee or Tea?",
+                "Beach or Mountains?",
+                "Summer or Winter?",
+                "Books or Movies?",
+                "Morning or Night?",
+                "Dogs or Cats?",
+                "Sweet or Savory?",
+                "City or Countryside?",
+                "Call or Text?",
+                "Pizza or Burger?"
+            ];
+            
+            const randomPair = pairs[Math.floor(Math.random() * pairs.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `🤔 This or That:\n\n${randomPair}\n\nWhat's your choice?` 
+            });
+        } catch (err) {
+            logger.error('This or That error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 19. Dare
+    async dare(sock, sender) {
+        try {
+            const dares = [
+                "Send the most recent photo in your gallery",
+                "Text a friend with just the 🐢 emoji and nothing else",
+                "Send a voice message singing the chorus of your favorite song",
+                "Change your profile picture to a cartoon character for 24 hours",
+                "Send a screenshot of your most recent call log",
+                "Text your best friend and tell them you have a secret to share",
+                "Send a selfie with a funny face",
+                "Write a short poem about the last thing you ate",
+                "Call someone on your contact list and say 'meow' 3 times, then hang up",
+                "Tell a joke in a voice message with your best accent"
+            ];
+            
+            const randomDare = dares[Math.floor(Math.random() * dares.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `🎲 Dare:\n\n${randomDare}` 
+            });
+        } catch (err) {
+            logger.error('Dare error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
+    
+    // 20. Truth
+    async truth(sock, sender) {
+        try {
+            const truths = [
+                "What's your biggest fear?",
+                "What's the most embarrassing thing you've ever done?",
+                "What's a secret you've never told anyone?",
+                "What's your worst habit?",
+                "What's the weirdest dream you've ever had?",
+                "What's something you wish more people knew about you?",
+                "What's your biggest regret?",
+                "Who's your celebrity crush?",
+                "What's the most childish thing you still do?",
+                "What's the most embarrassing music you listen to?"
+            ];
+            
+            const randomTruth = truths[Math.floor(Math.random() * truths.length)];
+            
+            await sock.sendMessage(sender, { 
+                text: `🎲 Truth:\n\n${randomTruth}` 
+            });
+        } catch (err) {
+            logger.error('Truth error:', err);
+            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+        }
+    },
 
     async _8ball(sock, sender, args) {
         try {
