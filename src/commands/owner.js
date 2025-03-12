@@ -618,4 +618,16 @@ const ownerCommands = {
     }
 };
 
-module.exports = ownerCommands;
+module.exports = {
+    commands: ownerCommands,
+    category: 'owner',
+    async init() {
+        try {
+            logger.info('Initializing owner command handler...');
+            return true;
+        } catch (error) {
+            logger.error('Failed to initialize owner commands:', error);
+            return false;
+        }
+    }
+};

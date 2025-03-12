@@ -665,4 +665,16 @@ UTC: ${utc}`;
 
 };
 
-module.exports = utilityCommands;
+module.exports = {
+    commands: utilityCommands,
+    category: 'utility',
+    async init() {
+        try {
+            logger.info('Initializing utility command handler...');
+            return true;
+        } catch (error) {
+            logger.error('Failed to initialize utility commands:', error);
+            return false;
+        }
+    }
+};

@@ -499,4 +499,16 @@ const reactionCommands = {
     }
 };
 
-module.exports = reactionCommands;
+module.exports = {
+    commands: reactionCommands,
+    category: 'reactions',
+    async init() {
+        try {
+            logger.info('Initializing reactions command handler...');
+            return true;
+        } catch (error) {
+            logger.error('Failed to initialize reactions commands:', error);
+            return false;
+        }
+    }
+};
