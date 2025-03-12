@@ -108,7 +108,7 @@ async function loadAllCommands(allCommands) {
     return totalCommands;
 }
 
-// SHABAN-MD-V5 Style Emojis and Design Elements
+// FLASH-MD Style Emojis and Design Elements
 const emojis = {
     // Category emojis
     owner: '👑',
@@ -143,7 +143,7 @@ const emojis = {
     cool: '😎',
     arrow: '➣',
     bullet: '•',
-    line: '┄┄',
+    line: '━━',
     dotline: '┈┈┈',
     flower: '✿',
     category: '📂',
@@ -153,6 +153,16 @@ const emojis = {
     hot: '🔥',
     crown: '👑',
     bolt: '⚡',
+    robot: '🤖',
+    zap: '⚡',
+    rocket: '🚀',
+    leaf: '🍃',
+    check: '✓',
+    time: '⏰',
+    wand: '🪄',
+    gear: '⚙️',
+    globe: '🌐',
+    link: '🔗',
 };
 
 // Box drawing characters
@@ -239,52 +249,58 @@ async function getInspirationalQuote() {
     }
 }
 
-// Function to create a SHABAN-style header box
-function createShabanHeader(title, subtitle = null) {
+// Function to create a FLASH-MD style header box
+function createFlashHeader(title, subtitle = null) {
     const headerTitle = title.toUpperCase();
-    const lineWidth = Math.max(headerTitle.length + 10, subtitle ? subtitle.length + 8 : 0, 25);
+    const lineWidth = Math.max(headerTitle.length + 12, subtitle ? subtitle.length + 10 : 0, 30);
     
-    let header = `${box.fancyCornerTL}${box.fancyLineH.repeat(lineWidth)}${box.fancyCornerTR}\n`;
-    header += `${box.fancyLineV} ${emojis.crown} ${styleTitle(headerTitle)} ${emojis.crown} ${box.fancyLineV}\n`;
+    let header = `${box.topLeft}${emojis.line.repeat(Math.floor(lineWidth/2))}${box.topRight}\n`;
+    header += `${box.middleLeft} ${emojis.robot} ${styleTitle(headerTitle)} ${emojis.zap} ${box.middleRight}\n`;
     
     if (subtitle) {
-        header += `${box.fancyLineV} ${styleSubtitle(subtitle)} ${box.fancyLineV}\n`;
+        header += `${box.middleLeft} ${emojis.sparkle} ${styleSubtitle(subtitle)} ${box.middleRight}\n`;
     }
     
-    header += `${box.fancyCornerBL}${box.fancyLineH.repeat(lineWidth)}${box.fancyCornerBR}`;
+    header += `${box.bottomLeft}${emojis.line.repeat(Math.floor(lineWidth/2))}${box.bottomRight}`;
     return header;
 }
 
-// Function to create a category section in SHABAN-style
+// Function to create a category section in FLASH-MD style
 function createCategorySection(categoryName, emoji, commands, prefix) {
     const catTitle = categoryName.toUpperCase();
-    let section = `\n${emojis.sparkle} ${styleTitle(emoji + ' ' + catTitle)} ${emojis.sparkle}\n`;
+    let section = `\n${emojis.rocket} ${styleTitle(`${emoji} ${catTitle}`)} ${emojis.rocket}\n`;
+    section += `${emojis.line}${emojis.line}${emojis.line}${emojis.line}${emojis.line}${emojis.line}\n`;
     
-    // Create a grid layout for commands
+    // Create a modern grid layout for commands with icons for each command
     let grid = '';
     const sortedCommands = [...commands].sort();
     
-    // Display commands in a compact grid (3 per line)
-    for (let i = 0; i < sortedCommands.length; i += 3) {
-        const cmd1 = sortedCommands[i] ? `${emojis.command} ${styleCommand(prefix + sortedCommands[i])}` : '';
-        const cmd2 = sortedCommands[i+1] ? `${emojis.command} ${styleCommand(prefix + sortedCommands[i+1])}` : '';
-        const cmd3 = sortedCommands[i+2] ? `${emojis.command} ${styleCommand(prefix + sortedCommands[i+2])}` : '';
+    // Command icons to make it visually appealing (cycling through different icons)
+    const cmdIcons = [emojis.leaf, emojis.star, emojis.check, emojis.fire, emojis.wand];
+    
+    // Display commands in a better looking grid (2 per line)
+    for (let i = 0; i < sortedCommands.length; i += 2) {
+        const icon1 = cmdIcons[i % cmdIcons.length];
+        const icon2 = cmdIcons[(i+1) % cmdIcons.length];
         
-        grid += `${cmd1.padEnd(25)} ${cmd2.padEnd(25)} ${cmd3}\n`;
+        const cmd1 = sortedCommands[i] ? `${icon1} ${styleCommand(prefix + sortedCommands[i])}` : '';
+        const cmd2 = sortedCommands[i+1] ? `${icon2} ${styleCommand(prefix + sortedCommands[i+1])}` : '';
+        
+        grid += `${cmd1.padEnd(30)} ${cmd2}\n`;
     }
     
     section += grid;
     
-    // Add count
-    section += `\n${emojis.info} ${styleSubtitle('Total: ' + sortedCommands.length + ' commands')}\n`;
-    section += createFancyDivider(emojis.dotline);
+    // Add detailed count with emoji
+    section += `\n${emojis.info} ${styleSubtitle(`Total ${catTitle} Commands: ${sortedCommands.length}`)}\n`;
+    section += `${emojis.dotline}${emojis.dotline}${emojis.dotline}${emojis.dotline}${emojis.dotline}\n`;
     
     return section;
 }
 
-// Function to create a compact category preview
+// Function to create a FLASH-MD style compact category button
 function createCompactCategory(categoryName, emoji, count, prefix) {
-    return `${emoji} ${styleTitle(categoryName)} ${styleSubtitle('(' + count + ')')} ${emojis.arrow} ${styleCommand(prefix + 'menu ' + categoryName.toLowerCase())}\n`;
+    return `${box.middleLeft} ${emoji} ${styleTitle(categoryName.padEnd(12))} ${styleSubtitle(`[${count}]`)} ${emojis.arrow} ${styleCommand(prefix + categoryName.toLowerCase())}\n`;
 }
 
 // Create the command list
@@ -383,16 +399,18 @@ const menuCommands = {
                     const quote = await getInspirationalQuote();
                     const categoryIcon = categoryIcons[category] || emojis.command;
                     
-                    // Create SHABAN-style category menu
-                    let menuText = createShabanHeader(`${config.bot.name} - ${categories[category]} Commands`, 
-                                                     `A total of ${commands.length} commands in this category`);
+                    // Create FLASH-MD style category menu with all commands
+                    let menuText = createFlashHeader(`${config.bot.name} ${emojis.zap} ${categories[category]}`, 
+                                                    `All ${commands.length} commands in this category`);
                     
                     menuText += `\n\n${createCategorySection(categories[category], categoryIcon, commands, prefix)}`;
                     
                     // Add footer with instructions
-                    menuText += `\n${emojis.bolt} ${styleTitle('USAGE INFO')} ${emojis.bolt}\n`;
-                    menuText += `${emojis.info} Type ${styleCommand(prefix + 'help <command>')} for detailed help\n`;
-                    menuText += `${emojis.arrow} Use ${styleCommand(prefix + 'menu')} to return to main menu\n\n`;
+                    menuText += `\n${box.topLeft}${emojis.line.repeat(20)}${box.topRight}\n`;
+                    menuText += `${box.middleLeft} ${emojis.gear} ${styleTitle('USAGE INFO')} ${box.middleRight}\n`;
+                    menuText += `${box.middleLeft} ${emojis.info} Type ${styleCommand(prefix + 'help <command>')} ${box.middleRight}\n`;
+                    menuText += `${box.middleLeft} ${emojis.arrow} Use ${styleCommand(prefix + 'menu')} to return ${box.middleRight}\n`;
+                    menuText += `${box.bottomLeft}${emojis.line.repeat(20)}${box.bottomRight}\n\n`;
                     
                     // Add inspirational quote
                     menuText += `${emojis.sparkle} ${styleSubtitle('"' + quote.text + '"')}\n`;
@@ -412,53 +430,56 @@ const menuCommands = {
                 // Get inspirational quote
                 const quote = await getInspirationalQuote();
                 
-                // Create SHABAN-style main menu
+                // Create FLASH-MD style main menu
                 let menuText = '';
                 
-                // Title Box
-                menuText += createShabanHeader(config.bot.name, 'The Ultimate WhatsApp AI Assistant');
+                // Title Box - FLASH-MD style header
+                menuText += createFlashHeader(`${config.bot.name}`, `The Ultimate WhatsApp Assistant Bot`);
                 
-                // User Info Section
-                menuText += `\n\n${box.topLeft}${box.horizontalLine.repeat(40)}${box.topRight}\n`;
-                menuText += `${box.middleLeft} ${emojis.user} ${styleTitle('USER INFO')}${box.middleRight}\n`;
+                // User Info Section - Enhanced with modern styling
+                menuText += `\n\n${box.topLeft}${emojis.line.repeat(16)}${box.topRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.user} ${styleTitle('USER INFO')} ${box.middleRight}\n`;
                 menuText += `${box.middleLeft} ${emojis.arrow} ${styleTitle('Name:')} ${styleSubtitle(username)}${box.middleRight}\n`;
-                menuText += `${box.middleLeft} ${emojis.arrow} ${styleTitle('Time:')} ${styleSubtitle(currentTime)}${box.middleRight}\n`;
-                menuText += `${box.middleLeft} ${emojis.arrow} ${styleTitle('Date:')} ${styleSubtitle(currentDate)}${box.middleRight}\n`;
-                menuText += `${box.middleLeft} ${emojis.arrow} ${styleTitle('Status:')} ${emojis.online} ${styleSubtitle('Online')}${box.middleRight}\n`;
-                menuText += `${box.middleLeft} ${emojis.arrow} ${styleTitle('Uptime:')} ${styleSubtitle(uptimeStr)}${box.middleRight}\n`;
-                menuText += `${box.bottomLeft}${box.horizontalLine.repeat(40)}${box.bottomRight}\n\n`;
+                menuText += `${box.middleLeft} ${emojis.time} ${styleTitle('Time:')} ${styleSubtitle(currentTime)}${box.middleRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.globe} ${styleTitle('Date:')} ${styleSubtitle(currentDate)}${box.middleRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.online} ${styleTitle('Status:')} ${styleSubtitle('Online')}${box.middleRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.rocket} ${styleTitle('Uptime:')} ${styleSubtitle(uptimeStr)}${box.middleRight}\n`;
+                menuText += `${box.bottomLeft}${emojis.line.repeat(16)}${box.bottomRight}\n\n`;
                 
-                // Command Categories Section
-                menuText += `${emojis.sparkle} ${styleTitle('COMMAND CATEGORIES')} ${emojis.sparkle}\n\n`;
+                // Command Categories Section - With better visual hierarchy
+                menuText += `${box.topLeft}${emojis.line.repeat(20)}${box.topRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.robot} ${styleTitle('COMMAND MENU')} ${box.middleRight}\n`;
+                menuText += `${box.bottomLeft}${emojis.line.repeat(20)}${box.bottomRight}\n\n`;
                 
                 let totalCommands = 0;
                 
-                // Add command categories in a new grid-style layout
+                // Add command categories with FLASH-MD compact layout
                 for (const [cat, commands] of Object.entries(allCommands)) {
                     if (categories[cat] && commands.length > 0) {
                         const icon = categoryIcons[cat] || emojis.command;
-                        menuText += createCompactCategory(categories[cat], icon, commands.length, prefix);
+                        menuText += createCompactCategory(categories[cat], icon, commands.length, prefix + 'menu ');
                         totalCommands += commands.length;
                     }
                 }
                 
-                // Special Commands Section
-                menuText += `\n${createFancyDivider(emojis.dotline)}\n\n`;
-                menuText += `${emojis.bolt} ${styleTitle('QUICK ACCESS')} ${emojis.bolt}\n\n`;
-                menuText += `${emojis.command} ${styleCommand(prefix + 'help')} - Get help on using the bot\n`;
-                menuText += `${emojis.command} ${styleCommand(prefix + 'list')} - View all commands in a list\n`;
-                menuText += `${emojis.command} ${styleCommand(prefix + 'ping')} - Check bot response time\n`;
-                menuText += `${emojis.command} ${styleCommand(prefix + 'info')} - Bot information\n`;
+                // Special Commands Section - Highlighted important commands
+                menuText += `\n${box.topLeft}${emojis.line.repeat(18)}${box.topRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.zap} ${styleTitle('QUICK ACCESS')} ${box.middleRight}\n`;
+                menuText += `${box.bottomLeft}${emojis.line.repeat(18)}${box.bottomRight}\n\n`;
                 
-                // Footer Section
-                menuText += `\n\n${createFancyDivider(emojis.sparkle)}\n\n`;
-                menuText += `${emojis.info} ${styleTitle('TOTAL COMMANDS:')} ${styleHighlight(' ' + totalCommands + ' ')}\n\n`;
+                menuText += `${emojis.leaf} ${styleCommand(prefix + 'help')} - Get detailed help\n`;
+                menuText += `${emojis.star} ${styleCommand(prefix + 'list')} - View all commands\n`;
+                menuText += `${emojis.check} ${styleCommand(prefix + 'ping')} - Check bot response\n`;
+                menuText += `${emojis.info} ${styleCommand(prefix + 'info')} - Bot information\n`;
                 
-                // Bot Version & Credits
-                menuText += `${emojis.crown} ${styleSubtitle('Bot Version:')} v5.0.0\n`;
-                menuText += `${emojis.crown} ${styleSubtitle('Developer:')} SHABAN-MD Team\n\n`;
+                // Stats section - Command count with visual highlight
+                menuText += `\n${box.topLeft}${emojis.line.repeat(16)}${box.topRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.fire} ${styleTitle('BOT STATS')} ${box.middleRight}\n`;
+                menuText += `${box.middleLeft} ${styleTitle('Total Commands:')} ${styleHighlight(totalCommands)}${box.middleRight}\n`;
+                menuText += `${box.middleLeft} ${styleTitle('Bot Version:')} ${styleSubtitle('v5.0.0')}${box.middleRight}\n`;
+                menuText += `${box.bottomLeft}${emojis.line.repeat(16)}${box.bottomRight}\n\n`;
                 
-                // Inspirational Quote
+                // Inspirational Quote - With better styling
                 menuText += `${emojis.sparkle} ${styleSubtitle('"' + quote.text + '"')}\n`;
                 menuText += `${emojis.star} ${styleSubtitle('- ' + quote.author)}\n`;
                 
@@ -551,13 +572,13 @@ const menuCommands = {
                 // Get inspirational quote
                 const quote = await getInspirationalQuote();
                 
-                // Create SHABAN-style list menu
-                let menuText = createShabanHeader('COMPLETE COMMAND LIST', 'All available commands at your fingertips');
+                // Create FLASH-MD style list menu
+                let menuText = createFlashHeader('COMPLETE COMMAND LIST', 'All commands at your fingertips');
                 menuText += '\n\n';
                 
                 let totalCommands = 0;
                 
-                // Generate category sections
+                // Generate category sections with FLASH-MD styling
                 for (const [cat, commands] of Object.entries(allCommands)) {
                     if (categories[cat] && commands.length > 0) {
                         const icon = categoryIcons[cat] || emojis.command;
@@ -566,13 +587,15 @@ const menuCommands = {
                     }
                 }
                 
-                // Add footer with information
-                menuText += `\n${emojis.bolt} ${styleTitle('COMMAND INFO')} ${emojis.bolt}\n\n`;
-                menuText += `${emojis.info} ${styleTitle('TOTAL COMMANDS:')} ${styleHighlight(' ' + totalCommands + ' ')}\n`;
-                menuText += `${emojis.info} Use ${styleCommand(prefix + 'help <command>')} for details on a specific command\n`;
-                menuText += `${emojis.info} Use ${styleCommand(prefix + 'menu')} to return to the main menu\n\n`;
+                // Add footer with information in FLASH-MD box style
+                menuText += `\n${box.topLeft}${emojis.line.repeat(18)}${box.topRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.gear} ${styleTitle('COMMAND INFO')} ${box.middleRight}\n`;
+                menuText += `${box.middleLeft} ${styleTitle('TOTAL:')} ${styleHighlight(' ' + totalCommands + ' ')} ${box.middleRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.info} Use ${styleCommand(prefix + 'help <command>')} ${box.middleRight}\n`;
+                menuText += `${box.middleLeft} ${emojis.arrow} ${styleCommand(prefix + 'menu')} for main menu ${box.middleRight}\n`;
+                menuText += `${box.bottomLeft}${emojis.line.repeat(18)}${box.bottomRight}\n\n`;
                 
-                // Add inspirational quote
+                // Add inspirational quote with FLASH-MD styling
                 menuText += `${emojis.sparkle} ${styleSubtitle('"' + quote.text + '"')}\n`;
                 menuText += `${emojis.star} ${styleSubtitle('- ' + quote.author)}\n`;
                 
@@ -602,35 +625,45 @@ const menuCommands = {
                 const quote = await getInspirationalQuote();
                 
                 if (!commandName) {
-                    // Default help menu in SHABAN-style
-                    let helpText = createShabanHeader('HELP CENTER', 'Your guide to using the bot effectively');
+                    // Default help menu in FLASH-MD style
+                    let helpText = createFlashHeader('HELP CENTER', 'Your guide to using the bot effectively');
                     
-                    // User greeting
-                    helpText += `\n\n${emojis.sparkle} Hello ${styleTitle(username)}! Welcome to the help center ${emojis.sparkle}\n\n`;
+                    // User greeting with improved styling
+                    helpText += `\n\n${box.topLeft}${emojis.line.repeat(20)}${box.topRight}\n`;
+                    helpText += `${box.middleLeft} ${emojis.user} ${styleTitle('WELCOME, ' + username)} ${box.middleRight}\n`;
+                    helpText += `${box.middleLeft} ${styleSubtitle('How can I assist you today?')} ${box.middleRight}\n`;
+                    helpText += `${box.bottomLeft}${emojis.line.repeat(20)}${box.bottomRight}\n\n`;
                     
-                    // Command Navigation Box
-                    helpText += `${box.topLeft}${box.horizontalLine.repeat(40)}${box.topRight}\n`;
-                    helpText += `${box.middleLeft} ${emojis.bolt} ${styleTitle('NAVIGATION GUIDE')} ${box.middleRight}\n`;
-                    helpText += `${box.middleLeft} ${emojis.arrow} ${styleCommand(prefix + 'menu')} - View main menu ${box.middleRight}\n`;
-                    helpText += `${box.middleLeft} ${emojis.arrow} ${styleCommand(prefix + 'menu <category>')} - View category commands ${box.middleRight}\n`;
-                    helpText += `${box.middleLeft} ${emojis.arrow} ${styleCommand(prefix + 'help <command>')} - Get command help ${box.middleRight}\n`;
-                    helpText += `${box.middleLeft} ${emojis.arrow} ${styleCommand(prefix + 'list')} - See all commands ${box.middleRight}\n`;
-                    helpText += `${box.bottomLeft}${box.horizontalLine.repeat(40)}${box.bottomRight}\n\n`;
+                    // Command Navigation Box with FLASH-MD styling
+                    helpText += `${box.topLeft}${emojis.line.repeat(22)}${box.topRight}\n`;
+                    helpText += `${box.middleLeft} ${emojis.robot} ${styleTitle('NAVIGATION GUIDE')} ${box.middleRight}\n`;
+                    helpText += `${box.bottomLeft}${emojis.line.repeat(22)}${box.bottomRight}\n\n`;
                     
-                    // Quick Start Section
-                    helpText += `${emojis.fire} ${styleTitle('QUICK START GUIDE')} ${emojis.fire}\n\n`;
-                    helpText += `${emojis.command} Try ${styleCommand(prefix + 'menu fun')} to see fun commands\n`;
-                    helpText += `${emojis.command} Use ${styleCommand(prefix + 'help sticker')} to learn about the sticker command\n`;
-                    helpText += `${emojis.command} Type ${styleCommand(prefix + 'ping')} to check if bot is responding\n\n`;
+                    helpText += `${emojis.leaf} ${styleCommand(prefix + 'menu')} - View main menu\n`;
+                    helpText += `${emojis.star} ${styleCommand(prefix + 'menu <category>')} - View category commands\n`;
+                    helpText += `${emojis.check} ${styleCommand(prefix + 'help <command>')} - Get command help\n`;
+                    helpText += `${emojis.fire} ${styleCommand(prefix + 'list')} - See all commands\n\n`;
                     
-                    // Tips Section
-                    helpText += `${emojis.sparkle} ${styleTitle('PRO TIPS')} ${emojis.sparkle}\n\n`;
+                    // Quick Start Section with enhanced visual appeal
+                    helpText += `${box.topLeft}${emojis.line.repeat(18)}${box.topRight}\n`;
+                    helpText += `${box.middleLeft} ${emojis.rocket} ${styleTitle('QUICK START')} ${box.middleRight}\n`;
+                    helpText += `${box.bottomLeft}${emojis.line.repeat(18)}${box.bottomRight}\n\n`;
+                    
+                    helpText += `${emojis.wand} Try ${styleCommand(prefix + 'menu fun')} to see fun commands\n`;
+                    helpText += `${emojis.gear} Use ${styleCommand(prefix + 'help sticker')} to learn about stickers\n`;
+                    helpText += `${emojis.zap} Type ${styleCommand(prefix + 'ping')} to check if bot is responding\n\n`;
+                    
+                    // Tips Section with FLASH-MD design
+                    helpText += `${box.topLeft}${emojis.line.repeat(10)}${box.topRight}\n`;
+                    helpText += `${box.middleLeft} ${emojis.sparkle} ${styleTitle('PRO TIPS')} ${box.middleRight}\n`;
+                    helpText += `${box.bottomLeft}${emojis.line.repeat(10)}${box.bottomRight}\n\n`;
+                    
                     helpText += `${emojis.info} Commands with ${emojis.crown} require owner privileges\n`;
                     helpText += `${emojis.info} Some commands only work in groups\n`;
-                    helpText += `${emojis.info} For media commands, send an image/video with caption\n\n`;
+                    helpText += `${emojis.info} For media commands, send image/video with caption\n\n`;
                     
-                    // Quote
-                    helpText += `${createFancyDivider(emojis.dotline)}\n\n`;
+                    // Quote with elegant styling
+                    helpText += `${emojis.dotline}${emojis.dotline}${emojis.dotline}${emojis.dotline}\n\n`;
                     helpText += `${emojis.sparkle} ${styleSubtitle('"' + quote.text + '"')}\n`;
                     helpText += `${emojis.star} ${styleSubtitle('- ' + quote.author)}\n`;
                     
@@ -704,36 +737,45 @@ const menuCommands = {
                 
                 const categoryIcon = categoryIcons[foundIn] || emojis.command;
                 
-                // Display command help in SHABAN-style
-                let helpText = createShabanHeader(`Command: ${commandName.toUpperCase()}`, 
-                                               `From the ${foundIn} category`);
+                // Display command help in FLASH-MD style
+                let helpText = createFlashHeader(`${commandName.toUpperCase()}`, 
+                                              `${categoryIcon} ${foundIn} command`);
                 helpText += '\n\n';
                 
-                // Command Info Box
-                helpText += `${box.topLeft}${box.horizontalLine.repeat(40)}${box.topRight}\n`;
-                helpText += `${box.middleLeft} ${categoryIcon} ${styleTitle('COMMAND INFORMATION')} ${box.middleRight}\n`;
-                helpText += `${box.middleLeft} ${emojis.arrow} ${styleTitle('Category:')} ${styleSubtitle(foundIn)} ${box.middleRight}\n`;
-                helpText += `${box.middleLeft} ${emojis.arrow} ${styleTitle('Usage:')} ${styleCommand(prefix + commandName)} ${box.middleRight}\n`;
-                helpText += `${box.bottomLeft}${box.horizontalLine.repeat(40)}${box.bottomRight}\n\n`;
+                // Command Info Box with FLASH-MD styling
+                helpText += `${box.topLeft}${emojis.line.repeat(20)}${box.topRight}\n`;
+                helpText += `${box.middleLeft} ${emojis.robot} ${styleTitle('COMMAND DETAILS')} ${box.middleRight}\n`;
+                helpText += `${box.bottomLeft}${emojis.line.repeat(20)}${box.bottomRight}\n\n`;
                 
-                // Usage Examples
-                helpText += `${emojis.bolt} ${styleTitle('HOW TO USE')} ${emojis.bolt}\n\n`;
-                helpText += `${emojis.info} Basic usage: ${styleCommand(prefix + commandName)}\n`;
-                helpText += `${emojis.info} With arguments: ${styleCommand(prefix + commandName + ' <text>')}\n\n`;
+                helpText += `${emojis.gear} ${styleTitle('Category:')} ${styleSubtitle(foundIn.charAt(0).toUpperCase() + foundIn.slice(1))}\n`;
+                helpText += `${emojis.wand} ${styleTitle('Syntax:')} ${styleCommand(prefix + commandName)}\n\n`;
                 
-                // Note about simplified help
-                helpText += `${box.topLeft}${box.horizontalLine.repeat(40)}${box.topRight}\n`;
-                helpText += `${box.middleLeft} ${emojis.warning} ${styleTitle('SIMPLIFIED HELP MESSAGE')} ${box.middleRight}\n`;
-                helpText += `${box.middleLeft} This is a basic overview of the command. ${box.middleRight}\n`;
-                helpText += `${box.middleLeft} Try using it to discover all its features! ${box.middleRight}\n`;
-                helpText += `${box.bottomLeft}${box.horizontalLine.repeat(40)}${box.bottomRight}\n\n`;
+                // Usage Examples with FLASH-MD styling
+                helpText += `${box.topLeft}${emojis.line.repeat(14)}${box.topRight}\n`;
+                helpText += `${box.middleLeft} ${emojis.zap} ${styleTitle('USAGE')} ${box.middleRight}\n`;
+                helpText += `${box.bottomLeft}${emojis.line.repeat(14)}${box.bottomRight}\n\n`;
                 
-                // Related Commands (just a placeholder since we don't have actual related commands data)
-                helpText += `${emojis.sparkle} ${styleTitle('RELATED COMMANDS')} ${emojis.sparkle}\n\n`;
+                helpText += `${emojis.leaf} Basic: ${styleCommand(prefix + commandName)}\n`;
+                helpText += `${emojis.star} With args: ${styleCommand(prefix + commandName + ' <text>')}\n\n`;
+                
+                // Command information in modern style
+                helpText += `${box.topLeft}${emojis.line.repeat(18)}${box.topRight}\n`;
+                helpText += `${box.middleLeft} ${emojis.info} ${styleTitle('COMMAND INFO')} ${box.middleRight}\n`;
+                helpText += `${box.bottomLeft}${emojis.line.repeat(18)}${box.bottomRight}\n\n`;
+                
+                helpText += `This is a ${styleTitle(foundIn)} command that provides functionality related to ${styleSubtitle(foundIn)} operations.\n\n`;
+                helpText += `${emojis.check} Try it out to discover all its features!\n`;
+                helpText += `${emojis.check} For more help, ask the bot owner.\n\n`;
+                
+                // Related Commands in FLASH-MD compact style
+                helpText += `${box.topLeft}${emojis.line.repeat(20)}${box.topRight}\n`;
+                helpText += `${box.middleLeft} ${emojis.link} ${styleTitle('RELATED COMMANDS')} ${box.middleRight}\n`;
+                helpText += `${box.bottomLeft}${emojis.line.repeat(20)}${box.bottomRight}\n\n`;
+                
                 helpText += `${emojis.command} Try ${styleCommand(prefix + 'menu ' + foundIn)} for similar commands\n\n`;
                 
-                // Quote
-                helpText += `${createFancyDivider(emojis.dotline)}\n\n`;
+                // Quote with FLASH-MD styling
+                helpText += `${emojis.dotline}${emojis.dotline}${emojis.dotline}${emojis.dotline}\n\n`;
                 helpText += `${emojis.sparkle} ${styleSubtitle('"' + quote.text + '"')}\n`;
                 helpText += `${emojis.star} ${styleSubtitle('- ' + quote.author)}\n`;
                 
