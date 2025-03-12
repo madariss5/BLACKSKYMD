@@ -96,51 +96,36 @@ function getMessageType(message) {
 
 async function messageHandler(sock, message) {
     try {
+        // FAST PATH: Skip protocol messages immediately
+        if (message.message?.protocolMessage) {
+            return;
+        }
+        
         // Process messages even if they're marked as fromMe during testing
         if (message.key.fromMe) {
-            console.log('Message marked as fromMe, processing anyway for testing');
-            // We continue execution instead of returning
+            // We continue execution instead of returning for testing
         }
 
-        // Debug: Print message object structure for troubleshooting
-        logger.debug('Processing message object:', JSON.stringify({
-            key: message.key,
-            messageTypes: message.message ? Object.keys(message.message) : [],
-            hasParticipant: !!message.participant || !!message.key.participant
-        }));
-
-        // Extract message content with more comprehensive support for different message types
+        // Extract message content with optimized path for common types
         let messageContent;
         
-        // Handle all possible message content locations in Baileys structure
+        // Fast path for most common message types (ordered by frequency)
         if (message.message?.conversation) {
             messageContent = message.message.conversation;
-            console.log('Found conversation message:', messageContent);
         } else if (message.message?.extendedTextMessage?.text) {
             messageContent = message.message.extendedTextMessage.text;
-            console.log('Found extended text message:', messageContent);
         } else if (message.message?.imageMessage?.caption) {
             messageContent = message.message.imageMessage.caption;
-            console.log('Found image caption:', messageContent);
         } else if (message.message?.videoMessage?.caption) {
             messageContent = message.message.videoMessage.caption;
-            console.log('Found video caption:', messageContent);
         } else if (message.message?.documentWithCaptionMessage?.message?.documentMessage?.caption) {
             messageContent = message.message.documentWithCaptionMessage.message.documentMessage.caption;
-            console.log('Found document caption:', messageContent);
         } else if (message.message?.buttonsResponseMessage?.selectedButtonId) {
             messageContent = message.message.buttonsResponseMessage.selectedButtonId;
-            console.log('Found button response:', messageContent);
         } else if (message.message?.listResponseMessage?.singleSelectReply?.selectedRowId) {
             messageContent = message.message.listResponseMessage.singleSelectReply.selectedRowId;
-            console.log('Found list response:', messageContent);
-        } else if (message.message?.protocolMessage) {
-            console.log('Ignoring protocol message');
-            return; // Skip protocol messages
         } else {
             // For other message types that don't contain text
-            const msgType = message.message ? Object.keys(message.message)[0] : 'unknown';
-            console.log(`Message type '${msgType}' doesn't contain extractable text content`);
             messageContent = null;
         }
 

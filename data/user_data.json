@@ -1,5 +1,20 @@
 {
-  "profiles": {},
+  "profiles": {
+    "4915561048015@s.whatsapp.net": {
+      "name": "User",
+      "age": 0,
+      "xp": 62,
+      "level": 1,
+      "coins": 0,
+      "bio": "",
+      "registeredAt": "2025-03-12T22:40:11.381Z",
+      "lastDaily": null,
+      "inventory": [],
+      "achievements": [],
+      "customTitle": "",
+      "warnings": 0
+    }
+  },
   "games": {},
   "marriages": {},
   "bank": {},

@@ -231,20 +231,38 @@ async function connectToWhatsApp(retryCount = 0) {
       }
     });
 
-    // Set up message event listener
-    sock.ev.on('messages.upsert', async ({ messages }) => {
+    // Set up message event listener with enhanced debugging
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      console.log(`Received messages.upsert event with type: ${type}`);
+      console.log(`Messages array length: ${messages ? messages.length : 'undefined'}`);
+      
       if (messages && messages.length > 0) {
         for (const message of messages) {
+          // Debug message info
+          console.log(`Message received:`, JSON.stringify({
+            jid: message.key?.remoteJid,
+            fromMe: message.key?.fromMe,
+            participant: message.key?.participant,
+            messageTypes: message.message ? Object.keys(message.message) : []
+          }));
+          
           // Skip empty messages
-          if (!message || !message.message) continue;
+          if (!message || !message.message) {
+            console.log('Skipping empty message');
+            continue;
+          }
           
           // Process the message
           try {
+            console.log('Processing message with handleIncomingMessage');
             await handleIncomingMessage(message);
           } catch (err) {
+            console.error('Error handling message:', err);
             logger.error('Error handling message:', err);
           }
         }
+      } else {
+        console.log('No messages to process in this event');
       }
     });
 
