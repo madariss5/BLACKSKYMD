@@ -42,6 +42,19 @@ function initializeGameState() {
     global.uno = global.uno || new Map();
     global.riddles = global.riddles || new Map();
     global.wordScramble = global.wordScramble || new Map();
+    
+    // Initialize state for new games
+    global.codeGames = global.codeGames || new Map();
+    global.numberGames = global.numberGames || new Map();
+    global.hangmanVsGames = global.hangmanVsGames || new Map();
+    global.connectFourGames = global.connectFourGames || new Map();
+    global.wordChainGames = global.wordChainGames || new Map();
+    global.personalityQuizzes = global.personalityQuizzes || new Map();
+    global.movieHangmanGames = global.movieHangmanGames || new Map();
+    global.movieQuizzes = global.movieQuizzes || new Map();
+    global.numberSequenceGames = global.numberSequenceGames || new Map();
+    global.dicePokerGames = global.dicePokerGames || new Map();
+    global.rpsTournaments = global.rpsTournaments || new Map();
 }
 
 // Board rendering functions
