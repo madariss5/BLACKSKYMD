@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp Bot QR Code</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f4f7;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #128C7E; /* WhatsApp green */
+            margin-bottom: 5px;
+        }
+        h2 {
+            color: #075E54;
+            font-size: 1.2em;
+            margin-top: 0;
+        }
+        .qr-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px auto;
+            display: inline-block;
+        }
+        .status {
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .disconnected { background-color: #ffcccc; color: #d32f2f; }
+        .connecting { background-color: #fff8e1; color: #ff8f00; }
+        .connected { background-color: #e8f5e9; color: #2e7d32; }
+        .refresh-button {
+            background-color: #128C7E;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 10px;
+        }
+        .instructions {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 20px;
+            line-height: 1.5;
+            text-align: left;
+        }
+        .instructions ol {
+            margin-top: 10px;
+            padding-left: 25px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WhatsApp Bot</h1>
+        <h2>QR Code Connection</h2>
+        
+        <div id="status-container" class="status disconnected">
+            Status: Waiting for QR Code...
+        </div>
+        
+        <div id="qr-container" class="qr-container">
+            <p>Generating QR code... Please wait.</p>
+            <p>If no QR appears after 15 seconds, click refresh.</p>
+        </div>
+        
+        <button class="refresh-button" onclick="location.reload()">Refresh</button>
+        
+        <div class="instructions">
+            <strong>Instructions:</strong>
+            <ol>
+                <li>Open WhatsApp on your phone</li>
+                <li>Tap Menu ⋮ or Settings ⚙ and select "Linked Devices"</li>
+                <li>Tap on "Link a Device"</li>
+                <li>Point your phone camera at this QR code to scan</li>
+            </ol>
+            <p>Once connected, this page will update automatically.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Check for QR code updates every few seconds
+        function fetchQRCode() {
+            fetch('/qrcode')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.qrCode) {
+                        // We have a QR code
+                        document.getElementById('qr-container').innerHTML = 
+                            `<img src="${data.qrCode}" alt="WhatsApp QR Code" width="300" height="300">`;
+                        
+                        // Update status
+                        const statusContainer = document.getElementById('status-container');
+                        statusContainer.className = 'status connecting';
+                        statusContainer.innerText = 'Status: Connecting...';
+                    } else if (data.status === 'connected') {
+                        // We are connected
+                        document.getElementById('qr-container').innerHTML = 
+                            `<p style="color: #2e7d32; font-weight: bold;">✓ Successfully connected!</p>`;
+                        
+                        // Update status
+                        const statusContainer = document.getElementById('status-container');
+                        statusContainer.className = 'status connected';
+                        statusContainer.innerText = 'Status: Connected ✓';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching QR code:', error);
+                });
+        }
+        
+        // Fetch QR code initially
+        fetchQRCode();
+        
+        // Set up polling interval
+        setInterval(fetchQRCode, 5000);
+    </script>
+</body>
+</html>
