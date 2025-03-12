@@ -530,16 +530,86 @@ const educationalCommands = {
     },
 
     async mindmap(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, topic] = args;
-        if (!action || !['create', 'view', 'edit'].includes(action)) {
-            await sock.sendMessage(remoteJid, {
-                text: '🧠 Usage: !mindmap <create|view|edit> [topic]'
-            });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [action, topic, ...nodes] = args;
+
+            if (!action || !['create', 'view', 'add'].includes(action)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🧠 Usage:* .mindmap [create|view|add] [topic] [nodes]\nExample: .mindmap create physics "Forces,Motion,Energy"'
+                });
+                return;
+            }
+
+            const mindmapsPath = path.join(__dirname, '../../data/educational/mindmaps.json');
+            let mindmaps = {};
+
+            try {
+                const data = await fs.promises.readFile(mindmapsPath, 'utf8');
+                mindmaps = JSON.parse(data);
+            } catch (err) {
+                mindmaps = {};
+            }
+
+            switch (action) {
+                case 'create':
+                    if (!topic || nodes.length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Please provide topic and initial nodes*'
+                        });
+                        return;
+                    }
+
+                    mindmaps[topic] = {
+                        nodes: nodes[0].split(','),
+                        created: new Date().toISOString(),
+                        updated: new Date().toISOString()
+                    };
+
+                    await fs.promises.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: '*✅ Mind map created successfully*'
+                    });
+                    break;
+
+                case 'add':
+                    if (!mindmaps[topic]) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Mind map not found*'
+                        });
+                        return;
+                    }
+
+                    const newNodes = nodes[0].split(',');
+                    mindmaps[topic].nodes.push(...newNodes);
+                    mindmaps[topic].updated = new Date().toISOString();
+
+                    await fs.promises.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: '*✅ Nodes added to mind map*'
+                    });
+                    break;
+
+                case 'view':
+                    if (!mindmaps[topic]) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Mind map not found*'
+                        });
+                        return;
+                    }
+
+                    const mindmap = mindmaps[topic];
+                    let display = `*🧠 Mind Map: ${topic}*\n\n`;
+                    display += `*Nodes:*\n${mindmap.nodes.map(node => `• ${node}`).join('\n')}\n\n`;
+                    display += `Created: ${new Date(mindmap.created).toLocaleDateString()}\n`;
+                    display += `Last Updated: ${new Date(mindmap.updated).toLocaleDateString()}`;
+
+                    await sock.sendMessage(remoteJid, { text: display });
+                    break;
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error managing mind maps');
         }
-        // TODO: Implement mind mapping
-        await sock.sendMessage(remoteJid, { text: '🗺️ Managing mind map...' });
     },
 
     // Geography Commands
@@ -1024,14 +1094,348 @@ const educationalCommands = {
         } catch (err) {
             await handleError(sock, message.key.remoteJid, err, 'Error managing study session');
         }
-    }
+    },
+    async flashcard(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [action, subject, ...content] = args;
 
+            if (!action || !['create', 'review', 'list'].includes(action)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .flashcard [create|review|list] [subject] [front::back]\nExample: .flashcard create biology "What is DNA::Deoxyribonucleic acid"'
+                });
+                return;
+            }
+
+            const flashcardsPath = path.join(__dirname, '../../data/educational/flashcards.json');
+            let flashcards = {};
+
+            try {
+                const data = await fs.promises.readFile(flashcardsPath, 'utf8');
+                flashcards = JSON.parse(data);
+            } catch (err) {
+                flashcards = {};
+            }
+
+            switch (action) {
+                case 'create':
+                    if (!subject || content.length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Please provide subject and flashcard content*'
+                        });
+                        return;
+                    }
+
+                    const [front, back] = content.join(' ').split('::');
+                    if (!front || !back) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Invalid flashcard format. Use front::back*'
+                        });
+                        return;
+                    }
+
+                    flashcards[subject] = flashcards[subject] || [];
+                    flashcards[subject].push({
+                        front,
+                        back,
+                        created: new Date().toISOString()
+                    });
+
+                    await fs.promises.writeFile(flashcardsPath, JSON.stringify(flashcards, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: '*✅ Flashcard created successfully*'
+                    });
+                    break;
+
+                case 'review':
+                    if (!flashcards[subject] || flashcards[subject].length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ No flashcards found for this subject*'
+                        });
+                        return;
+                    }
+
+                    const randomCard = flashcards[subject][Math.floor(Math.random() * flashcards[subject].length)];
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📚 Flashcard Review*\n\n*Question:*\n${randomCard.front}\n\n*Answer (reply with .answer to reveal):*\n||${randomCard.back}||`
+                    });
+                    break;
+
+                case 'list':
+                    const subjects = Object.keys(flashcards);
+                    if (subjects.length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ No flashcards found*'
+                        });
+                        return;
+                    }
+
+                    const subjectsList = subjects.map(s => `📚 ${s}: ${flashcards[s].length} cards`).join('\n');
+                    await sock.sendMessage(remoteJid, {
+                        text: `*Available Flashcard Subjects:*\n\n${subjectsList}`
+                    });
+                    break;
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error managing flashcards');
+        }
+    },
+
+    async research(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const query = args.join(' ');
+
+            if (!query) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📚 Usage:* .research [topic]\nExample: .research quantum physics'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*🔍 Searching scholarly articles...*' });
+
+            // Using Open Access API for academic research
+            const response = await axios.get(`https://core.ac.uk/api/v3/search/articles`, {
+                params: {
+                    q: query,
+                    limit: 5,
+                    metadata: true
+                },
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.data && response.data.results) {
+                let results = '*📚 Research Results:*\n\n';
+                response.data.results.forEach((article, index) => {
+                    results += `${index + 1}. *${article.title}*\n`;
+                    if (article.authors) results += `Authors: ${article.authors.join(', ')}\n`;
+                    if (article.abstract) results += `Abstract: ${article.abstract.substring(0, 200)}...\n`;
+                    results += '\n';
+                });
+
+                await sock.sendMessage(remoteJid, { text: results });
+            } else {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ No research articles found*'
+                });
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error searching research articles');
+        }
+    },
+
+    async mindmap(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [action, topic, ...nodes] = args;
+
+            if (!action || !['create', 'view', 'add'].includes(action)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🧠 Usage:* .mindmap [create|view|add] [topic] [nodes]\nExample: .mindmap create physics "Forces,Motion,Energy"'
+                });
+                return;
+            }
+
+            const mindmapsPath = path.join(__dirname, '../../data/educational/mindmaps.json');
+            let mindmaps = {};
+
+            try {
+                const data = await fs.promises.readFile(mindmapsPath, 'utf8');
+                mindmaps = JSON.parse(data);
+            } catch (err) {
+                mindmaps = {};
+            }
+
+            switch (action) {
+                case 'create':
+                    if (!topic || nodes.length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Please provide topic and initial nodes*'
+                        });
+                        return;
+                    }
+
+                    mindmaps[topic] = {
+                        nodes: nodes[0].split(','),
+                        created: new Date().toISOString(),
+                        updated: new Date().toISOString()
+                    };
+
+                    await fs.promises.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: '*✅ Mind map created successfully*'
+                    });
+                    break;
+
+                case 'add':
+                    if (!mindmaps[topic]) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Mind map not found*'
+                        });
+                        return;
+                    }
+
+                    const newNodes = nodes[0].split(',');
+                    mindmaps[topic].nodes.push(...newNodes);
+                    mindmaps[topic].updated = new Date().toISOString();
+
+                    await fs.promises.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: '*✅ Nodes added to mind map*'
+                    });
+                    break;
+
+                case 'view':
+                    if (!mindmaps[topic]) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Mind map not found*'
+                        });
+                        return;
+                    }
+
+                    const mindmap = mindmaps[topic];
+                    let display = `*🧠 Mind Map: ${topic}*\n\n`;
+                    display += `*Nodes:*\n${mindmap.nodes.map(node => `• ${node}`).join('\n')}\n\n`;
+                    display += `Created: ${new Date(mindmap.created).toLocaleDateString()}\n`;
+                    display += `Last Updated: ${new Date(mindmap.updated).toLocaleDateString()}`;
+
+                    await sock.sendMessage(remoteJid, { text: display });
+                    break;
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error managing mind maps');
+        }
+    },
+    // Adding new advanced scientific commands
+    async molecule(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const formula = args.join('');
+
+            if (!formula) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🧪 Usage:* .molecule [chemical_formula]\nExample: .molecule H2O'
+                });
+                return;
+            }
+
+            // Use regex to parse chemical formula
+            const elements = formula.match(/[A-Z][a-z]?\d*/g);
+            if (!elements) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Invalid chemical formula*'
+                });
+                return;
+            }
+
+            let analysis = '*🔬 Molecular Analysis:*\n\n';
+            let totalMass = 0;
+            const atomicMasses = {
+                H: 1.008, He: 4.003, Li: 6.941, Be: 9.012,
+                B: 10.811, C: 12.011, N: 14.007, O: 15.999,
+                F: 18.998, Ne: 20.180, Na: 22.990, Mg: 24.305,
+                Al: 26.982, Si: 28.086, P: 30.974, S: 32.065,
+                Cl: 35.453, Ar: 39.948, K: 39.098, Ca: 40.078
+            };
+
+            elements.forEach(element => {
+                const [, symbol, count = '1'] = element.match(/([A-Z][a-z]?)(\d*)/);
+                const quantity = parseInt(count);
+                const mass = atomicMasses[symbol] * quantity;
+                totalMass += mass;
+                analysis += `${symbol}: ${quantity} atom(s) × ${atomicMasses[symbol]} g/mol = ${mass.toFixed(3)} g/mol\n`;
+            });
+
+            analysis += `\n*Total Molecular Mass:* ${totalMass.toFixed(3)} g/mol`;
+            await sock.sendMessage(remoteJid, { text: analysis });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error analyzing molecule');
+        }
+    },
+
+    async equation(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const equation = args.join(' ');
+
+            if (!equation) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .equation [math_equation]\nExample: .equation x^2 + 2x + 1 = 0'
+                });
+                return;
+            }
+
+            // Parse and solve equation using mathjs
+            const solution = mathjs.solve(equation, 'x');
+            let response = '*🔢 Equation Solution:*\n\n';
+            response += `Equation: ${equation}\n`;
+            response += `Solution: x = ${Array.isArray(solution) ? solution.join(' or x = ') : solution}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error solving equation');
+        }
+    },
+
+    async unitconvert(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [value, fromUnit, toUnit] = args;
+
+            if (!value || !fromUnit || !toUnit) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📏 Usage:* .unitconvert [value] [from_unit] [to_unit]\nExample: .unitconvert 100 km mi'
+                });
+                return;
+            }
+
+            const result = mathjs.evaluate(`${value} ${fromUnit} to ${toUnit}`);
+            await sock.sendMessage(remoteJid, {
+                text: `*🔄 Conversion Result:*\n${value} ${fromUnit} = ${result} ${toUnit}`
+            });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error converting units');
+        }
+    },
+
+    async factorize(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const number = parseInt(args[0]);
+
+            if (!number || isNaN(number)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🔢 Usage:* .factorize [number]\nExample: .factorize 24'
+                });
+                return;
+            }
+
+            const factors = [];
+            for (let i = 1; i <= Math.sqrt(number); i++) {
+                if (number % i === 0) {
+                    factors.push(i);
+                    if (i !== number / i) {
+                        factors.push(number / i);
+                    }
+                }
+            }
+
+            factors.sort((a, b) => a - b);
+            await sock.sendMessage(remoteJid, {
+                text: `*🔢 Factors of ${number}:*\n${factors.join(', ')}`
+            });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error factorizing number');
+        }
+    }
 };
 
 module.exports = {
-    commands: educationalCommands,
-    category: 'educational',
-    async init() {
+    educationalCommands,
+    init: async () => {
         try {
             logger.moduleInit('Educational');
 
@@ -1065,7 +1469,7 @@ module.exports = {
             logger.moduleSuccess('Educational');
             return true;
         } catch (err) {
-            logger.moduleError('Educational', err);
+            logger.error('Educational module initialization failed:', err);
             return false;
         }
     }

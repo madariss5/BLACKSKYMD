@@ -123,6 +123,41 @@
       "description": "Generiert Quizfragen",
       "usage": ".quiz [Fach] [Schwierigkeit]",
       "error": "Fehler beim Erstellen des Quiz"
+    },
+    "flashcard": {
+      "description": "Erstellt und verwaltet Lernkarten",
+      "usage": ".flashcard [create|review|list] [Fach] [Vorderseite::Rückseite]",
+      "error": "Fehler bei der Verwaltung der Lernkarten"
+    },
+    "research": {
+      "description": "Sucht nach wissenschaftlichen Artikeln",
+      "usage": ".research [Thema]",
+      "error": "Fehler bei der Artikelsuche"
+    },
+    "mindmap": {
+      "description": "Erstellt und verwaltet Mindmaps",
+      "usage": ".mindmap [create|view|add] [Thema] [Knoten]",
+      "error": "Fehler bei der Mindmap-Verwaltung"
+    },
+    "molecule": {
+      "description": "Analysiert chemische Moleküle",
+      "usage": ".molecule [Formel]",
+      "error": "Fehler bei der Molekülanalyse"
+    },
+    "equation": {
+      "description": "Löst mathematische Gleichungen",
+      "usage": ".equation [Gleichung]",
+      "error": "Fehler beim Lösen der Gleichung"
+    },
+    "unitconvert": {
+      "description": "Konvertiert zwischen verschiedenen Einheiten",
+      "usage": ".unitconvert [Wert] [Von-Einheit] [Zu-Einheit]",
+      "error": "Fehler bei der Einheitenumrechnung"
+    },
+    "factorize": {
+      "description": "Findet alle Faktoren einer Zahl",
+      "usage": ".factorize [Zahl]",
+      "error": "Fehler bei der Faktorisierung"
     }
   }
 }
