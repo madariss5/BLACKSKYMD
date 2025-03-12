@@ -13,13 +13,13 @@ const basicCommands = {
                     return await menuModule.commands.help(sock, message, args);
                 }
             }
-            
+
             // General help message
             const prefix = require('../config/config').bot.prefix;
             const helpText = `
-*📚 WhatsApp Bot Help*
+*📚 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 Help*
 
-Welcome to the WhatsApp Bot! Here are some commands to get you started:
+Welcome to 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻! Here are some commands to get you started:
 
 *Main Commands:*
 • ${prefix}menu - View all command categories
@@ -158,7 +158,7 @@ This bot has over 300 commands across various categories!`.trim();
     async about(sock, message) {
         try {
             const about = `
-*About WhatsApp Bot*
+*About 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻*
 
 A powerful WhatsApp bot with useful features and commands.
 

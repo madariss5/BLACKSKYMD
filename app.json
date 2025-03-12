@@ -1,5 +1,5 @@
 {
-  "name": "WhatsApp Multi-Device Bot",
+  "name": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻",
   "description": "A comprehensive WhatsApp bot with multi-device support and extensive features",
   "keywords": [
     "whatsapp",
@@ -25,9 +25,9 @@
       "value": "."
     },
     "BOT_NAME": {
-      "description": "Custom name for your bot (default: WhatsApp-MD)",
+      "description": "Custom name for your bot (default: 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻)",
       "required": false,
-      "value": "WhatsApp-MD"
+      "value": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻"
     },
     "NODE_ENV": {
       "description": "Environment mode",

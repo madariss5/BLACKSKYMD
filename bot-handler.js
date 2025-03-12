@@ -1,5 +1,5 @@
 /**
- * WhatsApp Bot Handler
+ * 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 Bot Handler
  * Manages WhatsApp connection and message handling
  */
 
@@ -208,13 +208,13 @@ async function connectToWhatsApp(retryCount = 0) {
     // Initialize auth state
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
-    // Create socket connection optimized for maximum speed
+    // Create WhatsApp socket connection optimized for maximum speed
     sock = makeWASocket({
       version,
       auth: state,
       printQRInTerminal: true,
       logger: pino({ level: 'silent' }),
-      browser: ['WhatsApp Bot', 'Chrome', '121.0.0'],
+      browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Chrome', '121.0.0'],
       connectTimeoutMs: 30000,          // Reduced timeout for faster connection
       retryRequestDelayMs: 1000,        // Faster retry for failed requests
       defaultQueryTimeoutMs: 20000,     // Reduced query timeout

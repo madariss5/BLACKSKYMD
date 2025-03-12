@@ -1,14 +1,14 @@
 {
   "system": {
     "connected": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 successfully connected",
-    "bot_active": "WhatsApp Bot is active",
+    "bot_active": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 is active",
     "command_not_found": "Unknown command: %s\nUse %shelp to see available commands",
     "command_disabled": "This command is currently disabled.",
     "no_permission": "You do not have permission to use this command.",
     "cooldown": "Please wait %.1f seconds before using %s again.",
     "error": "Error processing command. Please try again later.",
     "language_changed": "Language has been changed to English",
-    "welcome_message": "Use %shelp to see available commands."
+    "welcome_message": "Welcome to 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻!\nUse %shelp to see available commands."
   },
   "leveling": {
     "level_up_title": "Level Up!",

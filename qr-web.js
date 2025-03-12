@@ -1,5 +1,5 @@
 /**
- * WhatsApp Web QR Code Server
+ * 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 QR Web Server
  * Serves a web interface for scanning the QR code
  */
 
@@ -53,11 +53,11 @@ app.get('/api/qrcode', (req, res) => {
 async function startWhatsAppConnection() {
   console.log('Starting WhatsApp connection...');
   connectionStatus = 'connecting';
-  
+
   try {
     // Initialize auth state
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-    
+
     // Create WhatsApp connection
     sock = makeWASocket({
       auth: state,
@@ -65,10 +65,10 @@ async function startWhatsAppConnection() {
       syncFullHistory: false,
       markOnlineOnConnect: false,
       connectTimeoutMs: 60000,
-      browser: ['WhatsApp Web', 'Firefox', '121.0'],
+      browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Firefox', '121.0'],
       patchMessageBeforeSending: msg => msg
     });
-    
+
     // Handle connection events
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
@@ -78,20 +78,20 @@ async function startWhatsAppConnection() {
         connectionStatus = 'qr_ready';
         console.log('QR Code ready to scan');
       }
-      
+
       if (connection === 'open') {
         console.log('Connection opened!');
         connectionStatus = 'connected';
         qrCodeDataURL = ''; // Clear QR code when connected
       }
-      
+
       if (connection === 'close') {
         // Connection closed
         const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== 401;
-        
+
         console.log(`Connection closed: ${lastDisconnect?.error?.message || 'Unknown reason'}`);
         connectionStatus = 'disconnected';
-        
+
         if (shouldReconnect) {
           console.log('Attempting to reconnect...');
           setTimeout(startWhatsAppConnection, 5000);
@@ -100,10 +100,10 @@ async function startWhatsAppConnection() {
         }
       }
     });
-    
+
     // Save credentials when updated
     sock.ev.on('creds.update', saveCreds);
-    
+
   } catch (err) {
     console.error('Error starting WhatsApp:', err);
     connectionStatus = 'error';
@@ -115,7 +115,7 @@ async function startWhatsAppConnection() {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Open http://localhost:${PORT} in your browser`);
-  
+
   // Start WhatsApp connection
   startWhatsAppConnection();
 });

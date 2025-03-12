@@ -1,5 +1,5 @@
 /**
- * Simple WhatsApp QR Terminal Display for Replit
+ * 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 QR Terminal Display
  * Displays QR code in the terminal and logs it to console
  */
 
@@ -17,7 +17,7 @@ if (!fs.existsSync(AUTH_DIRECTORY)) {
     fs.mkdirSync(AUTH_DIRECTORY, { recursive: true });
 }
 
-console.log('WhatsApp QR Terminal Connector');
+console.log('𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 QR Terminal Connector');
 console.log('=============================');
 console.log('Connecting to WhatsApp servers...');
 console.log('Watch this terminal for a QR code to appear.');
@@ -42,7 +42,7 @@ async function startWhatsAppConnection() {
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,  // This will print the QR in the terminal
-            browser: ['WhatsApp Bot', 'Chrome', '100.0.0'],
+            browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Chrome', '100.0.0'],
             logger: pino({ level: 'error' }),
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000

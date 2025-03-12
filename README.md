@@ -1,4 +1,4 @@
-# WhatsApp Multi-Device Bot
+# 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻
 
 A comprehensive WhatsApp bot with multi-device support and extensive features using @whiskeysockets/baileys.
 
@@ -25,7 +25,7 @@ A comprehensive WhatsApp bot with multi-device support and extensive features us
 1. Clone the repository
 ```bash
 git clone <repository-url>
-cd whatsapp-bot
+cd 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻
 ```
 
 2. Install dependencies
@@ -109,10 +109,10 @@ heroku logs --tail
 
 #### Session Management on Heroku
 
-Heroku has an ephemeral filesystem that doesn't persist data between dyno restarts. To address this challenge, this bot includes special mechanisms for session persistence:
+The 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 bot includes special mechanisms for session persistence:
 
 1. **Temporary Directory Storage**: The bot automatically detects Heroku environment and stores session files in Heroku's `/tmp` directory.
-   
+
 2. **Backup System**: The bot creates regular backups of your session:
    - Initial backup on startup
    - Regular backups (every 15 minutes by default, configurable via `BACKUP_INTERVAL`)
@@ -135,7 +135,7 @@ Required:
 - `OWNER_NUMBER`: Your WhatsApp number (format: 1234567890)
 - `SESSION_ID`: Unique session ID for multi-device support (auto-generated)
 - `BOT_PREFIX`: Command prefix for the bot (default: .)
-- `BOT_NAME`: Custom name for your bot
+- `BOT_NAME`: Name for your 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 instance
 
 Heroku Deployment (required for Heroku):
 - `HEROKU_APP_NAME`: The name of your Heroku app (for keep-alive mechanism)
