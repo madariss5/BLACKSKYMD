@@ -18,6 +18,31 @@ async function startServer(sock) {
             uptime: process.uptime()
         });
     });
+    
+    // Debug endpoint to check command loading
+    app.get('/debug/commands', (req, res) => {
+        const stats = commandLoader.getCommandStats();
+        const commands = commandLoader.getAllCommands();
+        const commandsByCategory = {};
+        
+        // Group commands by category
+        commands.forEach(cmd => {
+            if (!commandsByCategory[cmd.category]) {
+                commandsByCategory[cmd.category] = [];
+            }
+            commandsByCategory[cmd.category].push(cmd.name);
+        });
+        
+        res.json({
+            total: commands.length,
+            stats,
+            categories: Object.keys(commandsByCategory).map(category => ({
+                name: category,
+                commandCount: commandsByCategory[category].length,
+                commands: commandsByCategory[category]
+            }))
+        });
+    });
 
     // Always serve on port 5000 for Replit compatibility
     const PORT = 5000;
