@@ -20,40 +20,35 @@ async function ensureAuthDir() {
         }
         return authDir;
     } catch (err) {
-        logger.error('Error creating auth directory:', err);
-        throw err;
+        process.exit(1);
     }
 }
 
 async function displayQR(qr) {
     try {
-        // Clear console and add spacing
-        console.clear();
-        console.log('\n');
-        console.log('Please scan this QR code with WhatsApp:');
-        console.log('\n');
+        // Clear terminal completely
+        process.stdout.write('\x1Bc');
 
-        // Generate QR with custom size
+        // Generate QR code silently
         qrcode.generate(qr, { small: false });
-
-        console.log('\nWaiting for you to scan the QR code...');
     } catch (err) {
-        logger.error('Error displaying QR code:', err);
         process.exit(1);
     }
 }
 
 async function startConnection() {
     try {
-        console.clear();
+        // Clear terminal
+        process.stdout.write('\x1Bc');
+
         const authDir = await ensureAuthDir();
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
         sock = makeWASocket({
             auth: state,
-            printQRInTerminal: false, // Disable native QR printing
+            printQRInTerminal: false,
             browser: ['WhatsApp Bot', 'Firefox', '2.0.0'],
-            logger: pino({ level: 'silent' }), // Minimize logging
+            logger: pino({ level: 'silent' }),
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 30000,
@@ -77,7 +72,6 @@ async function startConnection() {
             }
         });
 
-        // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
@@ -87,14 +81,8 @@ async function startConnection() {
 
             if (connection === 'open') {
                 retryCount = 0;
-                console.clear();
-                console.log('✅ Connected to WhatsApp!\n');
-
-                try {
-                    await saveCreds();
-                } catch (err) {
-                    logger.error('Error saving session credentials:', err);
-                }
+                process.stdout.write('\x1Bc');
+                await saveCreds();
             }
 
             if (connection === 'close') {
@@ -104,48 +92,23 @@ async function startConnection() {
                 if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
                     const delay = RETRY_INTERVAL * Math.pow(2, retryCount - 1);
-                    console.log(`\nReconnecting... Attempt ${retryCount}/${MAX_RETRIES}`);
-
                     setTimeout(async () => {
                         try {
                             await startConnection();
                         } catch (err) {
-                            logger.error('Error during reconnection:', err);
+                            process.exit(1);
                         }
                     }, delay);
-                } else if (retryCount >= MAX_RETRIES) {
-                    console.log('\n❌ Max retry attempts reached. Please restart the bot manually.');
-                    process.exit(1);
                 } else {
-                    console.log('\n❌ Connection closed permanently. User logged out.');
-                    try {
-                        if (fs.existsSync(authDir)) {
-                            await fsPromises.rm(authDir, { recursive: true, force: true });
-                        }
-                    } catch (err) {
-                        logger.error('Error cleaning up auth state:', err);
-                    }
                     process.exit(1);
                 }
             }
         });
 
-        // Handle credentials update
         sock.ev.on('creds.update', saveCreds);
-
-        // Handle messages
-        sock.ev.on('messages.upsert', async (m) => {
-            logger.debug('New message received:', m.type);
-        });
-
-        // Handle errors
-        process.on('unhandledRejection', (err) => {
-            logger.error('Unhandled promise rejection:', err);
-        });
 
         return sock;
     } catch (err) {
-        logger.error('Connection error:', err);
         if (retryCount < MAX_RETRIES) {
             retryCount++;
             const delay = RETRY_INTERVAL * Math.pow(2, retryCount - 1);
@@ -153,11 +116,11 @@ async function startConnection() {
                 try {
                     await startConnection();
                 } catch (err) {
-                    logger.error('Error during retry:', err);
+                    process.exit(1);
                 }
             }, delay);
         } else {
-            throw err;
+            process.exit(1);
         }
     }
 }
