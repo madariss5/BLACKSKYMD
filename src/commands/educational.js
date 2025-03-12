@@ -1,7 +1,7 @@
 const logger = require('../utils/logger');
+const { default: axios } = require('axios');
 const path = require('path');
 const fs = require('fs');
-const axios = require('axios');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const mathjs = require('mathjs');
 
@@ -822,7 +822,210 @@ const educationalCommands = {
         } catch (err) {
             await handleError(sock, message.key.remoteJid, err, 'Error managing notes');
         }
+    },
+    async convert(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [value, fromUnit, toUnit] = args;
+
+            if (!value || !fromUnit || !toUnit) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📏 Usage:* .convert [value] [from_unit] [to_unit]\nExample: .convert 100 km mi'
+                });
+                return;
+            }
+
+            const result = mathjs.evaluate(`${value} ${fromUnit} to ${toUnit}`);
+            await sock.sendMessage(remoteJid, {
+                text: `*🔄 Conversion Result:*\n${value} ${fromUnit} = ${result} ${toUnit}`
+            });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error converting units');
+        }
+    },
+
+    async formula(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [subject, formula] = args;
+
+            const formulas = {
+                physics: {
+                    velocity: "v = d/t (velocity = distance/time)",
+                    force: "F = ma (force = mass × acceleration)",
+                    energy: "E = mc² (energy = mass × speed of light²)"
+                },
+                math: {
+                    quadratic: "ax² + bx + c = 0",
+                    pythagoras: "a² + b² = c²",
+                    area_circle: "A = πr²"
+                },
+                chemistry: {
+                    density: "ρ = m/V (density = mass/volume)",
+                    molarity: "M = moles of solute/liters of solution",
+                    gas: "PV = nRT (ideal gas law)"
+                }
+            };
+
+            if (!subject || !formulas[subject]) {
+                const subjects = Object.keys(formulas).join(', ');
+                await sock.sendMessage(remoteJid, {
+                    text: `*📚 Available Subjects:* ${subjects}\n*Usage:* .formula [subject] [formula_name]`
+                });
+                return;
+            }
+
+            if (!formula) {
+                const availableFormulas = Object.keys(formulas[subject]).join(', ');
+                await sock.sendMessage(remoteJid, {
+                    text: `*📚 Available Formulas for ${subject}:*\n${availableFormulas}`
+                });
+                return;
+            }
+
+            const formulaText = formulas[subject][formula];
+            if (!formulaText) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Formula not found*'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, {
+                text: `*📐 Formula:* ${formulaText}`
+            });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error displaying formula');
+        }
+    },
+
+    async dictionary(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const word = args.join(' ');
+
+            if (!word) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📚 Usage:* .dictionary [word]\nExample: .dictionary serendipity'
+                });
+                return;
+            }
+
+            const response = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+            const entry = response.data[0];
+
+            let result = `*📖 ${entry.word}*\n`;
+            if (entry.phonetic) result += `*Pronunciation:* ${entry.phonetic}\n\n`;
+
+            entry.meanings.forEach(meaning => {
+                result += `*${meaning.partOfSpeech}*\n`;
+                meaning.definitions.slice(0, 2).forEach((def, i) => {
+                    result += `${i + 1}. ${def.definition}\n`;
+                    if (def.example) result += `   Example: "${def.example}"\n`;
+                });
+                result += '\n';
+            });
+
+            await sock.sendMessage(remoteJid, { text: result });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error looking up word');
+        }
+    },
+
+    async study(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [action, subject, duration] = args;
+
+            if (!action || !['start', 'stop', 'status'].includes(action)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📚 Usage:* .study [start|stop|status] [subject] [duration_minutes]\nExample: .study start math 30'
+                });
+                return;
+            }
+
+            const studyPath = path.join(__dirname, '../../data/educational/study_sessions.json');
+            let sessions = {};
+
+            try {
+                const data = await fs.promises.readFile(studyPath, 'utf8');
+                sessions = JSON.parse(data);
+            } catch (err) {
+                sessions = {};
+            }
+
+            const userId = message.key.participant || message.key.remoteJid;
+
+            switch (action) {
+                case 'start':
+                    if (!subject || !duration) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Please provide both subject and duration*'
+                        });
+                        return;
+                    }
+
+                    sessions[userId] = {
+                        subject,
+                        startTime: new Date().toISOString(),
+                        duration: parseInt(duration),
+                        active: true
+                    };
+
+                    await fs.promises.writeFile(studyPath, JSON.stringify(sessions, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📚 Study Session Started*\nSubject: ${subject}\nDuration: ${duration} minutes`
+                    });
+
+                    // Set timer to notify when session ends
+                    setTimeout(async () => {
+                        if (sessions[userId]?.active) {
+                            sessions[userId].active = false;
+                            await fs.promises.writeFile(studyPath, JSON.stringify(sessions, null, 2));
+                            await sock.sendMessage(remoteJid, {
+                                text: `*⏰ Study Session Complete*\nSubject: ${subject}\nDuration: ${duration} minutes`
+                            });
+                        }
+                    }, parseInt(duration) * 60 * 1000);
+                    break;
+
+                case 'stop':
+                    if (!sessions[userId] || !sessions[userId].active) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ No active study session found*'
+                        });
+                        return;
+                    }
+
+                    sessions[userId].active = false;
+                    await fs.promises.writeFile(studyPath, JSON.stringify(sessions, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: '*✅ Study session stopped*'
+                    });
+                    break;
+
+                case 'status':
+                    if (!sessions[userId] || !sessions[userId].active) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*📊 No active study session*'
+                        });
+                        return;
+                    }
+
+                    const startTime = new Date(sessions[userId].startTime);
+                    const elapsedMinutes = Math.floor((new Date() - startTime) / 60000);
+                    const remainingMinutes = sessions[userId].duration - elapsedMinutes;
+
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📊 Study Session Status*\nSubject: ${sessions[userId].subject}\nElapsed: ${elapsedMinutes} minutes\nRemaining: ${remainingMinutes} minutes`
+                    });
+                    break;
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error managing study session');
+        }
     }
+
 };
 
 module.exports = {

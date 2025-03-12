@@ -74,16 +74,25 @@
     }
   },
   "educational": {
-    "define": {
-      "description": "Zeigt die Definition eines Wortes",
-      "usage": ".define [Wort]",
-      "not_found": "Keine Definition gefunden",
-      "searching": "Suche Definition..."
+    "convert": {
+      "description": "Konvertiert Einheiten",
+      "usage": ".convert [Wert] [Von-Einheit] [Zu-Einheit]",
+      "error": "Fehler bei der Konvertierung"
     },
-    "translate": {
-      "description": "Übersetzt Text in andere Sprachen",
-      "usage": ".translate [Zielsprache] [Text]",
-      "error": "Übersetzung fehlgeschlagen"
+    "formula": {
+      "description": "Zeigt wissenschaftliche Formeln",
+      "usage": ".formula [Fach] [Formel]",
+      "error": "Fehler beim Anzeigen der Formel"
+    },
+    "dictionary": {
+      "description": "Nachschlagen von Wörtern im Wörterbuch",
+      "usage": ".dictionary [Wort]",
+      "error": "Fehler beim Nachschlagen des Wortes"
+    },
+    "study": {
+      "description": "Verwaltet Lernsitzungen",
+      "usage": ".study [start|stop|status] [Fach] [Dauer]",
+      "error": "Fehler bei der Verwaltung der Lernsitzung"
     },
     "mathsolve": {
       "description": "Löst mathematische Gleichungen",
