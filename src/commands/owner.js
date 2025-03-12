@@ -112,12 +112,37 @@ const ownerCommands = {
     async setlanguage(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         const lang = args[0]?.toLowerCase();
-        if (!lang) {
-            await sock.sendMessage(remoteJid, { text: '⚠️ Please specify language code' });
-            return;
+        
+        try {
+            if (!lang) {
+                await sock.sendMessage(remoteJid, { text: '⚠️ Please specify language code (e.g., en, de)' });
+                return;
+            }
+            
+            // Get reference to language manager
+            const { languageManager } = require('../utils/language');
+            const config = require('../config/config');
+            
+            // Check if language is supported
+            if (!languageManager.isLanguageSupported(lang)) {
+                const availableLangs = languageManager.getAvailableLanguages().join(', ');
+                await sock.sendMessage(remoteJid, { 
+                    text: `❌ Language '${lang}' is not supported.\nAvailable languages: ${availableLangs}` 
+                });
+                return;
+            }
+            
+            // Update language in config
+            config.bot.language = lang;
+            
+            // Use the appropriate translation to respond
+            const response = languageManager.getText('system.language_changed', lang);
+            await sock.sendMessage(remoteJid, { text: `✅ ${response}` });
+            logger.info(`Bot language changed to: ${lang}`);
+        } catch (err) {
+            logger.error('Error setting language:', err);
+            await sock.sendMessage(remoteJid, { text: '❌ Error setting language. Please check logs.' });
         }
-        // Implement language setting
-        await sock.sendMessage(remoteJid, { text: `✅ Bot language set to: ${lang}` });
     },
 
     async setppic(sock, message, args) {

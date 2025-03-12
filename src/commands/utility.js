@@ -661,6 +661,58 @@ UTC: ${utc}`;
             logger.error('Case command error:', err);
             await sock.sendMessage(sender, { text: 'Error converting case. Please try again.' });
         }
+    },
+    
+    async language(sock, sender, args) {
+        try {
+            // Get reference to language manager and user database
+            const { languageManager } = require('../utils/language');
+            const { getUserProfile, updateUserProfile } = require('../utils/userDatabase');
+            
+            // If no arguments, show available languages
+            if (!args.length) {
+                const availableLangs = languageManager.getAvailableLanguages();
+                const currentLang = getUserProfile(sender) ? 
+                    getUserProfile(sender).language || 'en' : 'en';
+                
+                await sock.sendMessage(sender, { 
+                    text: `🌐 *Language Settings*\n\n` +
+                          `Current language: ${currentLang}\n` +
+                          `Available languages: ${availableLangs.join(', ')}\n\n` +
+                          `To change your language, use:\n.language [code]` 
+                });
+                return;
+            }
+            
+            // Get the requested language
+            const lang = args[0].toLowerCase();
+            
+            // Check if language is supported
+            if (!languageManager.isLanguageSupported(lang)) {
+                const availableLangs = languageManager.getAvailableLanguages().join(', ');
+                await sock.sendMessage(sender, { 
+                    text: `❌ Language '${lang}' is not supported.\nAvailable languages: ${availableLangs}` 
+                });
+                return;
+            }
+            
+            // Update user's preferred language in the database
+            let profile = getUserProfile(sender);
+            if (!profile) {
+                profile = { id: sender, language: lang };
+            } else {
+                profile.language = lang;
+            }
+            updateUserProfile(sender, profile);
+            
+            // Use the appropriate translation to respond
+            const response = languageManager.getText('system.language_changed', lang);
+            await sock.sendMessage(sender, { text: `✅ ${response}` });
+            logger.info(`User ${sender} changed language to: ${lang}`);
+        } catch (err) {
+            logger.error('Language command error:', err);
+            await sock.sendMessage(sender, { text: '❌ Error changing language. Please try again.' });
+        }
     }
 
 };

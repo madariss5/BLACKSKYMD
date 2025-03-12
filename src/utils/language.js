@@ -37,6 +37,30 @@ class LanguageManager {
 
     getText(key, lang = null, ...args) {
         try {
+            // Check if the first argument is a JID (user identifier)
+            let userJid = null;
+            let userLang = null;
+            
+            // If lang looks like a JID, try to get user's preferred language
+            if (typeof lang === 'string' && lang.includes('@')) {
+                userJid = lang;
+                
+                // Try to get user's preferred language from user database
+                try {
+                    const { getUserProfile } = require('./userDatabase');
+                    const profile = getUserProfile(userJid);
+                    if (profile && profile.language) {
+                        userLang = profile.language;
+                        logger.debug(`Using user's preferred language: ${userLang} for ${userJid}`);
+                    }
+                } catch (e) {
+                    logger.debug(`Could not get user language profile: ${e.message}`);
+                }
+                
+                // Reset lang to null to continue with normal fallbacks
+                lang = userLang;
+            }
+            
             // Use provided language, fallback to config, then default
             const language = lang || config.bot.language || this.defaultLanguage;
 
