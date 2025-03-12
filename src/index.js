@@ -19,13 +19,13 @@ async function startServer(sock) {
             uptime: process.uptime()
         });
     });
-    
+
     // Debug endpoint to check command loading
     app.get('/debug/commands', (req, res) => {
         const stats = commandLoader.getCommandStats();
         const commands = commandLoader.getAllCommands();
         const commandsByCategory = {};
-        
+
         // Group commands by category
         commands.forEach(cmd => {
             if (!commandsByCategory[cmd.category]) {
@@ -33,7 +33,7 @@ async function startServer(sock) {
             }
             commandsByCategory[cmd.category].push(cmd.name);
         });
-        
+
         res.json({
             total: commands.length,
             stats,
@@ -44,24 +44,24 @@ async function startServer(sock) {
             }))
         });
     });
-    
+
     // Advanced debug endpoint to check command loading errors
     app.get('/debug/command-modules', async (req, res) => {
         try {
             const commandsPath = require('path').join(__dirname, 'commands');
             const files = require('fs').readdirSync(commandsPath);
-            
+
             const moduleStatus = [];
-            
+
             for (const file of files) {
                 if (!file.endsWith('.js') || file === 'index.js') continue;
-                
+
                 try {
                     // Try to require the module directly for diagnostic purposes
                     const modulePath = require('path').join(commandsPath, file);
                     delete require.cache[require.resolve(modulePath)]; // Clear cache
                     const moduleData = require(modulePath);
-                    
+
                     moduleStatus.push({
                         file,
                         loaded: true,
@@ -86,7 +86,7 @@ async function startServer(sock) {
                     });
                 }
             }
-            
+
             res.json({
                 totalModules: moduleStatus.length,
                 moduleStatus
@@ -105,9 +105,6 @@ async function startServer(sock) {
         .on('error', (err) => {
             console.error('Failed to start HTTP server:', err);
             process.exit(1);
-        })
-        .on('listening', () => {
-            console.log(`Server is running on port ${PORT}`);
         });
 
     return server;
@@ -118,18 +115,12 @@ async function main() {
     let sock = null;
 
     try {
-        // Load commands first
-        console.log('Loading command configurations...');
-        try {
-            await commandLoader.loadCommandHandlers();
-            console.log(`Loaded ${commandLoader.getAllCommands().length} commands successfully`);
-        } catch (err) {
-            console.error('Error loading commands:', err);
-            throw err;
-        }
+        // Clear console first
+        console.clear();
+        process.stdout.write('\x1Bc');
 
-        // Start WhatsApp connection
-        console.log('Initializing WhatsApp connection...');
+        // Start WhatsApp connection first to show QR code
+        console.log('Starting WhatsApp connection...\n');
         try {
             sock = await startConnection();
         } catch (err) {
@@ -137,29 +128,31 @@ async function main() {
             throw err;
         }
 
-        // Initialize command modules with socket
-        try {
-            logger.info('🔍 Validator Debug: Starting command modules initialization...');
-            logger.info('Initializing command modules with socket connection...');
-            await commandModules.initializeModules(sock);
-            logger.info('Command modules initialized with socket connection successfully');
-            logger.info('🔍 Validator Debug: Command modules initialization completed');
-        } catch (err) {
-            logger.error('Error initializing command modules with socket:', err);
-            logger.error('🔍 Validator Debug: Error during initialization:', err.message);
-            // Continue execution despite initialization errors
-        }
-        
-        // Start HTTP server
-        server = await startServer(sock);
+        // Only load commands after connection is established
+        sock.ev.on('connection.update', async (update) => {
+            if (update.connection === 'open') {
+                // Load commands silently
+                try {
+                    await commandLoader.loadCommandHandlers();
+                } catch (err) {
+                    console.error('Error loading commands:', err);
+                }
 
-        // Connection is now managed by the connection.js file
-        // We no longer need to handle messages here
-        // This code is being removed to avoid duplicate event processing
+                // Initialize command modules with socket
+                try {
+                    await commandModules.initializeModules(sock);
+                } catch (err) {
+                    console.error('Error initializing command modules:', err);
+                }
+
+                // Start HTTP server after commands are loaded
+                server = await startServer(sock);
+            }
+        });
 
         // Enhanced graceful shutdown
         const cleanup = async (signal) => {
-            console.log(`Received ${signal} signal. Cleaning up...`);
+            console.log(`\nReceived ${signal} signal. Cleaning up...`);
 
             if (server) {
                 await new Promise((resolve) => {
@@ -184,7 +177,7 @@ async function main() {
 
         process.on('SIGTERM', () => cleanup('SIGTERM'));
         process.on('SIGINT', () => cleanup('SIGINT'));
-        
+
         // Implement periodic memory cleanup to keep the bot running smoothly 24/7
         const MEMORY_CLEANUP_INTERVAL = 3600000; // 1 hour
         setInterval(() => {
@@ -193,15 +186,15 @@ async function main() {
                     global.gc();
                     logger.info('Performed garbage collection to free memory');
                 }
-                
+
                 // Check for possible memory leaks
                 const memoryUsage = process.memoryUsage();
                 logger.info('Memory usage stats:', {
                     rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
-                    heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`, 
+                    heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
                     heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`
                 });
-                
+
                 // If memory usage is too high, implement more aggressive cleanup
                 if (memoryUsage.heapUsed > 1024 * 1024 * 500) { // 500MB threshold
                     logger.warn('High memory usage detected, performing additional cleanup');
@@ -212,11 +205,11 @@ async function main() {
                 logger.error('Memory cleanup error:', memErr);
             }
         }, MEMORY_CLEANUP_INTERVAL);
-        
+
         // Implement Heroku keep-alive mechanism
         if (process.env.DYNO) {
             logger.info('Running on Heroku, setting up session management');
-            
+
             // Ensure we have a SESSION_ID for Heroku - generate one if not provided
             if (!process.env.SESSION_ID) {
                 process.env.SESSION_ID = `heroku_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 5)}`;
@@ -225,20 +218,20 @@ async function main() {
             } else {
                 logger.info(`Using configured SESSION_ID: ${process.env.SESSION_ID}`);
             }
-            
+
             // Check if keep-alive is enabled (default: true)
             const keepAliveEnabled = process.env.KEEP_ALIVE !== 'false';
-            
+
             if (keepAliveEnabled && process.env.HEROKU_APP_NAME) {
                 logger.info('Keep-alive ping enabled for Heroku');
-                
+
                 // Set up a self-ping every 25 minutes to prevent Heroku from sleeping
                 // Only needed for free dynos, but harmless on paid ones
                 const KEEP_ALIVE_INTERVAL = 25 * 60 * 1000; // 25 minutes
-                
+
                 const appUrl = process.env.APP_URL || `https://${process.env.HEROKU_APP_NAME}.herokuapp.com`;
                 logger.info(`Keep-alive URL set to: ${appUrl}`);
-                
+
                 setInterval(() => {
                     try {
                         // Use the built-in http module to avoid adding dependencies
@@ -255,20 +248,20 @@ async function main() {
             } else {
                 logger.info('Keep-alive ping disabled or HEROKU_APP_NAME not set');
             }
-            
+
             // Also implement session backup on Heroku dyno cycling
             const { sessionManager } = require('./utils/sessionManager');
-            
+
             // First backup on startup
             sessionManager.backupCredentials()
                 .then(() => logger.info('Initial Heroku session backup complete'))
                 .catch(err => logger.error('Initial Heroku backup failed:', err));
-                
+
             // Schedule regular backups
             const backupIntervalMinutes = parseInt(process.env.BACKUP_INTERVAL || '15', 10);
             const backupIntervalMs = backupIntervalMinutes * 60 * 1000;
             logger.info(`Scheduling Heroku backups every ${backupIntervalMinutes} minutes`);
-            
+
             setInterval(() => {
                 sessionManager.backupCredentials()
                     .then(() => logger.debug('Scheduled Heroku backup complete'))
