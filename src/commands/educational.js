@@ -474,8 +474,8 @@ const educationalCommands = {
 
     async reminder(sock, message, args) {
         const remoteJid = message.key.remoteJid;
-        const [time, ...message] = args;
-        if (!time || !message.length) {
+        const [time, ...reminderText] = args;
+        if (!time || !reminderText.length) {
             await sock.sendMessage(remoteJid, {
                 text: '⏰ Usage: !reminder [time] [message]'
             });
