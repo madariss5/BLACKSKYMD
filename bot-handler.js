@@ -383,6 +383,50 @@ async function resetConnection() {
   }
 }
 
+// Add process error handlers
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // Keep process alive but attempt reconnection
+  if (sock) {
+    resetConnection();
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Keep process alive but attempt reconnection
+  if (sock) {
+    resetConnection();
+  }
+});
+
+// Add graceful shutdown handler
+process.on('SIGTERM', async () => {
+  console.log('Received SIGTERM. Performing graceful shutdown...');
+  try {
+    if (sock) {
+      await sock.logout();
+      sock = null;
+    }
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during graceful shutdown:', error);
+    process.exit(1);
+  }
+});
+
+// Start the bot with error handling
+(async () => {
+  try {
+    console.log('Starting WhatsApp Bot...');
+    await connectToWhatsApp();
+    console.log('Bot initialization complete');
+  } catch (error) {
+    console.error('Failed to start bot:', error);
+    // Don't exit, let the retry mechanism handle it
+  }
+})();
+
 module.exports = {
   connectToWhatsApp,
   setupSessionBackup,
