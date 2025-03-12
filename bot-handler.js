@@ -47,7 +47,7 @@ async function handleCommand(message, text) {
   if (text.startsWith('!ping')) {
     return { text: 'Pong! 🏓' };
   } 
-  
+
   if (text.startsWith('!help')) {
     return { 
       text: '🤖 *Available Commands*\n\n' +
@@ -146,10 +146,43 @@ async function sendResponse(jid, response) {
   }
 }
 
+// Add new retry configuration
+const RETRY_CONFIG = {
+  maxRetries: 5,
+  baseDelay: 2000, // Start with 2 seconds
+  maxDelay: 60000  // Max 1 minute delay
+};
+
 /**
- * Initialize WhatsApp connection
+ * Calculate exponential backoff delay
  */
-async function connectToWhatsApp() {
+function getRetryDelay(attempt) {
+  const delay = Math.min(
+    RETRY_CONFIG.maxDelay,
+    RETRY_CONFIG.baseDelay * Math.pow(2, attempt)
+  );
+  return delay + (Math.random() * 1000); // Add jitter
+}
+
+/**
+ * Clear authentication data
+ */
+async function clearAuthData() {
+  try {
+    if (fs.existsSync(SESSION_DIR)) {
+      fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+      fs.mkdirSync(SESSION_DIR, { recursive: true });
+    }
+    console.log('Authentication data cleared');
+  } catch (error) {
+    console.error('Error clearing auth data:', error);
+  }
+}
+
+/**
+ * Initialize WhatsApp connection with retry logic
+ */
+async function connectToWhatsApp(retryCount = 0) {
   try {
     connectionState.state = 'connecting';
     console.log('🟢 Starting WhatsApp authentication...');
@@ -158,7 +191,7 @@ async function connectToWhatsApp() {
     if (!fs.existsSync(SESSION_DIR)) {
       fs.mkdirSync(SESSION_DIR, { recursive: true });
     }
-    
+
     // Ensure backup directory exists
     if (!fs.existsSync(BACKUP_DIR)) {
       fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -171,71 +204,98 @@ async function connectToWhatsApp() {
     // Initialize auth state
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
-    // Create socket connection
+    // Create socket connection with improved options
     sock = makeWASocket({
       version,
       auth: state,
       printQRInTerminal: true,
-      logger: pino({ level: 'silent' })
+      logger: pino({ level: 'silent' }),
+      browser: ['WhatsApp Bot', 'Chrome', '121.0.0'],
+      connectTimeoutMs: 60000,
+      retryRequestDelayMs: 2000,
+      defaultQueryTimeoutMs: 60000
     });
 
     // Update connection state
     startTime = Date.now();
 
-    // Handle connection updates
-    sock.ev.on('connection.update', (update) => {
+    // Handle connection updates with improved error handling
+    sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
-      
+
       if (qr) {
         connectionState.state = 'qr_ready';
         connectionState.qrCode = qr;
         connectionState.connected = false;
-        console.log('⏳ Generating QR code, please wait...');
-        console.log('✅ QR code generated! Check web interface at http://localhost:5000');
+        console.log('⏳ New QR code generated');
         qrCount++;
       }
-      
+
       if (connection === 'close') {
-        const shouldReconnect = lastDisconnect?.error instanceof Boom &&
-                              lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut;
-        
-        console.log('Connection closed due to ', lastDisconnect?.error);
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        console.log(`Connection closed with status code: ${statusCode}`);
         connectionState.state = 'disconnected';
         connectionState.connected = false;
-        
-        if (shouldReconnect) {
-          console.log('Reconnecting...');
-          connectToWhatsApp();
+
+        // Handle different error scenarios
+        if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+          console.log('Session expired or invalid. Clearing auth data...');
+          await clearAuthData();
+
+          if (retryCount < RETRY_CONFIG.maxRetries) {
+            const delay = getRetryDelay(retryCount);
+            console.log(`Retrying connection in ${delay/1000} seconds... (Attempt ${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
+            setTimeout(() => connectToWhatsApp(retryCount + 1), delay);
+          } else {
+            console.log('Max retry attempts reached. Please scan new QR code.');
+            await resetConnection();
+          }
+        } else if (statusCode === DisconnectReason.connectionClosed) {
+          console.log('Connection closed by server. Reconnecting...');
+          setTimeout(() => connectToWhatsApp(0), 2000);
+        } else if (statusCode === DisconnectReason.connectionLost) {
+          console.log('Connection lost. Attempting immediate reconnection...');
+          connectToWhatsApp(0);
+        } else if (statusCode === DisconnectReason.connectionReplaced) {
+          console.log('Connection replaced. Please re-scan QR code.');
+          await resetConnection();
         } else {
-          console.log('Not reconnecting.');
+          // For unknown errors, attempt reconnection with backoff
+          if (retryCount < RETRY_CONFIG.maxRetries) {
+            const delay = getRetryDelay(retryCount);
+            console.log(`Unknown error. Retrying in ${delay/1000} seconds...`);
+            setTimeout(() => connectToWhatsApp(retryCount + 1), delay);
+          } else {
+            console.log('Max retry attempts reached. Manual intervention required.');
+          }
         }
       } else if (connection === 'open') {
         console.log('🟢 WhatsApp connection established!');
         connectionState.state = 'connected';
         connectionState.connected = true;
-      }
-    });
-
-    // Handle messages
-    sock.ev.on('messages.upsert', ({ messages }) => {
-      if (!messages || !messages[0]) return;
-      
-      // Handle each message
-      for (const message of messages) {
-        if (message.key.fromMe) continue; // Skip own messages
-        
-        handleIncomingMessage(message);
+        retryCount = 0; // Reset retry counter on successful connection
       }
     });
 
     // Handle credentials update
-    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', async () => {
+      await saveCreds();
+      console.log('Credentials updated and saved');
+    });
 
     return sock;
   } catch (error) {
     console.error('Error initializing WhatsApp connection:', error);
     connectionState.state = 'disconnected';
-    throw error;
+
+    if (retryCount < RETRY_CONFIG.maxRetries) {
+      const delay = getRetryDelay(retryCount);
+      console.log(`Connection error. Retrying in ${delay/1000} seconds...`);
+      setTimeout(() => connectToWhatsApp(retryCount + 1), delay);
+    } else {
+      console.error('Failed to establish connection after maximum retries');
+      throw error;
+    }
   }
 }
 
