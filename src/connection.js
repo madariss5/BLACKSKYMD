@@ -1,4 +1,4 @@
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const logger = require('./utils/logger');
 const path = require('path');
@@ -8,13 +8,10 @@ const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
 const { handleGroupMessage } = require('./handlers/groupMessageHandler');
 const { handleGroupParticipantsUpdate } = require('./handlers/groupParticipantHandler');
-const { sessionManager } = require('./utils/sessionManager');
 
 let sock = null;
 let retryCount = 0;
 const isProduction = process.env.NODE_ENV === 'production';
-const isHeroku = !!process.env.DYNO;
-
 const MAX_RETRIES = isProduction ? 999999 : 10;
 const RETRY_INTERVAL_BASE = isProduction ? 5000 : 10000;
 const MAX_RETRY_INTERVAL = isProduction ? 300000 : 60000;
@@ -54,15 +51,14 @@ async function cleanAuthState() {
 
 async function startConnection() {
     try {
-        qrDisplayed = false;
-
-        // Initialize command loader first (which also initializes fs)
+        // Initialize command loader first
         const commandsInitialized = await commandLoader.loadCommandHandlers();
         if (!commandsInitialized) {
             throw new Error('Failed to initialize commands');
         }
 
-        const { version } = await fetchLatestBaileysVersion();
+        // Reset flags
+        qrDisplayed = false;
         const isValidSession = await validateSession();
 
         if (!isValidSession && retryCount > 0) {
@@ -72,8 +68,9 @@ async function startConnection() {
         const authDir = path.join(process.cwd(), 'auth_info');
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
+        // Create socket connection
         sock = makeWASocket({
-            version,
+            version: [2, 2323, 4],
             auth: state,
             printQRInTerminal: false,
             logger: logger,
@@ -82,14 +79,12 @@ async function startConnection() {
             qrTimeout: 40000,
             defaultQueryTimeoutMs: 20000,
             keepAliveIntervalMs: 5000,
-            retryRequestDelayMs: 500,
             emitOwnEvents: false,
-            maxRetries: 15,
-            markOnlineOnConnect: true,
-            syncFullHistory: false
+            markOnlineOnConnect: true
         });
 
         sock.ev.process(async (events) => {
+            // Handle connection state updates
             if (events['connection.update']) {
                 const update = events['connection.update'];
                 const { connection, lastDisconnect, qr } = update;
@@ -97,60 +92,56 @@ async function startConnection() {
                 if (qr && !qrDisplayed) {
                     qrDisplayed = true;
 
-                    // Disable logging and clear console for clean QR display
+                    // Completely disable logging and clear console
                     const originalLogLevel = logger.level;
                     logger.level = 'silent';
-                    process.stdout.write('\x1Bc');
+                    console.clear();
 
+                    // Display QR code with minimal decoration
                     console.log('\n=== WhatsApp QR Code ===\n');
                     qrcode.generate(qr, { small: true }, (qrcode) => {
                         console.log(qrcode);
                         console.log('\nScan this QR code with WhatsApp\n');
                     });
 
-                    // Restore logging after QR is displayed
+                    // Restore logging after delay
                     setTimeout(() => {
                         logger.level = originalLogLevel;
                     }, 1000);
                 }
 
-                if (connection === 'open' && !isConnected) {
+                if (connection === 'open') {
                     isConnected = true;
                     qrDisplayed = false;
                     retryCount = 0;
                     console.clear();
-                    console.log('✅ Successfully connected to WhatsApp!\n');
+                    logger.info('✅ Successfully connected to WhatsApp!');
 
+                    // Notify owner if set
                     try {
-                        if (!global.connectionNotified) {
-                            global.connectionNotified = true;
-                            let ownerNumber = process.env.OWNER_NUMBER;
-                            if (ownerNumber) {
-                                try {
-                                    if (!ownerNumber.includes('@s.whatsapp.net')) {
-                                        ownerNumber = ownerNumber.replace(/[^\d]/g, '');
-                                        if (!ownerNumber.startsWith('1') && !ownerNumber.startsWith('91')) {
-                                            ownerNumber = '1' + ownerNumber;
-                                        }
-                                        ownerNumber = `${ownerNumber}@s.whatsapp.net`;
-                                    }
-                                    await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
-                                } catch (notifyErr) {
-                                    logger.error('Failed to send owner notification:', notifyErr.message);
+                        let ownerNumber = process.env.OWNER_NUMBER;
+                        if (ownerNumber) {
+                            if (!ownerNumber.includes('@s.whatsapp.net')) {
+                                ownerNumber = ownerNumber.replace(/[^\d]/g, '');
+                                if (!ownerNumber.startsWith('1') && !ownerNumber.startsWith('91')) {
+                                    ownerNumber = '1' + ownerNumber;
                                 }
+                                ownerNumber = `${ownerNumber}@s.whatsapp.net`;
                             }
+                            await sock.sendMessage(ownerNumber, { text: 'Bot is now connected and ready!' });
                         }
                     } catch (err) {
-                        logger.error('Failed to handle connection:', err.message);
+                        logger.error('Failed to send owner notification:', err.message);
                     }
                 }
 
                 if (connection === 'close') {
                     isConnected = false;
                     qrDisplayed = false;
+
                     const statusCode = lastDisconnect?.error?.output?.statusCode;
-                    const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
-                        statusCode !== DisconnectReason.forbidden;
+                    const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
+                                         statusCode !== DisconnectReason.forbidden;
 
                     if (shouldReconnect && retryCount < MAX_RETRIES) {
                         retryCount++;
@@ -171,10 +162,12 @@ async function startConnection() {
                 }
             }
 
+            // Handle credentials update
             if (events['creds.update']) {
                 await saveCreds();
             }
 
+            // Handle incoming messages
             if (events['messages.upsert']) {
                 const upsert = events['messages.upsert'];
                 if (upsert.type === 'notify') {
@@ -193,7 +186,7 @@ async function startConnection() {
                             logger.error('Message handling error:', err);
                             try {
                                 await sock.sendMessage(msg.key.remoteJid, { 
-                                    text: '❌ Sorry, there was an error processing your message. Please try again later.' 
+                                    text: '❌ Sorry, there was an error processing your message. Please try again.' 
                                 });
                             } catch (notifyErr) {
                                 logger.error('Failed to send error notification:', notifyErr);
@@ -203,6 +196,7 @@ async function startConnection() {
                 }
             }
 
+            // Handle group participant updates
             if (events['group-participants.update']) {
                 const update = events['group-participants.update'];
                 try {
@@ -216,6 +210,7 @@ async function startConnection() {
         return sock;
     } catch (err) {
         logger.error('Connection error:', err);
+
         if (retryCount < MAX_RETRIES) {
             retryCount++;
             const delay = Math.min(
@@ -224,7 +219,7 @@ async function startConnection() {
             );
             setTimeout(startConnection, delay);
         } else {
-            throw err;
+            throw new Error('Failed to connect after maximum retries');
         }
     }
 }
