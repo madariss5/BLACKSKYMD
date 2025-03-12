@@ -28,21 +28,22 @@ const ANIME_GIF_API = {
     grouphug: 'https://api.waifu.pics/sfw/hug' // Using hug as a placeholder for grouphug
 };
 
-const reactionCommands = {
-    // Helper function to fetch anime GIFs
-    async fetchAnimeGif(type) {
-        try {
-            const endpoint = ANIME_GIF_API[type];
-            if (!endpoint) {
-                throw new Error('Invalid reaction type');
-            }
-            const response = await axios.get(endpoint);
-            return response.data.url;
-        } catch (error) {
-            logger.error(`Error fetching ${type} GIF:`, error);
-            return null;
+// Helper function to fetch anime GIFs
+async function fetchAnimeGif(type) {
+    try {
+        const endpoint = ANIME_GIF_API[type];
+        if (!endpoint) {
+            throw new Error('Invalid reaction type');
         }
-    },
+        const response = await axios.get(endpoint);
+        return response.data.url;
+    } catch (error) {
+        logger.error(`Error fetching ${type} GIF:`, error);
+        return null;
+    }
+}
+
+const reactionCommands = {
 
     // Positive Reactions
     async hug(sock, sender, args) {
@@ -52,7 +53,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('hug');
+            const gifUrl = await fetchAnimeGif('hug');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} hugs ${target} warmly! 🤗`,
