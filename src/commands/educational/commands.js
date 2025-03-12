@@ -789,6 +789,241 @@ const commands = {
     },
 
 
+    async historicalEvent(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [era, ...eventQuery] = args;
+
+            if (!era || eventQuery.length === 0) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📅 Usage:* .historicalEvent [ancient|medieval|modern|contemporary] [event]\nExample: .historicalEvent modern "World War II"'
+                });
+                return;
+            }
+
+            const historicalData = {
+                ancient: {
+                    "Roman Empire": {
+                        period: "27 BC - 476 AD",
+                        location: "Europe, North Africa, Middle East",
+                        keyEvents: [
+                            "Foundation by Augustus (27 BC)",
+                            "Peak under Trajan (117 AD)",
+                            "Fall of Western Empire (476 AD)"
+                        ],
+                        significance: "Established lasting cultural, legal, and linguistic influences"
+                    }
+                },
+                medieval: {
+                    "Crusades": {
+                        period: "1095 - 1291",
+                        location: "Europe and Middle East",
+                        keyEvents: [
+                            "First Crusade (1095-1099)",
+                            "Capture of Jerusalem (1099)",
+                            "Fall of Acre (1291)"
+                        ],
+                        significance: "Cultural exchange between Europe and Middle East"
+                    }
+                },
+                modern: {
+                    "World War II": {
+                        period: "1939 - 1945",
+                        location: "Global",
+                        keyEvents: [
+                            "German invasion of Poland (1939)",
+                            "Pearl Harbor Attack (1941)",
+                            "D-Day (1944)",
+                            "Atomic bombings (1945)"
+                        ],
+                        significance: "Reshaped global political landscape"
+                    }
+                }
+            };
+
+            const event = eventQuery.join(' ');
+            if (!historicalData[era] || !historicalData[era][event]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Event not found in database*'
+                });
+                return;
+            }
+
+            const data = historicalData[era][event];
+            let response = `*📜 Historical Event: ${event}*\n\n`;
+            response += `*Period:* ${data.period}\n`;
+            response += `*Location:* ${data.location}\n\n`;
+            response += `*Key Events:*\n${data.keyEvents.map(e => `• ${e}`).join('\n')}\n\n`;
+            response += `*Historical Significance:*\n${data.significance}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error retrieving historical event');
+        }
+    },
+
+    async academicCite(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [style, ...sourceDetails] = args;
+
+            if (!style || sourceDetails.length === 0) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📚 Usage:* .academicCite [apa|mla|chicago] [author] [title] [year] [source]\nExample: .academicCite apa "John Smith" "Research Paper" 2024 "Journal of Science"'
+                });
+                return;
+            }
+
+            const citationStyles = {
+                apa: (author, title, year, source) =>
+                    `${author}. (${year}). ${title}. ${source}.`,
+                mla: (author, title, year, source) =>
+                    `${author}. "${title}." ${source}, ${year}.`,
+                chicago: (author, title, year, source) =>
+                    `${author}. "${title}." ${source} (${year}).`
+            };
+
+            if (!citationStyles[style.toLowerCase()]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Invalid citation style*\nAvailable styles: apa, mla, chicago'
+                });
+                return;
+            }
+
+            const [author, title, year, source] = sourceDetails;
+            const citation = citationStyles[style.toLowerCase()](author, title, year, source);
+
+            await sock.sendMessage(remoteJid, {
+                text: `*📝 Citation (${style.toUpperCase()}):*\n\n${citation}`
+            });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error generating citation');
+        }
+    },
+
+    async literatureAnalysis(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const text = args.join(' ');
+
+            if (!text) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📖 Usage:* .literatureAnalysis [text]\nExample: .literatureAnalysis "To be or not to be"'
+                });
+                return;
+            }
+
+            // Basic literary analysis
+            const analysis = {
+                wordCount: text.split(/\s+/).length,
+                sentenceCount: text.split(/[.!?]+/).length,
+                themes: [],
+                tone: '',
+                literaryDevices: []
+            };
+
+            // Detect themes and tone
+            const themeKeywords = {
+                love: ['love', 'heart', 'passion'],
+                death: ['death', 'die', 'mortality'],
+                nature: ['nature', 'tree', 'flower'],
+                freedom: ['freedom', 'liberty', 'free']
+            };
+
+            for (const [theme, keywords] of Object.entries(themeKeywords)) {
+                if (keywords.some(keyword => text.toLowerCase().includes(keyword))) {
+                    analysis.themes.push(theme);
+                }
+            }
+
+            // Detect literary devices
+            const devices = {
+                alliteration: /(\b\w)\w+\s+\1\w+/i,
+                repetition: /\b(\w+)\b(?:\s+\w+){0,5}\s+\1\b/i,
+                metaphor: /(like|as)\s+a?\s+\w+/i
+            };
+
+            for (const [device, pattern] of Object.entries(devices)) {
+                if (pattern.test(text)) {
+                    analysis.literaryDevices.push(device);
+                }
+            }
+
+            let response = `*📚 Literary Analysis:*\n\n`;
+            response += `*Text Length:*\n• Words: ${analysis.wordCount}\n• Sentences: ${analysis.sentenceCount}\n\n`;
+
+            if (analysis.themes.length > 0) {
+                response += `*Detected Themes:*\n${analysis.themes.map(t => `• ${t}`).join('\n')}\n\n`;
+            }
+
+            if (analysis.literaryDevices.length > 0) {
+                response += `*Literary Devices:*\n${analysis.literaryDevices.map(d => `• ${d}`).join('\n')}`;
+            }
+
+            await sock.sendMessage(remoteJid, { text: response });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error analyzing text');
+        }
+    },
+
+    async mathExplain(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const problem = args.join(' ');
+
+            if (!problem) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🔢 Usage:* .mathExplain [problem]\nExample: .mathExplain solve quadratic equation x^2 + 2x + 1 = 0'
+                });
+                return;
+            }
+
+            const explanations = {
+                'quadratic': {
+                    steps: [
+                        "1. Identify the coefficients a, b, and c",
+                        "2. Use the quadratic formula: x = (-b ± √(b² - 4ac)) / 2a",
+                        "3. Calculate the discriminant: b² - 4ac",
+                        "4. Solve for both possible values of x"
+                    ],
+                    example: "For x² + 2x + 1 = 0:\na = 1, b = 2, c = 1\nDiscriminant = 4 - 4(1)(1) = 0\nx = -1 (double root)"
+                },
+                'derivative': {
+                    steps: [
+                        "1. Apply the power rule: d/dx(x^n) = nx^(n-1)",
+                        "2. Apply the constant rule: d/dx(c) = 0",
+                        "3. Apply the sum rule: d/dx(f + g) = f' + g'",
+                        "4. Combine the terms"
+                    ],
+                    example: "For d/dx(x² + 2x):\nd/dx(x²) = 2x\nd/dx(2x) = 2\nResult: 2x + 2"
+                }
+            };
+
+            let explanation = `*📝 Mathematical Explanation:*\n\n`;
+            explanation += `*Problem:* ${problem}\n\n`;
+
+            // Identify the type of problem
+            if (problem.includes('quadratic')) {
+                explanation += `*Steps for Solving Quadratic Equations:*\n${explanations.quadratic.steps.join('\n')}\n\n`;
+                explanation += `*Example:*\n${explanations.quadratic.example}`;
+            } else if (problem.includes('derivative')) {
+                explanation += `*Steps for Finding Derivatives:*\n${explanations.derivative.steps.join('\n')}\n\n`;
+                explanation += `*Example:*\n${explanations.derivative.example}`;
+            } else {
+                // Default explanation
+                explanation += `*General Problem-Solving Steps:*\n`;
+                explanation += `1. Understand the problem\n`;
+                explanation += `2. Identify known and unknown variables\n`;
+                explanation += `3. Select appropriate formula or method\n`;
+                explanation += `4. Solve step by step\n`;
+                explanation += `5. Verify the solution`;
+            }
+
+            await sock.sendMessage(remoteJid, { text: explanation });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error explaining math problem');
+        }
+    }
 };
 
 module.exports = commands;
