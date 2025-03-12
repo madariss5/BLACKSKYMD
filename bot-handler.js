@@ -10,9 +10,16 @@ const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
 
-// Configurable options
+// Import message handlers
+const { messageHandler } = require('./src/handlers/messageHandler');
+const { commandLoader } = require('./src/utils/commandLoader');
+
+// Configure options
 const SESSION_DIR = path.join(__dirname, 'auth_info');
 const BACKUP_DIR = path.join(__dirname, 'sessions');
+
+// Set up logger
+const logger = require('./src/utils/logger');
 
 // Globals 
 let sock = null;
@@ -38,43 +45,6 @@ function getUptime() {
 }
 
 /**
- * Handle incoming commands
- */
-async function handleCommand(message, text) {
-  console.log('Command received:', text);
-  const sender = message.key.remoteJid;
-
-  if (text.startsWith('!ping')) {
-    return { text: 'Pong! 🏓' };
-  } 
-
-  if (text.startsWith('!help')) {
-    return { 
-      text: '🤖 *Available Commands*\n\n' +
-            '!ping - Check if bot is online\n' +
-            '!help - Show this help message\n' +
-            '!about - About this bot\n' +
-            '!uptime - Show bot uptime'
-    };
-  }
-
-  if (text.startsWith('!about')) {
-    return { 
-      text: '🤖 *WhatsApp Bot*\n\n' +
-            'A sophisticated WhatsApp multi-device bot that delivers intelligent, ' +
-            'interactive, and educational experiences through advanced messaging capabilities.'
-    };
-  }
-
-  if (text.startsWith('!uptime')) {
-    return { text: `🕒 Bot uptime: ${getUptime()}` };
-  }
-
-  // No command matched
-  return null;
-}
-
-/**
  * Parse message to determine its type
  */
 function getMessageType(message) {
@@ -89,38 +59,17 @@ function getMessageType(message) {
 }
 
 /**
- * Handle an incoming message
+ * Handle an incoming message using the message handler
  */
 async function handleIncomingMessage(message) {
   try {
     // Ignore messages from status broadcast
     if (message.key.remoteJid === 'status@broadcast') return;
     
-    // Get message type
-    const messageType = getMessageType(message);
-    if (!messageType) return;
-    
-    // Extract message text
-    let messageText = '';
-    if (messageType === 'conversation') {
-      messageText = message.message.conversation;
-    } else if (messageType === 'extendedTextMessage' && message.message.extendedTextMessage?.text) {
-      messageText = message.message.extendedTextMessage.text;
-    } else {
-      // Handle non-text messages (like stickers, images, etc.)
-      const caption = message.message[messageType]?.caption;
-      messageText = caption || '';
-    }
-    
-    // Check if message is a command
-    if (messageText.startsWith('!')) {
-      const response = await handleCommand(message, messageText);
-      if (response) {
-        await sendResponse(message.key.remoteJid, response);
-      }
-    }
+    // Process with message handler
+    await messageHandler(sock, message);
   } catch (error) {
-    console.error('Error processing message:', error);
+    logger.error('Error processing message:', error);
   }
 }
 
@@ -142,7 +91,7 @@ async function sendResponse(jid, response) {
       await sock.sendMessage(jid, { sticker: response.sticker });
     }
   } catch (error) {
-    console.error('Error sending response:', error);
+    logger.error('Error sending response:', error);
   }
 }
 
@@ -219,6 +168,11 @@ async function connectToWhatsApp(retryCount = 0) {
     // Update connection state
     startTime = Date.now();
 
+    // Load all command handlers
+    console.log('Loading command handlers...');
+    await commandLoader.loadCommandHandlers();
+    console.log(`Successfully loaded ${commandLoader.commands.size} commands`);
+
     // Handle connection updates with improved error handling
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -274,6 +228,23 @@ async function connectToWhatsApp(retryCount = 0) {
         connectionState.state = 'connected';
         connectionState.connected = true;
         retryCount = 0; // Reset retry counter on successful connection
+      }
+    });
+
+    // Set up message event listener
+    sock.ev.on('messages.upsert', async ({ messages }) => {
+      if (messages && messages.length > 0) {
+        for (const message of messages) {
+          // Skip empty messages
+          if (!message || !message.message) continue;
+          
+          // Process the message
+          try {
+            await handleIncomingMessage(message);
+          } catch (err) {
+            logger.error('Error handling message:', err);
+          }
+        }
       }
     });
 
