@@ -189,6 +189,7 @@ async function connectToWhatsApp() {
         connectionState.state = 'qr_ready';
         connectionState.qrCode = qr;
         console.log('⏳ Generating QR code, please wait...');
+        console.log('✅ QR code generated! Check web interface at http://localhost:5000');
         qrCount++;
       }
       

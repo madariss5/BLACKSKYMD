@@ -1,15 +1,10 @@
 /**
- * WhatsApp Bot QR Web Server Launcher
- * This file launches the web server for the QR code scanner
+ * WhatsApp Bot Launcher
+ * This script helps launch the WhatsApp bot with proper port configuration
  */
 
-// Display banner
-console.log('\n==============================================');
-console.log('  WHATSAPP WEB QR CODE SERVER');
-console.log('==============================================');
-console.log('Starting WhatsApp QR code web server...');
-console.log('This will allow you to scan the QR code from your browser');
-console.log('==============================================\n');
+console.log('Starting WhatsApp Bot...');
+console.log('Launching server with web interface on port 5000...');
 
-// Launch the server
-require('./server.js');
+// Start server
+require('./compatible-qr.js');
