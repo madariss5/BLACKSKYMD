@@ -75,7 +75,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('pat');
+            const gifUrl = await fetchAnimeGif('pat');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} pats ${target} gently! 👋`,
@@ -97,7 +97,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('kiss');
+            const gifUrl = await fetchAnimeGif('kiss');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} kisses ${target}! 💋`,
@@ -119,7 +119,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('cuddle');
+            const gifUrl = await fetchAnimeGif('cuddle');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} cuddles with ${target}! 🤗`,
@@ -142,7 +142,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('poke');
+            const gifUrl = await fetchAnimeGif('poke');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} pokes ${target}! 👉`,
@@ -164,7 +164,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('tickle');
+            const gifUrl = await fetchAnimeGif('tickle');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} tickles ${target}! 🤣`,
@@ -186,7 +186,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('boop');
+            const gifUrl = await fetchAnimeGif('boop');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} boops ${target}! 👆`,
@@ -205,7 +205,7 @@ const reactionCommands = {
     // Emotional Reactions
     async blush(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('blush');
+            const gifUrl = await fetchAnimeGif('blush');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} blushes! 😊`,
@@ -222,7 +222,7 @@ const reactionCommands = {
 
     async cry(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('cry');
+            const gifUrl = await fetchAnimeGif('cry');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} starts crying! 😢`,
@@ -239,7 +239,7 @@ const reactionCommands = {
 
     async dance(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('dance');
+            const gifUrl = await fetchAnimeGif('dance');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} starts dancing! 💃`,
@@ -256,7 +256,7 @@ const reactionCommands = {
 
     async laugh(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('smile'); // Using smile as a placeholder
+            const gifUrl = await fetchAnimeGif('smile'); // Using smile as a placeholder
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} laughs out loud! 😆`,
@@ -279,7 +279,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('slap');
+            const gifUrl = await fetchAnimeGif('slap');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} slaps ${target}! 👋`,
@@ -301,7 +301,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('punch');
+            const gifUrl = await fetchAnimeGif('punch');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} punches ${target}! 👊`,
@@ -323,7 +323,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('bonk');
+            const gifUrl = await fetchAnimeGif('bonk');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} bonks ${target}! 🔨`,
@@ -341,7 +341,7 @@ const reactionCommands = {
     // Complex Emotions
     async pout(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('pout');
+            const gifUrl = await fetchAnimeGif('pout');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} pouts! 😤`,
@@ -358,7 +358,7 @@ const reactionCommands = {
 
     async smug(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('smug');
+            const gifUrl = await fetchAnimeGif('smug');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} looks smug! 😏`,
@@ -380,7 +380,7 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await this.fetchAnimeGif('wink');
+            const gifUrl = await fetchAnimeGif('wink');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} winks at ${target}! 😉`,
@@ -398,7 +398,7 @@ const reactionCommands = {
     // Group Reactions
     async grouphug(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('grouphug');
+            const gifUrl = await fetchAnimeGif('grouphug');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} hugs everyone! 🤗`,
@@ -415,7 +415,7 @@ const reactionCommands = {
 
     async wave(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('wave');
+            const gifUrl = await fetchAnimeGif('wave');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} waves at everyone! 👋`,
@@ -433,7 +433,7 @@ const reactionCommands = {
     // Action Reactions
     async run(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('run');
+            const gifUrl = await fetchAnimeGif('run');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} starts running! 🏃`,
@@ -450,7 +450,7 @@ const reactionCommands = {
 
     async sleep(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('sleep');
+            const gifUrl = await fetchAnimeGif('sleep');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} falls asleep! 😴`,
@@ -467,7 +467,7 @@ const reactionCommands = {
 
     async panic(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('panic');
+            const gifUrl = await fetchAnimeGif('panic');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} starts panicking! 😱`,
@@ -484,7 +484,7 @@ const reactionCommands = {
 
     async facepalm(sock, sender) {
         try {
-            const gifUrl = await this.fetchAnimeGif('facepalm');
+            const gifUrl = await fetchAnimeGif('facepalm');
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: `${sender.split('@')[0]} facepalms! 🤦`,
