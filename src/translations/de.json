@@ -197,6 +197,26 @@
       "description": "Erstellt Visualisierungen mathematischer Funktionen",
       "usage": ".mathVisualize [Typ] [Parameter...]",
       "error": "Fehler bei der mathematischen Visualisierung"
+    },
+    "academicCite": {
+      "description": "Erstellt akademische Zitate in verschiedenen Formaten",
+      "usage": ".academicCite [apa|mla|chicago] [Autor] [Titel] [Jahr] [Quelle]",
+      "error": "Fehler beim Erstellen des Zitats"
+    },
+    "literatureAnalysis": {
+      "description": "Analysiert literarische Texte",
+      "usage": ".literatureAnalysis [Text]",
+      "error": "Fehler bei der Textanalyse"
+    },
+    "mathExplain": {
+      "description": "Erklärt mathematische Probleme Schritt für Schritt",
+      "usage": ".mathExplain [Problem]",
+      "error": "Fehler bei der mathematischen Erklärung"
+    },
+    "historicalEvent": {
+      "description": "Zeigt Informationen zu historischen Ereignissen",
+      "usage": ".historicalEvent [Epoche] [Ereignis]",
+      "error": "Fehler beim Abrufen des historischen Ereignisses"
     }
   },
   "media": {
