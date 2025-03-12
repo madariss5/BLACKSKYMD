@@ -217,6 +217,21 @@
       "description": "Zeigt Informationen zu historischen Ereignissen",
       "usage": ".historicalEvent [Epoche] [Ereignis]",
       "error": "Fehler beim Abrufen des historischen Ereignisses"
+    },
+    "mathPractice": {
+      "description": "Bietet Mathematik-Übungsaufgaben",
+      "usage": ".mathPractice [Thema]",
+      "error": "Fehler beim Erstellen der Übungsaufgabe"
+    },
+    "solution": {
+      "description": "Zeigt die Lösung der aktuellen Mathematikaufgabe",
+      "usage": ".solution",
+      "error": "Fehler beim Anzeigen der Lösung"
+    },
+    "studyPlan": {
+      "description": "Verwaltet Lernpläne",
+      "usage": ".studyPlan [create|view|update] [Fach] [Details]",
+      "error": "Fehler bei der Verwaltung des Lernplans"
     }
   },
   "media": {
@@ -365,6 +380,21 @@
       "description": "Erstellt Visualisierungen mathematischer Funktionen",
       "usage": ".mathVisualize [Typ] [Parameter...]",
       "error": "Fehler bei der mathematischen Visualisierung"
+    },
+    "mathPractice": {
+      "description": "Bietet Mathematik-Übungsaufgaben",
+      "usage": ".mathPractice [Thema]",
+      "error": "Fehler beim Erstellen der Übungsaufgabe"
+    },
+    "solution": {
+      "description": "Zeigt die Lösung der aktuellen Mathematikaufgabe",
+      "usage": ".solution",
+      "error": "Fehler beim Anzeigen der Lösung"
+    },
+    "studyPlan": {
+      "description": "Verwaltet Lernpläne",
+      "usage": ".studyPlan [create|view|update] [Fach] [Details]",
+      "error": "Fehler bei der Verwaltung des Lernplans"
     }
   }
 }

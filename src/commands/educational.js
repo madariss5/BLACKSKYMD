@@ -842,6 +842,257 @@ const educationalCommands = {
         }
     },
 
+    async mathPractice(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [topic] = args;
+
+            if (!topic) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🔢 Usage:* .mathPractice [topic]\nAvailable topics: algebra, calculus, geometry'
+                });
+                return;
+            }
+
+            const problems = {
+                algebra: [
+                    {
+                        question: "Solve for x: 3x + 5 = 14",
+                        solution: "x = 3",
+                        steps: [
+                            "1. Subtract 5 from both sides: 3x = 9",
+                            "2. Divide both sides by 3: x = 3",
+                            "3. Verify: 3(3) + 5 = 14 ✓"
+                        ]
+                    },
+                    {
+                        question: "Simplify: 2(x + 3) - 4x",
+                        solution: "2x + 6 - 4x = -2x + 6",
+                        steps: [
+                            "1. Distribute 2: 2x + 6",
+                            "2. Combine like terms: 2x - 4x + 6",
+                            "3. Simplify: -2x + 6"
+                        ]
+                    }
+                ],
+                calculus: [
+                    {
+                        question: "Find d/dx of x² + 3x",
+                        solution: "2x + 3",
+                        steps: [
+                            "1. Power rule on x²: 2x",
+                            "2. Power rule on 3x: 3",
+                            "3. Add terms: 2x + 3"
+                        ]
+                    }
+                ],
+                geometry: [
+                    {
+                        question: "Find the area of a triangle with base 6 and height 8",
+                        solution: "24 square units",
+                        steps: [
+                            "1. Use formula: A = ½bh",
+                            "2. Plug in values: A = ½(6)(8)",
+                            "3. Calculate: A = 24"
+                        ]
+                    }
+                ]
+            };
+
+            if (!problems[topic]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Invalid topic*\nAvailable topics: ' + Object.keys(problems).join(', ')
+                });
+                return;
+            }
+
+            // Select random problem
+            const problem = problems[topic][Math.floor(Math.random() * problems[topic].length)];
+            
+            let response = `*📝 Math Practice - ${topic}*\n\n`;
+            response += `*Question:*\n${problem.question}\n\n`;
+            response += `*Need help? Use .solution to see the steps.*`;
+
+            // Store the solution for later
+            const solutionsPath = path.join(__dirname, '../../data/educational/math_solutions.json');
+            let solutions = {};
+            try {
+                const data = await fs.promises.readFile(solutionsPath, 'utf8');
+                solutions = JSON.parse(data);
+            } catch (err) {
+                solutions = {};
+            }
+
+            solutions[remoteJid] = {
+                problem: problem.question,
+                solution: problem.solution,
+                steps: problem.steps,
+                timestamp: new Date().toISOString()
+            };
+
+            await fs.promises.writeFile(solutionsPath, JSON.stringify(solutions, null, 2));
+            await sock.sendMessage(remoteJid, { text: response });
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error generating math practice');
+        }
+    },
+
+    async solution(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            
+            const solutionsPath = path.join(__dirname, '../../data/educational/math_solutions.json');
+            let solutions = {};
+            try {
+                const data = await fs.promises.readFile(solutionsPath, 'utf8');
+                solutions = JSON.parse(data);
+            } catch (err) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ No active math problem found*'
+                });
+                return;
+            }
+
+            const userSolution = solutions[remoteJid];
+            if (!userSolution || new Date() - new Date(userSolution.timestamp) > 3600000) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ No active math problem found or solution expired*'
+                });
+                return;
+            }
+
+            let response = `*📊 Solution:*\n\n`;
+            response += `*Problem:*\n${userSolution.problem}\n\n`;
+            response += `*Steps:*\n${userSolution.steps.join('\n')}\n\n`;
+            response += `*Final Answer:*\n${userSolution.solution}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error showing solution');
+        }
+    },
+
+    async studyPlan(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [action, subject, ...details] = args;
+
+            if (!action || !['create', 'view', 'update'].includes(action)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📚 Usage:* .studyPlan [create|view|update] [subject] [details]\nExample: .studyPlan create math "Chapter 1: 30min, Chapter 2: 45min"'
+                });
+                return;
+            }
+
+            const plansPath = path.join(__dirname, '../../data/educational/study_plans.json');
+            let plans = {};
+
+            try {
+                const data = await fs.promises.readFile(plansPath, 'utf8');
+                plans = JSON.parse(data);
+            } catch (err) {
+                plans = {};
+            }
+
+            switch (action) {
+                case 'create':
+                    if (!subject || details.length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Please provide subject and study plan details*'
+                        });
+                        return;
+                    }
+
+                    plans[subject] = {
+                        details: details.join(' '),
+                        created: new Date().toISOString(),
+                        lastStudied: null,
+                        progress: 0
+                    };
+
+                    await fs.promises.writeFile(plansPath, JSON.stringify(plans, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: '*✅ Study plan created successfully*'
+                    });
+                    break;
+
+                case 'view':
+                    if (!subject) {
+                        const subjects = Object.keys(plans);
+                        if (subjects.length === 0) {
+                            await sock.sendMessage(remoteJid, {
+                                text: '*❌ No study plans found*'
+                            });
+                            return;
+                        }
+
+                        let response = '*📚 Study Plans:*\n\n';
+                        subjects.forEach(s => {
+                            response += `• ${s} (Progress: ${plans[s].progress}%)\n`;
+                        });
+                        await sock.sendMessage(remoteJid, { text: response });
+                        return;
+                    }
+
+                    if (!plans[subject]) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Study plan not found*'
+                        });
+                        return;
+                    }
+
+                    const plan = plans[subject];
+                    let response = `*📚 Study Plan for ${subject}*\n\n`;
+                    response += `*Details:*\n${plan.details}\n\n`;
+                    response += `*Progress:* ${plan.progress}%\n`;
+                    response += `*Created:* ${new Date(plan.created).toLocaleDateString()}\n`;
+                    if (plan.lastStudied) {
+                        response += `*Last Studied:* ${new Date(plan.lastStudied).toLocaleDateString()}`;
+                    }
+
+                    await sock.sendMessage(remoteJid, { text: response });
+                    break;
+
+                case 'update':
+                    if (!subject || details.length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Please provide subject and progress update*'
+                        });
+                        return;
+                    }
+
+                    if (!plans[subject]) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Study plan not found*'
+                        });
+                        return;
+                    }
+
+                    const progress = parseInt(details[0]);
+                    if (isNaN(progress) || progress < 0 || progress > 100) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Progress must be a number between 0 and 100*'
+                        });
+                        return;
+                    }
+
+                    plans[subject].progress = progress;
+                    plans[subject].lastStudied = new Date().toISOString();
+
+                    await fs.promises.writeFile(plansPath, JSON.stringify(plans, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: `*✅ Progress updated to ${progress}%*`
+                    });
+                    break;
+            }
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error managing study plan');
+        }
+    },
+
     async literatureAnalysis(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
