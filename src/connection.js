@@ -1,40 +1,61 @@
-const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const path = require('path');
 const fs = require('fs');
 const fsPromises = fs.promises;
+const pino = require('pino');
 
 let sock = null;
 
 async function startConnection() {
     try {
+        console.clear();
+        console.log("Starting WhatsApp connection...\n");
+
         const authDir = path.join(process.cwd(), 'auth_info');
         if (fs.existsSync(authDir)) {
             await fsPromises.rm(authDir, { recursive: true, force: true });
         }
         await fsPromises.mkdir(authDir);
 
+        console.log('Creating new auth state...');
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
+        console.log('Initializing WhatsApp connection...');
         sock = makeWASocket({
             auth: state,
-            printQRInTerminal: false,
-            version: [2, 2308, 7]
+            printQRInTerminal: true,
+            browser: ['Chrome (Linux)', '', ''],
+            logger: pino({ level: 'silent' })
         });
 
-        sock.ev.process(async (events) => {
-            if (events['connection.update']) {
-                const update = events['connection.update'];
-                const { qr } = update;
-                if (qr) qrcode.generate(qr, { small: true });
+        sock.ev.on('connection.update', (update) => {
+            console.log('Connection update:', update);
+            if(update.qr){
+                console.log('\nQR Code received, attempting to display...\n');
+                qrcode.generate(update.qr, { small: true }, (qr) => {
+                    console.log(qr);
+                });
+            }
+            if (update.connection === 'open') {
+                console.log('\nConnected to WhatsApp!\n');
+            }
+            if(update.connection === 'close'){
+                console.log('Connection closed. Reason:', update.reason);
+                // Add more robust handling here based on DisconnectReason.
             }
 
-            if (events['creds.update']) await saveCreds();
+        });
+
+
+        sock.ev.on('creds.update', async () => {
+            await saveCreds();
         });
 
         return sock;
     } catch (err) {
-        setTimeout(startConnection, 3000);
+        console.error('Connection error:', err);
+        throw err;
     }
 }
 
