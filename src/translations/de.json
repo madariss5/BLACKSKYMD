@@ -232,6 +232,21 @@
       "description": "Verwaltet Lernpläne",
       "usage": ".studyPlan [create|view|update] [Fach] [Details]",
       "error": "Fehler bei der Verwaltung des Lernplans"
+    },
+    "scienceSimulation": {
+      "description": "Führt wissenschaftliche Simulationen durch",
+      "usage": ".scienceSimulation [Thema] [Parameter]",
+      "error": "Fehler bei der Simulation"
+    },
+    "languageExercise": {
+      "description": "Bietet interaktive Sprachübungen",
+      "usage": ".languageExercise [Sprache] [Niveau]",
+      "error": "Fehler bei der Sprachübung"
+    },
+    "interactiveQuiz": {
+      "description": "Startet ein interaktives Quiz",
+      "usage": ".interactiveQuiz [Fach] [Schwierigkeit]",
+      "error": "Fehler beim Erstellen des Quiz"
     }
   },
   "media": {
@@ -395,6 +410,21 @@
       "description": "Verwaltet Lernpläne",
       "usage": ".studyPlan [create|view|update] [Fach] [Details]",
       "error": "Fehler bei der Verwaltung des Lernplans"
+    },
+    "scienceSimulation": {
+      "description": "Führt wissenschaftliche Simulationen durch",
+      "usage": ".scienceSimulation [Thema] [Parameter]",
+      "error": "Fehler bei der Simulation"
+    },
+    "languageExercise": {
+      "description": "Bietet interaktive Sprachübungen",
+      "usage": ".languageExercise [Sprache] [Niveau]",
+      "error": "Fehler bei der Sprachübung"
+    },
+    "interactiveQuiz": {
+      "description": "Startet ein interaktives Quiz",
+      "usage": ".interactiveQuiz [Fach] [Schwierigkeit]",
+      "error": "Fehler beim Erstellen des Quiz"
     }
   }
 }
