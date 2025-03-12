@@ -1,8 +1,10 @@
 const pino = require('pino');
 
+let originalLevel = 'debug';
+
 // Create a consistent logger instance with enhanced configuration
 const logger = pino({
-    level: 'debug', // Force debug level for troubleshooting
+    level: 'silent', // Start with silent logging
     transport: {
         target: 'pino-pretty',
         options: {
@@ -21,7 +23,6 @@ const logger = pino({
             };
         }
     },
-    // Enhanced serializers for better error handling
     serializers: {
         err: (err) => ({
             type: err.type || 'Error',
@@ -31,19 +32,21 @@ const logger = pino({
             details: err.details || {}
         })
     },
-    // Add timestamp to all logs
-    timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`,
-    // Add module name to all logs
-    mixin: () => {
-        const stack = new Error().stack;
-        const caller = stack.split('\n')[2];
-        const match = caller.match(/[\/\\]([^\/\\]+)\.js/);
-        return { module: match ? match[1] : 'unknown' };
-    }
+    timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`
 });
 
 // Prevent unnecessary warnings
 process.removeAllListeners('warning');
+
+// Add methods to control logging
+logger.silenceLogging = () => {
+    originalLevel = logger.level;
+    logger.level = 'silent';
+};
+
+logger.restoreLogging = () => {
+    logger.level = originalLevel;
+};
 
 // Add custom methods for module loading
 logger.moduleInit = (moduleName) => {

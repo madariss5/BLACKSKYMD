@@ -9,12 +9,12 @@ const logger = require('./utils/logger');
 let sock = null;
 let retryCount = 0;
 const MAX_RETRIES = 5;
-const RETRY_INTERVAL = 5000; // 5 seconds
-const RECONNECT_INTERVAL = 3000; // 3 seconds
+const RETRY_INTERVAL = 5000;
+const RECONNECT_INTERVAL = 3000;
 
 async function ensureAuthDir() {
-    const authDir = path.join(process.cwd(), 'auth_info');
     try {
+        const authDir = path.join(process.cwd(), 'auth_info');
         if (!fs.existsSync(authDir)) {
             await fsPromises.mkdir(authDir, { recursive: true });
         }
@@ -26,18 +26,32 @@ async function ensureAuthDir() {
 
 async function displayQR(qr) {
     try {
-        // Clear terminal completely
-        process.stdout.write('\x1Bc');
+        // Debug: Log QR data
+        console.log(`\nDEBUG: Received QR code of length: ${qr.length}`);
 
-        // Generate QR code silently
-        qrcode.generate(qr, { small: false });
+        // Clear terminal completely and add spacing
+        process.stdout.write('\x1Bc');
+        console.log('\n\n');
+
+        // Display QR code with clear instructions
+        console.log('Please scan this QR code with WhatsApp:\n');
+        qrcode.generate(qr, { small: false }, (qrResult) => {
+            console.log(qrResult);
+            console.log('\nWaiting for scan...\n');
+            // Debug: Log after QR generation
+            console.log('DEBUG: QR code has been generated and displayed');
+        });
     } catch (err) {
+        console.error('Failed to display QR code:', err);
         process.exit(1);
     }
 }
 
 async function startConnection() {
     try {
+        // Debug: Log connection start
+        console.log('DEBUG: Starting WhatsApp connection');
+
         // Clear terminal
         process.stdout.write('\x1Bc');
 
@@ -75,6 +89,13 @@ async function startConnection() {
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
+            // Debug: Log connection update
+            console.log('DEBUG: Connection update received:', { 
+                connection, 
+                hasQR: !!qr,
+                disconnectReason: lastDisconnect?.error?.output?.statusCode
+            });
+
             if(qr) {
                 await displayQR(qr);
             }
@@ -83,6 +104,8 @@ async function startConnection() {
                 retryCount = 0;
                 process.stdout.write('\x1Bc');
                 await saveCreds();
+                logger.restoreLogging();
+                console.log('\nConnection established successfully!\n');
             }
 
             if (connection === 'close') {

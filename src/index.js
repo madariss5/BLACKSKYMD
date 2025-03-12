@@ -116,11 +116,9 @@ async function main() {
 
     try {
         // Clear console first
-        console.clear();
         process.stdout.write('\x1Bc');
 
         // Start WhatsApp connection first to show QR code
-        console.log('Starting WhatsApp connection...\n');
         try {
             sock = await startConnection();
         } catch (err) {
@@ -128,25 +126,25 @@ async function main() {
             throw err;
         }
 
-        // Only load commands after connection is established
+        // Only load commands after successful connection
         sock.ev.on('connection.update', async (update) => {
-            if (update.connection === 'open') {
-                // Load commands silently
+            const { connection } = update;
+
+            if (connection === 'open') {
+                // Silence the logger temporarily
+                const originalLevel = logger.level;
+                logger.level = 'silent';
+
                 try {
                     await commandLoader.loadCommandHandlers();
-                } catch (err) {
-                    console.error('Error loading commands:', err);
-                }
-
-                // Initialize command modules with socket
-                try {
                     await commandModules.initializeModules(sock);
+                    server = await startServer(sock);
                 } catch (err) {
-                    console.error('Error initializing command modules:', err);
+                    console.error('Error during initialization:', err);
+                } finally {
+                    // Restore logger level
+                    logger.level = originalLevel;
                 }
-
-                // Start HTTP server after commands are loaded
-                server = await startServer(sock);
             }
         });
 
@@ -271,20 +269,6 @@ async function main() {
 
     } catch (err) {
         console.error('Fatal error starting bot:', err);
-
-        if (server) {
-            try {
-                await new Promise((resolve) => {
-                    server.close(() => {
-                        console.log('HTTP server closed due to fatal error');
-                        resolve();
-                    });
-                });
-            } catch (cleanupErr) {
-                console.error('Error during server cleanup:', cleanupErr);
-            }
-        }
-
         process.exit(1);
     }
 }
