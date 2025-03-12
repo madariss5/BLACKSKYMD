@@ -1035,7 +1035,7 @@ const groupCommands = {
 
 module.exports = {
     commands: groupCommands,
-    category: 'group_base',
+    category: 'group',
     async init() {
         try {
             logger.moduleInit('Group Base');
