@@ -43,6 +43,60 @@ async function startServer(sock) {
             }))
         });
     });
+    
+    // Advanced debug endpoint to check command loading errors
+    app.get('/debug/command-modules', async (req, res) => {
+        try {
+            const commandsPath = require('path').join(__dirname, 'commands');
+            const files = require('fs').readdirSync(commandsPath);
+            
+            const moduleStatus = [];
+            
+            for (const file of files) {
+                if (!file.endsWith('.js') || file === 'index.js') continue;
+                
+                try {
+                    // Try to require the module directly for diagnostic purposes
+                    const modulePath = require('path').join(commandsPath, file);
+                    delete require.cache[require.resolve(modulePath)]; // Clear cache
+                    const moduleData = require(modulePath);
+                    
+                    moduleStatus.push({
+                        file,
+                        loaded: true,
+                        hasCommands: !!moduleData.commands,
+                        commandCount: moduleData.commands ? Object.keys(moduleData.commands).length : 0,
+                        category: moduleData.category || file.replace('.js', ''),
+                        hasInit: typeof moduleData.init === 'function',
+                        error: null
+                    });
+                } catch (err) {
+                    moduleStatus.push({
+                        file,
+                        loaded: false,
+                        hasCommands: false,
+                        commandCount: 0,
+                        category: file.replace('.js', ''),
+                        hasInit: false,
+                        error: {
+                            message: err.message,
+                            stack: err.stack
+                        }
+                    });
+                }
+            }
+            
+            res.json({
+                totalModules: moduleStatus.length,
+                moduleStatus
+            });
+        } catch (err) {
+            res.status(500).json({
+                error: err.message,
+                stack: err.stack
+            });
+        }
+    });
 
     // Always serve on port 5000 for Replit compatibility
     const PORT = 5000;
