@@ -1244,8 +1244,11 @@ NSFW Statistics:
     }
 };
 
+// Export the commands object directly to ensure it's accessible
+const commands = nsfwCommands;
+
 module.exports = {
-    commands: nsfwCommands,
+    commands,
     category: 'nsfw',
     async init() {
         try {

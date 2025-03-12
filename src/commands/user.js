@@ -1082,8 +1082,11 @@ ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty
     }
 };
 
+// Export the commands object directly to ensure it's accessible
+const commands = userCommands;
+
 module.exports = {
-    commands: userCommands,
+    commands,
     category: 'user',
     async init() {
         try {

@@ -1033,8 +1033,11 @@ const groupCommands = {
 
 };
 
+// Export the commands object directly to ensure it's accessible
+const commands = groupCommands;
+
 module.exports = {
-    commands: groupCommands,
+    commands,
     category: 'group',
     async init() {
         try {
