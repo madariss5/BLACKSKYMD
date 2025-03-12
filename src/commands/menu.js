@@ -7,6 +7,107 @@ const { commandLoader } = require('../utils/commandLoader');
 const moment = require('moment');
 const axios = require('axios');
 
+/**
+ * Loads commands from all available sources including main directory and subdirectories
+ * @param {Object} allCommands Object to store commands by category
+ * @returns {Promise<number>} Total number of commands loaded
+ */
+async function loadAllCommands(allCommands) {
+    const commandsPath = path.join(__dirname);
+    const commandFiles = await fs.readdir(commandsPath);
+    let totalCommands = 0;
+    
+    // Helper function to process a module and extract commands
+    const processModule = (moduleData, suggestedCategory) => {
+        let commandsObject;
+        let categoryName = suggestedCategory;
+        
+        if (moduleData.commands) {
+            commandsObject = moduleData.commands;
+            if (moduleData.category) {
+                categoryName = moduleData.category;
+            }
+        } else {
+            commandsObject = moduleData;
+        }
+        
+        const commandNames = Object.keys(commandsObject).filter(cmd => 
+            cmd !== 'init' && typeof commandsObject[cmd] === 'function'
+        );
+        
+        if (commandNames.length > 0) {
+            if (allCommands[categoryName]) {
+                allCommands[categoryName] = [...allCommands[categoryName], ...commandNames];
+            } else {
+                allCommands[categoryName] = commandNames;
+            }
+            totalCommands += commandNames.length;
+        }
+        
+        return commandNames.length;
+    };
+    
+    // First load commands from direct JS files in the commands directory
+    for (const file of commandFiles) {
+        if (file.endsWith('.js') && file !== 'index.js' && file !== 'menu.js') {
+            try {
+                const moduleData = require(`./${file}`);
+                const categoryName = file.replace('.js', '');
+                const cmdCount = processModule(moduleData, categoryName);
+                logger.info(`Loaded ${cmdCount} commands from file ${file}`);
+            } catch (err) {
+                logger.error(`Error loading commands from ${file}:`, err);
+            }
+        }
+    }
+    
+    // Then load commands from subdirectories
+    for (const item of commandFiles) {
+        const itemPath = path.join(commandsPath, item);
+        try {
+            const stats = await fs.stat(itemPath);
+            
+            if (stats.isDirectory()) {
+                logger.info(`Checking subdirectory: ${item}`);
+                
+                // Check for index.js in subdirectory
+                const indexPath = path.join(itemPath, 'index.js');
+                try {
+                    // Try to require the index.js file
+                    const moduleData = require(`./${item}/index.js`);
+                    const cmdCount = processModule(moduleData, item);
+                    logger.info(`Loaded ${cmdCount} commands from ${item}/index.js`);
+                } catch (indexErr) {
+                    logger.info(`Could not load index.js from ${item} directory, trying individual files`);
+                    
+                    // If index.js fails, try loading individual files
+                    try {
+                        const subFiles = await fs.readdir(itemPath);
+                        for (const subFile of subFiles) {
+                            if (subFile.endsWith('.js') && subFile !== 'index.js') {
+                                try {
+                                    const subModulePath = `./${item}/${subFile}`;
+                                    const subModule = require(subModulePath);
+                                    const cmdCount = processModule(subModule, item);
+                                    logger.info(`Loaded ${cmdCount} commands from ${subModulePath}`);
+                                } catch (subErr) {
+                                    logger.error(`Error loading commands from ${item}/${subFile}:`, subErr);
+                                }
+                            }
+                        }
+                    } catch (readErr) {
+                        logger.error(`Error reading directory ${item}:`, readErr);
+                    }
+                }
+            }
+        } catch (statErr) {
+            logger.error(`Error checking ${item}:`, statErr);
+        }
+    }
+    
+    return totalCommands;
+}
+
 // SHABAN-MD-V5 Style Emojis and Design Elements
 const emojis = {
     // Category emojis
