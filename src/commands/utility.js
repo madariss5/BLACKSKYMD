@@ -536,40 +536,8 @@ const utilityCommands = {
         }
     },
 
-    async language(sock, sender, args) {
-        try {
-            const newLang = args[0]?.toLowerCase();
-
-            if (!newLang) {
-                const availableLangs = languageManager.getAvailableLanguages();
-                const currentLang = config.bot.language || languageManager.defaultLanguage;
-
-                await sock.sendMessage(sender, { 
-                    text: `Available languages: ${availableLangs.join(', ')}\nCurrent language: ${currentLang}`
-                });
-                return;
-            }
-
-            if (!languageManager.isLanguageSupported(newLang)) {
-                const availableLangs = languageManager.getAvailableLanguages();
-                await sock.sendMessage(sender, {
-                    text: `Language '${newLang}' is not supported.\nAvailable languages: ${availableLangs.join(', ')}`
-                });
-                return;
-            }
-
-            config.bot.language = newLang;
-            await sock.sendMessage(sender, {
-                text: `Language changed to ${newLang}`
-            });
-
-        } catch (err) {
-            logger.error('Language command error:', err);
-            await sock.sendMessage(sender, { 
-                text: 'Error changing language. Please try again.' 
-            });
-        }
-    },
+    // This function will be removed since it's duplicated below
+    // The improved version at line ~666 will be kept
     async wordcount(sock, sender, args) {
         try {
             const text = args.join(' ');
@@ -665,15 +633,14 @@ UTC: ${utc}`;
     
     async language(sock, sender, args) {
         try {
-            // Get reference to language manager and user database
-            const { languageManager } = require('../utils/language');
-            const { getUserProfile, updateUserProfile } = require('../utils/userDatabase');
+            // Import required modules
+            const userDatabase = require('../utils/userDatabase');
             
             // If no arguments, show available languages
             if (!args.length) {
                 const availableLangs = languageManager.getAvailableLanguages();
-                const currentLang = getUserProfile(sender) ? 
-                    getUserProfile(sender).language || 'en' : 'en';
+                const currentLang = userDatabase.getUserProfile(sender) ? 
+                    userDatabase.getUserProfile(sender).language || 'en' : 'en';
                 
                 await sock.sendMessage(sender, { 
                     text: `🌐 *Language Settings*\n\n` +
@@ -697,13 +664,13 @@ UTC: ${utc}`;
             }
             
             // Update user's preferred language in the database
-            let profile = getUserProfile(sender);
+            let profile = userDatabase.getUserProfile(sender);
             if (!profile) {
                 profile = { id: sender, language: lang };
             } else {
                 profile.language = lang;
             }
-            updateUserProfile(sender, profile);
+            userDatabase.updateUserProfile(sender, profile);
             
             // Use the appropriate translation to respond
             const response = languageManager.getText('system.language_changed', lang);

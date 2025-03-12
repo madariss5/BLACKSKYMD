@@ -5,36 +5,36 @@ const { proto } = require('@whiskeysockets/baileys');
 const basicCommands = {
     async help(sock, message, args) {
         try {
+            // If specific command help is requested, forward to menu.js help
+            if (args.length > 0) {
+                // Import menu commands
+                const menuModule = require('./menu');
+                if (menuModule.commands && menuModule.commands.help) {
+                    return await menuModule.commands.help(sock, message, args);
+                }
+            }
+            
+            // General help message
+            const prefix = require('../config/config').bot.prefix;
             const helpText = `
-*📚 Available Commands*
+*📚 WhatsApp Bot Help*
 
-*1. Basic Commands:*
-• .help - Show this help message
-• .ping - Check bot status
-• .info - Get bot information
-• .botinfo - Show detailed statistics
-• .rules - Show usage rules
-• .status - Check bot status
-• .about - Bot info and credits
-• .uptime - Show bot uptime
+Welcome to the WhatsApp Bot! Here are some commands to get you started:
 
-*2. Group Commands:*
-• .kick @user - Kick user from group
-• .promote @user - Promote to admin
-• .demote @user - Demote from admin
-• .everyone - Tag all members
+*Main Commands:*
+• ${prefix}menu - View all command categories
+• ${prefix}list - List all available commands
+• ${prefix}help [command] - Get help with specific command
 
-*3. Fun Commands:*
-• .quote - Get random quote
-• .joke - Get random joke
-• .meme - Get random meme
+*Quick Start:*
+• ${prefix}ping - Check if bot is online
+• ${prefix}info - Get bot information
+• ${prefix}weather [city] - Get weather information
+• ${prefix}translate [text] - Translate text
 
-*4. Utility Commands:*
-• .weather [city] - Get weather info
-• .translate [text] - Translate text
-• .calculate [expr] - Calculate expression
+*For more commands, type:* ${prefix}menu
 
-Type .help [command] for more info`.trim();
+This bot has over 300 commands across various categories!`.trim();
 
             await sock.sendMessage(message.key.remoteJid, {
                 text: helpText,
