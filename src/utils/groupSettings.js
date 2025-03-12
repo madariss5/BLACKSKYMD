@@ -24,6 +24,7 @@ async function getGroupSettings(jid) {
                 raidThreshold: 5,
                 polls: {},
                 scheduled: [],
+                pinnedMessages: [],
                 features: {
                     leveling: true,
                     welcome: true,
@@ -74,6 +75,7 @@ function validateGroupSettings(settings) {
         raidThreshold: 'number',
         polls: 'object',
         scheduled: 'object',
+        pinnedMessages: 'object',
         features: 'object'
     };
 
