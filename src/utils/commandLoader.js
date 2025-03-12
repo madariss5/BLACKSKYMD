@@ -50,8 +50,16 @@ class CommandLoader {
             // Check if module has commands property
             if (module.commands && typeof module.commands === 'object') {
                 // Module uses new format with commands property
+                console.log(`Module ${file} has commands: ${Object.keys(module.commands).length} found`);
                 if (Object.keys(module.commands).length === 0) {
                     logger.warn(`Module ${file} has empty commands object`);
+                    console.log(`WARNING: Module ${file} commands object is empty!`);
+                }
+                
+                // Debug the structure of the commands
+                if (Object.keys(module.commands).length > 0) {
+                    const firstCmdName = Object.keys(module.commands)[0];
+                    console.log(`First command in ${file}: ${firstCmdName}, type: ${typeof module.commands[firstCmdName]}`);
                 }
                 
                 // Initialize module if it has an init function
@@ -59,12 +67,17 @@ class CommandLoader {
                     try {
                         logger.info(`Initializing module ${file}...`);
                         await module.init();
+                        console.log(`Module ${file} initialized successfully`);
                     } catch (initError) {
                         logger.error(`Error initializing module ${file}:`, initError);
+                        console.log(`ERROR initializing module ${file}: ${initError.message}`);
                         // Continue loading even if initialization fails
                     }
+                } else {
+                    console.log(`Module ${file} has no init function`);
                 }
                 
+                console.log(`Returning module data for ${file}: category=${module.category || file.replace('.js', '')}`);
                 return {
                     commands: module.commands,
                     category: module.category || file.replace('.js', '')
