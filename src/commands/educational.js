@@ -1,7 +1,9 @@
 const logger = require('../utils/logger');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
 const axios = require('axios');
+const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+const mathjs = require('mathjs');
 
 // Helper functions
 const handleError = async (sock, jid, err, message) => {
@@ -9,6 +11,72 @@ const handleError = async (sock, jid, err, message) => {
     logger.error('Stack trace:', err.stack);
     await sock.sendMessage(jid, { text: `❌ ${message}` });
 };
+
+// Ensure data directory exists
+const ensureDataDir = async () => {
+    const dataDir = path.join(__dirname, '../../data/educational');
+    try {
+        await fs.promises.mkdir(dataDir, { recursive: true });
+        return dataDir;
+    } catch (err) {
+        logger.error('Error creating data directory:', err);
+        throw err;
+    }
+};
+
+// Create charts for math visualization
+async function createMathChart(equation, xRange = [-10, 10]) {
+    const width = 800;
+    const height = 600;
+    const chartCallback = (ChartJS) => {
+        ChartJS.defaults.color = '#666';
+    };
+    const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, chartCallback });
+
+    const points = [];
+    const step = (xRange[1] - xRange[0]) / 100;
+    for (let x = xRange[0]; x <= xRange[1]; x += step) {
+        try {
+            const scope = { x };
+            const y = mathjs.evaluate(equation, scope);
+            if (isFinite(y)) {
+                points.push({ x, y });
+            }
+        } catch (e) {
+            continue;
+        }
+    }
+
+    const data = {
+        datasets: [{
+            label: equation,
+            data: points,
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1,
+            fill: false
+        }]
+    };
+
+    const config = {
+        type: 'line',
+        data: data,
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'center'
+                },
+                y: {
+                    type: 'linear',
+                    position: 'center'
+                }
+            }
+        }
+    };
+
+    return await chartJSNodeCanvas.renderToBuffer(config);
+}
 
 const educationalCommands = {
     async define(sock, message, args) {
@@ -111,16 +179,63 @@ const educationalCommands = {
     },
 
     async vocabulary(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const [action, language] = args;
-        if (!action || !['learn', 'practice', 'test'].includes(action)) {
-            await sock.sendMessage(remoteJid, {
-                text: '📚 Usage: !vocabulary <learn|practice|test> [language]'
-            });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [action, language, ...words] = args;
+
+            if (!action || !['add', 'test', 'list'].includes(action)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .vocabulary [add|test|list] [language] [word1, word2, ...]\nExample: .vocabulary add es casa,perro,gato'
+                });
+                return;
+            }
+
+            const vocabPath = path.join(__dirname, '../../data/educational/vocabulary.json');
+            let vocabulary = {};
+
+            try {
+                const data = await fs.promises.readFile(vocabPath, 'utf8');
+                vocabulary = JSON.parse(data);
+            } catch (err) {
+                vocabulary = {};
+            }
+
+            switch (action) {
+                case 'add':
+                    vocabulary[language] = vocabulary[language] || [];
+                    vocabulary[language].push(...words);
+                    await fs.promises.writeFile(vocabPath, JSON.stringify(vocabulary, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: `*✅ Added ${words.length} words to ${language} vocabulary*`
+                    });
+                    break;
+
+                case 'test':
+                    if (!vocabulary[language] || vocabulary[language].length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ No vocabulary found for this language*'
+                        });
+                        return;
+                    }
+                    const randomWords = vocabulary[language]
+                        .sort(() => 0.5 - Math.random())
+                        .slice(0, 5);
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📝 Vocabulary Test:*\n\n${randomWords.join('\n')}`
+                    });
+                    break;
+
+                case 'list':
+                    const wordList = vocabulary[language] || [];
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📚 ${language} Vocabulary:*\n\n${wordList.join(', ')}`
+                    });
+                    break;
+            }
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error managing vocabulary');
         }
-        // TODO: Implement vocabulary learning system
-        await sock.sendMessage(remoteJid, { text: '📝 Starting vocabulary session...' });
     },
 
     async idioms(sock, message, args) {
@@ -171,14 +286,28 @@ const educationalCommands = {
     },
 
     async graph(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const function_str = args.join(' ');
-        if (!function_str) {
-            await sock.sendMessage(remoteJid, { text: '📈 Please provide a function to graph' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+            const equation = args.join(' ');
+
+            if (!equation) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* .graph [equation]\nExample: .graph x^2 + 2*x + 1' 
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*📈 Graphing:* Generating visual representation...' });
+
+            const chartBuffer = await createMathChart(equation);
+            await sock.sendMessage(remoteJid, {
+                image: chartBuffer,
+                caption: `*Graph of:* ${equation}`
+            });
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error creating graph');
         }
-        // TODO: Implement function graphing
-        await sock.sendMessage(remoteJid, { text: '📊 Generating graph...' });
     },
 
     async statistics(sock, message, args) {
@@ -290,14 +419,59 @@ const educationalCommands = {
     },
 
     async quiz(sock, message, args) {
-        const remoteJid = message.key.remoteJid;
-        const subject = args[0];
-        if (!subject) {
-            await sock.sendMessage(remoteJid, { text: '❓ Please specify a subject for the quiz' });
-            return;
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [subject, difficulty = 'medium'] = args;
+
+            if (!subject) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .quiz [subject] [difficulty]\nExample: .quiz math medium'
+                });
+                return;
+            }
+
+            // TODO: Implement actual quiz database
+            const quizzes = {
+                math: {
+                    easy: [
+                        {
+                            question: 'What is 2 + 2?',
+                            options: ['3', '4', '5', '6'],
+                            answer: 1
+                        }
+                    ],
+                    medium: [
+                        {
+                            question: 'Solve for x: 2x + 5 = 13',
+                            options: ['3', '4', '5', '6'],
+                            answer: 2
+                        }
+                    ],
+                    hard: [
+                        {
+                            question: 'What is the derivative of x²?',
+                            options: ['x', '2x', '2', 'x³'],
+                            answer: 1
+                        }
+                    ]
+                }
+            };
+
+            if (!quizzes[subject] || !quizzes[subject][difficulty]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ No quiz available for this subject/difficulty*'
+                });
+                return;
+            }
+
+            const quiz = quizzes[subject][difficulty][0];
+            await sock.sendMessage(remoteJid, {
+                text: `*📝 Quiz Question:*\n\n${quiz.question}\n\n${quiz.options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`
+            });
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error generating quiz');
         }
-        // TODO: Implement quiz generation
-        await sock.sendMessage(remoteJid, { text: '📝 Generating quiz...' });
     },
 
     async studytimer(sock, message, args) {
@@ -523,6 +697,131 @@ const educationalCommands = {
         }
         // TODO: Implement discoveries database
         await sock.sendMessage(remoteJid, { text: '💡 Getting discovery info...' });
+    },
+
+    // New advanced math commands
+    async mathsolve(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const equation = args.join(' ');
+
+            if (!equation) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* .mathsolve [equation]\nExample: .mathsolve 2x + 5 = 15' 
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⚡ Solving:* Processing mathematical equation...' });
+
+            const solution = mathjs.solve(equation);
+            await sock.sendMessage(remoteJid, { 
+                text: `*📊 Solution:*\n${solution.toString()}` 
+            });
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error solving equation');
+        }
+    },
+
+
+    // Scientific calculator
+    async calc(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const expression = args.join(' ');
+
+            if (!expression) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '*📝 Usage:* .calc [expression]\nExample: .calc sin(45) * sqrt(16)' 
+                });
+                return;
+            }
+
+            const result = mathjs.evaluate(expression);
+            await sock.sendMessage(remoteJid, {
+                text: `*🧮 Expression:* ${expression}\n*Result:* ${result}`
+            });
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error calculating expression');
+        }
+    },
+
+    // Study notes management
+    async notes(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [action, subject, ...content] = args;
+
+            if (!action || !['add', 'view', 'list'].includes(action)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .notes [add|view|list] [subject] [content]\nExample: .notes add math Quadratic formula: ax² + bx + c = 0'
+                });
+                return;
+            }
+
+            const notesPath = path.join(__dirname, '../../data/educational/notes.json');
+            let notes = {};
+
+            try {
+                const data = await fs.promises.readFile(notesPath, 'utf8');
+                notes = JSON.parse(data);
+            } catch (err) {
+                notes = {};
+            }
+
+            switch (action) {
+                case 'add':
+                    if (!subject || !content.length) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Please provide both subject and content*'
+                        });
+                        return;
+                    }
+                    notes[subject] = notes[subject] || [];
+                    notes[subject].push({
+                        content: content.join(' '),
+                        date: new Date().toISOString()
+                    });
+                    await fs.promises.writeFile(notesPath, JSON.stringify(notes, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: '*✅ Note added successfully*'
+                    });
+                    break;
+
+                case 'view':
+                    if (!notes[subject]) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ No notes found for this subject*'
+                        });
+                        return;
+                    }
+                    const subjectNotes = notes[subject]
+                        .map((note, index) => `${index + 1}. ${note.content}\n   📅 ${new Date(note.date).toLocaleDateString()}`)
+                        .join('\n\n');
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📚 ${subject} Notes:*\n\n${subjectNotes}`
+                    });
+                    break;
+
+                case 'list':
+                    const subjects = Object.keys(notes);
+                    if (subjects.length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ No notes found*'
+                        });
+                        return;
+                    }
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📚 Available Subjects:*\n\n${subjects.join('\n')}`
+                    });
+                    break;
+            }
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error managing notes');
+        }
     }
 };
 
@@ -533,36 +832,33 @@ module.exports = {
         try {
             logger.moduleInit('Educational');
 
-            // Check core dependencies first
+            // Initialize and check core dependencies
+            const fsPromises = fs.promises;
+            if (!fsPromises) {
+                throw new Error('fs.promises is not available');
+            }
+
             const coreDeps = {
                 path,
                 logger,
-                fs: fs.promises
+                fs: fsPromises,
+                mathjs,
+                ChartJSNodeCanvas
             };
 
-            // Check each dependency with detailed logging
+            // Verify each dependency
             for (const [name, dep] of Object.entries(coreDeps)) {
                 if (!dep) {
-                    logger.error(`❌ Core educational dependency '${name}' is not initialized`);
-                    return false;
+                    throw new Error(`Core educational dependency '${name}' is not initialized`);
                 }
                 logger.info(`✓ Core educational dependency '${name}' verified`);
             }
 
-            // Create necessary directories
-            const dataDir = path.join(__dirname, '../../data/educational');
-            try {
-                await fs.mkdir(dataDir, { recursive: true });
-                const stats = await fs.stat(dataDir);
-                if (!stats.isDirectory()) {
-                    throw new Error('Path exists but is not a directory');
-                }
-                logger.info(`✓ Directory verified: ${dataDir}`);
-            } catch (err) {
-                logger.error(`❌ Directory creation failed for ${dataDir}:`, err);
-                return false;
-            }
+            // Create and verify data directory
+            const dataDir = await ensureDataDir();
+            logger.info(`✓ Data directory verified: ${dataDir}`);
 
+            // Initialize module state
             logger.moduleSuccess('Educational');
             return true;
         } catch (err) {
