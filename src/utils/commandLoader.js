@@ -266,49 +266,57 @@ class CommandLoader {
     }
 
     async getCommand(name) {
+        // Fast path - direct lookup without any overhead
         try {
-            if (!this.initialized) {
-                await this.loadCommandHandlers();
+            // Skip initialization check if already initialized
+            if (this.initialized) {
+                const command = this.commands.get(name);
+                
+                // Fast enabled check - return null immediately if not usable
+                if (!command || !command.config.enabled) return null;
+                
+                // Optional cache update - separated to reduce critical path latency
+                if (this.commandCache.has(name)) {
+                    setTimeout(() => {
+                        try {
+                            const cacheInfo = this.commandCache.get(name);
+                            if (cacheInfo) {
+                                cacheInfo.lastUsed = Date.now();
+                                cacheInfo.usageCount++;
+                                this.commandCache.set(name, cacheInfo);
+                            }
+                        } catch (e) {
+                            // Silently fail - caching is non-critical
+                        }
+                    }, 0);
+                }
+                
+                return command;
             }
-
+            
+            // Slower path for first-time initialization
+            await this.loadCommandHandlers();
             const command = this.commands.get(name);
-            if (!command || !command.config.enabled) {
-                return null;
-            }
-
-            const cacheInfo = this.commandCache.get(name);
-            if (cacheInfo) {
-                cacheInfo.lastUsed = Date.now();
-                cacheInfo.usageCount++;
-                this.commandCache.set(name, cacheInfo);
-            }
+            if (!command || !command.config.enabled) return null;
             return command;
         } catch (err) {
-            logger.error('Error getting command:', err);
-            const cacheInfo = this.commandCache.get(name);
-            if (cacheInfo) {
-                cacheInfo.errors = (cacheInfo.errors || 0) + 1;
-                this.commandCache.set(name, cacheInfo);
-            }
+            // Minimal error handling for speed
             return null;
         }
     }
 
     async hasPermission(sender, requiredPermissions) {
-        try {
-            if (!requiredPermissions?.length) {
-                return true;
-            }
-
-            if (requiredPermissions.includes('owner')) {
-                return sender === process.env.OWNER_NUMBER;
-            }
-
-            return requiredPermissions.includes('user');
-        } catch (err) {
-            logger.error('Error checking permissions:', err);
-            return false;
+        // Fast path - most common case first
+        if (!requiredPermissions?.length || requiredPermissions.includes('user')) {
+            return true;
         }
+        
+        // Owner check - only needed for admin commands
+        if (requiredPermissions.includes('owner')) {
+            return sender === process.env.OWNER_NUMBER;
+        }
+        
+        return false;
     }
 
     getCommandStats() {

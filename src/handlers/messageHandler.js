@@ -182,39 +182,50 @@ async function messageHandler(sock, message) {
             logger.info(`Auto-registered new user: ${userId}`);
         }
 
-        // Process message if it contains content
+        // FAST PATH: Skip empty messages immediately
         if (!messageContent) return;
 
-        // Check if message starts with prefix
+        // FAST PATH: Command processing - highest priority
         if (messageContent.startsWith(prefix)) {
             const commandText = messageContent.slice(prefix.length).trim();
             if (commandText) {
-                logger.info(`Processing command: ${commandText} from ${sender}`);
                 try {
+                    // Process command directly without logging for speed
                     await processCommand(sock, message, commandText);
                 } catch (err) {
-                    logger.error('Error processing command:', err);
+                    // Minimal error response
                     await sock.sendMessage(sender, { 
-                        text: '❌ Error processing command. Please try again.' 
+                        text: '❌ Command failed. Try again.' 
                     });
                 }
             }
-        } else if (!isGroup) {
-            // Check if we've sent a help message recently
+            return; // Exit early after command processing
+        } 
+        
+        // ONLY FOR DMs: Show welcome message with help info
+        if (!isGroup) {
             const now = Date.now();
             const lastHelpMessage = helpMessageCache.get(sender);
 
             if (!lastHelpMessage || (now - lastHelpMessage) > HELP_MESSAGE_COOLDOWN) {
                 helpMessageCache.set(sender, now);
-                const response = `Welcome! To use the bot, start your message with ${prefix}\nExample: ${prefix}help`;
-                await sock.sendMessage(sender, { text: response });
-
-                // Clean up old cache entries
-                for (const [key, timestamp] of helpMessageCache.entries()) {
-                    if (now - timestamp > HELP_MESSAGE_COOLDOWN * 2) { //Clean up older entries to prevent memory leaks.
-                        helpMessageCache.delete(key);
+                // Simplified welcome message
+                await sock.sendMessage(sender, { 
+                    text: `Use ${prefix}help to see available commands.` 
+                });
+                
+                // Clean cache in background
+                setTimeout(() => {
+                    try {
+                        for (const [key, timestamp] of helpMessageCache.entries()) {
+                            if (Date.now() - timestamp > HELP_MESSAGE_COOLDOWN * 2) {
+                                helpMessageCache.delete(key);
+                            }
+                        }
+                    } catch (e) {
+                        // Ignore cache errors
                     }
-                }
+                }, 0);
             }
         }
 

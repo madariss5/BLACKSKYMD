@@ -47,51 +47,106 @@ function getUptime() {
 /**
  * Parse message to determine its type
  */
+/**
+ * Fast message type detection - optimized for performance
+ * Works by checking the most common message types first
+ */
 function getMessageType(message) {
-  const types = ['conversation', 'imageMessage', 'videoMessage', 'extendedTextMessage', 'stickerMessage', 'documentMessage', 'audioMessage'];
-  const messageContent = message.message || {};
+  if (!message?.message) return null;
   
-  for (const type of types) {
-    if (messageContent[type]) return type;
-  }
+  // Check most common message types first (optimized order)
+  const content = message.message;
   
-  return null;
+  // Fast path for text messages (most common)
+  if (content.conversation) return 'conversation';
+  if (content.extendedTextMessage) return 'extendedTextMessage';
+  
+  // Fast path for media types (second most common)
+  if (content.imageMessage) return 'imageMessage';
+  if (content.videoMessage) return 'videoMessage';
+  if (content.stickerMessage) return 'stickerMessage';
+  
+  // Less common types
+  if (content.audioMessage) return 'audioMessage';
+  if (content.documentMessage) return 'documentMessage';
+  
+  // Fall back to object key detection for any other types
+  return Object.keys(content)[0] || null;
 }
 
 /**
- * Handle an incoming message using the message handler
+ * Handle incoming messages using the optimized message handler
  */
 async function handleIncomingMessage(message) {
+  // Fast exit conditions - most common filters
+  if (!message?.key?.remoteJid || 
+      message.key.remoteJid === 'status@broadcast' || 
+      !message.message) {
+    return;
+  }
+  
   try {
-    // Ignore messages from status broadcast
-    if (message.key.remoteJid === 'status@broadcast') return;
-    
-    // Process with message handler
+    // Directly pass to message handler - minimal overhead
     await messageHandler(sock, message);
   } catch (error) {
-    logger.error('Error processing message:', error);
+    // Minimal error logging
+    console.error('Message process error:', error.message);
   }
 }
 
 /**
- * Send a response based on type
+ * Send a response based on type - optimized for performance
  */
 async function sendResponse(jid, response) {
+  // Fast exit for common error cases
+  if (!sock || !response || !jid) return;
+
   try {
-    if (!sock) return;
+    // Fast path: String responses (most common)
+    if (typeof response === 'string') {
+      return await sock.sendMessage(jid, { text: response });
+    }
     
+    // Object responses with optimal type checking
     if (response.text) {
-      await sock.sendMessage(jid, { text: response.text });
-    } else if (response.image) {
-      await sock.sendMessage(jid, { 
+      return await sock.sendMessage(jid, { text: response.text });
+    } 
+    
+    if (response.image) {
+      return await sock.sendMessage(jid, { 
         image: response.image,
         caption: response.caption || ''
       });
-    } else if (response.sticker) {
-      await sock.sendMessage(jid, { sticker: response.sticker });
+    } 
+    
+    if (response.sticker) {
+      return await sock.sendMessage(jid, { sticker: response.sticker });
+    }
+    
+    // Handle other media types
+    if (response.video) {
+      return await sock.sendMessage(jid, { 
+        video: response.video,
+        caption: response.caption || ''
+      });
+    }
+    
+    if (response.audio) {
+      return await sock.sendMessage(jid, { 
+        audio: response.audio,
+        mimetype: 'audio/mp4'
+      });
+    }
+    
+    // Handle array of responses
+    if (Array.isArray(response)) {
+      for (const item of response) {
+        await sendResponse(jid, item);
+      }
     }
   } catch (error) {
-    logger.error('Error sending response:', error);
+    // Minimal error logging for speed
+    console.error('Send error:', error.message);
   }
 }
 
@@ -153,16 +208,25 @@ async function connectToWhatsApp(retryCount = 0) {
     // Initialize auth state
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
-    // Create socket connection with improved options
+    // Create socket connection optimized for maximum speed
     sock = makeWASocket({
       version,
       auth: state,
       printQRInTerminal: true,
       logger: pino({ level: 'silent' }),
       browser: ['WhatsApp Bot', 'Chrome', '121.0.0'],
-      connectTimeoutMs: 60000,
-      retryRequestDelayMs: 2000,
-      defaultQueryTimeoutMs: 60000
+      connectTimeoutMs: 30000,          // Reduced timeout for faster connection
+      retryRequestDelayMs: 1000,        // Faster retry for failed requests
+      defaultQueryTimeoutMs: 20000,     // Reduced query timeout
+      emitOwnEvents: false,             // Don't emit own events (reduces overhead)
+      syncFullHistory: false,           // Don't sync full history (saves time)
+      fireInitQueries: true,            // Fire initialization queries in parallel
+      markOnlineOnConnect: true,        // Mark as online immediately
+      transactionOpts: {                // Faster transaction options
+        maxCommitRetries: 2,            // Fewer retries for failed commits
+        delayBetweenTriesMs: 500        // Shorter delay between retries
+      },
+      getMessage: async () => ({ conversation: '' }) // Minimal message retrieval
     });
 
     // Update connection state
@@ -231,38 +295,25 @@ async function connectToWhatsApp(retryCount = 0) {
       }
     });
 
-    // Set up message event listener with enhanced debugging
+    // Optimized message event handler with minimal logging
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      console.log(`Received messages.upsert event with type: ${type}`);
-      console.log(`Messages array length: ${messages ? messages.length : 'undefined'}`);
+      // Skip non-notify events for performance
+      if (type !== 'notify') return;
       
-      if (messages && messages.length > 0) {
+      // Process all valid messages quickly
+      if (messages?.length) {
         for (const message of messages) {
-          // Debug message info
-          console.log(`Message received:`, JSON.stringify({
-            jid: message.key?.remoteJid,
-            fromMe: message.key?.fromMe,
-            participant: message.key?.participant,
-            messageTypes: message.message ? Object.keys(message.message) : []
-          }));
+          // Fast skip for empty messages
+          if (!message?.message) continue;
           
-          // Skip empty messages
-          if (!message || !message.message) {
-            console.log('Skipping empty message');
-            continue;
-          }
-          
-          // Process the message
+          // Process message directly - minimal overhead
           try {
-            console.log('Processing message with handleIncomingMessage');
             await handleIncomingMessage(message);
           } catch (err) {
-            console.error('Error handling message:', err);
-            logger.error('Error handling message:', err);
+            // Minimal error handling in case of failure
+            console.error('Message error:', err.message);
           }
         }
-      } else {
-        console.log('No messages to process in this event');
       }
     });
 
