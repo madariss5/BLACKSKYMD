@@ -17,7 +17,6 @@ async function ensureAuthDir() {
     try {
         if (!fs.existsSync(authDir)) {
             await fsPromises.mkdir(authDir, { recursive: true });
-            logger.info('Created auth directory');
         }
         return authDir;
     } catch (err) {
@@ -30,59 +29,45 @@ async function displayQR(qr) {
     try {
         // Clear console and add spacing
         console.clear();
-        console.log('\n'.repeat(2));
-
-        logger.info('⚡ NEW QR CODE RECEIVED ⚡');
-        logger.info('Please scan this QR code with WhatsApp on your phone:');
-        console.log('\n'.repeat(1));
+        console.log('\n');
+        console.log('Please scan this QR code with WhatsApp:');
+        console.log('\n');
 
         // Generate QR with custom size
-        qrcode.generate(qr, { small: false }, (qrResult) => {
-            console.log(qrResult);
-            console.log('\n'.repeat(1));
-            logger.info('Waiting for you to scan the QR code...');
-            logger.info('Note: QR code will refresh if not scanned soon.');
-        });
+        qrcode.generate(qr, { small: false });
+
+        console.log('\nWaiting for you to scan the QR code...');
     } catch (err) {
         logger.error('Error displaying QR code:', err);
-        // Try alternative display method
-        console.log('\nQR CODE (if not visible, try resizing your terminal):\n');
-        qrcode.generate(qr, { small: true });
+        process.exit(1);
     }
 }
 
 async function startConnection() {
     try {
         console.clear();
-        logger.info("Starting WhatsApp connection...\n");
-
         const authDir = await ensureAuthDir();
-
-        logger.info('Loading auth state...');
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
-        logger.info('Initializing WhatsApp connection...');
         sock = makeWASocket({
             auth: state,
-            printQRInTerminal: true, // Enable native QR printing temporarily for debugging
+            printQRInTerminal: false, // Disable native QR printing
             browser: ['WhatsApp Bot', 'Firefox', '2.0.0'],
-            logger: pino({ level: 'info' }), // Enable more detailed logging
+            logger: pino({ level: 'silent' }), // Minimize logging
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 30000,
             emitOwnEvents: true,
             retryRequestDelayMs: 2000,
             version: [2, 2323, 4],
-            // Add these connection parameters
             patchMessageBeforeSending: false,
             getMessage: async () => {
                 return { conversation: 'hello' };
             },
-            markOnlineOnConnect: false, // Don't mark as online immediately
-            syncFullHistory: false, // Don't sync full history to reduce load
-            userDevicesCache: false, // Disable device cache
+            markOnlineOnConnect: false,
+            syncFullHistory: false,
+            userDevicesCache: false,
             transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
-            // Add WebSocket options
             ws: {
                 connectTimeoutMs: 30000,
                 keepAliveIntervalMs: 25000,
@@ -96,29 +81,17 @@ async function startConnection() {
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
-            // Debug log the entire update object
-            logger.info('Connection update received:', JSON.stringify(update, null, 2));
-
             if(qr) {
-                logger.info('QR Code received, length:', qr.length);
-                logger.info('Attempting to display QR code...');
-                // Try both display methods
                 await displayQR(qr);
-                // Force QR to display using native method as backup
-                qrcode.generate(qr, { small: true });
-            }
-
-            if (connection === 'connecting') {
-                logger.info('Connecting to WhatsApp...');
             }
 
             if (connection === 'open') {
-                retryCount = 0; // Reset retry count on successful connection
-                logger.info('Connected successfully to WhatsApp!');
+                retryCount = 0;
+                console.clear();
+                console.log('✅ Connected to WhatsApp!\n');
 
                 try {
-                    await saveCreds(); // Save session immediately
-                    logger.info('Session credentials saved successfully');
+                    await saveCreds();
                 } catch (err) {
                     logger.error('Error saving session credentials:', err);
                 }
@@ -127,14 +100,11 @@ async function startConnection() {
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                const error = lastDisconnect?.error?.message || 'Unknown error';
-
-                logger.warn(`Connection closed. Status: ${statusCode}, Error: ${error}`);
 
                 if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
-                    const delay = RETRY_INTERVAL * Math.pow(2, retryCount - 1); // Exponential backoff
-                    logger.info(`Reconnecting... Attempt ${retryCount}/${MAX_RETRIES} in ${delay}ms`);
+                    const delay = RETRY_INTERVAL * Math.pow(2, retryCount - 1);
+                    console.log(`\nReconnecting... Attempt ${retryCount}/${MAX_RETRIES}`);
 
                     setTimeout(async () => {
                         try {
@@ -144,16 +114,13 @@ async function startConnection() {
                         }
                     }, delay);
                 } else if (retryCount >= MAX_RETRIES) {
-                    logger.error('Max retry attempts reached. Please restart the bot manually.');
+                    console.log('\n❌ Max retry attempts reached. Please restart the bot manually.');
                     process.exit(1);
                 } else {
-                    logger.error('Connection closed permanently. User logged out.');
-                    // Clean up auth state before exiting
+                    console.log('\n❌ Connection closed permanently. User logged out.');
                     try {
-                        const authDir = path.join(process.cwd(), 'auth_info');
                         if (fs.existsSync(authDir)) {
                             await fsPromises.rm(authDir, { recursive: true, force: true });
-                            logger.info('Auth state cleaned up');
                         }
                     } catch (err) {
                         logger.error('Error cleaning up auth state:', err);
@@ -164,15 +131,7 @@ async function startConnection() {
         });
 
         // Handle credentials update
-        sock.ev.on('creds.update', async () => {
-            logger.info('Credentials updated, saving...');
-            try {
-                await saveCreds();
-                logger.info('Credentials saved successfully');
-            } catch (err) {
-                logger.error('Error saving credentials:', err);
-            }
-        });
+        sock.ev.on('creds.update', saveCreds);
 
         // Handle messages
         sock.ev.on('messages.upsert', async (m) => {
@@ -190,8 +149,6 @@ async function startConnection() {
         if (retryCount < MAX_RETRIES) {
             retryCount++;
             const delay = RETRY_INTERVAL * Math.pow(2, retryCount - 1);
-            logger.info(`Retrying connection... Attempt ${retryCount}/${MAX_RETRIES} in ${delay}ms`);
-
             setTimeout(async () => {
                 try {
                     await startConnection();
@@ -200,7 +157,6 @@ async function startConnection() {
                 }
             }, delay);
         } else {
-            logger.error('Failed to connect after maximum retries');
             throw err;
         }
     }
