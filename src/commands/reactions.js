@@ -395,14 +395,22 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await fetchAnimeGif('slap');
+            // Randomly decide whether to use Walking Dead or anime GIF (30% chance for Walking Dead)
+            const useWalkingDead = Math.random() < 0.3;
+            const gifUrl = await getGif('slap', useWalkingDead);
+            
+            let message = `${sender.split('@')[0]} slaps ${target}! 👋`;
+            if (useWalkingDead) {
+                message += ' [Walking Dead Style]';
+            }
+            
             if (gifUrl) {
                 await sock.sendMessage(sender, {
-                    text: `${sender.split('@')[0]} slaps ${target}! 👋`,
+                    text: message,
                     image: { url: gifUrl }
                 });
             } else {
-                await sock.sendMessage(sender, { text: `${sender.split('@')[0]} slaps ${target}! 👋` });
+                await sock.sendMessage(sender, { text: message });
             }
         } catch (error) {
             logger.error('Error in slap command:', error);
@@ -417,14 +425,22 @@ const reactionCommands = {
             return;
         }
         try {
-            const gifUrl = await fetchAnimeGif('punch');
+            // Randomly decide whether to use Walking Dead or anime GIF (40% chance for Walking Dead)
+            const useWalkingDead = Math.random() < 0.4;
+            const gifUrl = await getGif('punch', useWalkingDead);
+            
+            let message = `${sender.split('@')[0]} punches ${target}! 👊`;
+            if (useWalkingDead) {
+                message += ' [Walking Dead Style]';
+            }
+            
             if (gifUrl) {
                 await sock.sendMessage(sender, {
-                    text: `${sender.split('@')[0]} punches ${target}! 👊`,
+                    text: message,
                     image: { url: gifUrl }
                 });
             } else {
-                await sock.sendMessage(sender, { text: `${sender.split('@')[0]} punches ${target}! 👊` });
+                await sock.sendMessage(sender, { text: message });
             }
         } catch (error) {
             logger.error('Error in punch command:', error);
@@ -740,18 +756,28 @@ module.exports = {
             return;
         }
         try {
-            const gifUrl = await fetchAnimeGif('kill');
+            // Walking Dead is especially appropriate for this command (60% chance)
+            const useWalkingDead = Math.random() < 0.6;
+            const gifUrl = await getGif('kill', useWalkingDead);
+            
+            let message = `${sender.split('@')[0]} kills ${target}! 💀 (Don't worry, it's just a reaction!)`;
+            if (useWalkingDead) {
+                message += ' [Walking Dead Style]';
+            } else {
+                message += ' [Anime Style]';
+            }
+            
             if (gifUrl) {
                 await sock.sendMessage(sender, {
-                    text: `${sender.split('@')[0]} kills ${target}! 💀 (Don't worry, it's just an anime reaction!)`,
+                    text: message,
                     image: { url: gifUrl }
                 });
             } else {
-                await sock.sendMessage(sender, { text: `${sender.split('@')[0]} kills ${target}! 💀 (Don't worry, it's just an anime reaction!)` });
+                await sock.sendMessage(sender, { text: message });
             }
         } catch (error) {
             logger.error('Error in kill command:', error);
-            await sock.sendMessage(sender, { text: `${sender.split('@')[0]} kills ${target}! 💀 (Don't worry, it's just an anime reaction!)` });
+            await sock.sendMessage(sender, { text: `${sender.split('@')[0]} kills ${target}! 💀 (Don't worry, it's just a reaction!)` });
         }
     },
 
