@@ -9,6 +9,7 @@ const ownerCommands = require('./owner');
 const groupCommands = require('./group');
 const groupNewCommands = require('./group_new');
 const userCommands = require('./user');
+const userExtendedCommands = require('./user_extended'); // Added extended user commands
 const basicCommands = require('./basic');
 const funCommands = require('./fun');
 const mediaCommands = require('./media');
@@ -29,6 +30,7 @@ async function initializeModules(sock) {
         { name: 'Group Base', module: groupCommands },
         { name: 'Group Extended', module: groupNewCommands },
         { name: 'User', module: userCommands },
+        { name: 'User Extended', module: userExtendedCommands },
         { name: 'Fun', module: funCommands },
         { name: 'Media', module: mediaCommands, validator: validateMediaCommands },
         { name: 'Educational', module: educationalCommands, validator: validateEducationalCommands },
@@ -155,6 +157,7 @@ const commands = {
 
     // User commands
     ...loadCommandsFromModule(userCommands, 'user'),
+    ...loadCommandsFromModule(userExtendedCommands, 'user_extended'),
 
     // Fun commands
     ...loadCommandsFromModule(funCommands, 'fun'),
