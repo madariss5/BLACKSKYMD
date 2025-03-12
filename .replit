@@ -11,26 +11,8 @@ name = "Project"
 mode = "parallel"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Replit QR Server"
-
-[[workflows.workflow]]
-name = "Replit QR Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node qr-terminal.js --clear-auth"
-
 [deployment]
-run = ["sh", "-c", "node qr-terminal.js --clear-auth"]
+run = ["sh", "-c", "node compatible-qr.js"]
 
 [[ports]]
 localPort = 5000

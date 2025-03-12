@@ -1,0 +1,7 @@
+/**
+ * Ultra-Compatible WhatsApp QR Generator
+ * Designed for maximum scan success in Replit environment
+ */
+
+// Start the server for web-based QR code
+require('./server.js');
