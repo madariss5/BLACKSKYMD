@@ -144,18 +144,23 @@ const menuCommands = {
             
             for (const file of commandFiles) {
                 if (file.endsWith('.js') && file !== 'index.js' && file !== 'menu.js') {
-                    const categoryName = file.replace('.js', '');
                     try {
                         // Try to load using modern format (module.exports.commands)
                         const moduleData = require(`./${file}`);
                         let commandsObject;
+                        let categoryName = file.replace('.js', '');
                         
                         if (moduleData.commands) {
                             // Modern format: { commands: {...}, category: '...', init: ... }
                             commandsObject = moduleData.commands;
+                            if (moduleData.category) {
+                                categoryName = moduleData.category;
+                                logger.info(`Using category "${categoryName}" from module ${file}`);
+                            }
                         } else {
                             // Legacy format: direct export of commands object
                             commandsObject = moduleData;
+                            logger.warn(`Module ${file} using legacy format without explicit category`);
                         }
                         
                         const commandNames = Object.keys(commandsObject).filter(cmd => 
@@ -350,15 +355,22 @@ const menuCommands = {
                         if (moduleData.commands) {
                             // Modern format: { commands: {...}, category: '...', init: ... }
                             commandsObject = moduleData.commands;
+                            if (commandsObject[commandName] && typeof commandsObject[commandName] === 'function') {
+                                foundCommand = commandsObject[commandName];
+                                // Use the category from the module if available
+                                foundIn = moduleData.category || file.replace('.js', '');
+                                logger.info(`Found command "${commandName}" in category "${foundIn}"`);
+                                break;
+                            }
                         } else {
                             // Legacy format: direct export of commands object
                             commandsObject = moduleData;
-                        }
-                        
-                        if (commandsObject[commandName] && typeof commandsObject[commandName] === 'function') {
-                            foundCommand = commandsObject[commandName];
-                            foundIn = file.replace('.js', '');
-                            break;
+                            if (commandsObject[commandName] && typeof commandsObject[commandName] === 'function') {
+                                foundCommand = commandsObject[commandName];
+                                foundIn = file.replace('.js', '');
+                                logger.info(`Found command "${commandName}" in legacy module "${file}"`);
+                                break;
+                            }
                         }
                     } catch (loadErr) {
                         logger.error(`Error loading ${file} for help command:`, loadErr);
