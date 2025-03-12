@@ -137,9 +137,10 @@ const categoryNames = {
     'default': 'Misc'
 };
 
-// Decorative symbols
+// Decorative symbols for elegant menu styling
 const symbols = {
     divider: '┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄',
+    dotted: '┄┄┄┄┄┄┄┄┄',
     bullet: '•',
     arrow: '➤',
     star: '✦',
@@ -151,34 +152,45 @@ const symbols = {
     circle: '○',
     square: '■',
     flower: '✿',
+    fire: '🔥',
     line: '━━━━━━━━━━━━━━━━━',
-    doubleLine: '═════════════════'
+    doubleLine: '═════════════════',
+    // Box drawing characters
+    box: {
+        corner1: '┌',
+        corner2: '┐',
+        corner3: '└',
+        corner4: '┘',
+        horizontal: '─',
+        vertical: '│'
+    }
 };
 
 /**
- * Creates a beautifully formatted menu header
+ * Creates a beautifully formatted menu header with advanced styling
  */
 function createHeader(botName, totalCommands, uptime) {
-    return `╭────❮ *${botName}* ❯────╮
-│
-│ *📊 Status:* Online
-│ *⏰ Uptime:* ${uptime}
-│ *🔢 Commands:* ${totalCommands}
-│
-╰────────────────╯
+    return `┏━━━❮ *${botName.toUpperCase()}* ❯━━━┓
+┃
+┃ *📊 Status:* Online ✅
+┃ *⏰ Uptime:* ${uptime}
+┃ *🔢 Commands:* ${totalCommands}
+┃ *🌐 Version:* 1.0.0
+┃
+┗━━━━━━━━━━━━━━━━━━━━┛
 
-${symbols.line}
+${symbols.doubleLine}
 `;
 }
 
 /**
- * Creates a nicely formatted category section
+ * Creates a nicely formatted category section with improved styling
  */
 function createCategorySection(categoryName, commands, prefix) {
     const emoji = categoryEmojis[categoryName] || categoryEmojis.default;
     const prettyName = categoryNames[categoryName] || categoryNames.default;
     
-    let section = `\n*${emoji} ${prettyName.toUpperCase()}*\n${symbols.divider}\n`;
+    let section = `\n┌───「 *${emoji} ${prettyName.toUpperCase()}* 」───┐\n`;
     
     // Format commands in a clean 2-column layout when possible
     const sortedCommands = [...commands].sort();
@@ -186,43 +198,63 @@ function createCategorySection(categoryName, commands, prefix) {
     
     for (let i = 0; i < sortedCommands.length; i += commandsPerLine) {
         const commandsInThisLine = sortedCommands.slice(i, i + commandsPerLine);
-        const formattedCommands = commandsInThisLine.map(cmd => `${symbols.bullet} \`${prefix}${cmd}\``);
+        const formattedCommands = commandsInThisLine.map(cmd => {
+            // Add some styling variation based on command length
+            const icon = cmd.length % 5 === 0 ? symbols.star : 
+                        cmd.length % 4 === 0 ? symbols.diamond : 
+                        cmd.length % 3 === 0 ? symbols.flower : symbols.bullet;
+            return `${icon} \`${prefix}${cmd}\``;
+        });
         section += formattedCommands.join(' ᅠ ᅠ ') + '\n';
     }
     
+    section += `└─────────${symbols.dotted}─────────┘\n`;
     return section;
 }
 
 /**
- * Creates a compact category summary
+ * Creates a stylish category summary with modern formatting
  */
 function createCategorySummary(categories) {
-    let summary = `*📂 COMMAND CATEGORIES*\n${symbols.divider}\n`;
+    let summary = `┏━━━❮ *📂 CATEGORIES* ❯━━━┓\n`;
     
     Object.keys(categories).forEach(category => {
         const emoji = categoryEmojis[category] || categoryEmojis.default;
         const prettyName = categoryNames[category] || categoryNames.default;
         const count = categories[category].length;
         
-        summary += `${emoji} *${prettyName}* - ${count} commands\n`;
+        // Add a different decorative symbol based on the count
+        const countSymbol = count > 20 ? symbols.fire : 
+                          count > 10 ? symbols.star : 
+                          count > 5 ? symbols.sparkle : 
+                          symbols.circle;
+        
+        summary += `┃ ${emoji} *${prettyName.padEnd(15)}* ${countSymbol} ${count}\n`;
     });
     
+    summary += `┗━━━━━━━━━━━━━━━━━━━━┛\n`;
     return summary;
 }
 
 /**
- * Create footer with usage instructions
+ * Create stylish footer with usage instructions
  */
 function createFooter(prefix) {
     return `
-${symbols.line}
-*💡 USAGE TIPS*
-${symbols.divider}
-• Type \`${prefix}menu [category]\` for specific category
-• Type \`${prefix}help [command]\` for command details
-• Use \`${prefix}\` as command prefix
+┏━━━❮ *💡 HELP & TIPS* ❯━━━┓
+┃
+┃ ${symbols.arrow} Type \`${prefix}menu [category]\`
+┃   View commands in a category
+┃
+┃ ${symbols.arrow} Type \`${prefix}help [command]\`
+┃   Get detailed command help
+┃
+┃ ${symbols.arrow} Use \`${prefix}\` as your prefix
+┃   For all commands
+┃
+┗━━━━━━━━━━━━━━━━━━━━┛
 
-_Powered by @whiskeysockets/baileys_`;
+_${symbols.heart} Powered by @whiskeysockets/baileys_`;
 }
 
 // Define menu commands
@@ -295,29 +327,42 @@ const menuCommands = {
                     const emoji = categoryEmojis[category] || categoryEmojis.default;
                     const prettyName = categoryNames[category] || categoryNames.default;
                     
-                    let listText = `*${emoji} ${prettyName} Commands*\n${symbols.divider}\n`;
+                    let listText = `┏━━━❮ *${emoji} ${prettyName.toUpperCase()}* ❯━━━┓\n`;
+                    
                     commands.sort().forEach(cmd => {
-                        listText += `${symbols.bullet} \`${prefix}${cmd}\`\n`;
+                        // Add some styling variation based on command length
+                        const icon = cmd.length % 5 === 0 ? symbols.star : 
+                                    cmd.length % 4 === 0 ? symbols.diamond : 
+                                    cmd.length % 3 === 0 ? symbols.flower : symbols.bullet;
+                        listText += `┃ ${icon} \`${prefix}${cmd}\`\n`;
                     });
                     
-                    listText += `\n_Total: ${commands.length} commands_`;
+                    listText += `┗━━━━━━━━━━━━━━━━━━━━┛\n\n_${symbols.sparkle} Total: ${commands.length} commands_`;
                     
                     await sock.sendMessage(sender, { text: listText });
                     return;
                 }
                 
-                // List all categories
-                let listText = `*📋 All Command Categories*\n${symbols.divider}\n`;
+                // List all categories with modern styling
+                let listText = `┏━━━❮ *📋 CATEGORIES* ❯━━━┓\n`;
                 
                 Object.keys(allCommands).forEach(cat => {
                     const emoji = categoryEmojis[cat] || categoryEmojis.default;
                     const prettyName = categoryNames[cat] || categoryNames.default;
                     const count = allCommands[cat].length;
                     
-                    listText += `${emoji} *${prettyName}* - ${count} commands\n`;
+                    // Use different symbols for different command counts
+                    const countSymbol = count > 20 ? symbols.fire : 
+                                      count > 10 ? symbols.star : 
+                                      count > 5 ? symbols.sparkle : 
+                                      symbols.circle;
+                    
+                    listText += `┃ ${emoji} *${prettyName.padEnd(12)}* ${countSymbol} ${count}\n`;
                 });
                 
-                listText += `\n_To see commands in a category:_\n\`${prefix}list [category]\``;
+                listText += `┗━━━━━━━━━━━━━━━━━━━━┛\n\n` +
+                           `${symbols.arrow} _To see commands in a category:_\n` +
+                           `   \`${prefix}list [category]\``;
                 
                 await sock.sendMessage(sender, { text: listText });
                 
@@ -339,20 +384,22 @@ const menuCommands = {
                 const commandName = args[0]?.toLowerCase();
                 
                 if (!commandName) {
-                    // No specific command requested, show general help
-                    const helpText = `*📚 Command Help*
-${symbols.divider}
-To get help with a specific command, type:
-\`${prefix}help [command]\`
-
-For a list of all commands:
-\`${prefix}menu\` - Show all categories
-\`${prefix}list\` - List all categories
-\`${prefix}list [category]\` - List commands in category
-
-*Examples:*
-\`${prefix}help sticker\` - Get help with sticker command
-\`${prefix}list media\` - List all media commands`;
+                    // No specific command requested, show general help with modern styling
+                    const helpText = `┏━━━❮ *📚 COMMAND HELP* ❯━━━┓
+┃
+┃ ${symbols.arrow} Get command details:
+┃   \`${prefix}help [command]\`
+┃
+┃ ${symbols.arrow} Browse commands:
+┃   \`${prefix}menu\` - All categories
+┃   \`${prefix}list\` - All categories
+┃   \`${prefix}list [category]\` - Specific category
+┃
+┃ ${symbols.sparkle} *Examples:*
+┃   \`${prefix}help sticker\`
+┃   \`${prefix}list media\`
+┃
+┗━━━━━━━━━━━━━━━━━━━━┛`;
                     
                     await sock.sendMessage(sender, { text: helpText });
                     return;
@@ -410,12 +457,18 @@ For a list of all commands:
                         // Config file might not exist, that's ok
                     }
                     
-                    const helpText = `*${emoji} Command: ${prefix}${commandName}*
-${symbols.divider}
-*Category:* ${categoryNames[foundIn] || foundIn}
-*Description:* ${configInfo}
-
-*Usage:* \`${prefix}${commandName}\``;
+                    const helpText = `┏━━━❮ *${emoji} COMMAND INFO* ❯━━━┓
+┃
+┃ *${symbols.sparkle} Command:* \`${prefix}${commandName}\`
+┃ *${symbols.diamond} Category:* ${categoryNames[foundIn] || foundIn}
+┃
+┃ *${symbols.arrow} Description:* 
+┃   ${configInfo}
+┃
+┃ *${symbols.check} Usage:* 
+┃   \`${prefix}${commandName}\`
+┃
+┗━━━━━━━━━━━━━━━━━━━━┛`;
                     
                     await sock.sendMessage(sender, { text: helpText });
                 } else {
