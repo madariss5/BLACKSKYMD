@@ -3,6 +3,34 @@ const fs = require('fs').promises;
 const logger = require('./logger');
 
 /**
+ * Get default group settings
+ * @returns {Object} Default group settings
+ */
+function getDefaultGroupSettings() {
+    return {
+        warnings: {},
+        antispam: false,
+        antilink: false,
+        antitoxic: false,
+        antiraid: false,
+        raidThreshold: 5,
+        polls: {},
+        scheduled: [],
+        pinnedMessages: [],
+        features: {
+            leveling: true,
+            welcome: true,
+            goodbye: true,
+            nsfw: false,
+            games: true,
+            economy: true,
+            reactions: true,
+            media: true
+        }
+    };
+}
+
+/**
  * Get settings for a specific group
  * @param {string} jid Group JID
  * @returns {Promise<Object>} Group settings
@@ -11,31 +39,37 @@ async function getGroupSettings(jid) {
     const filePath = path.join(__dirname, '../../data/groups', `${jid}.json`);
     try {
         const data = await fs.readFile(filePath, 'utf8');
-        return JSON.parse(data);
+        const settings = JSON.parse(data);
+        
+        // Check for any missing properties and add them from defaults
+        const defaults = getDefaultGroupSettings();
+        let modified = false;
+        
+        // Add any missing properties
+        for (const [key, value] of Object.entries(defaults)) {
+            if (settings[key] === undefined) {
+                settings[key] = value;
+                modified = true;
+            }
+        }
+        
+        // Specifically ensure pinnedMessages array exists
+        if (!Array.isArray(settings.pinnedMessages)) {
+            settings.pinnedMessages = [];
+            modified = true;
+        }
+        
+        // Save the updated settings if modified
+        if (modified) {
+            await saveGroupSettings(jid, settings);
+            logger.info(`Updated group settings for ${jid} with missing properties`);
+        }
+        
+        return settings;
     } catch (err) {
         if (err.code === 'ENOENT') {
             // Return default settings if file doesn't exist
-            return {
-                warnings: {},
-                antispam: false,
-                antilink: false,
-                antitoxic: false,
-                antiraid: false,
-                raidThreshold: 5,
-                polls: {},
-                scheduled: [],
-                pinnedMessages: [],
-                features: {
-                    leveling: true,
-                    welcome: true,
-                    goodbye: true,
-                    nsfw: false,
-                    games: true,
-                    economy: true,
-                    reactions: true,
-                    media: true
-                }
-            };
+            return getDefaultGroupSettings();
         }
         logger.error(`Failed to read group settings for ${jid}:`, err);
         throw err;
@@ -74,14 +108,22 @@ function validateGroupSettings(settings) {
         antiraid: 'boolean',
         raidThreshold: 'number',
         polls: 'object',
-        scheduled: 'object',
-        pinnedMessages: 'object',
         features: 'object'
     };
 
-    return Object.entries(requiredProps).every(([prop, type]) => 
+    const requiredArrays = ['scheduled', 'pinnedMessages'];
+
+    // Check required properties
+    const hasRequiredProps = Object.entries(requiredProps).every(([prop, type]) => 
         settings.hasOwnProperty(prop) && typeof settings[prop] === type
     );
+
+    // Check required arrays
+    const hasRequiredArrays = requiredArrays.every(arrayProp => 
+        settings.hasOwnProperty(arrayProp) && Array.isArray(settings[arrayProp])
+    );
+
+    return hasRequiredProps && hasRequiredArrays;
 }
 
 /**
@@ -200,6 +242,7 @@ async function getFeatureSettings(jid) {
 }
 
 module.exports = {
+    getDefaultGroupSettings,
     getGroupSettings,
     saveGroupSettings,
     validateGroupSettings,

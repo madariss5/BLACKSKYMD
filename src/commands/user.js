@@ -6,7 +6,7 @@ const path = require('path');
 const { createCanvas, loadImage, registerFont } = require('canvas');
 const Jimp = require('jimp');
 const randomstring = require('randomstring');
-const cryptoRandomString = require('crypto-random-string');
+// Remove crypto-random-string as it's an ESM module and not used in this file
 const axios = require('axios');
 const { getCountry } = require('countries-list');
 const userDatabase = require('../utils/userDatabase');

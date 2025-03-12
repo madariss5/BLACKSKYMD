@@ -2,6 +2,7 @@ const express = require('express');
 const { startConnection } = require('./connection');
 const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
+const commandModules = require('./commands/index');
 const logger = require('./utils/logger');
 const config = require('./config/config');
 
@@ -136,6 +137,16 @@ async function main() {
             throw err;
         }
 
+        // Initialize command modules with socket
+        try {
+            logger.info('Initializing command modules with socket connection...');
+            await commandModules.initializeModules(sock);
+            logger.info('Command modules initialized with socket connection successfully');
+        } catch (err) {
+            logger.error('Error initializing command modules with socket:', err);
+            // Continue execution despite initialization errors
+        }
+        
         // Start HTTP server
         server = await startServer(sock);
 
