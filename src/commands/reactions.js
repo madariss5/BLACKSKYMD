@@ -52,10 +52,10 @@ const ANIME_GIF_API = {
     tickle: 'https://api.waifu.pics/sfw/tickle',
     boop: 'https://api.waifu.pics/sfw/boop',
     grouphug: 'https://api.waifu.pics/sfw/hug', // Using hug as a placeholder for grouphug
-    
+
     // New reaction endpoints - additional 40 anime reactions
     // Using appropriate endpoints from waifu.pics API, with fallbacks to similar emotions when needed
-    
+
     // Positive Reactions
     handhold: 'https://api.waifu.pics/sfw/handhold',
     highfive: 'https://api.waifu.pics/sfw/highfive',
@@ -65,7 +65,7 @@ const ANIME_GIF_API = {
     kill: 'https://api.waifu.pics/sfw/kill',
     happy: 'https://api.waifu.pics/sfw/happy',
     waifu: 'https://api.waifu.pics/sfw/waifu',
-    
+
     // Action Reactions
     cringe: 'https://api.waifu.pics/sfw/cringe',
     kick: 'https://api.waifu.pics/sfw/kick',
@@ -75,7 +75,7 @@ const ANIME_GIF_API = {
     megumin: 'https://api.waifu.pics/sfw/megumin',
     lick: 'https://api.waifu.pics/sfw/lick',
     bully: 'https://api.waifu.pics/sfw/bully',
-    
+
     // Extended Emotions
     awoo: 'https://api.waifu.pics/sfw/awoo',
     thumbsup: 'https://api.waifu.pics/sfw/smile', // Using smile as fallback
@@ -85,7 +85,7 @@ const ANIME_GIF_API = {
     shake: 'https://api.waifu.pics/sfw/wave', // Using wave as fallback
     shrug: 'https://api.waifu.pics/sfw/shrug',
     stare: 'https://api.waifu.pics/sfw/stare',
-    
+
     // Additional Expressions
     poke2: 'https://api.waifu.pics/sfw/poke', // Alternative poke
     amazing: 'https://api.waifu.pics/sfw/smile', // Using smile as fallback
@@ -95,7 +95,7 @@ const ANIME_GIF_API = {
     cool: 'https://api.waifu.pics/sfw/smile', // Using smile as fallback
     love: 'https://api.waifu.pics/sfw/kiss', // Using kiss as fallback
     nervous: 'https://api.waifu.pics/sfw/panic', // Using panic as fallback
-    
+
     // Complex Actions
     headpat: 'https://api.waifu.pics/sfw/pat', // Alternative pat
     tackle: 'https://api.waifu.pics/sfw/glomp', // Using glomp as fallback
@@ -112,9 +112,12 @@ async function fetchAnimeGif(type) {
     try {
         const endpoint = ANIME_GIF_API[type];
         if (!endpoint) {
+            logger.error(`Invalid reaction type: ${type}`);
             throw new Error('Invalid reaction type');
         }
+        logger.info(`Fetching gif for type: ${type} from endpoint: ${endpoint}`);
         const response = await axios.get(endpoint);
+        logger.info(`Got response for ${type}: ${response.data.url}`);
         return response.data.url;
     } catch (error) {
         logger.error(`Error fetching ${type} GIF:`, error);
@@ -155,21 +158,24 @@ const reactionCommands = {
 
     // Positive Reactions
     async hug(sock, sender, args) {
+        logger.info(`Hug command called by ${sender} with args:`, args);
         const target = args[0];
         if (!target) {
+            logger.info('No target specified for hug command');
             await sock.sendMessage(sender, { text: '🤗 Please mention someone to hug' });
             return;
         }
         try {
-            // Randomly decide whether to use Walking Dead or anime GIF (25% chance for Walking Dead)
             const useWalkingDead = Math.random() < 0.25;
+            logger.info(`Fetching ${useWalkingDead ? 'Walking Dead' : 'anime'} hug gif`);
             const gifUrl = await getGif('hug', useWalkingDead);
-            
+
             let message = `${sender.split('@')[0]} hugs ${target} warmly! 🤗`;
             if (useWalkingDead) {
                 message += ' [Walking Dead Style]';
             }
-            
+
+            logger.info(`Sending hug message with gif: ${gifUrl}`);
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: message,
@@ -398,12 +404,12 @@ const reactionCommands = {
             // Randomly decide whether to use Walking Dead or anime GIF (30% chance for Walking Dead)
             const useWalkingDead = Math.random() < 0.3;
             const gifUrl = await getGif('slap', useWalkingDead);
-            
+
             let message = `${sender.split('@')[0]} slaps ${target}! 👋`;
             if (useWalkingDead) {
                 message += ' [Walking Dead Style]';
             }
-            
+
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: message,
@@ -428,12 +434,12 @@ const reactionCommands = {
             // Randomly decide whether to use Walking Dead or anime GIF (40% chance for Walking Dead)
             const useWalkingDead = Math.random() < 0.4;
             const gifUrl = await getGif('punch', useWalkingDead);
-            
+
             let message = `${sender.split('@')[0]} punches ${target}! 👊`;
             if (useWalkingDead) {
                 message += ' [Walking Dead Style]';
             }
-            
+
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: message,
@@ -633,8 +639,8 @@ const reactionCommands = {
 };
 
 module.exports = {
-    // 1. Handhold
-    async handhold(sock, sender, args) {
+    ...reactionCommands, // Include all reaction commands from the reactionCommands object
+    handhold: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🤝 Please mention someone to hold hands with' });
@@ -656,8 +662,7 @@ module.exports = {
         }
     },
 
-    // 2. Highfive
-    async highfive(sock, sender, args) {
+    highfive: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '✋ Please mention someone to high five' });
@@ -679,8 +684,7 @@ module.exports = {
         }
     },
 
-    // 3. Nom
-    async nom(sock, sender, args) {
+    nom: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🍽️ Please mention someone or something to nom' });
@@ -702,11 +706,9 @@ module.exports = {
         }
     },
 
-    // 4. Bite
-    async bite(sock, sender, args) {
+    bite: async function(sock, sender, args) {
         const target = args[0];
-        if (!target) {
-            await sock.sendMessage(sender, { text: '😬 Please mention someone to bite' });
+        if (!target) {            await sock.sendMessage(sender, { text: '😬 Please mention someone to bite' });
             return;
         }
         try {
@@ -725,8 +727,7 @@ module.exports = {
         }
     },
 
-    // 5. Glomp
-    async glomp(sock, sender, args) {
+    glomp: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🫂 Please mention someone to glomp' });
@@ -748,8 +749,7 @@ module.exports = {
         }
     },
 
-    // 6. Kill
-    async kill(sock, sender, args) {
+    kill: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '💀 Please mention someone to kill (just for fun!)' });
@@ -759,14 +759,14 @@ module.exports = {
             // Walking Dead is especially appropriate for this command (60% chance)
             const useWalkingDead = Math.random() < 0.6;
             const gifUrl = await getGif('kill', useWalkingDead);
-            
+
             let message = `${sender.split('@')[0]} kills ${target}! 💀 (Don't worry, it's just a reaction!)`;
             if (useWalkingDead) {
                 message += ' [Walking Dead Style]';
             } else {
                 message += ' [Anime Style]';
             }
-            
+
             if (gifUrl) {
                 await sock.sendMessage(sender, {
                     text: message,
@@ -781,8 +781,7 @@ module.exports = {
         }
     },
 
-    // 7. Happy
-    async happy(sock, sender) {
+    happy: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('happy');
             if (gifUrl) {
@@ -799,8 +798,7 @@ module.exports = {
         }
     },
 
-    // 8. Waifu
-    async waifu(sock, sender) {
+    waifu: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('waifu');
             if (gifUrl) {
@@ -816,9 +814,7 @@ module.exports = {
             await sock.sendMessage(sender, { text: `${sender.split('@')[0]} shares a cute waifu! 💖` });
         }
     },
-
-    // 9. Cringe
-    async cringe(sock, sender) {
+    cringe: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('cringe');
             if (gifUrl) {
@@ -835,8 +831,7 @@ module.exports = {
         }
     },
 
-    // 10. Kick
-    async kick(sock, sender, args) {
+    kick: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🦵 Please mention someone to kick' });
@@ -858,8 +853,7 @@ module.exports = {
         }
     },
 
-    // 11. Yeet
-    async yeet(sock, sender, args) {
+    yeet: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🚀 Please mention someone to yeet' });
@@ -881,8 +875,7 @@ module.exports = {
         }
     },
 
-    // 12. Neko
-    async neko(sock, sender) {
+    neko: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('neko');
             if (gifUrl) {
@@ -899,8 +892,7 @@ module.exports = {
         }
     },
 
-    // 13. Shinobu
-    async shinobu(sock, sender) {
+    shinobu: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('shinobu');
             if (gifUrl) {
@@ -917,8 +909,7 @@ module.exports = {
         }
     },
 
-    // 14. Megumin
-    async megumin(sock, sender) {
+    megumin: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('megumin');
             if (gifUrl) {
@@ -935,8 +926,7 @@ module.exports = {
         }
     },
 
-    // 15. Lick
-    async lick(sock, sender, args) {
+    lick: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👅 Please mention someone to lick' });
@@ -958,8 +948,7 @@ module.exports = {
         }
     },
 
-    // 16. Bully
-    async bully(sock, sender, args) {
+    bully: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '😈 Please mention someone to bully' });
@@ -981,8 +970,7 @@ module.exports = {
         }
     },
 
-    // 17. Awoo
-    async awoo(sock, sender) {
+    awoo: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('awoo');
             if (gifUrl) {
@@ -999,8 +987,7 @@ module.exports = {
         }
     },
 
-    // 18. Thumbsup
-    async thumbsup(sock, sender) {
+    thumbsup: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('thumbsup');
             if (gifUrl) {
@@ -1017,8 +1004,7 @@ module.exports = {
         }
     },
 
-    // 19. Thinking
-    async thinking(sock, sender) {
+    thinking: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('thinking');
             if (gifUrl) {
@@ -1035,8 +1021,7 @@ module.exports = {
         }
     },
 
-    // 20. Confused
-    async confused(sock, sender) {
+    confused: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('confused');
             if (gifUrl) {
@@ -1053,8 +1038,7 @@ module.exports = {
         }
     },
 
-    // 21. Nodding
-    async nod(sock, sender) {
+    nod: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('nod');
             if (gifUrl) {
@@ -1071,8 +1055,7 @@ module.exports = {
         }
     },
 
-    // 22. Shaking Head
-    async shake(sock, sender) {
+    shake: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('shake');
             if (gifUrl) {
@@ -1089,8 +1072,7 @@ module.exports = {
         }
     },
 
-    // 23. Shrug
-    async shrug(sock, sender) {
+    shrug: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('shrug');
             if (gifUrl) {
@@ -1107,8 +1089,7 @@ module.exports = {
         }
     },
 
-    // 24. Stare
-    async stare(sock, sender, args) {
+    stare: async function(sock, sender, args) {
         const target = args[0] ? args[0] : "intensely";
         try {
             const gifUrl = await fetchAnimeGif('stare');
@@ -1126,8 +1107,7 @@ module.exports = {
         }
     },
 
-    // 25. Poke2 (Alternative poke)
-    async poke2(sock, sender, args) {
+    poke2: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👈 Please mention someone to super poke' });
@@ -1149,8 +1129,7 @@ module.exports = {
         }
     },
 
-    // 26. Amazing
-    async amazing(sock, sender) {
+    amazing: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('amazing');
             if (gifUrl) {
@@ -1167,8 +1146,7 @@ module.exports = {
         }
     },
 
-    // 27. Bleh (Tongue out)
-    async bleh(sock, sender) {
+    bleh: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('bleh');
             if (gifUrl) {
@@ -1185,8 +1163,7 @@ module.exports = {
         }
     },
 
-    // 28. Hmph
-    async hmph(sock, sender) {
+    hmph: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('hmph');
             if (gifUrl) {
@@ -1203,8 +1180,7 @@ module.exports = {
         }
     },
 
-    // 29. Wow
-    async wow(sock, sender) {
+    wow: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('wow');
             if (gifUrl) {
@@ -1221,8 +1197,7 @@ module.exports = {
         }
     },
 
-    // 30. Cool
-    async cool(sock, sender) {
+    cool: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('cool');
             if (gifUrl) {
@@ -1239,8 +1214,7 @@ module.exports = {
         }
     },
 
-    // 31. Love
-    async love(sock, sender, args) {
+    love: async function(sock, sender, args) {
         const target = args[0] ? args[0] : "everyone";
         try {
             const gifUrl = await fetchAnimeGif('love');
@@ -1258,8 +1232,7 @@ module.exports = {
         }
     },
 
-    // 32. Nervous
-    async nervous(sock, sender) {
+    nervous: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('nervous');
             if (gifUrl) {
@@ -1276,8 +1249,7 @@ module.exports = {
         }
     },
 
-    // 33. Headpat (Alternative pat)
-    async headpat(sock, sender, args) {
+    headpat: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '✋ Please mention someone to headpat' });
@@ -1299,8 +1271,7 @@ module.exports = {
         }
     },
 
-    // 34. Tackle
-    async tackle(sock, sender, args) {
+    tackle: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '💥 Please mention someone to tackle' });
@@ -1322,8 +1293,7 @@ module.exports = {
         }
     },
 
-    // 35. Shoot
-    async shoot(sock, sender, args) {
+    shoot: async function(sock, sender, args) {
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🔫 Please mention someone to shoot (as a joke!)' });
@@ -1345,8 +1315,7 @@ module.exports = {
         }
     },
 
-    // 36. Throw
-    async throw(sock, sender, args) {
+    throw: async function(sock, sender, args) {
         const target = args[0] ? args[0] : "something";
         try {
             const gifUrl = await fetchAnimeGif('throw');
@@ -1364,8 +1333,7 @@ module.exports = {
         }
     },
 
-    // 37. Hide
-    async hide(sock, sender) {
+    hide: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('hide');
             if (gifUrl) {
@@ -1382,8 +1350,7 @@ module.exports = {
         }
     },
 
-    // 38. Greet
-    async greet(sock, sender, args) {
+    greet: async function(sock, sender, args) {
         const target = args[0] ? args[0] : "everyone";
         try {
             const gifUrl = await fetchAnimeGif('greet');
@@ -1401,8 +1368,7 @@ module.exports = {
         }
     },
 
-    // 39. Shocked
-    async shocked(sock, sender) {
+    shocked: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('shocked');
             if (gifUrl) {
@@ -1419,8 +1385,7 @@ module.exports = {
         }
     },
 
-    // 40. Scared
-    async scared(sock, sender) {
+    scared: async function(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('scared');
             if (gifUrl) {
