@@ -64,9 +64,9 @@ async function startConnection() {
         logger.info('Initializing WhatsApp connection...');
         sock = makeWASocket({
             auth: state,
-            printQRInTerminal: false, // We'll handle QR display ourselves
+            printQRInTerminal: true, // Enable native QR printing temporarily for debugging
             browser: ['WhatsApp-MD', 'Chrome', '4.0.0'],
-            logger: pino({ level: 'silent' }),
+            logger: pino({ level: 'info' }), // Enable more detailed logging
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 30000,
@@ -78,11 +78,17 @@ async function startConnection() {
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            logger.info('Connection state update:', { connection, qr: !!qr });
+
+            // Debug log the entire update object
+            logger.info('Connection update received:', JSON.stringify(update, null, 2));
 
             if(qr) {
-                logger.info('QR Code event received, displaying QR code...');
+                logger.info('QR Code received, length:', qr.length);
+                logger.info('Attempting to display QR code...');
+                // Try both display methods
                 await displayQR(qr);
+                // Force QR to display using native method as backup
+                qrcode.generate(qr, { small: true });
             }
 
             if (connection === 'connecting') {
