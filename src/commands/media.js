@@ -1099,8 +1099,11 @@ const mediaCommands = {
 
 };
 
+// Export the commands object directly to ensure it's accessible
+const commands = mediaCommands;
+
 module.exports = {
-    commands: mediaCommands,
+    commands,
     category: 'media',
     async init() {
         try {

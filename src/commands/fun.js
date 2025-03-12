@@ -1996,9 +1996,11 @@ function initializeGameState() {
     global.triviaGames = global.triviaGames || new Map();
 }
 
+// Export the commands object directly to ensure it's accessible
+const commands = funCommands;
 
 module.exports = {
-    commands: funCommands,
+    commands,
     category: 'fun',
     async init() {
         try {
