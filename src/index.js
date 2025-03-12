@@ -26,12 +26,67 @@ async function startServer(sock) {
             // Commands not loaded yet
         }
         
-        res.json({
-            status: currentSock ? 'connected' : 'initializing',
-            message: 'WhatsApp Bot is active',
-            commands: commandCount,
-            uptime: process.uptime()
-        });
+        if (!currentSock) {
+            // If we're initializing, show a link to the QR code
+            res.send(`
+                <html>
+                    <head>
+                        <title>WhatsApp Bot - Initializing</title>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                            body { 
+                                font-family: Arial, sans-serif; 
+                                text-align: center;
+                                margin-top: 50px;
+                                background-color: #f5f5f5;
+                            }
+                            h1 { color: #128C7E; }
+                            .container {
+                                max-width: 600px;
+                                margin: 0 auto;
+                                padding: 20px;
+                                background-color: white;
+                                border-radius: 10px;
+                                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                            }
+                            a.qr-button {
+                                display: inline-block;
+                                background-color: #128C7E;
+                                color: white;
+                                padding: 10px 20px;
+                                border-radius: 5px;
+                                text-decoration: none;
+                                font-weight: bold;
+                                margin-top: 20px;
+                            }
+                            .status-info {
+                                margin-top: 20px;
+                                color: #666;
+                                font-size: 0.9em;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <h1>WhatsApp Bot Initializing</h1>
+                            <p>The WhatsApp bot is starting up. To connect, you need to scan the QR code.</p>
+                            <a href="http://${req.headers.host.split(':')[0]}:5006" class="qr-button" target="_blank">View QR Code</a>
+                            <div class="status-info">
+                                <p>Status: Initializing<br>
+                                Uptime: ${Math.floor(process.uptime())} seconds</p>
+                            </div>
+                        </div>
+                    </body>
+                </html>
+            `);
+        } else {
+            res.json({
+                status: 'connected',
+                message: 'WhatsApp Bot is active',
+                commands: commandCount,
+                uptime: process.uptime()
+            });
+        }
     });
 
     // Debug endpoint to check command loading
@@ -158,18 +213,15 @@ async function main() {
                     await commandLoader.loadCommandHandlers();
                     await commandModules.initializeModules(sock);
                     
-                    // Create a simple POST endpoint to handle messages from the server
-                    server._events.request._router.stack.forEach(layer => {
-                        if (layer.route && layer.route.path === '/') {
-                            const app = layer.route.stack[0].handle.toString().match(/app/);
-                            if (app) {
-                                // We found the app reference within express
-                                const expressApp = server._events.request;
-                                expressApp.set('sock', sock);
-                                console.log('Updated server with active WhatsApp connection');
-                            }
-                        }
-                    });
+                    // Update the express app with the sock instance
+                    // We can directly access the app via server
+                    const expressApp = server._events.request;
+                    if (expressApp && typeof expressApp.set === 'function') {
+                        expressApp.set('sock', sock);
+                        console.log('Updated server with active WhatsApp connection');
+                    } else {
+                        console.log('Unable to update server with sock instance');
+                    }
                 } catch (err) {
                     console.error('Error during initialization:', err);
                 } finally {
