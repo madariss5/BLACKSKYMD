@@ -1,4 +1,8 @@
 const logger = require('../utils/logger');
+const { 
+    validateMediaCommands, 
+    validateEducationalCommands 
+} = require('../utils/commandValidator');
 
 // Import all command modules
 const ownerCommands = require('./owner');
@@ -26,8 +30,8 @@ async function initializeModules(sock) {
         { name: 'Group Extended', module: groupNewCommands },
         { name: 'User', module: userCommands },
         { name: 'Fun', module: funCommands },
-        { name: 'Media', module: mediaCommands },
-        { name: 'Educational', module: educationalCommands },
+        { name: 'Media', module: mediaCommands, validator: validateMediaCommands },
+        { name: 'Educational', module: educationalCommands, validator: validateEducationalCommands },
         { name: 'NSFW', module: nsfwCommands },
         { name: 'Reactions', module: reactionCommands },
         { name: 'Utility', module: utilityCommands },
@@ -35,7 +39,7 @@ async function initializeModules(sock) {
     ];
 
     // Initialize each module
-    for (const { name, module } of modules) {
+    for (const { name, module, validator } of modules) {
         try {
             // First, check if the module is properly defined
             if (!module) {
@@ -57,6 +61,15 @@ async function initializeModules(sock) {
                 logger.info(`✓ Found ${commandCount} commands in ${name} module`);
             } else {
                 logger.warn(`⚠️ Missing commands object in ${name} module`);
+            }
+
+            // Run validator if available
+            if (validator) {
+                logger.info(`→ Running validator for ${name} module...`);
+                const validationResult = await validator(sock);
+                if (!validationResult) {
+                    logger.warn(`⚠️ Validation failed for ${name} module but will continue with initialization`);
+                }
             }
 
             // Check and call the init method
