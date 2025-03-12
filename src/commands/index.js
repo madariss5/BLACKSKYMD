@@ -36,14 +36,43 @@ async function initializeModules() {
     // Initialize each module
     for (const { name, module } of modules) {
         try {
-            if (module && typeof module.init === 'function') {
+            // First, check if the module is properly defined
+            if (!module) {
+                logger.error(`❌ Module ${name} is undefined or null`);
+                continue;
+            }
+
+            // Check for the presence of category and commands
+            if (module.category) {
+                logger.info(`✓ Found category "${module.category}" in ${name} module`);
+            } else {
+                logger.warn(`⚠️ Missing category in ${name} module`);
+            }
+
+            if (module.commands) {
+                const commandCount = Object.keys(module.commands).filter(
+                    cmd => typeof module.commands[cmd] === 'function' && cmd !== 'init'
+                ).length;
+                logger.info(`✓ Found ${commandCount} commands in ${name} module`);
+            } else {
+                logger.warn(`⚠️ Missing commands object in ${name} module`);
+            }
+
+            // Check and call the init method
+            if (typeof module.init === 'function') {
+                logger.info(`→ Initializing ${name} module...`);
                 const success = await module.init();
-                if (!success) {
-                    logger.error(`❌ Failed to initialize ${name} module`);
+                if (success) {
+                    logger.info(`✅ Successfully initialized ${name} module`);
+                } else {
+                    logger.error(`❌ Failed to initialize ${name} module (init returned false)`);
                 }
+            } else {
+                logger.warn(`⚠️ No init method found in ${name} module`);
             }
         } catch (err) {
             logger.error(`❌ Error initializing ${name} module:`, err);
+            logger.error(`Stack trace: ${err.stack}`);
         }
     }
 }
@@ -51,17 +80,46 @@ async function initializeModules() {
 // Helper function to safely load commands
 function loadCommandsFromModule(module, name) {
     try {
+        let commandsObject = {};
+        
         if (module && module.commands) {
-            logger.info(`✓ Successfully loaded ${name} commands`);
-            return module.commands;
+            // Get commands from the modern format
+            commandsObject = module.commands;
+            
+            // Check if the module has a category property
+            const category = module.category || name.split('_')[0];
+            const commandCount = Object.keys(commandsObject).filter(
+                cmd => typeof commandsObject[cmd] === 'function' && cmd !== 'init'
+            ).length;
+            
+            logger.info(`✓ Successfully loaded ${commandCount} commands from "${name}" (category: "${category}")`);
+            
+            if (commandCount === 0) {
+                logger.warn(`⚠️ No commands found in "${name}" module`);
+            }
+            
+            return commandsObject;
         } else if (typeof module === 'object') {
-            logger.info(`✓ Successfully loaded ${name} commands (legacy format)`);
-            return module;
+            // Legacy format handling
+            commandsObject = module;
+            const commandCount = Object.keys(commandsObject).filter(
+                cmd => typeof commandsObject[cmd] === 'function' && cmd !== 'init'
+            ).length;
+            
+            logger.info(`✓ Successfully loaded ${commandCount} commands from "${name}" (legacy format)`);
+            
+            if (commandCount === 0) {
+                logger.warn(`⚠️ No commands found in "${name}" module (legacy format)`);
+            }
+            
+            return commandsObject;
         }
-        logger.warn(`⚠️ Invalid module format for ${name}`);
+        
+        logger.warn(`⚠️ Invalid module format for "${name}"`);
         return {};
     } catch (err) {
-        logger.error(`❌ Error loading ${name} commands:`, err);
+        logger.error(`❌ Error loading "${name}" commands:`, err);
+        console.error(err); // Print to console for debugging
         return {};
     }
 }

@@ -168,8 +168,14 @@ const menuCommands = {
                         );
                         
                         if (commandNames.length > 0) {
-                            allCommands[categoryName] = commandNames;
-                            logger.info(`Loaded ${commandNames.length} commands from ${file}`);
+                            // If this category already exists, merge commands instead of overwriting
+                            if (allCommands[categoryName]) {
+                                allCommands[categoryName] = [...allCommands[categoryName], ...commandNames];
+                                logger.info(`Added ${commandNames.length} commands to existing category "${categoryName}" from ${file}`);
+                            } else {
+                                allCommands[categoryName] = commandNames;
+                                logger.info(`Created new category "${categoryName}" with ${commandNames.length} commands from ${file}`);
+                            }
                         }
                     } catch (err) {
                         logger.error(`Error loading commands from ${file}:`, err);
