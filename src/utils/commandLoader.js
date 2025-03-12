@@ -1,4 +1,5 @@
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = fs.promises;
 const path = require('path');
 const logger = require('./logger');
 
@@ -8,14 +9,6 @@ class CommandError extends Error {
         this.name = 'CommandError';
         this.command = command;
         this.originalError = originalError;
-
-        if (Error.captureStackTrace) {
-            Error.captureStackTrace(this, CommandError);
-        }
-    }
-
-    toString() {
-        return `${this.name}: ${this.message}${this.command ? ` (Command: ${this.command})` : ''}${this.originalError ? `\nCaused by: ${this.originalError.message}` : ''}`;
     }
 }
 
@@ -29,81 +22,64 @@ class CommandLoader {
         this.reloadCooldown = 1000;
     }
 
+    async initializeFS() {
+        try {
+            // Ensure necessary directories exist
+            const requiredDirs = [
+                path.join(__dirname, '../../data'),
+                path.join(__dirname, '../../temp'),
+                path.join(__dirname, '../config/commands')
+            ];
+
+            for (const dir of requiredDirs) {
+                if (!fs.existsSync(dir)) {
+                    await fsPromises.mkdir(dir, { recursive: true });
+                    logger.info(`Created directory: ${dir}`);
+                }
+            }
+            return true;
+        } catch (err) {
+            logger.error('Failed to initialize file system:', err);
+            return false;
+        }
+    }
+
     async loadModuleSafely(modulePath, file) {
         try {
-            // Clear require cache
             delete require.cache[require.resolve(modulePath)];
 
-            logger.info(`Loading module from ${file}...`);
-            console.log(`Attempting to load module: ${file}`);
             const module = require(modulePath);
-            console.log(`Module loaded successfully: ${file}, module type: ${typeof module}`);
-            if (module && typeof module === 'object') {
-                console.log(`Module keys: ${Object.keys(module).join(', ')}`);
-            }
 
-            // Verify module structure
             if (!module || (typeof module !== 'object' && typeof module !== 'function')) {
-                throw new CommandError(`Invalid module format in ${file}: Expected object or function, got ${typeof module}`);
+                throw new CommandError(`Invalid module format in ${file}`);
             }
 
-            // Check if module has commands property
             if (module.commands && typeof module.commands === 'object') {
-                // Module uses new format with commands property
-                console.log(`Module ${file} has commands: ${Object.keys(module.commands).length} found`);
-                if (Object.keys(module.commands).length === 0) {
-                    logger.warn(`Module ${file} has empty commands object`);
-                    console.log(`WARNING: Module ${file} commands object is empty!`);
-                }
-                
-                // Debug the structure of the commands
-                if (Object.keys(module.commands).length > 0) {
-                    const firstCmdName = Object.keys(module.commands)[0];
-                    console.log(`First command in ${file}: ${firstCmdName}, type: ${typeof module.commands[firstCmdName]}`);
-                }
-                
-                // Initialize module if it has an init function
                 if (module.init && typeof module.init === 'function') {
                     try {
-                        logger.info(`Initializing module ${file}...`);
                         await module.init();
-                        console.log(`Module ${file} initialized successfully`);
                     } catch (initError) {
                         logger.error(`Error initializing module ${file}:`, initError);
-                        console.log(`ERROR initializing module ${file}: ${initError.message}`);
-                        // Continue loading even if initialization fails
                     }
-                } else {
-                    console.log(`Module ${file} has no init function`);
                 }
-                
-                console.log(`Returning module data for ${file}: category=${module.category || file.replace('.js', '')}`);
+
                 return {
                     commands: module.commands,
                     category: module.category || file.replace('.js', '')
                 };
             } else if (typeof module === 'object') {
-                // Check if the module has any function properties that might be commands
                 const possibleCommands = Object.entries(module)
                     .filter(([key, value]) => typeof value === 'function' && key !== 'init')
                     .map(([key]) => key);
-                
+
                 if (possibleCommands.length > 0) {
-                    logger.info(`Module ${file} using legacy format with ${possibleCommands.length} commands`);
                     return {
                         commands: module,
-                        category: file.replace('.js', '')
-                    };
-                } else {
-                    logger.warn(`Module ${file} has no valid commands`);
-                    return {
-                        commands: {},
                         category: file.replace('.js', '')
                     };
                 }
             }
 
-            logger.error(`Invalid module structure in ${file}: No valid commands found`);
             return {
                 commands: {},
                 category: file.replace('.js', '')
@@ -113,9 +89,6 @@ class CommandLoader {
                 throw err;
             }
             logger.error(`Failed to load module ${file}:`, err);
-            logger.error('Stack trace:', err.stack);
-            
-            // Return empty commands object to prevent the entire module loading from failing
             return {
                 commands: {},
                 category: file.replace('.js', '')
@@ -126,54 +99,45 @@ class CommandLoader {
     async loadCommandHandlers() {
         try {
             if (this.initialized && Date.now() - this.lastReload < this.reloadCooldown) {
-                logger.warn(`Command reload attempted too soon, please wait ${this.reloadCooldown}ms between reloads`);
                 return false;
             }
 
-            // Clear existing commands but keep cache
+            const fsInitialized = await this.initializeFS();
+            if (!fsInitialized) {
+                throw new Error('Failed to initialize filesystem');
+            }
+
             this.commands.clear();
             await this.loadCommandConfigs();
 
             const commandsPath = path.join(__dirname, '../commands');
-            logger.info(`Loading commands from directory: ${commandsPath}`);
-
             let files;
             try {
-                files = await fs.readdir(commandsPath);
+                files = await fsPromises.readdir(commandsPath);
             } catch (err) {
-                logger.error('Error reading commands directory:', err);
                 throw new CommandError('Failed to read commands directory', null, err);
             }
 
             const loadedHandlers = {};
-            logger.info('\nLoading command handlers...');
 
             for (const file of files) {
                 if (!file.endsWith('.js') || file === 'index.js') continue;
 
                 const category = file.replace('.js', '');
                 const modulePath = path.join(commandsPath, file);
-                
-                // Debug: log file being loaded
-                console.log(`CommandLoader: Attempting to load file: ${file}, path: ${modulePath}`);
 
                 try {
                     const moduleData = await this.loadModuleSafely(modulePath, file);
                     const commands = moduleData.commands;
                     const moduleCategory = moduleData.category || category;
-                    
-                    // Add more detailed logging for debugging
-                    console.log(`Module ${file} loaded: Category=${moduleCategory}, CommandsType=${typeof commands}, CommandCount=${Object.keys(commands).length}`);
-                    console.log(`First few commands: ${Object.keys(commands).slice(0, 3).join(', ')}`);
+
 
                     for (const [name, handler] of Object.entries(commands)) {
                         try {
                             if (typeof handler !== 'function') {
-                                logger.warn(`Skipping ${name} in ${file} - not a function, got ${typeof handler}`);
                                 continue;
                             }
 
-                            // Get or create config
                             const config = this.commandConfigs.get(name) || {
                                 name,
                                 description: 'No description available',
@@ -183,21 +147,12 @@ class CommandLoader {
                                 enabled: true
                             };
 
-                            // Validate handler signature
-                            if (handler.length > 3) {
-                                throw new CommandError(
-                                    `Command handler ${name} has too many parameters (max 3)`,
-                                    name
-                                );
-                            }
-
                             this.commands.set(name, {
                                 execute: handler,
                                 config,
                                 category: moduleCategory
                             });
 
-                            // Update or initialize cache
                             if (!this.commandCache.has(name)) {
                                 this.commandCache.set(name, {
                                     lastUsed: Date.now(),
@@ -208,15 +163,12 @@ class CommandLoader {
                             }
 
                             loadedHandlers[moduleCategory] = (loadedHandlers[moduleCategory] || 0) + 1;
-                            logger.info(`✅ Registered command: ${name} from ${moduleCategory}`);
                         } catch (err) {
-                            logger.error(`Failed to register handler for ${name} in ${file}:`, err.toString());
-                            if (err.stack) logger.error('Stack trace:', err.stack);
+                            logger.error(`Failed to register handler for ${name} in ${file}:`, err);
                         }
                     }
                 } catch (err) {
-                    logger.error(`Error processing module ${file}:`, err.toString());
-                    if (err.stack) logger.error('Stack trace:', err.stack);
+                    logger.error(`Error processing module ${file}:`, err);
                     continue;
                 }
             }
@@ -231,8 +183,7 @@ class CommandLoader {
             this.lastReload = Date.now();
             return this.commands.size > 0;
         } catch (err) {
-            logger.error('Critical error in loadCommandHandlers:', err.toString());
-            if (err.stack) logger.error('Stack trace:', err.stack);
+            logger.error('Critical error in loadCommandHandlers:', err);
             return false;
         }
     }
@@ -240,40 +191,35 @@ class CommandLoader {
     async loadCommandConfigs() {
         try {
             const configPath = path.join(__dirname, '../config/commands');
-            const files = await fs.readdir(configPath);
+            if (!fs.existsSync(configPath)) {
+                await fsPromises.mkdir(configPath, { recursive: true });
+            }
+
+            const files = await fsPromises.readdir(configPath);
             let loadedCount = 0;
 
             this.commandConfigs.clear();
-            logger.info('Loading command configurations...');
 
             for (const file of files) {
                 if (file.endsWith('.json')) {
                     try {
-                        const category = file.replace('.json', '');
-                        const configContent = await fs.readFile(path.join(configPath, file), 'utf8');
+                        const configContent = await fsPromises.readFile(path.join(configPath, file), 'utf8');
                         const config = JSON.parse(configContent);
 
                         if (!Array.isArray(config.commands)) {
-                            logger.warn(`Invalid config file ${file}: 'commands' is not an array`);
                             continue;
                         }
 
                         for (const cmd of config.commands) {
-                            try {
-                                const validatedConfig = await this.validateCommandConfig(cmd, cmd.name);
-                                this.commandConfigs.set(cmd.name, {
-                                    ...validatedConfig,
-                                    category
-                                });
-                                loadedCount++;
-                                logger.debug(`Loaded config for command: ${cmd.name}`);
-                            } catch (err) {
-                                logger.error(`Error processing command ${cmd.name} in ${file}:`, err);
-                            }
+                            const validatedConfig = await this.validateCommandConfig(cmd, cmd.name);
+                            this.commandConfigs.set(cmd.name, {
+                                ...validatedConfig,
+                                category: file.replace('.json', '')
+                            });
+                            loadedCount++;
                         }
                     } catch (err) {
                         logger.error(`Error reading/parsing config file ${file}:`, err);
-                        logger.error('Stack trace:', err.stack);
                         continue;
                     }
                 }
@@ -281,7 +227,6 @@ class CommandLoader {
             logger.info(`Successfully loaded ${loadedCount} command configs`);
         } catch (err) {
             logger.error('Critical error loading command configs:', err);
-            logger.error('Stack trace:', err.stack);
             throw new CommandError('Failed to load command configurations', null, err);
         }
     }
@@ -317,17 +262,10 @@ class CommandLoader {
             }
 
             const command = this.commands.get(name);
-            if (!command) {
-                logger.warn(`Command '${name}' not found`);
+            if (!command || !command.config.enabled) {
                 return null;
             }
 
-            if (!command.config.enabled) {
-                logger.warn(`Command '${name}' is disabled`);
-                return null;
-            }
-
-            logger.info(`Command '${name}' found in category '${command.category}'`);
             const cacheInfo = this.commandCache.get(name);
             if (cacheInfo) {
                 cacheInfo.lastUsed = Date.now();
@@ -353,9 +291,7 @@ class CommandLoader {
             }
 
             if (requiredPermissions.includes('owner')) {
-                const isOwner = sender === process.env.OWNER_NUMBER;
-                logger.info(`Owner permission check for ${sender}: ${isOwner}`);
-                return isOwner;
+                return sender === process.env.OWNER_NUMBER;
             }
 
             return requiredPermissions.includes('user');
@@ -364,7 +300,6 @@ class CommandLoader {
             return false;
         }
     }
-
     getCommandStats() {
         const stats = {
             totalCommands: this.commands.size,

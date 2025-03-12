@@ -1,5 +1,6 @@
 const logger = require('../../utils/logger');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = fs.promises;
 const path = require('path');
 
 // Import commands
@@ -21,8 +22,10 @@ async function initializeDirectories() {
     try {
         for (const dir of dirs) {
             const fullPath = path.join(__dirname, '../../../', dir);
-            await fs.mkdir(fullPath, { recursive: true });
-            logger.info(`Educational directory initialized: ${dir}`);
+            if (!fs.existsSync(fullPath)) {
+                await fsPromises.mkdir(fullPath, { recursive: true });
+                logger.info(`Educational directory initialized: ${dir}`);
+            }
         }
         return true;
     } catch (err) {
@@ -37,6 +40,9 @@ module.exports = {
     async init() {
         try {
             logger.info('Initializing Educational module...');
+            if (!fs.existsSync(path.join(__dirname, '../../../data'))) {
+                await fsPromises.mkdir(path.join(__dirname, '../../../data'), { recursive: true });
+            }
             await initializeDirectories();
             logger.success('Educational module initialized successfully');
             return true;

@@ -2,7 +2,8 @@ const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLat
 const qrcode = require('qrcode-terminal');
 const logger = require('./utils/logger');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = fs.promises;
 const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
 const { handleGroupMessage } = require('./handlers/groupMessageHandler');
@@ -30,58 +31,20 @@ let streamRetryCount = 0;
 let lastRestartTime = 0;
 let lastLogTime = 0;
 
-let initialCredsSent = false;
-let lastCredsSentTime = 0;
-const CREDS_SEND_COOLDOWN = 300000;
-
-// Initialize fs module
-const initFS = async () => {
-    try {
-        await fs.access(AUTH_DIR);
-    } catch (err) {
-        await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
-    }
-};
-
 async function validateSession() {
     try {
-        await initFS(); // Initialize fs before using it
-
         const credentialsPath = path.join(AUTH_DIR, 'creds.json');
-        let exists = await fs.access(credentialsPath)
+        const exists = await fsPromises.access(credentialsPath)
             .then(() => true)
             .catch(() => false);
 
-        if (!exists && isHeroku) {
-            logger.info('Running on Heroku with no credentials file - attempting restore from backup');
-            const restored = await sessionManager.restoreFromBackup();
-            if (restored) {
-                logger.info('Successfully restored credentials from backup');
-                exists = true;
-            } else {
-                logger.warn('Could not restore credentials from backup, will need to scan QR code');
-            }
+        if (!exists) {
+            logger.info('No credentials found, new session will be created');
+            return false;
         }
 
-        if (!exists) return false;
-
-        const creds = JSON.parse(await fs.readFile(credentialsPath, 'utf8'));
-        const valid = !!creds?.me?.id;
-
-        if (valid) {
-            logger.info('Session validated successfully');
-
-            if (isHeroku) {
-                try {
-                    logger.info('Creating post-validation backup on Heroku');
-                    await sessionManager.backupCredentials();
-                } catch (backupErr) {
-                    logger.error('Failed to create backup:', backupErr);
-                }
-            }
-        }
-
-        return valid;
+        const creds = JSON.parse(await fsPromises.readFile(credentialsPath, 'utf8'));
+        return !!creds?.me?.id;
     } catch (err) {
         logger.error('Session validation error:', err);
         return false;
@@ -90,8 +53,8 @@ async function validateSession() {
 
 async function cleanAuthState() {
     try {
-        await fs.rm(AUTH_DIR, { recursive: true, force: true });
-        await fs.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
+        await fsPromises.rm(AUTH_DIR, { recursive: true, force: true });
+        await fsPromises.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
     } catch (err) {
         logger.error('Clean auth state error:', err);
     }
@@ -99,10 +62,13 @@ async function cleanAuthState() {
 
 async function startConnection() {
     try {
-        await initFS(); // Initialize fs before starting connection
         qrDisplayed = false;
 
-        await commandLoader.loadCommandHandlers();
+        // Initialize command loader first (which also initializes fs)
+        const commandsInitialized = await commandLoader.loadCommandHandlers();
+        if (!commandsInitialized) {
+            throw new Error('Failed to initialize commands');
+        }
 
         const { version } = await fetchLatestBaileysVersion();
         const isValidSession = await validateSession();
@@ -127,7 +93,7 @@ async function startConnection() {
         sock = makeWASocket({
             version,
             auth: state,
-            printQRInTerminal: false, // We'll handle QR display ourselves
+            printQRInTerminal: false,
             logger: logger,
             browser: ['WhatsApp-MD', 'Chrome', '1.0.0'],
             connectTimeoutMs: 60000,
@@ -149,7 +115,7 @@ async function startConnection() {
                 if (qr && !qrDisplayed) {
                     qrDisplayed = true;
 
-                    // Completely disable all logging
+                    // Disable logging completely
                     const originalLogLevel = logger.level;
                     logger.level = 'silent';
 
@@ -157,13 +123,12 @@ async function startConnection() {
                     process.stdout.write('\x1Bc');
                     console.log('\n=== WhatsApp QR Code ===\n');
 
-                    // Generate QR with minimal decoration
-                    qrcode.generate(qr, { small: true }, (qrcode) => {
+                    qrcode.generate(qr, { small: true, margin: 0 }, (qrcode) => {
                         console.log(qrcode);
-                        console.log('\nScan this QR code with WhatsApp\n');
+                        console.log('\nPlease scan this QR code with WhatsApp\n');
                     });
 
-                    // Restore logging after QR is displayed
+                    // Restore logging after QR display
                     setTimeout(() => {
                         logger.level = originalLogLevel;
                     }, 1000);
@@ -174,21 +139,14 @@ async function startConnection() {
                     qrDisplayed = false;
                     retryCount = 0;
                     streamRetryCount = 0;
-                    process.stdout.write('\x1Bc');
+                    console.clear();
                     console.log('✅ Successfully connected to WhatsApp!\n');
 
                     try {
-                        initialCredsSent = true;
-                        lastCredsSentTime = Date.now();
-                        logger.info('Connection initialized and credentials tracking set up');
-
                         if (!global.connectionNotified) {
                             global.connectionNotified = true;
-
                             let ownerNumber = process.env.OWNER_NUMBER;
-                            if (!ownerNumber) {
-                                logger.warn('OWNER_NUMBER environment variable is not set - skipping notification');
-                            } else {
+                            if (ownerNumber) {
                                 try {
                                     if (!ownerNumber.includes('@s.whatsapp.net')) {
                                         ownerNumber = ownerNumber.replace(/[^\d]/g, '');
@@ -197,16 +155,11 @@ async function startConnection() {
                                         }
                                         ownerNumber = `${ownerNumber}@s.whatsapp.net`;
                                     }
-
                                     await sock.sendMessage(ownerNumber, { text: 'Bot is now connected!' });
-                                    logger.info('Connection notification sent successfully to: ' + ownerNumber);
                                 } catch (notifyErr) {
                                     logger.error('Failed to send owner notification:', notifyErr.message);
-                                    logger.info('Bot will continue to operate normally despite notification failure');
                                 }
                             }
-                        } else {
-                            logger.info('Connection notification already sent, skipping to avoid spam');
                         }
                     } catch (err) {
                         logger.error('Failed to handle connection:', err.message);
@@ -220,15 +173,12 @@ async function startConnection() {
                     const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
                         statusCode !== DisconnectReason.forbidden;
 
-                    logger.info(`Connection closed. Status code: ${statusCode}`);
-
                     if (shouldReconnect && retryCount < MAX_RETRIES) {
                         retryCount++;
                         const delay = Math.min(
                             RETRY_INTERVAL_BASE * Math.pow(1.5, retryCount - 1),
                             MAX_RETRY_INTERVAL
                         );
-
                         setTimeout(startConnection, delay);
                     } else {
                         if (!shouldReconnect) {
@@ -246,14 +196,12 @@ async function startConnection() {
                 await saveCreds();
             }
 
-            // Handle incoming messages
             if (events['messages.upsert']) {
                 const upsert = events['messages.upsert'];
                 if (upsert.type === 'notify') {
                     for (const msg of upsert.messages) {
                         if (!msg.message) continue;
 
-                        const msgType = msg.message ? Object.keys(msg.message)[0] : 'unknown';
                         const remoteJid = msg.key.remoteJid || 'unknown';
                         const isGroup = remoteJid.endsWith('@g.us');
 
@@ -261,13 +209,12 @@ async function startConnection() {
                             if (isGroup) {
                                 await handleGroupMessage(sock, msg);
                             }
-
                             await messageHandler(sock, msg);
                         } catch (err) {
                             logger.error('Message handling error:', err);
                             try {
                                 await sock.sendMessage(msg.key.remoteJid, { 
-                                    text: '❌ Sorry, there was an error processing your message. Please try again later.' 
+                                    text: '❌ Sorry, there was an error processing your message. Please try again later.'
                                 });
                             } catch (notifyErr) {
                                 logger.error('Failed to send error notification:', notifyErr);

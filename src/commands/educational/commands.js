@@ -1,6 +1,7 @@
 const { handleError } = require('../../utils/error');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = fs.promises;
 const mathjs = require('mathjs');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const logger = require('../../utils/logger');
@@ -72,6 +73,13 @@ async function createMathChart(equation, xRange = [-10, 10]) {
     return await chartJSNodeCanvas.renderToBuffer(config);
 }
 
+// Ensure directory exists
+async function ensureDirectory(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+        await fsPromises.mkdir(dirPath, { recursive: true });
+    }
+}
+
 // Command implementations
 const commands = {
     // Language Learning Commands
@@ -88,9 +96,14 @@ const commands = {
             }
 
             const vocabPath = path.join(__dirname, '../../../data/educational/vocabulary.json');
+            await ensureDirectory(path.dirname(vocabPath));
+
             let vocabulary = await safeFileOperation(async () => {
-                const data = await fs.readFile(vocabPath, 'utf8');
-                return JSON.parse(data);
+                if (fs.existsSync(vocabPath)) {
+                    const data = await fsPromises.readFile(vocabPath, 'utf8');
+                    return JSON.parse(data);
+                }
+                return {};
             }, {});
 
             switch (action) {
@@ -106,7 +119,7 @@ const commands = {
                     const newWords = words.join(' ').split(',');
                     vocabulary[language].push(...newWords);
 
-                    await fs.writeFile(vocabPath, JSON.stringify(vocabulary, null, 2));
+                    await fsPromises.writeFile(vocabPath, JSON.stringify(vocabulary, null, 2));
                     await sock.sendMessage(remoteJid, {
                         text: `*✅ Added ${newWords.length} words to ${language} vocabulary*`
                     });
@@ -210,9 +223,13 @@ const commands = {
             response += `*Need help? Use .solution to see the steps.*`;
 
             const solutionsPath = path.join(__dirname, '../../../data/educational/math_solutions.json');
+            await ensureDirectory(path.dirname(solutionsPath));
             let solutions = await safeFileOperation(async () => {
-                const data = await fs.readFile(solutionsPath, 'utf8');
-                return JSON.parse(data);
+                if (fs.existsSync(solutionsPath)) {
+                    const data = await fsPromises.readFile(solutionsPath, 'utf8');
+                    return JSON.parse(data);
+                }
+                return {};
             }, {});
 
             solutions[remoteJid] = {
@@ -222,7 +239,7 @@ const commands = {
                 timestamp: new Date().toISOString()
             };
 
-            await fs.writeFile(solutionsPath, JSON.stringify(solutions, null, 2));
+            await fsPromises.writeFile(solutionsPath, JSON.stringify(solutions, null, 2));
             await sock.sendMessage(remoteJid, { text: response });
 
         } catch (err) {
@@ -236,7 +253,7 @@ const commands = {
 
             const solutionsPath = path.join(__dirname, '../../../data/educational/math_solutions.json');
             let solutions = await safeFileOperation(async () => {
-                const data = await fs.readFile(solutionsPath, 'utf8');
+                const data = await fsPromises.readFile(solutionsPath, 'utf8');
                 return JSON.parse(data);
             }, {});
 
@@ -497,9 +514,13 @@ const commands = {
             response += `*Check your answer with .answer [your answer]*`;
 
             const exercisesPath = path.join(__dirname, '../../../data/educational/language_exercises.json');
+            await ensureDirectory(path.dirname(exercisesPath));
             let activeExercises = await safeFileOperation(async () => {
-                const data = await fs.readFile(exercisesPath, 'utf8');
-                return JSON.parse(data);
+                if (fs.existsSync(exercisesPath)) {
+                    const data = await fsPromises.readFile(exercisesPath, 'utf8');
+                    return JSON.parse(data);
+                }
+                return {};
             }, {});
 
             activeExercises[remoteJid] = {
@@ -507,7 +528,7 @@ const commands = {
                 timestamp: new Date().toISOString()
             };
 
-            await fs.writeFile(exercisesPath, JSON.stringify(activeExercises, null, 2));
+            await fsPromises.writeFile(exercisesPath, JSON.stringify(activeExercises, null, 2));
             await sock.sendMessage(remoteJid, { text: response });
 
         } catch (err) {
@@ -528,9 +549,13 @@ const commands = {
             }
 
             const plansPath = path.join(__dirname, '../../../data/educational/study_plans.json');
+            await ensureDirectory(path.dirname(plansPath));
             let plans = await safeFileOperation(async () => {
-                const data = await fs.readFile(plansPath, 'utf8');
-                return JSON.parse(data);
+                if (fs.existsSync(plansPath)) {
+                    const data = await fsPromises.readFile(plansPath, 'utf8');
+                    return JSON.parse(data);
+                }
+                return {};
             }, {});
 
             switch (action) {
@@ -549,7 +574,7 @@ const commands = {
                         progress: 0
                     };
 
-                    await fs.writeFile(plansPath, JSON.stringify(plans, null, 2));
+                    await fsPromises.writeFile(plansPath, JSON.stringify(plans, null, 2));
                     await sock.sendMessage(remoteJid, {
                         text: '*✅ Study plan created successfully*'
                     });
@@ -618,7 +643,7 @@ const commands = {
                     plans[subject].progress = progress;
                     plans[subject].lastStudied = new Date().toISOString();
 
-                    await fs.writeFile(plansPath, JSON.stringify(plans, null, 2));
+                    await fsPromises.writeFile(plansPath, JSON.stringify(plans, null, 2));
                     await sock.sendMessage(remoteJid, {
                         text: `*✅ Progress updated to ${progress}%*`
                     });
@@ -717,11 +742,14 @@ const commands = {
             }
 
             const mindmapsPath = path.join(__dirname, '../../../data/educational/mindmaps.json');
+            await ensureDirectory(path.dirname(mindmapsPath));
             let mindmaps = {};
 
             try {
-                const data = await fs.readFile(mindmapsPath, 'utf8');
-                mindmaps = JSON.parse(data);
+                if (fs.existsSync(mindmapsPath)) {
+                    const data = await fsPromises.readFile(mindmapsPath, 'utf8');
+                    mindmaps = JSON.parse(data);
+                }
             } catch (err) {
                 mindmaps = {};
             }
@@ -741,7 +769,7 @@ const commands = {
                         updated: new Date().toISOString()
                     };
 
-                    await fs.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
+                    await fsPromises.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
                     await sock.sendMessage(remoteJid, {
                         text: '*✅ Mind map created successfully*'
                     });
@@ -776,7 +804,7 @@ const commands = {
                     mindmaps[topic].nodes.push(...newNodes);
                     mindmaps[topic].updated = new Date().toISOString();
 
-                    await fs.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
+                    await fsPromises.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
                     await sock.sendMessage(remoteJid, {
                         text: '*✅ Nodes added to mind map*'
                     });

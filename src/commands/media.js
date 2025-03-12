@@ -2,7 +2,8 @@ const logger = require('../utils/logger');
 const config = require('../config/config');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const sharp = require('sharp');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = fs.promises;
 const path = require('path');
 const { writeExifToWebp } = require('../utils/stickerMetadata');
 const axios = require('axios');
@@ -13,6 +14,31 @@ const yts = require('yt-search');
 const { getLyrics } = require('genius-lyrics-api');
 const webp = require('node-webpmux');
 const { isFeatureEnabled } = require('../utils/groupSettings');
+
+// Initialize required directories
+const initializeDirectories = async () => {
+    try {
+        const tempDir = path.join(__dirname, '../../temp');
+        if (!fs.existsSync(tempDir)) {
+            await fsPromises.mkdir(tempDir, { recursive: true });
+            logger.info('Media temp directory created successfully');
+        }
+        return true;
+    } catch (err) {
+        logger.error('Failed to initialize media directories:', err);
+        return false;
+    }
+};
+
+// Initialize module
+const init = async () => {
+    try {
+        return await initializeDirectories();
+    } catch (err) {
+        logger.error('Failed to initialize media module:', err);
+        return false;
+    }
+};
 
 /**
  * Helper function to check if media commands are enabled for a group
@@ -121,12 +147,12 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}`);
             const outputPath = path.join(tempDir, `output_${Date.now()}.webp`);
 
-            await fs.writeFile(inputPath, buffer);
+            await fsPromises.writeFile(inputPath, buffer);
 
             // Convert to WebP
             await sharp(buffer)
@@ -142,8 +168,8 @@ const mediaCommands = {
             });
 
             // Cleanup
-            await fs.unlink(inputPath);
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(inputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in sticker command:', err);
@@ -169,7 +195,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -182,7 +208,7 @@ const mediaCommands = {
                 caption: '✅ Here\'s your image!'
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in toimg command:', err);
@@ -277,7 +303,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -301,7 +327,7 @@ const mediaCommands = {
                     caption: '✅ Here\'s your enhanced image!'
                 });
 
-                await fs.unlink(outputPath);
+                await fsPromises.unlink(outputPath);
             } catch (processErr) {
                 throw new Error(`Failed to enhance image: ${processErr.message}`);
             }
@@ -342,7 +368,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -361,7 +387,7 @@ const mediaCommands = {
                     caption: `✅ Image sharpened with level ${level}!`
                 });
 
-                await fs.unlink(outputPath);
+                await fsPromises.unlink(outputPath);
             } catch (processErr) {
                 throw new Error(`Failed to sharpen image: ${processErr.message}`);
             }
@@ -394,12 +420,12 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
             const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
 
-            await fs.writeFile(inputPath, buffer);
+            await fsPromises.writeFile(inputPath, buffer);
 
             const ffmpeg = require('fluent-ffmpeg');
             const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
@@ -419,8 +445,8 @@ const mediaCommands = {
             });
 
             // Cleanup
-            await fs.unlink(inputPath);
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(inputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in reverse command:', err);
@@ -448,7 +474,7 @@ const mediaCommands = {
             await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Creating text sticker...' });
 
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
             const outputPath = path.join(tempDir, `${Date.now()}.webp`);
 
             // Create text image using Sharp
@@ -476,7 +502,7 @@ const mediaCommands = {
                 sticker: { url: outputPath }
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in ttp command:', err);
@@ -502,7 +528,7 @@ const mediaCommands = {
             await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Creating animated text sticker...' });
 
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
             const outputPath = path.join(tempDir, `${Date.now()}.webp`);
 
             // Create animated text image using Sharp
@@ -547,7 +573,7 @@ const mediaCommands = {
                 sticker: { url: outputPath }
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in attp command:', err);
@@ -582,7 +608,7 @@ const mediaCommands = {
             const buffer = Buffer.from(response.data);
 
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
             const outputPath = path.join(tempDir, `${Date.now()}.webp`);
 
             // Convert to WebP sticker
@@ -598,7 +624,7 @@ const mediaCommands = {
                 sticker: { url: outputPath }
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in emojimix command:', err);
@@ -624,12 +650,12 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}.webp`);
             const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
 
-            await fs.writeFile(inputPath, buffer);
+            await fsPromises.writeFile(inputPath, buffer);
 
             const ffmpeg = require('fluent-ffmpeg');
             const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
@@ -649,8 +675,8 @@ const mediaCommands = {
             });
 
             // Cleanup
-            await fs.unlink(inputPath);
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(inputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in tovideo command:', err);
@@ -679,12 +705,12 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
             const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
 
-            await fs.writeFile(inputPath, buffer);
+            await fsPromises.writeFile(inputPath, buffer);
 
             const ffmpeg = require('fluent-ffmpeg');
             const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
@@ -706,8 +732,8 @@ const mediaCommands = {
             });
 
             // Cleanup
-            await fs.unlink(inputPath);
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(inputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in trim command:', err);
@@ -741,12 +767,12 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
             const outputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
 
-            await fs.writeFile(inputPath, buffer);
+            await fsPromises.writeFile(inputPath, buffer);
 
             const ffmpeg = require('fluent-ffmpeg');
             const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
@@ -768,8 +794,8 @@ const mediaCommands = {
             });
 
             // Cleanup
-            await fs.unlink(inputPath);
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(inputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in speed command:', err);
@@ -796,7 +822,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -811,7 +837,7 @@ const mediaCommands = {
                 caption: `✅ Image brightness adjusted to ${level}x`
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in brightness command:', err);
@@ -839,7 +865,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -854,7 +880,7 @@ const mediaCommands = {
                 caption: `✅ Image contrast adjusted to ${level}x`
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in contrast command:', err);
@@ -882,7 +908,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -895,7 +921,7 @@ const mediaCommands = {
                 caption: `✅ Applied blur effect (sigma: ${sigma})`
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in blur command:', err);
@@ -923,7 +949,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -936,7 +962,7 @@ const mediaCommands = {
                 caption: `✅ Image rotated by ${angle} degrees`
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in rotate command:', err);
@@ -964,7 +990,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -978,7 +1004,7 @@ const mediaCommands = {
                 caption: `✅ Image flipped ${direction}ly`
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in flip command:', err);
@@ -1006,7 +1032,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -1019,7 +1045,7 @@ const mediaCommands = {
                 caption: `✅ Applied color tint (R:${r}, G:${g}, B:${b})`
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in tint command:', err);
@@ -1041,7 +1067,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -1054,7 +1080,7 @@ const mediaCommands = {
                 caption: '✅ Image colors inverted'
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in negate command:', err);
@@ -1076,7 +1102,7 @@ const mediaCommands = {
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
-            await fs.mkdir(tempDir, { recursive: true });
+            await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
 
@@ -1089,7 +1115,7 @@ const mediaCommands = {
                 caption: '✅ Image converted to grayscale'
             });
 
-            await fs.unlink(outputPath);
+            await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in grayscale command:', err);
@@ -1112,7 +1138,7 @@ module.exports = {
             // Check core dependencies first
             const coreDeps = {
                 sharp,
-                fs: fs.promises,
+                fs,
                 path,
                 logger
             };
@@ -1151,8 +1177,8 @@ module.exports = {
 
             for (const dir of dirs) {
                 try {
-                    await fs.mkdir(dir, { recursive: true });
-                    const stats = await fs.stat(dir);
+                    await fsPromises.mkdir(dir, { recursive: true });
+                    const stats = await fsPromises.stat(dir);
                     if (!stats.isDirectory()) {
                         throw new Error(`Path exists but is not a directory: ${dir}`);
                     }
