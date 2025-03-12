@@ -65,14 +65,31 @@ async function startConnection() {
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: true, // Enable native QR printing temporarily for debugging
-            browser: ['WhatsApp-MD', 'Chrome', '4.0.0'],
+            browser: ['WhatsApp Bot', 'Firefox', '2.0.0'],
             logger: pino({ level: 'info' }), // Enable more detailed logging
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 30000,
             emitOwnEvents: true,
             retryRequestDelayMs: 2000,
-            version: [2, 2323, 4]
+            version: [2, 2323, 4],
+            // Add these connection parameters
+            patchMessageBeforeSending: false,
+            getMessage: async () => {
+                return { conversation: 'hello' };
+            },
+            markOnlineOnConnect: false, // Don't mark as online immediately
+            syncFullHistory: false, // Don't sync full history to reduce load
+            userDevicesCache: false, // Disable device cache
+            transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
+            // Add WebSocket options
+            ws: {
+                connectTimeoutMs: 30000,
+                keepAliveIntervalMs: 25000,
+                retryOnServerClose: true,
+                retryOnTimeout: true,
+                retryCount: 5
+            }
         });
 
         // Handle connection updates
