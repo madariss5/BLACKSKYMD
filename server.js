@@ -9,7 +9,7 @@
 const express = require('express');
 const qrcode = require('qrcode');
 const path = require('path');
-const { connectToWhatsApp, setupSessionBackup, getConnectionStatus } = require('./bot-handler');
+const { connectToWhatsApp, setupSessionBackup, getConnectionStatus, resetConnection } = require('./bot-handler');
 
 // Create Express app
 const app = express();
