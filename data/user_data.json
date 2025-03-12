@@ -1,0 +1,27 @@
+{
+  "profiles": {
+    "491708887679@s.whatsapp.net": {
+      "name": "User",
+      "age": 0,
+      "xp": 44,
+      "level": 1,
+      "coins": 0,
+      "bio": "",
+      "registeredAt": "2025-03-11T22:42:27.143Z",
+      "lastDaily": null,
+      "inventory": [],
+      "achievements": [],
+      "customTitle": "",
+      "warnings": 0
+    }
+  },
+  "games": {},
+  "marriages": {},
+  "bank": {},
+  "jobs": {},
+  "pets": {},
+  "afk": {},
+  "streaks": {},
+  "checkins": {},
+  "lottery": []
+}
