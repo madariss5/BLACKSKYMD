@@ -818,6 +818,27 @@ const educationalCommands = {
         }
     },
 
+    async convert(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [value, fromUnit, toUnit] = args;
+
+            if (!value || !fromUnit || !toUnit) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📏 Usage:* .convert [value] [from_unit] [to_unit]\nExample: .convert 100 km mi'
+                });
+                return;
+            }
+
+            const result = mathjs.evaluate(`${value} ${fromUnit} to ${toUnit}`);
+            await sock.sendMessage(remoteJid, {
+                text: `*🔄 Conversion Result:*\n${value} ${fromUnit} = ${result} ${toUnit}`
+            });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error converting units');
+        }
+    },
+
     // Study notes management
     async notes(sock, message, args) {
         try {
@@ -893,26 +914,7 @@ const educationalCommands = {
             await handleError(sock, message.key.remoteJid, err, 'Error managing notes');
         }
     },
-    async convert(sock, message, args) {
-        try {
-            const remoteJid = message.key.remoteJid;
-            const [value, fromUnit, toUnit] = args;
 
-            if (!value || !fromUnit || !toUnit) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📏 Usage:* .convert [value] [from_unit] [to_unit]\nExample: .convert 100 km mi'
-                });
-                return;
-            }
-
-            const result = mathjs.evaluate(`${value} ${fromUnit} to ${toUnit}`);
-            await sock.sendMessage(remoteJid, {
-                text: `*🔄 Conversion Result:*\n${value} ${fromUnit} = ${result} ${toUnit}`
-            });
-        } catch (err) {
-            await handleError(sock, message.key.remoteJid, err, 'Error converting units');
-        }
-    },
 
     async formula(sock, message, args) {
         try {
@@ -1577,6 +1579,513 @@ const educationalCommands = {
             await sock.sendMessage(remoteJid, { text: content });
         } catch (err) {
             await handleError(sock, message.key.remoteJid, err, 'Error fetching study material');
+        }
+    },
+    async quizScore(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [subject] = args;
+            const userId = message.key.participant || message.key.remoteJid;
+
+            if (!subject) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📊 Usage:* .quizScore [subject]\nExample: .quizScore math'
+                });
+                return;
+            }
+
+            const scoresPath = path.join(__dirname, '../../data/educational/quiz_scores.json');
+            let scores = {};
+
+            try {
+                const data = await fs.promises.readFile(scoresPath, 'utf8');
+                scores = JSON.parse(data);
+            } catch (err) {
+                scores = {};
+            }
+
+            scores[userId] = scores[userId] || {};
+            scores[userId][subject] = scores[userId][subject] || {
+                total: 0,
+                correct: 0,
+                history: []
+            };
+
+            const userScore = scores[userId][subject];
+            let response = `*📊 Quiz Score for ${subject}*\n\n`;
+            response += `Total Questions: ${userScore.total}\n`;
+            response += `Correct Answers: ${userScore.correct}\n`;
+            response += `Success Rate: ${((userScore.correct / userScore.total) * 100 || 0).toFixed(1)}%\n\n`;
+
+            if (userScore.history.length > 0) {
+                response += '*Recent Attempts:*\n';
+                userScore.history.slice(-5).forEach((attempt, i) => {
+                    response += `${i + 1}. ${attempt.date}: ${attempt.correct}/${attempt.total}\n`;
+                });
+            }
+
+            await sock.sendMessage(remoteJid, { text: response });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error retrieving quiz scores');
+        }
+    },
+
+    async experiment(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [type] = args;
+
+            if (!type) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🧪 Usage:* .experiment [type]\nAvailable types: pendulum, wave, chemical'
+                });
+                return;
+            }
+
+            const experiments = {
+                pendulum: {
+                    title: "Simple Pendulum",
+                    description: "A weight suspended from a pivot point that swings back and forth under gravity.",
+                    variables: [
+                        "Length of string (L)",
+                        "Mass of bob (m)",
+                        "Gravity (g)",
+                        "Maximum angle (θ)"
+                    ],
+                    formula: "Period T = 2π√(L/g)",
+                    observations: [
+                        "Period is independent of mass",
+                        "Period increases with length",
+                        "Small angle approximation valid for θ < 15°"
+                    ]
+                },
+                wave: {
+                    title: "Wave Properties",
+                    description: "Study of mechanical waves and their properties.",
+                    variables: [
+                        "Frequency (f)",
+                        "Wavelength (λ)",
+                        "Amplitude (A)",
+                        "Speed (v)"
+                    ],
+                    formula: "v = fλ",
+                    observations: [
+                        "Higher frequency = shorter wavelength",
+                        "Energy proportional to amplitude squared",
+                        "Speed depends on medium"
+                    ]
+                },
+                chemical: {
+                    title: "Acid-Base Reaction",
+                    description: "Study of reaction between acids and bases.",
+                    variables: [
+                        "pH levels",
+                        "Concentration",
+                        "Temperature",
+                        "Reaction rate"
+                    ],
+                    formula: "H+ + OH- → H2O",
+                    observations: [
+                        "Neutralization produces salt and water",
+                        "pH changes during reaction",
+                        "Temperature affects reaction rate"
+                    ]
+                }
+            };
+
+            if (!experiments[type]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Invalid experiment type*'
+                });
+                return;
+            }
+
+            const exp = experiments[type];
+            let response = `*🔬 ${exp.title}*\n\n`;
+            response += `*Description:*\n${exp.description}\n\n`;
+            response += `*Variables:*\n${exp.variables.map(v => `• ${v}`).join('\n')}\n\n`;
+            response += `*Key Formula:*\n${exp.formula}\n\n`;
+            response += `*Observations:*\n${exp.observations.map(o => `• ${o}`).join('\n')}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error displaying experiment');
+        }
+    },
+
+    async solveStep(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const equation = args.join(' ');
+
+            if (!equation) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .solveStep [equation]\nExample: .solveStep 2x + 5 = 15'
+                });
+                return;
+            }
+
+            // Parse equation
+            const sides = equation.split('=').map(side => side.trim());
+            if (sides.length !== 2) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Invalid equation format. Use format: ax + b = c*'
+                });
+                return;
+            }
+
+            let steps = `*🔢 Step-by-Step Solution:*\n\n`;
+            steps += `Original equation: ${equation}\n\n`;
+
+            // Solve step by step
+            try {
+                const leftSide = sides[0];
+                const rightSide = sides[1];
+
+                // Step 1: Combine like terms on left side
+                steps += `1️⃣ Combine like terms on left side:\n`;
+                const combinedLeft = mathjs.simplify(leftSide).toString();
+                steps += `${combinedLeft} = ${rightSide}\n\n`;
+
+                // Step 2: Move all terms with x to left side
+                steps += `2️⃣ Move all terms with x to left side:\n`;
+                const withX = mathjs.simplify(`${combinedLeft} - ${rightSide}`).toString();
+                steps += `${withX} = 0\n\n`;
+
+                // Step 3: Solve for x
+                steps += `3️⃣ Solve for x:\n`;
+                const solution = mathjs.solve(equation, 'x');
+                steps += `x = ${solution}\n\n`;
+
+                // Step 4: Verify
+                steps += `4️⃣ Verify solution:\n`;
+                const verification = mathjs.evaluate(equation.replace(/x/g, `(${solution})`));
+                steps += `Both sides equal: ${verification}`;
+
+                await sock.sendMessage(remoteJid, { text: steps });
+            } catch (err) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Error solving equation. Please check format.*'
+                });
+            }
+        } catch (err) {
+            awaithandleError(sock, message.key.remoteJid, err, 'Error solving equation step by step');
+        }
+    },
+
+    async languagePractice(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [language, level = 'beginner'] = args;
+
+            if (!language) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🗣️ Usage:* .languagePractice [language] [level]\nExample: .languagePractice spanish beginner'
+                });
+                return;
+            }
+
+            const exercises = {
+                spanish: {
+                    beginner: {
+                        vocabulary: [
+                            { word: "hola", translation: "hello" },
+                            { word: "gracias", translation: "thank you" },
+                            { word: "por favor", translation: "please" }
+                        ],
+                        phrases: [
+                            { text: "¿Cómo estás?", translation: "How are you?" },
+                            { text: "Me llamo...", translation: "My name is..." },
+                            { text: "Buenos días", translation: "Good morning" }
+                        ],
+                        grammar: [
+                            "Present tense conjugation",
+                            "Gender of nouns",
+                            "Basic pronouns"
+                        ]
+                    },
+                    intermediate: {
+                        vocabulary: [
+                            { word: "desarrollar", translation: "to develop" },
+                            { word: "mientras", translation: "while" },
+                            { word: "aunque", translation: "although" }
+                        ],
+                        phrases: [
+                            { text: "¿Qué te parece?", translation: "What do you think?" },
+                            { text: "Me da igual", translation: "I don't mind" },
+                            { text: "Vale la pena", translation: "It's worth it" }
+                        ],
+                        grammar: [
+                            "Past tenses",
+                            "Subjunctive mood",
+                            "Conditional sentences"
+                        ]
+                    }
+                }
+            };
+
+            if (!exercises[language] || !exercises[language][level]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Language or level not available*'
+                });
+                return;
+            }
+
+            const practice = exercises[language][level];
+            let response = `*📚 ${language.charAt(0).toUpperCase() + language.slice(1)} Practice (${level})*\n\n`;
+
+            response += '*Vocabulary:*\n';
+            practice.vocabulary.forEach(item => {
+                response += `• ${item.word} - ${item.translation}\n`;
+            });
+
+            response += '\n*Common Phrases:*\n';
+            practice.phrases.forEach(item => {
+                response += `• ${item.text} - ${item.translation}\n`;
+            });
+
+            response += '\n*Grammar Focus:*\n';
+            practice.grammar.forEach(item => {
+                response += `• ${item}\n`;
+            });
+
+            await sock.sendMessage(remoteJid, { text: response });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error providing language practice');
+        }
+    },
+    // Add new scientific visualization commands
+    async chemReaction(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [reactant1, reactant2] = args;
+
+            if (!reactant1 || !reactant2) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🧪 Usage:* .chemReaction [reactant1] [reactant2]\nExample: .chemReaction HCl NaOH'
+                });
+                return;
+            }
+
+            const reactions = {
+                'HCl+NaOH': {
+                    products: ['NaCl', 'H2O'],
+                    type: 'Neutralization',
+                    balanced: 'HCl + NaOH → NaCl + H2O',
+                    description: 'Acid-base neutralization reaction',
+                    conditions: 'Room temperature, aqueous solution'
+                },
+                'H2+O2': {
+                    products: ['H2O'],
+                    type: 'Synthesis',
+                    balanced: '2H2 + O2 → 2H2O',
+                    description: 'Formation of water',
+                    conditions: 'Requires activation energy (spark)'
+                }
+            };
+
+            const reactionKey = `${reactant1}+${reactant2}`;
+            const reaction = reactions[reactionKey];
+
+            if (!reaction) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Reaction not found in database*'
+                });
+                return;
+            }
+
+            let response = `*⚗️ Chemical Reaction Analysis:*\n\n`;
+            response += `*Balanced Equation:*\n${reaction.balanced}\n\n`;
+            response += `*Reaction Type:*\n${reaction.type}\n\n`;
+            response += `*Products:*\n${reaction.products.join(', ')}\n\n`;
+            response += `*Description:*\n${reaction.description}\n\n`;
+            response += `*Conditions:*\n${reaction.conditions}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error analyzing chemical reaction');
+        }
+    },
+
+    async physicsCalc(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [formula, ...values] = args;
+
+            if (!formula || values.length === 0) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🔬 Usage:* .physicsCalc [formula] [values...]\nExample: .physicsCalc velocity 100 2'
+                });
+                return;
+            }
+
+            const formulas = {
+                velocity: {
+                    variables: ['distance', 'time'],
+                    calculate: (d, t) => d / t,
+                    unit: 'm/s',
+                    equation: 'v = d/t'
+                },
+                force: {
+                    variables: ['mass', 'acceleration'],
+                    calculate: (m, a) => m * a,
+                    unit: 'N',
+                    equation: 'F = ma'
+                },
+                energy: {
+                    variables: ['mass', 'height'],
+                    calculate: (m, h) => m * 9.81 * h,
+                    unit: 'J',
+                    equation: 'E = mgh'
+                }
+            };
+
+            if (!formulas[formula]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Formula not found*\nAvailable formulas: ' + Object.keys(formulas).join(', ')
+                });
+                return;
+            }
+
+            const calc = formulas[formula];
+            if (values.length !== calc.variables.length) {
+                await sock.sendMessage(remoteJid, {
+                    text: `*❌ Required variables:* ${calc.variables.join(', ')}`
+                });
+                return;
+            }
+
+            const numValues = values.map(Number);
+            const result = calc.calculate(...numValues);
+
+            let response = `*📊 Physics Calculation:*\n\n`;
+            response += `*Formula:* ${calc.equation}\n\n`;
+            response += `*Given Values:*\n`;
+            calc.variables.forEach((v, i) => {
+                response += `${v}: ${numValues[i]}\n`;
+            });
+            response += `\n*Result:* ${result} ${calc.unit}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error in physics calculation');
+        }
+    },
+
+    async bioSystem(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [system] = args;
+
+            if (!system) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🧬 Usage:* .bioSystem [system]\nExample: .bioSystem circulatory'
+                });
+                return;
+            }
+
+            const systems = {
+                circulatory: {
+                    components: [
+                        'Heart',
+                        'Blood vessels',
+                        'Blood'
+                    ],
+                    functions: [
+                        'Transport of oxygen and nutrients',
+                        'Removal of waste products',
+                        'Temperature regulation'
+                    ],
+                    diseases: [
+                        'Hypertension',
+                        'Atherosclerosis',
+                        'Heart disease'
+                    ]
+                },
+                respiratory: {
+                    components: [
+                        'Lungs',
+                        'Trachea',
+                        'Bronchi'
+                    ],
+                    functions: [
+                        'Gas exchange',
+                        'Oxygen intake',
+                        'Carbon dioxide removal'
+                    ],
+                    diseases: [
+                        'Asthma',
+                        'Bronchitis',
+                        'Pneumonia'
+                    ]
+                }
+            };
+
+            if (!systems[system]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ System not found*\nAvailable systems: ' + Object.keys(systems).join(', ')
+                });
+                return;
+            }
+
+            const bioSystem = systems[system];
+            let response = `*🔬 ${system.charAt(0).toUpperCase() + system.slice(1)} System:*\n\n`;
+            response += `*Components:*\n${bioSystem.components.map(c => `• ${c}`).join('\n')}\n\n`;
+            response += `*Functions:*\n${bioSystem.functions.map(f => `• ${f}`).join('\n')}\n\n`;
+            response += `*Common Diseases:*\n${bioSystem.diseases.map(d => `• ${d}`).join('\n')}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error displaying biological system');
+        }
+    },
+
+    async mathVisualize(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [type, ...params] = args;
+
+            if (!type || params.length === 0) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📊 Usage:* .mathVisualize [type] [parameters...]\nExample: .mathVisualize parabola 1 0 0'
+                });
+                return;
+            }
+
+            let equation;
+            let title;
+            switch (type) {
+                case 'parabola':
+                    const [a = 1, b = 0, c = 0] = params.map(Number);
+                    equation = `${a}x^2 + ${b}x + ${c}`;
+                    title = 'Quadratic Function';
+                    break;
+                case 'sine':
+                    const [amplitude = 1, frequency = 1] = params.map(Number);
+                    equation = `${amplitude}*sin(${frequency}*x)`;
+                    title = 'Sine Wave';
+                    break;
+                case 'exponential':
+                    const [base = Math.E, coefficient = 1] = params.map(Number);
+                    equation = `${coefficient}*${base}^x`;
+                    title = 'Exponential Function';
+                    break;
+                default:
+                    await sock.sendMessage(remoteJid, {
+                        text: '*❌ Invalid visualization type*\nAvailable types: parabola, sine, exponential'
+                    });
+                    return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*📈 Generating visualization...*' });
+
+            const chartBuffer = await createMathChart(equation);
+            await sock.sendMessage(remoteJid, {
+                image: chartBuffer,
+                caption: `*${title}:* ${equation}`
+            });
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error creating math visualization');
         }
     }
 };

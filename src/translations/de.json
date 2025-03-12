@@ -45,6 +45,158 @@
       "not_supported": "Sprache '%s' wird nicht unterstützt. Verfügbare Sprachen: %s",
       "success": "Sprache erfolgreich geändert",
       "error": "Fehler beim Ändern der Sprache"
+    },
+    "quizScore": {
+      "description": "Zeigt den Punktestand der Quiz-Tests",
+      "usage": ".quizScore [Fach]",
+      "error": "Fehler beim Abrufen der Punktzahl"
+    },
+    "experiment": {
+      "description": "Zeigt wissenschaftliche Experimente und Simulationen",
+      "usage": ".experiment [Typ]",
+      "error": "Fehler beim Anzeigen des Experiments"
+    },
+    "solveStep": {
+      "description": "Löst mathematische Gleichungen Schritt für Schritt",
+      "usage": ".solveStep [Gleichung]",
+      "error": "Fehler beim schrittweisen Lösen"
+    },
+    "languagePractice": {
+      "description": "Bietet Sprachübungen und Lernmaterial",
+      "usage": ".languagePractice [Sprache] [Niveau]",
+      "error": "Fehler beim Laden der Sprachübungen"
+    },
+    "kick": {
+      "description": "Entfernt einen Benutzer aus der Gruppe",
+      "usage": ".kick @benutzer",
+      "success": "Benutzer wurde aus der Gruppe entfernt",
+      "error": "Fehler beim Entfernen des Benutzers"
+    },
+    "add": {
+      "description": "Fügt einen Benutzer zur Gruppe hinzu",
+      "usage": ".add [Nummer]",
+      "success": "Benutzer wurde zur Gruppe hinzugefügt",
+      "error": "Fehler beim Hinzufügen des Benutzers"
+    },
+    "convert": {
+      "description": "Konvertiert Einheiten",
+      "usage": ".convert [Wert] [Von-Einheit] [Zu-Einheit]",
+      "error": "Fehler bei der Konvertierung"
+    },
+    "formula": {
+      "description": "Zeigt wissenschaftliche Formeln",
+      "usage": ".formula [Fach] [Formel]",
+      "error": "Fehler beim Anzeigen der Formel"
+    },
+    "dictionary": {
+      "description": "Nachschlagen von Wörtern im Wörterbuch",
+      "usage": ".dictionary [Wort]",
+      "error": "Fehler beim Nachschlagen des Wortes"
+    },
+    "study": {
+      "description": "Verwaltet Lernsitzungen",
+      "usage": ".study [start|stop|status] [Fach] [Dauer]",
+      "error": "Fehler bei der Verwaltung der Lernsitzung"
+    },
+    "mathsolve": {
+      "description": "Löst mathematische Gleichungen",
+      "usage": ".mathsolve [Gleichung]",
+      "error": "Fehler beim Lösen der Gleichung"
+    },
+    "graph": {
+      "description": "Erstellt einen Graph für mathematische Funktionen",
+      "usage": ".graph [Funktion]",
+      "error": "Fehler beim Erstellen des Graphen"
+    },
+    "vocabulary": {
+      "description": "Verwaltet Vokabeln zum Lernen",
+      "usage": ".vocabulary [add|test|list] [Sprache] [Wörter]",
+      "error": "Fehler bei der Vokabelverwaltung"
+    },
+    "calc": {
+      "description": "Wissenschaftlicher Taschenrechner",
+      "usage": ".calc [Ausdruck]",
+      "error": "Fehler bei der Berechnung"
+    },
+    "notes": {
+      "description": "Verwaltet Studiennotizen",
+      "usage": ".notes [add|view|list] [Fach] [Inhalt]",
+      "error": "Fehler bei der Notizenverwaltung"
+    },
+    "quiz": {
+      "description": "Generiert Quizfragen",
+      "usage": ".quiz [Fach] [Schwierigkeit]",
+      "error": "Fehler beim Erstellen des Quiz"
+    },
+    "flashcard": {
+      "description": "Erstellt und verwaltet Lernkarten",
+      "usage": ".flashcard [create|review|list] [Fach] [Vorderseite::Rückseite]",
+      "error": "Fehler bei der Verwaltung der Lernkarten"
+    },
+    "research": {
+      "description": "Sucht nach wissenschaftlichen Artikeln",
+      "usage": ".research [Thema]",
+      "error": "Fehler bei der Artikelsuche"
+    },
+    "mindmap": {
+      "description": "Erstellt und verwaltet Mindmaps",
+      "usage": ".mindmap [create|view|add] [Thema] [Knoten]",
+      "error": "Fehler bei der Mindmap-Verwaltung"
+    },
+    "molecule": {
+      "description": "Analysiert chemische Moleküle",
+      "usage": ".molecule [Formel]",
+      "error": "Fehler bei der Molekülanalyse"
+    },
+    "equation": {
+      "description": "Löst mathematische Gleichungen",
+      "usage": ".equation [Gleichung]",
+      "error": "Fehler beim Lösen der Gleichung"
+    },
+    "unitconvert": {
+      "description": "Konvertiert zwischen verschiedenen Einheiten",
+      "usage": ".unitconvert [Wert] [Von-Einheit] [Zu-Einheit]",
+      "error": "Fehler bei der Einheitenumrechnung"
+    },
+    "factorize": {
+      "description": "Findet alle Faktoren einer Zahl",
+      "usage": ".factorize [Zahl]",
+      "error": "Fehler bei der Faktorisierung"
+    },
+    "pronunciation": {
+      "description": "Zeigt die Aussprache eines Wortes",
+      "usage": ".pronunciation [Wort]",
+      "error": "Fehler beim Abrufen der Aussprache"
+    },
+    "functionAnalysis": {
+      "description": "Analysiert mathematische Funktionen",
+      "usage": ".functionAnalysis [Funktion]",
+      "error": "Fehler bei der Funktionsanalyse"
+    },
+    "studyMaterial": {
+      "description": "Zeigt Lernmaterialien für verschiedene Fächer",
+      "usage": ".studyMaterial [Fach] [Thema]",
+      "error": "Fehler beim Abrufen der Lernmaterialien"
+    },
+    "chemReaction": {
+      "description": "Analysiert chemische Reaktionen",
+      "usage": ".chemReaction [Reaktant1] [Reaktant2]",
+      "error": "Fehler bei der Analyse der chemischen Reaktion"
+    },
+    "physicsCalc": {
+      "description": "Führt physikalische Berechnungen durch",
+      "usage": ".physicsCalc [Formel] [Werte...]",
+      "error": "Fehler bei der physikalischen Berechnung"
+    },
+    "bioSystem": {
+      "description": "Zeigt Informationen über biologische Systeme",
+      "usage": ".bioSystem [System]",
+      "error": "Fehler beim Anzeigen des biologischen Systems"
+    },
+    "mathVisualize": {
+      "description": "Erstellt Visualisierungen mathematischer Funktionen",
+      "usage": ".mathVisualize [Typ] [Parameter...]",
+      "error": "Fehler bei der mathematischen Visualisierung"
     }
   },
   "media": {
@@ -173,6 +325,26 @@
       "description": "Zeigt Lernmaterialien für verschiedene Fächer",
       "usage": ".studyMaterial [Fach] [Thema]",
       "error": "Fehler beim Abrufen der Lernmaterialien"
+    },
+    "chemReaction": {
+      "description": "Analysiert chemische Reaktionen",
+      "usage": ".chemReaction [Reaktant1] [Reaktant2]",
+      "error": "Fehler bei der Analyse der chemischen Reaktion"
+    },
+    "physicsCalc": {
+      "description": "Führt physikalische Berechnungen durch",
+      "usage": ".physicsCalc [Formel] [Werte...]",
+      "error": "Fehler bei der physikalischen Berechnung"
+    },
+    "bioSystem": {
+      "description": "Zeigt Informationen über biologische Systeme",
+      "usage": ".bioSystem [System]",
+      "error": "Fehler beim Anzeigen des biologischen Systems"
+    },
+    "mathVisualize": {
+      "description": "Erstellt Visualisierungen mathematischer Funktionen",
+      "usage": ".mathVisualize [Typ] [Parameter...]",
+      "error": "Fehler bei der mathematischen Visualisierung"
     }
   }
 }
