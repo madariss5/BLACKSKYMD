@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const config = require('../config/config');
 const levelingSystem = require('../utils/levelingSystem');
 const userDatabase = require('../utils/userDatabase');
+const { languageManager } = require('../utils/language');
 
 // Cache for help messages to prevent spam
 const helpMessageCache = new Map();
@@ -43,16 +44,41 @@ async function handleLevelUp(sock, sender, levelUpData, userData) {
             }
         }
         
+        // Get user's preferred language or default to English
+        const userLang = userData && userData.language ? userData.language : 'en';
+        
+        // Try to get level up message from translations
+        let levelUpTitle = languageManager.getText('leveling.level_up_title', userLang);
+        let levelUpCongrats = languageManager.getText('leveling.congrats', userLang);
+        let levelUpReward = languageManager.getText('leveling.coin_reward', userLang);
+        let levelUpTip = languageManager.getText('leveling.xp_tip', userLang);
+        let levelUpCurrent = languageManager.getText('leveling.current_xp', userLang);
+        let levelUpNext = languageManager.getText('leveling.next_level', userLang);
+        
+        // If translations are missing, fall back to keys (which helps identify missing translations)
+        if (levelUpTitle === 'leveling.level_up_title') levelUpTitle = 'Level Up!';
+        if (levelUpCongrats === 'leveling.congrats') levelUpCongrats = 'Congratulations! You\'ve reached level %s!';
+        if (levelUpReward === 'leveling.coin_reward') levelUpReward = '+%s coins added to your balance';
+        if (levelUpTip === 'leveling.xp_tip') levelUpTip = 'Keep chatting to earn more XP';
+        if (levelUpCurrent === 'leveling.current_xp') levelUpCurrent = 'Current XP: %s';
+        if (levelUpNext === 'leveling.next_level') levelUpNext = 'Next level: %s XP needed';
+        
+        // Format the strings with the values
+        levelUpCongrats = levelUpCongrats.replace('%s', levelUpData.newLevel);
+        levelUpReward = levelUpReward.replace('%s', levelUpData.coinReward);
+        levelUpCurrent = levelUpCurrent.replace('%s', levelUpData.totalXp);
+        levelUpNext = levelUpNext.replace('%s', levelUpData.requiredXp);
+        
         // Create level up message
         const levelUpMessage = `
-🎉 *Level Up!*
+🎉 *${levelUpTitle}*
         
-Congratulations! You've reached level ${levelUpData.newLevel}!
-🏆 +${levelUpData.coinReward} coins added to your balance
-⭐ Keep chatting to earn more XP
+${levelUpCongrats}
+🏆 ${levelUpReward}
+⭐ ${levelUpTip}
         
-Current XP: ${levelUpData.totalXp}
-Next level: ${levelUpData.requiredXp} XP needed
+${levelUpCurrent}
+${levelUpNext}
         `.trim();
         
         // Send level up notification
@@ -63,9 +89,16 @@ Next level: ${levelUpData.requiredXp} XP needed
             try {
                 const cardPath = await levelingSystem.generateLevelCard(sender, userData);
                 if (cardPath) {
+                    // Try to get the achievement message from translations
+                    let achievementText = languageManager.getText('leveling.achievement_unlocked', userLang);
+                    if (achievementText === 'leveling.achievement_unlocked') {
+                        achievementText = 'Level %s Achievement Unlocked!';
+                    }
+                    achievementText = achievementText.replace('%s', levelUpData.newLevel);
+                    
                     await sock.sendMessage(sender, {
                         image: { url: cardPath },
-                        caption: `🏆 Level ${levelUpData.newLevel} Achievement Unlocked!`
+                        caption: `🏆 ${achievementText}`
                     });
                 }
             } catch (err) {
@@ -209,10 +242,28 @@ async function messageHandler(sock, message) {
 
             if (!lastHelpMessage || (now - lastHelpMessage) > HELP_MESSAGE_COOLDOWN) {
                 helpMessageCache.set(sender, now);
-                // Simplified welcome message
-                await sock.sendMessage(sender, { 
-                    text: `Use ${prefix}help to see available commands.` 
-                });
+                
+                // Get welcome message in user's preferred language
+                let welcomeMessage;
+                if (userData && userData.language) {
+                    // If user has a language preference, use it
+                    const translationKey = 'system.welcome_message';
+                    welcomeMessage = languageManager.getText(translationKey, userData.language, prefix);
+                    
+                    // If translation not found, fallback to a basic message
+                    if (welcomeMessage === translationKey) {
+                        welcomeMessage = `Use ${prefix}help to see available commands.`;
+                    }
+                } else {
+                    // Default welcome message
+                    welcomeMessage = `Use ${prefix}help to see available commands.`;
+                    
+                    // Add language suggestion if user doesn't have a language set
+                    welcomeMessage += `\n\nTip: You can change the language with ${prefix}language`;
+                }
+                
+                // Send welcome message
+                await sock.sendMessage(sender, { text: welcomeMessage });
                 
                 // Clean cache in background
                 setTimeout(() => {

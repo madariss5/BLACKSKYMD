@@ -7,7 +7,8 @@
     "no_permission": "Sie haben keine Berechtigung, diesen Befehl zu verwenden.",
     "cooldown": "Bitte warten Sie %.1f Sekunden, bevor Sie %s erneut verwenden.",
     "error": "Fehler beim Verarbeiten des Befehls. Bitte versuchen Sie es später erneut.",
-    "language_changed": "Sprache wurde zu Deutsch geändert"
+    "language_changed": "Sprache wurde zu Deutsch geändert",
+    "welcome_message": "Benutze %shelp um verfügbare Befehle anzuzeigen."
   },
   "commands": {
     "help": {

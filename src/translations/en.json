@@ -7,7 +7,17 @@
     "no_permission": "You do not have permission to use this command.",
     "cooldown": "Please wait %.1f seconds before using %s again.",
     "error": "Error processing command. Please try again later.",
-    "language_changed": "Language has been changed to English"
+    "language_changed": "Language has been changed to English",
+    "welcome_message": "Use %shelp to see available commands."
+  },
+  "leveling": {
+    "level_up_title": "Level Up!",
+    "congrats": "Congratulations! You've reached level %s!",
+    "coin_reward": "+%s coins added to your balance",
+    "xp_tip": "Keep chatting to earn more XP",
+    "current_xp": "Current XP: %s",
+    "next_level": "Next level: %s XP needed",
+    "achievement_unlocked": "Level %s Achievement Unlocked!"
   },
   "commands": {
     "help": {
