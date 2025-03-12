@@ -102,6 +102,21 @@
             color: #666;
             font-size: 12px;
         }
+        .reconnect-btn {
+            background-color: #25D366;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            margin: 15px auto 0;
+            cursor: pointer;
+            font-weight: bold;
+            display: block;
+            transition: background-color 0.3s;
+        }
+        .reconnect-btn:hover {
+            background-color: #128C7E;
+        }
     </style>
 </head>
 <body>
@@ -117,6 +132,7 @@
                 <p>Loading QR code...</p>
             </div>
             <div class="timer" id="timer"></div>
+            <button id="reconnect-btn" class="reconnect-btn" style="display: none;">Generate New QR Code</button>
         </div>
         
         <div class="instructions">
@@ -128,6 +144,7 @@
                 <li>Point your camera at the QR code above</li>
             </ol>
             <p><strong>Note:</strong> QR codes are valid for 20 seconds only. If it expires, a new one will be generated automatically.</p>
+            <p>If you need a new QR code, click the "Generate New QR Code" button when it appears.</p>
         </div>
     </div>
     
@@ -140,15 +157,30 @@
         const statusElement = document.getElementById('status');
         const timerElement = document.getElementById('timer');
         const uptimeElement = document.getElementById('uptime');
+        const reconnectBtn = document.getElementById('reconnect-btn');
         
         // Track QR code expiration
         let qrExpireTime = null;
         let qrInterval = null;
+        let lastState = null;
+        let reconnectEnabled = false;
         
         // Update the status UI based on state
         function updateStatus(statusText, state) {
             statusElement.textContent = statusText;
             statusElement.className = 'status ' + state;
+            
+            // Show/hide reconnect button
+            if ((state === 'disconnected' || state === 'connecting') && 
+                (lastState === 'connected' || reconnectEnabled)) {
+                reconnectBtn.style.display = 'block';
+                reconnectEnabled = true;
+            } else if (state === 'qr-ready') {
+                reconnectBtn.style.display = 'none';
+            }
+            
+            // Update last state
+            lastState = state;
             
             if (state === 'qr-ready') {
                 // QR code is valid for 20 seconds
@@ -165,6 +197,9 @@
                     if (remaining <= 0) {
                         timerElement.textContent = 'QR code expired. Waiting for new code...';
                         clearInterval(qrInterval);
+                        // Show reconnect button when QR expires
+                        reconnectBtn.style.display = 'block';
+                        reconnectEnabled = true;
                     }
                 }, 1000);
             } else {
@@ -176,6 +211,37 @@
                 timerElement.textContent = '';
             }
         }
+        
+        // Handle manual reconnection
+        async function handleReconnect() {
+            try {
+                reconnectBtn.disabled = true;
+                reconnectBtn.textContent = 'Generating new QR code...';
+                
+                // Call reconnect endpoint
+                const response = await fetch('/api/reconnect', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    updateStatus('Connecting...', 'connecting');
+                    qrcodeElement.innerHTML = '<p>Generating new QR code, please wait...</p>';
+                } else {
+                    console.error('Reconnection failed:', await response.json());
+                    qrcodeElement.innerHTML = '<p>Failed to generate new QR code. Please try again.</p>';
+                }
+            } catch (error) {
+                console.error('Error triggering reconnection:', error);
+            } finally {
+                reconnectBtn.disabled = false;
+                reconnectBtn.textContent = 'Generate New QR Code';
+                // Fetch status immediately to update UI
+                setTimeout(fetchStatus, 1000);
+            }
+        }
+        
+        // Add event listener to reconnect button
+        reconnectBtn.addEventListener('click', handleReconnect);
         
         // Fetch status from server
         async function fetchStatus() {

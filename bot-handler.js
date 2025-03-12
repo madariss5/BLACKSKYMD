@@ -20,7 +20,8 @@ let startTime = Date.now();
 let connectionState = {
   state: 'disconnected',  // disconnected, connecting, qr_ready, connected
   qrCode: null,
-  uptime: 0
+  uptime: 0,
+  connected: false
 };
 let qrCount = 0;
 let backupInterval = null;
@@ -188,6 +189,7 @@ async function connectToWhatsApp() {
       if (qr) {
         connectionState.state = 'qr_ready';
         connectionState.qrCode = qr;
+        connectionState.connected = false;
         console.log('⏳ Generating QR code, please wait...');
         console.log('✅ QR code generated! Check web interface at http://localhost:5000');
         qrCount++;
@@ -199,6 +201,7 @@ async function connectToWhatsApp() {
         
         console.log('Connection closed due to ', lastDisconnect?.error);
         connectionState.state = 'disconnected';
+        connectionState.connected = false;
         
         if (shouldReconnect) {
           console.log('Reconnecting...');
@@ -209,6 +212,7 @@ async function connectToWhatsApp() {
       } else if (connection === 'open') {
         console.log('🟢 WhatsApp connection established!');
         connectionState.state = 'connected';
+        connectionState.connected = true;
       }
     });
 
@@ -285,8 +289,43 @@ function getConnectionStatus() {
   return connectionState;
 }
 
+/**
+ * Reset the connection state and reconnect
+ */
+async function resetConnection() {
+  try {
+    console.log('🔄 Manually resetting connection...');
+    
+    // Force disconnect if connected
+    if (sock) {
+      try {
+        sock.ev.removeAllListeners();
+        await sock.logout();
+      } catch (e) {
+        console.log('Error during logout:', e);
+        // Continue anyway
+      }
+      sock = null;
+    }
+    
+    // Reset state
+    connectionState.state = 'connecting';
+    connectionState.qrCode = null;
+    connectionState.connected = false;
+    
+    // Reconnect
+    connectToWhatsApp();
+    
+    return { success: true, message: 'Connection reset initiated' };
+  } catch (error) {
+    console.error('Error resetting connection:', error);
+    return { success: false, message: 'Failed to reset connection' };
+  }
+}
+
 module.exports = {
   connectToWhatsApp,
   setupSessionBackup,
-  getConnectionStatus
+  getConnectionStatus,
+  resetConnection
 };
