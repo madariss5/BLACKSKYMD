@@ -140,6 +140,9 @@ class CommandLoader {
 
                 const category = file.replace('.js', '');
                 const modulePath = path.join(commandsPath, file);
+                
+                // Debug: log file being loaded
+                console.log(`CommandLoader: Attempting to load file: ${file}, path: ${modulePath}`);
 
                 try {
                     const moduleData = await this.loadModuleSafely(modulePath, file);
