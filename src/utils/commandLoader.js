@@ -20,18 +20,24 @@ class CommandLoader {
         this.commandConfigs = new Map();
         this.lastReload = Date.now();
         this.reloadCooldown = 1000;
+        this.fs = fs;
+        this.fsPromises = fsPromises;
     }
 
-    async initializeFS() {
-        try {
-            // Ensure necessary directories exist
-            const requiredDirs = [
-                path.join(__dirname, '../../data'),
-                path.join(__dirname, '../../temp'),
-                path.join(__dirname, '../config/commands')
-            ];
+    async initializeDirectories() {
+        const dirs = [
+            path.join(__dirname, '../../data'),
+            path.join(__dirname, '../../temp'),
+            path.join(__dirname, '../../temp/media'),
+            path.join(__dirname, '../../temp/stickers'),
+            path.join(__dirname, '../../auth_info'),
+            path.join(__dirname, '../../data/educational'),
+            path.join(__dirname, '../../data/groups'),
+            path.join(__dirname, '../config/commands')
+        ];
 
-            for (const dir of requiredDirs) {
+        try {
+            for (const dir of dirs) {
                 if (!fs.existsSync(dir)) {
                     await fsPromises.mkdir(dir, { recursive: true });
                     logger.info(`Created directory: ${dir}`);
@@ -39,7 +45,7 @@ class CommandLoader {
             }
             return true;
         } catch (err) {
-            logger.error('Failed to initialize file system:', err);
+            logger.error('Failed to initialize directories:', err);
             return false;
         }
     }
@@ -47,7 +53,6 @@ class CommandLoader {
     async loadModuleSafely(modulePath, file) {
         try {
             delete require.cache[require.resolve(modulePath)];
-
             const module = require(modulePath);
 
             if (!module || (typeof module !== 'object' && typeof module !== 'function')) {
@@ -55,8 +60,12 @@ class CommandLoader {
             }
 
             if (module.commands && typeof module.commands === 'object') {
+                // Inject fs instances if module needs them
                 if (module.init && typeof module.init === 'function') {
                     try {
+                        // Provide fs instances to module
+                        module.fs = this.fs;
+                        module.fsPromises = this.fsPromises;
                         await module.init();
                     } catch (initError) {
                         logger.error(`Error initializing module ${file}:`, initError);
@@ -102,9 +111,10 @@ class CommandLoader {
                 return false;
             }
 
-            const fsInitialized = await this.initializeFS();
-            if (!fsInitialized) {
-                throw new Error('Failed to initialize filesystem');
+            // Initialize directories first
+            const dirsInitialized = await this.initializeDirectories();
+            if (!dirsInitialized) {
+                throw new Error('Failed to initialize directories');
             }
 
             this.commands.clear();
@@ -300,6 +310,7 @@ class CommandLoader {
             return false;
         }
     }
+
     getCommandStats() {
         const stats = {
             totalCommands: this.commands.size,
@@ -329,7 +340,6 @@ class CommandLoader {
 
         stats.mostUsedCommands = usageStats;
 
-        // Calculate error stats
         for (const [_, info] of this.commandCache) {
             if (info.errors) {
                 stats.errorStats.totalErrors += info.errors;

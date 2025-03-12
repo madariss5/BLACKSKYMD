@@ -3,7 +3,8 @@ const { isAdmin, isBotAdmin } = require('../utils/permissions');
 const { downloadMediaMessage } = require('../utils/helpers');
 const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = fs.promises;
 
 // Extended group command handlers
 const groupNewCommands = {
@@ -115,22 +116,55 @@ const groupNewCommands = {
     }
 };
 
+// Initialize directories needed for extended group functionality
+const initializeDirectories = async () => {
+    try {
+        const dirs = [
+            path.join(__dirname, '../../data/groups_extended'),
+            path.join(__dirname, '../../data/groups_extended/pins'),
+            path.join(__dirname, '../../data/groups_extended/media')
+        ];
+
+        for (const dir of dirs) {
+            try {
+                if (!fs.existsSync(dir)) {
+                    await fsPromises.mkdir(dir, { recursive: true });
+                    logger.info(`✓ Extended group directory created: ${dir}`);
+                } else {
+                    logger.info(`✓ Extended group directory exists: ${dir}`);
+                }
+            } catch (dirErr) {
+                logger.error(`Failed to initialize directory ${dir}:`, dirErr);
+                throw dirErr;
+            }
+        }
+        return true;
+    } catch (err) {
+        logger.error('Directory creation failed:', err);
+        logger.error('Stack trace:', err.stack);
+        return false;
+    }
+};
+
 module.exports = {
     commands: groupNewCommands,
     category: 'group',
-    async init(sock) {
+    fs,
+    fsPromises,
+    async init() {
         try {
-            logger.moduleInit('Group Extended');
+            logger.info('🔄 Initializing Group Extended module...');
 
-            // Check core dependencies
+            // Verify core dependencies first
             const coreDeps = {
-                isAdmin,
-                isBotAdmin,
-                path,
-                logger,
-                fs: fs.promises,
-                getGroupSettings,
-                saveGroupSettings
+                'fs': fs,
+                'fsPromises': fsPromises,
+                'isAdmin': isAdmin,
+                'isBotAdmin': isBotAdmin,
+                'path': path,
+                'logger': logger,
+                'getGroupSettings': getGroupSettings,
+                'saveGroupSettings': saveGroupSettings
             };
 
             for (const [name, dep] of Object.entries(coreDeps)) {
@@ -141,49 +175,18 @@ module.exports = {
                 logger.info(`✓ Core extended group dependency '${name}' verified`);
             }
 
-            // Check optional dependencies
-            const optionalDeps = {
-                downloadMediaMessage
-            };
-
-            for (const [name, dep] of Object.entries(optionalDeps)) {
-                if (!dep) {
-                    logger.warn(`⚠️ Optional extended group dependency '${name}' is not available`);
-                } else {
-                    logger.info(`✓ Optional extended group dependency '${name}' verified`);
-                }
-            }
-
-            // Ensure required directories exist
-            const dataDir = path.join(__dirname, '../../data/groups_extended');
-            try {
-                await fs.mkdir(dataDir, { recursive: true });
-                const stats = await fs.stat(dataDir);
-                if (!stats.isDirectory()) {
-                    throw new Error('Path exists but is not a directory');
-                }
-                logger.info(`✓ Directory verified: ${dataDir}`);
-            } catch (err) {
-                logger.error(`❌ Directory creation failed for ${dataDir}:`, err);
+            // Initialize directories
+            const initialized = await initializeDirectories();
+            if (!initialized) {
+                logger.error('❌ Failed to initialize extended group directories');
                 return false;
             }
 
-            // Validate extended command functionality
-            const { validateGroupCommands } = require('../utils/commandValidator');
-            // Use a test group JID for validation
-            const testGroupJid = "123456789@g.us"; // Example group JID for testing
-            const validationResult = await validateGroupCommands(sock, testGroupJid);
-
-            if (!validationResult) {
-                logger.warn('⚠️ Extended group command validation reported issues');
-            } else {
-                logger.info('✓ Extended group command validation passed');
-            }
-
-            logger.moduleSuccess('Group Extended');
+            logger.info('✅ Group Extended module initialized successfully');
             return true;
         } catch (err) {
-            logger.moduleError('Group Extended', err);
+            logger.error('❌ Failed to initialize Group Extended module:', err);
+            logger.error('Stack trace:', err.stack);
             return false;
         }
     }

@@ -18,22 +18,13 @@ const isHeroku = !!process.env.DYNO;
 const MAX_RETRIES = isProduction ? 999999 : 10;
 const RETRY_INTERVAL_BASE = isProduction ? 5000 : 10000;
 const MAX_RETRY_INTERVAL = isProduction ? 300000 : 60000;
-const STREAM_ERROR_COOLDOWN = isProduction ? 30000 : 15000;
-const RESTART_COOLDOWN = isProduction ? 60000 : 30000;
-const MAX_STREAM_ATTEMPTS = isProduction ? 20 : 10;
-
-const AUTH_DIR = path.join(process.cwd(), 'auth_info');
 
 let isConnected = false;
 let qrDisplayed = false;
-let connectionAttempts = 0;
-let streamRetryCount = 0;
-let lastRestartTime = 0;
-let lastLogTime = 0;
 
 async function validateSession() {
     try {
-        const credentialsPath = path.join(AUTH_DIR, 'creds.json');
+        const credentialsPath = path.join(process.cwd(), 'auth_info/creds.json');
         const exists = await fsPromises.access(credentialsPath)
             .then(() => true)
             .catch(() => false);
@@ -53,8 +44,9 @@ async function validateSession() {
 
 async function cleanAuthState() {
     try {
-        await fsPromises.rm(AUTH_DIR, { recursive: true, force: true });
-        await fsPromises.mkdir(AUTH_DIR, { recursive: true, mode: 0o700 });
+        const authDir = path.join(process.cwd(), 'auth_info');
+        await fsPromises.rm(authDir, { recursive: true, force: true });
+        await fsPromises.mkdir(authDir, { recursive: true });
     } catch (err) {
         logger.error('Clean auth state error:', err);
     }
@@ -77,18 +69,8 @@ async function startConnection() {
             await cleanAuthState();
         }
 
-        let state, saveCreds;
-        try {
-            const auth = await useMultiFileAuthState(AUTH_DIR);
-            state = auth.state;
-            saveCreds = auth.saveCreds;
-        } catch (authErr) {
-            logger.error('Auth state error:', authErr);
-            await cleanAuthState();
-            const auth = await useMultiFileAuthState(AUTH_DIR);
-            state = auth.state;
-            saveCreds = auth.saveCreds;
-        }
+        const authDir = path.join(process.cwd(), 'auth_info');
+        const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
         sock = makeWASocket({
             version,
@@ -115,20 +97,18 @@ async function startConnection() {
                 if (qr && !qrDisplayed) {
                     qrDisplayed = true;
 
-                    // Disable logging completely
+                    // Disable logging and clear console for clean QR display
                     const originalLogLevel = logger.level;
                     logger.level = 'silent';
-
-                    // Clear console and show minimal output
                     process.stdout.write('\x1Bc');
-                    console.log('\n=== WhatsApp QR Code ===\n');
 
-                    qrcode.generate(qr, { small: true, margin: 0 }, (qrcode) => {
+                    console.log('\n=== WhatsApp QR Code ===\n');
+                    qrcode.generate(qr, { small: true }, (qrcode) => {
                         console.log(qrcode);
-                        console.log('\nPlease scan this QR code with WhatsApp\n');
+                        console.log('\nScan this QR code with WhatsApp\n');
                     });
 
-                    // Restore logging after QR display
+                    // Restore logging after QR is displayed
                     setTimeout(() => {
                         logger.level = originalLogLevel;
                     }, 1000);
@@ -138,7 +118,6 @@ async function startConnection() {
                     isConnected = true;
                     qrDisplayed = false;
                     retryCount = 0;
-                    streamRetryCount = 0;
                     console.clear();
                     console.log('✅ Successfully connected to WhatsApp!\n');
 
@@ -185,7 +164,7 @@ async function startConnection() {
                             await cleanAuthState();
                             startConnection();
                         } else {
-                            console.log('\n❌ Maximum retry attempts reached. Please restart the bot.\n');
+                            logger.error('Maximum retry attempts reached. Please restart the bot.');
                             process.exit(1);
                         }
                     }
@@ -214,7 +193,7 @@ async function startConnection() {
                             logger.error('Message handling error:', err);
                             try {
                                 await sock.sendMessage(msg.key.remoteJid, { 
-                                    text: '❌ Sorry, there was an error processing your message. Please try again later.'
+                                    text: '❌ Sorry, there was an error processing your message. Please try again later.' 
                                 });
                             } catch (notifyErr) {
                                 logger.error('Failed to send error notification:', notifyErr);
