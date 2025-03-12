@@ -117,7 +117,7 @@ const groupNewCommands = {
 
 module.exports = {
     commands: groupNewCommands,
-    category: 'group_extended',
+    category: 'group',
     async init() {
         try {
             logger.moduleInit('Group Extended');
