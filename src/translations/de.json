@@ -10,6 +10,15 @@
     "language_changed": "Sprache wurde zu Deutsch geändert",
     "welcome_message": "Benutze %shelp um verfügbare Befehle anzuzeigen."
   },
+  "leveling": {
+    "level_up_title": "Level aufgestiegen!",
+    "congrats": "Glückwunsch! Du hast Level %s erreicht!",
+    "coin_reward": "+%s Münzen zu deinem Guthaben hinzugefügt",
+    "xp_tip": "Chatte weiter, um mehr XP zu verdienen",
+    "current_xp": "Aktuelle XP: %s",
+    "next_level": "Nächstes Level: %s XP benötigt",
+    "achievement_unlocked": "Level %s Errungenschaft freigeschaltet!"
+  },
   "commands": {
     "help": {
       "description": "Zeigt Hilfe zu verfügbaren Befehlen",
