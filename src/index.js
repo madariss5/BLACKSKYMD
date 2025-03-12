@@ -139,11 +139,14 @@ async function main() {
 
         // Initialize command modules with socket
         try {
+            logger.info('🔍 Validator Debug: Starting command modules initialization...');
             logger.info('Initializing command modules with socket connection...');
             await commandModules.initializeModules(sock);
             logger.info('Command modules initialized with socket connection successfully');
+            logger.info('🔍 Validator Debug: Command modules initialization completed');
         } catch (err) {
             logger.error('Error initializing command modules with socket:', err);
+            logger.error('🔍 Validator Debug: Error during initialization:', err.message);
             // Continue execution despite initialization errors
         }
         

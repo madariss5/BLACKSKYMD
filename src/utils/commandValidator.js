@@ -19,16 +19,25 @@ async function validateCommandModule(module, moduleName, requiredCommands) {
         
         const commands = module.commands;
         const missingCommands = requiredCommands.filter(cmd => !commands[cmd]);
+        const availableCommands = requiredCommands.filter(cmd => commands[cmd]);
+        
+        logger.info(`🔍 Validator Debug: Validating ${moduleName} module...`);
+        logger.info(`🔍 Required commands for ${moduleName}: ${requiredCommands.length}`);
+        logger.info(`🔍 Available commands in module: ${Object.keys(commands).length}`);
         
         if (missingCommands.length > 0) {
-            logger.warn(`⚠️ Missing ${moduleName} commands:`, missingCommands);
+            logger.warn(`⚠️ Missing ${moduleName} commands (${missingCommands.length}/${requiredCommands.length}):`, missingCommands);
+            
+            // Provide suggestions for implementing missing commands
+            logger.info(`🔧 Suggestion: Add these commands to the ${moduleName} module or update the configuration file`);
         } else {
-            logger.info(`✓ All required ${moduleName} commands are present`);
+            logger.info(`✓ All required ${moduleName} commands are present (${availableCommands.length}/${requiredCommands.length})`);
         }
         
         return missingCommands;
     } catch (err) {
         logger.error(`❌ Error validating ${moduleName} commands:`, err);
+        logger.error(`Stack trace: ${err.stack}`);
         return requiredCommands; // Return all as missing on error
     }
 }
@@ -122,33 +131,47 @@ async function validateMediaCommands(sock) {
         
         // Load commands from config
         const requiredCommands = await loadCommandsFromConfig('media');
+        logger.info(`🔍 Validator Debug: Loaded ${requiredCommands.length} required commands from media.json config`);
+        
+        // Print out the required commands for reference
+        logger.info(`🔍 Required media commands: ${requiredCommands.join(', ')}`);
         
         // Validate commands
         const mediaModule = require('../commands/media');
         const missingCommands = await validateCommandModule(mediaModule, 'media', requiredCommands);
         
-        if (missingCommands.length === 0) {
-            // Verify dependencies
-            const dependencies = ['sharp', 'ytdl-core', 'yt-search', 'node-webpmux'];
+        // Check dependencies regardless of command status
+        logger.info('🔍 Checking media module dependencies...');
+        const dependencies = ['sharp', 'ytdl-core', 'yt-search', 'node-webpmux'];
+        const missingDependencies = [];
+        
+        for (const dep of dependencies) {
             try {
-                dependencies.forEach(dep => {
-                    // This will throw if dependency is not available
-                    require(dep);
-                    logger.info(`✓ Media dependency '${dep}' is available`);
-                });
+                require(dep);
+                logger.info(`✓ Media dependency '${dep}' is available`);
             } catch (err) {
-                logger.error(`❌ Media dependency check failed:`, err);
-                return false;
+                logger.error(`❌ Media dependency '${dep}' is not available`);
+                missingDependencies.push(dep);
             }
-            
+        }
+        
+        if (missingCommands.length === 0 && missingDependencies.length === 0) {
             logger.info('✅ Media command validation completed successfully');
             return true;
         } else {
-            logger.warn(`⚠️ Media module is missing ${missingCommands.length} commands`);
+            if (missingCommands.length > 0) {
+                logger.warn(`⚠️ Media module is missing ${missingCommands.length} commands: ${missingCommands.join(', ')}`);
+            }
+            
+            if (missingDependencies.length > 0) {
+                logger.warn(`⚠️ Media module is missing ${missingDependencies.length} dependencies: ${missingDependencies.join(', ')}`);
+            }
+            
             return false;
         }
     } catch (err) {
         logger.error('❌ Error during media command validation:', err);
+        logger.error(`Stack trace: ${err.stack}`);
         return false;
     }
 }
@@ -163,20 +186,47 @@ async function validateEducationalCommands(sock) {
         
         // Load commands from config
         const requiredCommands = await loadCommandsFromConfig('educational');
+        logger.info(`🔍 Validator Debug: Loaded ${requiredCommands.length} required commands from educational.json config`);
+        
+        // Print out the required commands for reference
+        logger.info(`🔍 Required educational commands: ${requiredCommands.join(', ')}`);
         
         // Validate commands
         const educationalModule = require('../commands/educational');
         const missingCommands = await validateCommandModule(educationalModule, 'educational', requiredCommands);
         
-        if (missingCommands.length === 0) {
+        // Check for dependencies specific to educational commands
+        logger.info('🔍 Checking educational module dependencies...');
+        const dependencies = ['axios'];
+        const missingDependencies = [];
+        
+        for (const dep of dependencies) {
+            try {
+                require(dep);
+                logger.info(`✓ Educational dependency '${dep}' is available`);
+            } catch (err) {
+                logger.error(`❌ Educational dependency '${dep}' is not available`);
+                missingDependencies.push(dep);
+            }
+        }
+        
+        if (missingCommands.length === 0 && missingDependencies.length === 0) {
             logger.info('✅ Educational command validation completed successfully');
             return true;
         } else {
-            logger.warn(`⚠️ Educational module is missing ${missingCommands.length} commands`);
+            if (missingCommands.length > 0) {
+                logger.warn(`⚠️ Educational module is missing ${missingCommands.length} commands: ${missingCommands.join(', ')}`);
+            }
+            
+            if (missingDependencies.length > 0) {
+                logger.warn(`⚠️ Educational module is missing ${missingDependencies.length} dependencies: ${missingDependencies.join(', ')}`);
+            }
+            
             return false;
         }
     } catch (err) {
         logger.error('❌ Error during educational command validation:', err);
+        logger.error(`Stack trace: ${err.stack}`);
         return false;
     }
 }
