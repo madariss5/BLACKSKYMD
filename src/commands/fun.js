@@ -2,6 +2,12 @@ const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
 const { isFeatureEnabled } = require('../utils/groupSettings');
+const axios = require('axios');
+const { createCanvas, loadImage } = require('canvas');
+const { formatNumber, randomInt, shuffleArray, sleep } = require('../utils/helpers');
+const crypto = require('crypto');
+const mathjs = require('mathjs');
+const moment = require('moment');
 
 /**
  * Helper function to check if games are enabled for a group
@@ -31,6 +37,11 @@ function initializeGameState() {
     global.chessGames = global.chessGames || new Map();
     global.quizGames = global.quizGames || new Map();
     global.triviaGames = global.triviaGames || new Map();
+    global.akinator = global.akinator || new Map();
+    global.truthOrDare = global.truthOrDare || { truth: new Set(), dare: new Set() };
+    global.uno = global.uno || new Map();
+    global.riddles = global.riddles || new Map();
+    global.wordScramble = global.wordScramble || new Map();
 }
 
 // Board rendering functions
