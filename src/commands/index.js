@@ -15,7 +15,7 @@ const utilityCommands = require('./utility');
 const menuCommands = require('./menu'); // Added menu commands
 
 // Initialize modules in the correct order
-async function initializeModules() {
+async function initializeModules(sock) {
     logger.info('🔄 Starting command module initialization...');
 
     const modules = [
@@ -61,7 +61,7 @@ async function initializeModules() {
             // Check and call the init method
             if (typeof module.init === 'function') {
                 logger.info(`→ Initializing ${name} module...`);
-                const success = await module.init();
+                const success = await module.init(sock);
                 if (success) {
                     logger.info(`✅ Successfully initialized ${name} module`);
                 } else {
@@ -124,10 +124,8 @@ function loadCommandsFromModule(module, name) {
     }
 }
 
-// Initialize all modules
-initializeModules().catch(err => {
-    logger.error('❌ Fatal error during module initialization:', err);
-});
+// Initialize all modules function export
+// The actual initialization will be called from src/index.js with the sock object
 
 // Combine all commands with proper error handling
 const commands = {
@@ -170,4 +168,7 @@ const commands = {
 const commandCount = Object.keys(commands).length;
 logger.info(`\n✅ Total commands loaded: ${commandCount}`);
 
-module.exports = commands;
+module.exports = {
+    commands,
+    initializeModules
+};

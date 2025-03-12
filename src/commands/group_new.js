@@ -118,7 +118,7 @@ const groupNewCommands = {
 module.exports = {
     commands: groupNewCommands,
     category: 'group',
-    async init() {
+    async init(sock) {
         try {
             logger.moduleInit('Group Extended');
 
@@ -170,7 +170,9 @@ module.exports = {
 
             // Validate extended command functionality
             const { validateGroupCommands } = require('../utils/commandValidator');
-            const validationResult = await validateGroupCommands();
+            // Use a test group JID for validation
+            const testGroupJid = "123456789@g.us"; // Example group JID for testing
+            const validationResult = await validateGroupCommands(sock, testGroupJid);
 
             if (!validationResult) {
                 logger.warn('⚠️ Extended group command validation reported issues');

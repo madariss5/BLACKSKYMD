@@ -1039,7 +1039,7 @@ const commands = groupCommands;
 module.exports = {
     commands,
     category: 'group',
-    async init() {
+    async init(sock) {
         try {
             logger.moduleInit('Group Base');
 
@@ -1094,7 +1094,9 @@ module.exports = {
 
             // Validate command functionality
             const { validateGroupCommands } = require('../utils/commandValidator');
-            const validationResult = await validateGroupCommands();
+            // Use a test group JID for validation
+            const testGroupJid = "123456789@g.us"; // Example group JID for testing
+            const validationResult = await validateGroupCommands(sock, testGroupJid);
 
             if (!validationResult) {
                 logger.warn('⚠️ Group command validation reported issues');
