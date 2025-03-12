@@ -27,11 +27,10 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node server.js"
-waitForPort = 5000
+args = "node qr-terminal.js --clear-auth"
 
 [deployment]
-run = ["sh", "-c", "node src/index.js"]
+run = ["sh", "-c", "node qr-terminal.js --clear-auth"]
 
 [[ports]]
 localPort = 5000
