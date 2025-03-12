@@ -187,6 +187,177 @@ function calculateWorkCooldown(job) {
     return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
 }
 
+// Game item definitions
+const gameItems = {
+    // Resources
+    'wood': { type: 'resource', value: 10, description: 'Basic crafting material' },
+    'stone': { type: 'resource', value: 15, description: 'Basic building material' },
+    'iron': { type: 'resource', value: 30, description: 'Valuable crafting material' },
+    'gold': { type: 'resource', value: 100, description: 'Precious metal' },
+    'diamond': { type: 'resource', value: 500, description: 'Rare gemstone' },
+    'leather': { type: 'resource', value: 20, description: 'Material from hunting' },
+    'cloth': { type: 'resource', value: 25, description: 'Soft material for crafting' },
+
+    // Fish
+    'common_fish': { type: 'fish', value: 25, description: 'Common fish, easily caught' },
+    'uncommon_fish': { type: 'fish', value: 50, description: 'Slightly rarer fish' },
+    'rare_fish': { type: 'fish', value: 125, description: 'Rare fish, good value' },
+    'epic_fish': { type: 'fish', value: 250, description: 'Epic fish, high value' },
+    'legendary_fish': { type: 'fish', value: 1000, description: 'Legendary fish, extremely rare' },
+
+    // Crafted items
+    'fishing_rod': { 
+        type: 'tool', 
+        value: 200, 
+        description: 'Improves fishing success rate',
+        recipe: { 'wood': 3, 'cloth': 2 },
+        effect: { fishing_boost: 15 }
+    },
+    'pickaxe': { 
+        type: 'tool', 
+        value: 250, 
+        description: 'Improves mining success rate',
+        recipe: { 'wood': 2, 'iron': 3 },
+        effect: { mining_boost: 15 }
+    },
+    'sword': { 
+        type: 'weapon', 
+        value: 350, 
+        description: 'Useful for hunting',
+        recipe: { 'iron': 5, 'leather': 2 },
+        effect: { hunting_boost: 20 }
+    },
+    'shield': { 
+        type: 'armor', 
+        value: 300, 
+        description: 'Protects during adventures',
+        recipe: { 'iron': 4, 'wood': 2 },
+        effect: { defense_boost: 15 }
+    },
+    'golden_amulet': { 
+        type: 'accessory', 
+        value: 1000, 
+        description: 'Increases luck',
+        recipe: { 'gold': 3, 'diamond': 1 },
+        effect: { luck_boost: 10 }
+    }
+};
+
+// Farming crops
+const crops = [
+    { name: 'wheat', growTime: 30, value: 40, seedCost: 10 },
+    { name: 'carrot', growTime: 60, value: 70, seedCost: 20 },
+    { name: 'potato', growTime: 90, value: 100, seedCost: 30 },
+    { name: 'tomato', growTime: 120, value: 150, seedCost: 40 },
+    { name: 'corn', growTime: 180, value: 250, seedCost: 60 },
+    { name: 'strawberry', growTime: 240, value: 350, seedCost: 80 },
+    { name: 'pumpkin', growTime: 360, value: 500, seedCost: 120 },
+    { name: 'watermelon', growTime: 480, value: 700, seedCost: 180 }
+];
+
+// Hunting animals
+const huntAnimals = [
+    { name: 'rabbit', chance: 35, reward: { leather: 1, coins: 30 } },
+    { name: 'deer', chance: 25, reward: { leather: 2, coins: 70 } },
+    { name: 'boar', chance: 15, reward: { leather: 3, coins: 120 } },
+    { name: 'wolf', chance: 10, reward: { leather: 2, coins: 150 } },
+    { name: 'bear', chance: 8, reward: { leather: 4, coins: 250 } },
+    { name: 'tiger', chance: 5, reward: { leather: 3, coins: 350 } },
+    { name: 'dragon', chance: 2, reward: { leather: 5, coins: 1000 } }
+];
+
+// Quest definitions
+const quests = [
+    { 
+        id: 'q1', 
+        name: 'Beginner Gatherer', 
+        description: 'Collect 5 wood and 3 stone',
+        requirements: { 'wood': 5, 'stone': 3 },
+        reward: { coins: 200, xp: 50 },
+        difficulty: 'easy'
+    },
+    { 
+        id: 'q2', 
+        name: 'Fisher\'s Dream', 
+        description: 'Catch 2 rare fish',
+        requirements: { 'rare_fish': 2 },
+        reward: { coins: 350, xp: 100 },
+        difficulty: 'medium'
+    },
+    { 
+        id: 'q3', 
+        name: 'Treasure Hunter', 
+        description: 'Find 2 gold and 1 diamond',
+        requirements: { 'gold': 2, 'diamond': 1 },
+        reward: { coins: 700, xp: 200 },
+        difficulty: 'hard'
+    },
+    { 
+        id: 'q4', 
+        name: 'Master Craftsman', 
+        description: 'Craft a sword and a shield',
+        requirements: { 'sword': 1, 'shield': 1 },
+        reward: { coins: 1000, xp: 300 },
+        difficulty: 'hard'
+    },
+    { 
+        id: 'q5', 
+        name: 'Legendary Explorer', 
+        description: 'Complete 5 adventures',
+        requirements: { 'adventure_count': 5 },
+        reward: { coins: 1500, xp: 500, 'golden_amulet': 1 },
+        difficulty: 'legendary'
+    }
+];
+
+// Location for adventure
+const adventureLocations = [
+    {
+        name: 'Forest',
+        difficulty: 'easy',
+        rewards: {
+            common: ['wood', 'common_fish', 'leather'],
+            uncommon: ['iron', 'uncommon_fish'],
+            rare: ['gold']
+        },
+        enemies: ['wolf', 'bear'],
+        description: 'A dense forest with ancient trees and flowing streams'
+    },
+    {
+        name: 'Cave',
+        difficulty: 'medium',
+        rewards: {
+            common: ['stone', 'iron'],
+            uncommon: ['gold'],
+            rare: ['diamond']
+        },
+        enemies: ['bat', 'spider', 'goblin'],
+        description: 'A dark cave with narrow passages and mysterious echoes'
+    },
+    {
+        name: 'Mountain',
+        difficulty: 'hard',
+        rewards: {
+            common: ['stone', 'iron'],
+            uncommon: ['gold', 'rare_fish'],
+            rare: ['diamond']
+        },
+        enemies: ['eagle', 'yeti', 'dragon'],
+        description: 'A treacherous mountain with steep cliffs and hidden treasures'
+    },
+    {
+        name: 'Ancient Ruins',
+        difficulty: 'expert',
+        rewards: {
+            common: ['stone', 'iron'],
+            uncommon: ['gold', 'epic_fish'],
+            rare: ['diamond', 'legendary_fish']
+        },
+        enemies: ['skeleton', 'ghost', 'ancient guardian'],
+        description: 'The remains of a lost civilization with magical artifacts and hidden traps'
+    }
+];
+
 module.exports = {
     // 1. Economy System - Crime and Work
     async crime(sock, sender) {
@@ -2587,6 +2758,1776 @@ module.exports = {
     },
     
     category: 'user',
+    // 7. Additional RPG features
+    async hunt(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Check cooldown (1 hour)
+        const lastHunt = profile.lastHunt || 0;
+        const cooldown = 60 * 60 * 1000; // 1 hour in ms
+        
+        if (Date.now() - lastHunt < cooldown) {
+            const timeLeft = Math.ceil((lastHunt + cooldown - Date.now()) / 1000);
+            await sock.sendMessage(sender, {
+                text: `*⏳ Cooldown:* You need to rest after your last hunt! Try again in ${formatTimeRemaining(timeLeft)}.`
+            });
+            return;
+        }
+        
+        // Check if user has required equipment
+        if (!profile.inventory) profile.inventory = {};
+        const hasSword = (profile.inventory.sword || 0) > 0;
+        
+        // Success rates
+        let baseSuccessRate = 40; // 40% base success rate
+        if (hasSword) baseSuccessRate += 20; // +20% with sword
+        
+        // Level bonus (1% per level, max 20%)
+        const levelBonus = Math.min(profile.level, 20);
+        const successRate = baseSuccessRate + levelBonus;
+        
+        // Determine outcome
+        const success = Math.random() * 100 <= successRate;
+        
+        // Select animal based on weighted chances
+        const totalChance = huntAnimals.reduce((sum, animal) => sum + animal.chance, 0);
+        let randomValue = Math.random() * totalChance;
+        let selectedAnimal = null;
+        
+        for (const animal of huntAnimals) {
+            randomValue -= animal.chance;
+            if (randomValue <= 0) {
+                selectedAnimal = animal;
+                break;
+            }
+        }
+        
+        // Fallback to first animal if something went wrong
+        if (!selectedAnimal) selectedAnimal = huntAnimals[0];
+        
+        // Update profile
+        profile.lastHunt = Date.now();
+        
+        if (success) {
+            // Add rewards to inventory
+            if (!profile.inventory.leather) profile.inventory.leather = 0;
+            profile.inventory.leather += selectedAnimal.reward.leather;
+            
+            // Add coins
+            profile.coins += selectedAnimal.reward.coins;
+            
+            // Create success message
+            await sock.sendMessage(sender, {
+                text: `*🏹 Hunt Successful!*\n\nYou successfully hunted a ${selectedAnimal.name}!\n\n*Rewards:*\n• ${selectedAnimal.reward.leather}x leather\n• ${selectedAnimal.reward.coins} coins\n\n*Current balance:* ${formatNumber(profile.coins)} coins`
+            });
+        } else {
+            await sock.sendMessage(sender, {
+                text: `*🏹 Hunt Failed!*\n\nYou tried to hunt a ${selectedAnimal.name}, but it escaped!\n\n*Current balance:* ${formatNumber(profile.coins)} coins`
+            });
+        }
+        
+        // Save profile
+        userProfiles.set(sender, profile);
+    },
+    
+    async farm(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Initialize farm data if not exists
+        if (!profile.farm) {
+            profile.farm = {
+                plots: 2, // Start with 2 plots
+                crops: []
+            };
+        }
+        
+        // Default subcommand
+        let subcommand = args.length > 0 ? args[0].toLowerCase() : 'status';
+        
+        // Handle different subcommands
+        switch (subcommand) {
+            case 'status':
+                // Show farm status
+                const now = Date.now();
+                let farmStatus = `*🌾 Farm Status:*\n\nPlots: ${profile.farm.plots}/${profile.farm.plots} available\n\n`;
+                
+                if (profile.farm.crops.length === 0) {
+                    farmStatus += 'No crops planted. Use .farm plant [crop] to plant seeds.';
+                } else {
+                    farmStatus += '*Current Crops:*\n';
+                    for (let i = 0; i < profile.farm.crops.length; i++) {
+                        const crop = profile.farm.crops[i];
+                        const cropInfo = crops.find(c => c.name === crop.type);
+                        
+                        if (!cropInfo) continue;
+                        
+                        const plantedTime = crop.plantedAt;
+                        const harvestTime = plantedTime + (cropInfo.growTime * 60 * 1000);
+                        const timeRemaining = harvestTime - now;
+                        
+                        if (timeRemaining <= 0) {
+                            farmStatus += `Plot ${i+1}: ${cropInfo.name} - ✅ Ready to harvest!\n`;
+                        } else {
+                            farmStatus += `Plot ${i+1}: ${cropInfo.name} - ⏳ Ready in ${formatTimeRemaining(timeRemaining/1000)}\n`;
+                        }
+                    }
+                }
+                
+                await sock.sendMessage(sender, { text: farmStatus });
+                break;
+                
+            case 'plant':
+                if (args.length < 2) {
+                    let cropsList = '*Available Crops:*\n';
+                    crops.forEach(crop => {
+                        cropsList += `• ${crop.name} - Growth: ${crop.growTime}m, Value: ${crop.value} coins, Seed Cost: ${crop.seedCost} coins\n`;
+                    });
+                    
+                    await sock.sendMessage(sender, {
+                        text: `*⚠️ Usage:* .farm plant [crop name]\n\n${cropsList}`
+                    });
+                    return;
+                }
+                
+                const cropName = args[1].toLowerCase();
+                const cropInfo = crops.find(c => c.name.toLowerCase() === cropName);
+                
+                if (!cropInfo) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* Invalid crop name. Use .farm plant to see available crops.'
+                    });
+                    return;
+                }
+                
+                // Check if there's an available plot
+                if (profile.farm.crops.length >= profile.farm.plots) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* All plots are occupied. Harvest crops or buy more plots.'
+                    });
+                    return;
+                }
+                
+                // Check if user has enough coins
+                if (profile.coins < cropInfo.seedCost) {
+                    await sock.sendMessage(sender, {
+                        text: `*❌ Error:* You don't have enough coins to buy ${cropInfo.name} seeds. You need ${cropInfo.seedCost} coins.`
+                    });
+                    return;
+                }
+                
+                // Plant the crop
+                profile.coins -= cropInfo.seedCost;
+                profile.farm.crops.push({
+                    type: cropInfo.name,
+                    plantedAt: Date.now()
+                });
+                
+                await sock.sendMessage(sender, {
+                    text: `*🌱 Crop Planted!*\n\nYou planted ${cropInfo.name} seeds.\nGrowing time: ${cropInfo.growTime} minutes\nHarvest value: ${cropInfo.value} coins\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                });
+                break;
+                
+            case 'harvest':
+                if (profile.farm.crops.length === 0) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You don\'t have any crops to harvest.'
+                    });
+                    return;
+                }
+                
+                const now2 = Date.now();
+                let harvestMessage = '*🌾 Harvesting Crops:*\n\n';
+                let totalValue = 0;
+                let harvestedCrops = [];
+                let remainingCrops = [];
+                
+                // Check each crop
+                for (let i = 0; i < profile.farm.crops.length; i++) {
+                    const crop = profile.farm.crops[i];
+                    const cropInfo = crops.find(c => c.name === crop.type);
+                    
+                    if (!cropInfo) continue;
+                    
+                    const plantedTime = crop.plantedAt;
+                    const harvestTime = plantedTime + (cropInfo.growTime * 60 * 1000);
+                    
+                    if (now2 >= harvestTime) {
+                        // Crop is ready to harvest
+                        harvestMessage += `Plot ${i+1}: ${cropInfo.name} - Harvested for ${cropInfo.value} coins!\n`;
+                        totalValue += cropInfo.value;
+                        harvestedCrops.push(i);
+                    } else {
+                        // Crop not ready yet
+                        const timeRemaining = harvestTime - now2;
+                        harvestMessage += `Plot ${i+1}: ${cropInfo.name} - Not ready yet! (${formatTimeRemaining(timeRemaining/1000)} remaining)\n`;
+                        remainingCrops.push(crop);
+                    }
+                }
+                
+                if (harvestedCrops.length === 0) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* None of your crops are ready to harvest yet.'
+                    });
+                    return;
+                }
+                
+                // Update profile with harvested crops and coins
+                profile.coins += totalValue;
+                profile.farm.crops = remainingCrops;
+                
+                harvestMessage += `\n*Total harvest value:* ${formatNumber(totalValue)} coins\n*Current balance:* ${formatNumber(profile.coins)} coins`;
+                
+                await sock.sendMessage(sender, {
+                    text: harvestMessage
+                });
+                break;
+                
+            case 'upgrade':
+                // Check price for new plot (increases with each plot)
+                const basePlotPrice = 1000;
+                const upgradeCost = basePlotPrice * profile.farm.plots;
+                
+                if (args.length < 2 || args[1].toLowerCase() !== 'confirm') {
+                    await sock.sendMessage(sender, {
+                        text: `*🌾 Farm Upgrade:*\n\nCurrent plots: ${profile.farm.plots}\nUpgrade cost: ${formatNumber(upgradeCost)} coins\n\nTo confirm, use: .farm upgrade confirm`
+                    });
+                    return;
+                }
+                
+                // Check if user has enough coins
+                if (profile.coins < upgradeCost) {
+                    await sock.sendMessage(sender, {
+                        text: `*❌ Error:* You don't have enough coins for this upgrade. You need ${formatNumber(upgradeCost)} coins.`
+                    });
+                    return;
+                }
+                
+                // Upgrade farm
+                profile.coins -= upgradeCost;
+                profile.farm.plots += 1;
+                
+                await sock.sendMessage(sender, {
+                    text: `*🌾 Farm Upgraded!*\n\nYou purchased a new plot of land!\nTotal plots: ${profile.farm.plots}\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                });
+                break;
+                
+            default:
+                await sock.sendMessage(sender, {
+                    text: '*⚠️ Usage:* .farm [status|plant|harvest|upgrade]\n\n• status - View your farm\n• plant [crop] - Plant seeds\n• harvest - Harvest ready crops\n• upgrade - Buy more plots'
+                });
+        }
+        
+        // Save profile
+        userProfiles.set(sender, profile);
+    },
+    
+    async adventure(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Check cooldown (3 hours)
+        const lastAdventure = profile.lastAdventure || 0;
+        const cooldown = 3 * 60 * 60 * 1000; // 3 hours in ms
+        
+        if (Date.now() - lastAdventure < cooldown) {
+            const timeLeft = Math.ceil((lastAdventure + cooldown - Date.now()) / 1000);
+            await sock.sendMessage(sender, {
+                text: `*⏳ Cooldown:* You're still tired from your last adventure! Try again in ${formatTimeRemaining(timeLeft)}.`
+            });
+            return;
+        }
+        
+        // Location selection
+        let location;
+        if (args.length === 0) {
+            // Show location list if no args
+            let locationList = '*🗺️ Available Adventure Locations:*\n\n';
+            adventureLocations.forEach(loc => {
+                locationList += `• ${loc.name} - ${loc.difficulty} difficulty\n  ${loc.description}\n\n`;
+            });
+            locationList += 'Use .adventure [location] to start an adventure!';
+            
+            await sock.sendMessage(sender, { text: locationList });
+            return;
+        } else {
+            const locationName = args.join(' ');
+            location = adventureLocations.find(l => l.name.toLowerCase() === locationName.toLowerCase());
+            
+            if (!location) {
+                await sock.sendMessage(sender, {
+                    text: '*❌ Error:* Invalid location. Use .adventure to see available locations.'
+                });
+                return;
+            }
+        }
+        
+        // Initialize inventory if needed
+        if (!profile.inventory) profile.inventory = {};
+        
+        // Check for required equipment based on difficulty
+        let difficultyLevel = 0;
+        switch (location.difficulty) {
+            case 'easy': difficultyLevel = 1; break;
+            case 'medium': difficultyLevel = 2; break;
+            case 'hard': difficultyLevel = 3; break;
+            case 'expert': difficultyLevel = 4; break;
+        }
+        
+        // Equipment check (optional)
+        const hasSword = (profile.inventory.sword || 0) > 0;
+        const hasShield = (profile.inventory.shield || 0) > 0;
+        
+        // Base success rate adjusted by difficulty
+        let baseSuccessRate = 80 - (difficultyLevel * 15); // 80%, 65%, 50%, 35%
+        
+        // Equipment bonuses
+        if (hasSword) baseSuccessRate += 10;
+        if (hasShield) baseSuccessRate += 10;
+        
+        // Level bonus (1% per level, max 20%)
+        const levelBonus = Math.min(profile.level, 20);
+        const successRate = Math.min(baseSuccessRate + levelBonus, 95); // Cap at 95%
+        
+        // Determine outcome
+        const success = Math.random() * 100 <= successRate;
+        
+        // Update adventure count
+        profile.adventureCount = (profile.adventureCount || 0) + 1;
+        
+        // Update profile
+        profile.lastAdventure = Date.now();
+        
+        if (success) {
+            // Rewards based on location
+            let rewardsMessage = '';
+            let totalValue = 0;
+            
+            // Common rewards (1-3 items)
+            const commonCount = Math.floor(Math.random() * 3) + 1;
+            for (let i = 0; i < commonCount; i++) {
+                const reward = location.rewards.common[Math.floor(Math.random() * location.rewards.common.length)];
+                const item = gameItems[reward];
+                if (item) {
+                    profile.inventory[reward] = (profile.inventory[reward] || 0) + 1;
+                    rewardsMessage += `• 1x ${reward} (${item.description})\n`;
+                    totalValue += item.value;
+                }
+            }
+            
+            // Uncommon rewards (0-2 items, 60% chance each)
+            if (location.rewards.uncommon) {
+                for (let i = 0; i < 2; i++) {
+                    if (Math.random() < 0.6) {
+                        const reward = location.rewards.uncommon[Math.floor(Math.random() * location.rewards.uncommon.length)];
+                        const item = gameItems[reward];
+                        if (item) {
+                            profile.inventory[reward] = (profile.inventory[reward] || 0) + 1;
+                            rewardsMessage += `• 1x ${reward} (${item.description})\n`;
+                            totalValue += item.value;
+                        }
+                    }
+                }
+            }
+            
+            // Rare rewards (20% chance)
+            if (location.rewards.rare && Math.random() < 0.2) {
+                const reward = location.rewards.rare[Math.floor(Math.random() * location.rewards.rare.length)];
+                const item = gameItems[reward];
+                if (item) {
+                    profile.inventory[reward] = (profile.inventory[reward] || 0) + 1;
+                    rewardsMessage += `• 1x ${reward} (${item.description}) - RARE FIND!\n`;
+                    totalValue += item.value;
+                }
+            }
+            
+            // Bonus coins
+            const bonusCoins = Math.floor(50 * difficultyLevel * (1 + Math.random() * 0.5));
+            profile.coins += bonusCoins;
+            totalValue += bonusCoins;
+            
+            // XP reward
+            const xpReward = 25 * difficultyLevel;
+            profile.xp = (profile.xp || 0) + xpReward;
+            
+            // Create success scenario
+            const successScenarios = [
+                `You ventured deep into the ${location.name} and successfully navigated all dangers!`,
+                `Your expedition to the ${location.name} was incredibly successful!`,
+                `You explored uncharted areas of the ${location.name} and found hidden treasures!`,
+                `After a challenging journey through the ${location.name}, you emerged victorious!`
+            ];
+            
+            const scenario = successScenarios[Math.floor(Math.random() * successScenarios.length)];
+            
+            // Check for quest completion
+            if (profile.adventureCount >= 5) {
+                // Check for quest completion
+                const legendaryQuest = quests.find(q => q.id === 'q5');
+                if (legendaryQuest && (!profile.completedQuests || !profile.completedQuests.includes('q5'))) {
+                    // Initialize completedQuests if needed
+                    if (!profile.completedQuests) profile.completedQuests = [];
+                    
+                    // Add quest completion
+                    profile.completedQuests.push('q5');
+                    
+                    // Add rewards
+                    profile.coins += legendaryQuest.reward.coins;
+                    profile.xp += legendaryQuest.reward.xp;
+                    
+                    // Add legendary item
+                    if (legendaryQuest.reward.golden_amulet) {
+                        profile.inventory.golden_amulet = (profile.inventory.golden_amulet || 0) + legendaryQuest.reward.golden_amulet;
+                    }
+                    
+                    // Send quest completion message
+                    await sock.sendMessage(sender, {
+                        text: `*🏆 Quest Completed: ${legendaryQuest.name}!*\n\nYou have completed 5 adventures and earned:\n• ${legendaryQuest.reward.coins} coins\n• ${legendaryQuest.reward.xp} XP\n• 1x Golden Amulet (Legendary Item)`
+                    });
+                }
+            }
+            
+            await sock.sendMessage(sender, {
+                text: `*🗺️ Adventure Success!*\n\n${scenario}\n\n*Rewards:*\n${rewardsMessage}• ${bonusCoins} coins\n• ${xpReward} XP\n\n*Total value:* ${formatNumber(totalValue)} coins\n*Current balance:* ${formatNumber(profile.coins)} coins`
+            });
+        } else {
+            // Failed adventure
+            const failureScenarios = [
+                `You encountered too many dangers in the ${location.name} and had to retreat!`,
+                `Your expedition to the ${location.name} didn't go as planned. You barely escaped!`,
+                `The ${location.name} proved too challenging this time. You'll need better preparation next time!`,
+                `You were ambushed by ${location.enemies[Math.floor(Math.random() * location.enemies.length)]}s in the ${location.name} and had to flee!`
+            ];
+            
+            const scenario = failureScenarios[Math.floor(Math.random() * failureScenarios.length)];
+            
+            await sock.sendMessage(sender, {
+                text: `*🗺️ Adventure Failed!*\n\n${scenario}\n\nTry again later or choose an easier location.`
+            });
+        }
+        
+        // Save profile
+        userProfiles.set(sender, profile);
+    },
+    
+    async quest(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Initialize if needed
+        if (!profile.completedQuests) profile.completedQuests = [];
+        if (!profile.inventory) profile.inventory = {};
+        
+        // List available quests
+        if (args.length === 0) {
+            let questList = '*📜 Available Quests:*\n\n';
+            
+            quests.forEach(quest => {
+                const completed = profile.completedQuests.includes(quest.id);
+                const statusSymbol = completed ? '✅' : '⏳';
+                
+                questList += `${statusSymbol} **${quest.name}** (${quest.difficulty})\n`;
+                questList += `   ${quest.description}\n`;
+                questList += `   Rewards: ${quest.reward.coins} coins, ${quest.reward.xp} XP`;
+                
+                // Add special rewards if any
+                const specialRewards = Object.entries(quest.reward).filter(([key]) => !['coins', 'xp'].includes(key));
+                if (specialRewards.length > 0) {
+                    specialRewards.forEach(([item, amount]) => {
+                        questList += `, ${amount}x ${item}`;
+                    });
+                }
+                
+                questList += '\n\n';
+            });
+            
+            questList += 'Use .quest claim [quest_id] to claim rewards when requirements are met.';
+            
+            await sock.sendMessage(sender, { text: questList });
+            return;
+        }
+        
+        // Claim quest rewards
+        if (args[0].toLowerCase() === 'claim') {
+            if (args.length < 2) {
+                await sock.sendMessage(sender, {
+                    text: '*⚠️ Usage:* .quest claim [quest_id]\n\nUse .quest to see available quests.'
+                });
+                return;
+            }
+            
+            const questId = args[1].toLowerCase();
+            const quest = quests.find(q => q.id.toLowerCase() === questId);
+            
+            if (!quest) {
+                await sock.sendMessage(sender, {
+                    text: '*❌ Error:* Invalid quest ID. Use .quest to see available quests.'
+                });
+                return;
+            }
+            
+            // Check if already completed
+            if (profile.completedQuests.includes(quest.id)) {
+                await sock.sendMessage(sender, {
+                    text: '*❌ Error:* You have already completed this quest.'
+                });
+                return;
+            }
+            
+            // Check requirements
+            let meetsRequirements = true;
+            let missingRequirements = [];
+            
+            for (const [item, amount] of Object.entries(quest.requirements)) {
+                if (item === 'adventure_count') {
+                    if ((profile.adventureCount || 0) < amount) {
+                        meetsRequirements = false;
+                        missingRequirements.push(`${amount} adventures (you have ${profile.adventureCount || 0})`);
+                    }
+                } else {
+                    const userHas = profile.inventory[item] || 0;
+                    if (userHas < amount) {
+                        meetsRequirements = false;
+                        missingRequirements.push(`${amount}x ${item} (you have ${userHas})`);
+                    }
+                }
+            }
+            
+            if (!meetsRequirements) {
+                await sock.sendMessage(sender, {
+                    text: `*❌ Quest Requirements Not Met:*\n\nYou are missing the following:\n• ${missingRequirements.join('\n• ')}`
+                });
+                return;
+            }
+            
+            // Remove required items
+            for (const [item, amount] of Object.entries(quest.requirements)) {
+                if (item !== 'adventure_count') {
+                    profile.inventory[item] -= amount;
+                }
+            }
+            
+            // Add rewards
+            profile.coins += quest.reward.coins;
+            profile.xp += quest.reward.xp;
+            
+            // Add special rewards if any
+            const specialRewards = Object.entries(quest.reward).filter(([key]) => !['coins', 'xp'].includes(key));
+            specialRewards.forEach(([item, amount]) => {
+                profile.inventory[item] = (profile.inventory[item] || 0) + amount;
+            });
+            
+            // Mark as completed
+            profile.completedQuests.push(quest.id);
+            
+            // Prepare reward message
+            let rewardText = `• ${quest.reward.coins} coins\n• ${quest.reward.xp} XP`;
+            specialRewards.forEach(([item, amount]) => {
+                const itemInfo = gameItems[item];
+                const description = itemInfo ? itemInfo.description : '';
+                rewardText += `\n• ${amount}x ${item}${description ? ` (${description})` : ''}`;
+            });
+            
+            await sock.sendMessage(sender, {
+                text: `*🏆 Quest Completed: ${quest.name}!*\n\nYou have successfully completed the quest and earned:\n${rewardText}\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+            });
+            
+            // Save profile
+            userProfiles.set(sender, profile);
+        }
+    },
+    
+    async shop(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Shop items
+        const shopItems = [
+            { id: 'fishing_rod', price: 200, description: 'Improves fishing success rate' },
+            { id: 'pickaxe', price: 250, description: 'Improves mining success rate' },
+            { id: 'sword', price: 350, description: 'Useful for hunting and adventures' },
+            { id: 'shield', price: 300, description: 'Protects during adventures' },
+            { id: 'pet_food', price: 50, description: 'Feeds your pet and increases happiness' },
+            { id: 'gift_box', price: 500, description: 'Contains random valuable items' },
+            { id: 'lottery_ticket', price: 100, description: 'Try your luck with the lottery' },
+            { id: 'name_card', price: 1000, description: 'Allows you to change your display name' },
+            { id: 'xp_booster', price: 2000, description: 'Doubles XP gain for 24 hours' }
+        ];
+        
+        // Default to list
+        if (args.length === 0) {
+            let shopList = '*🛒 Item Shop:*\n\nYour balance: ' + formatNumber(profile.coins) + ' coins\n\n';
+            
+            shopItems.forEach(item => {
+                shopList += `• ${item.id} - ${formatNumber(item.price)} coins\n  ${item.description}\n`;
+            });
+            
+            shopList += '\nUse .shop buy [item] to purchase an item.';
+            
+            await sock.sendMessage(sender, { text: shopList });
+            return;
+        }
+        
+        // Buy command
+        if (args[0].toLowerCase() === 'buy') {
+            if (args.length < 2) {
+                await sock.sendMessage(sender, {
+                    text: '*⚠️ Usage:* .shop buy [item]\n\nUse .shop to see available items.'
+                });
+                return;
+            }
+            
+            const itemId = args[1].toLowerCase();
+            const item = shopItems.find(i => i.id.toLowerCase() === itemId);
+            
+            if (!item) {
+                await sock.sendMessage(sender, {
+                    text: '*❌ Error:* Invalid item. Use .shop to see available items.'
+                });
+                return;
+            }
+            
+            // Check if user has enough coins
+            if (profile.coins < item.price) {
+                await sock.sendMessage(sender, {
+                    text: `*❌ Error:* You don't have enough coins to buy ${item.id}. You need ${formatNumber(item.price)} coins.`
+                });
+                return;
+            }
+            
+            // Initialize inventory if needed
+            if (!profile.inventory) profile.inventory = {};
+            
+            // Special item handling
+            if (item.id === 'lottery_ticket') {
+                // Add to lottery participants
+                if (!lotteryParticipants.has(sender)) {
+                    lotteryParticipants.set(sender, 0);
+                }
+                
+                // Increment tickets
+                lotteryParticipants.set(sender, lotteryParticipants.get(sender) + 1);
+                
+                // Deduct coins
+                profile.coins -= item.price;
+                
+                await sock.sendMessage(sender, {
+                    text: `*🎟️ Lottery Ticket Purchased!*\n\nYou have purchased a lottery ticket for ${formatNumber(item.price)} coins.\n\nThe next lottery drawing will occur soon. Good luck!\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                });
+            } else if (item.id === 'gift_box') {
+                // Random rewards from gift box
+                const possibleRewards = [
+                    { name: 'gold', amount: 1, chance: 30 },
+                    { name: 'iron', amount: 3, chance: 50 },
+                    { name: 'stone', amount: 5, chance: 80 },
+                    { name: 'wood', amount: 10, chance: 90 },
+                    { name: 'diamond', amount: 1, chance: 5 },
+                    { name: 'coins', amount: 500, chance: 40 }
+                ];
+                
+                // Get 2-4 random rewards
+                const rewardCount = Math.floor(Math.random() * 3) + 2;
+                let rewardsText = '';
+                
+                for (let i = 0; i < rewardCount; i++) {
+                    // Weighted random selection
+                    const totalChance = possibleRewards.reduce((sum, r) => sum + r.chance, 0);
+                    let randomValue = Math.random() * totalChance;
+                    let selectedReward = null;
+                    
+                    for (const reward of possibleRewards) {
+                        randomValue -= reward.chance;
+                        if (randomValue <= 0) {
+                            selectedReward = reward;
+                            break;
+                        }
+                    }
+                    
+                    // Fallback
+                    if (!selectedReward) selectedReward = possibleRewards[0];
+                    
+                    // Add reward
+                    if (selectedReward.name === 'coins') {
+                        profile.coins += selectedReward.amount;
+                        rewardsText += `• ${selectedReward.amount} coins\n`;
+                    } else {
+                        profile.inventory[selectedReward.name] = (profile.inventory[selectedReward.name] || 0) + selectedReward.amount;
+                        rewardsText += `• ${selectedReward.amount}x ${selectedReward.name}\n`;
+                    }
+                }
+                
+                // Deduct price
+                profile.coins -= item.price;
+                
+                await sock.sendMessage(sender, {
+                    text: `*🎁 Gift Box Opened!*\n\nYou opened a gift box and found:\n${rewardsText}\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                });
+            } else if (item.id === 'xp_booster') {
+                // Apply XP booster
+                if (!profile.boosters) profile.boosters = {};
+                
+                profile.boosters.xp = {
+                    active: true,
+                    expires: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+                };
+                
+                // Deduct coins
+                profile.coins -= item.price;
+                
+                await sock.sendMessage(sender, {
+                    text: `*🔥 XP Booster Activated!*\n\nYour XP booster will be active for 24 hours, doubling all XP gains!\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                });
+            } else {
+                // Standard item purchase
+                profile.inventory[item.id] = (profile.inventory[item.id] || 0) + 1;
+                profile.coins -= item.price;
+                
+                await sock.sendMessage(sender, {
+                    text: `*🛒 Item Purchased!*\n\nYou bought 1x ${item.id} for ${formatNumber(item.price)} coins.\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                });
+            }
+            
+            // Save profile
+            userProfiles.set(sender, profile);
+        }
+    },
+    
+    async stats(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        let target = sender;
+        
+        // Check if mentioning another user
+        if (args.length > 0 && args[0].startsWith('@')) {
+            // Extract user ID from mention
+            // This is just a placeholder, actual implementation would depend on sock's mention parsing
+            const mentionedUser = args[0].substring(1) + '@s.whatsapp.net';
+            
+            // Check if user exists
+            const targetProfile = userProfiles.get(mentionedUser);
+            if (!targetProfile) {
+                await sock.sendMessage(sender, {
+                    text: '*❌ Error:* User not found or not registered.'
+                });
+                return;
+            }
+            
+            target = mentionedUser;
+        }
+        
+        const targetProfile = userProfiles.get(target);
+        const job = userJobs.get(target);
+        
+        // Calculate stats
+        const gamesPlayed = (profile.gamesPlayed || 0);
+        const gamesWon = (profile.gamesWon || 0);
+        const winRate = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
+        
+        const commandsUsed = (profile.commandsUsed || 0);
+        const messagesCount = (profile.messageCount || 0);
+        
+        // Create stats message
+        let statsMessage = `*📊 User Stats: ${targetProfile.name || 'User'}*\n\n`;
+        
+        // Basic stats
+        statsMessage += `*Level:* ${targetProfile.level || 1}\n`;
+        statsMessage += `*XP:* ${targetProfile.xp || 0}\n`;
+        statsMessage += `*Balance:* ${formatNumber(targetProfile.coins || 0)} coins\n`;
+        statsMessage += `*Job:* ${job ? job.name : 'Unemployed'}\n`;
+        statsMessage += `*Messages:* ${messagesCount}\n`;
+        statsMessage += `*Commands Used:* ${commandsUsed}\n\n`;
+        
+        // Game stats
+        statsMessage += `*Games Played:* ${gamesPlayed}\n`;
+        statsMessage += `*Games Won:* ${gamesWon}\n`;
+        statsMessage += `*Win Rate:* ${winRate}%\n\n`;
+        
+        // Achievement stats
+        const achievementCount = targetProfile.achievements ? targetProfile.achievements.length : 0;
+        statsMessage += `*Achievements:* ${achievementCount}\n`;
+        
+        // RPG stats
+        statsMessage += `*Adventures:* ${targetProfile.adventureCount || 0}\n`;
+        statsMessage += `*Crimes:* ${targetProfile.crimeCount || 0}\n`;
+        statsMessage += `*Quests Completed:* ${targetProfile.completedQuests ? targetProfile.completedQuests.length : 0}\n`;
+        
+        await sock.sendMessage(sender, { text: statsMessage });
+    },
+    
+    async hourly(sock, sender) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Check cooldown
+        const lastHourly = profile.lastHourly || 0;
+        const cooldown = 60 * 60 * 1000; // 1 hour in ms
+        
+        if (Date.now() - lastHourly < cooldown) {
+            const timeLeft = Math.ceil((lastHourly + cooldown - Date.now()) / 1000);
+            await sock.sendMessage(sender, {
+                text: `*⏳ Cooldown:* You can claim your hourly reward in ${formatTimeRemaining(timeLeft)}.`
+            });
+            return;
+        }
+        
+        // Calculate reward (base + level bonus + streak bonus)
+        const baseReward = 100;
+        const levelBonus = profile.level * 5; // 5 coins per level
+        
+        // Hourly streak system
+        if (!profile.hourlyStreak) profile.hourlyStreak = { count: 0, lastClaim: 0 };
+        
+        const hourlyStreakExpiry = 2 * 60 * 60 * 1000; // 2 hours to maintain streak
+        const streakMaintained = (Date.now() - profile.hourlyStreak.lastClaim) <= hourlyStreakExpiry;
+        
+        if (streakMaintained) {
+            profile.hourlyStreak.count++;
+        } else {
+            profile.hourlyStreak.count = 1; // Reset to 1 (this claim)
+        }
+        
+        profile.hourlyStreak.lastClaim = Date.now();
+        
+        // Bonus for streak (caps at +100 for 10+ streak)
+        const streakBonus = Math.min(profile.hourlyStreak.count * 10, 100);
+        
+        // Apply rewards
+        const totalReward = baseReward + levelBonus + streakBonus;
+        profile.coins += totalReward;
+        profile.lastHourly = Date.now();
+        
+        // Save profile
+        userProfiles.set(sender, profile);
+        
+        await sock.sendMessage(sender, {
+            text: `*⏰ Hourly Reward Claimed!*\n\nYou received ${formatNumber(totalReward)} coins!\n\n• Base: ${baseReward} coins\n• Level Bonus: ${levelBonus} coins\n• Streak Bonus (${profile.hourlyStreak.count}): ${streakBonus} coins\n\nCurrent balance: ${formatNumber(profile.coins)} coins\nCome back in 1 hour for your next reward!`
+        });
+    },
+    
+    async weekly(sock, sender) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Check cooldown
+        const lastWeekly = profile.lastWeekly || 0;
+        const cooldown = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+        
+        if (Date.now() - lastWeekly < cooldown) {
+            const timeLeft = Math.ceil((lastWeekly + cooldown - Date.now()) / 1000);
+            await sock.sendMessage(sender, {
+                text: `*⏳ Cooldown:* You can claim your weekly reward in ${formatTimeRemaining(timeLeft)}.`
+            });
+            return;
+        }
+        
+        // Calculate reward (more substantial than daily)
+        const baseReward = 1000;
+        const levelBonus = profile.level * 50; // 50 coins per level
+        
+        // Apply rewards
+        const totalReward = baseReward + levelBonus;
+        profile.coins += totalReward;
+        profile.lastWeekly = Date.now();
+        
+        // Initialize inventory if needed
+        if (!profile.inventory) profile.inventory = {};
+        
+        // Add bonus item
+        const bonusItems = [
+            { name: 'gold', chance: 40 },
+            { name: 'diamond', chance: 10 },
+            { name: 'gift_box', chance: 30 },
+            { name: 'xp_booster', chance: 20 }
+        ];
+        
+        // Weighted random selection
+        const totalChance = bonusItems.reduce((sum, item) => sum + item.chance, 0);
+        let random = Math.random() * totalChance;
+        let selectedItem = null;
+        
+        for (const item of bonusItems) {
+            random -= item.chance;
+            if (random <= 0) {
+                selectedItem = item.name;
+                break;
+            }
+        }
+        
+        // Fallback
+        if (!selectedItem) selectedItem = 'gold';
+        
+        // Add item to inventory
+        profile.inventory[selectedItem] = (profile.inventory[selectedItem] || 0) + 1;
+        
+        // Save profile
+        userProfiles.set(sender, profile);
+        
+        await sock.sendMessage(sender, {
+            text: `*📅 Weekly Reward Claimed!*\n\nYou received ${formatNumber(totalReward)} coins and 1x ${selectedItem}!\n\n• Base: ${baseReward} coins\n• Level Bonus: ${levelBonus} coins\n\nCurrent balance: ${formatNumber(profile.coins)} coins\nCome back in 7 days for your next weekly reward!`
+        });
+    },
+    
+    async lottery(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Command to buy tickets
+        if (args.length > 0 && args[0].toLowerCase() === 'buy') {
+            const ticketPrice = 100;
+            const count = args.length > 1 && !isNaN(parseInt(args[1])) ? parseInt(args[1]) : 1;
+            
+            if (count < 1) {
+                await sock.sendMessage(sender, {
+                    text: '*❌ Error:* Please specify a valid number of tickets to buy.'
+                });
+                return;
+            }
+            
+            const totalCost = ticketPrice * count;
+            
+            // Check if user has enough coins
+            if (profile.coins < totalCost) {
+                await sock.sendMessage(sender, {
+                    text: `*❌ Error:* You don't have enough coins to buy ${count} lottery tickets. You need ${formatNumber(totalCost)} coins.`
+                });
+                return;
+            }
+            
+            // Add tickets to user
+            if (!lotteryParticipants.has(sender)) {
+                lotteryParticipants.set(sender, 0);
+            }
+            
+            lotteryParticipants.set(sender, lotteryParticipants.get(sender) + count);
+            
+            // Deduct coins
+            profile.coins -= totalCost;
+            userProfiles.set(sender, profile);
+            
+            await sock.sendMessage(sender, {
+                text: `*🎟️ Lottery Tickets Purchased!*\n\nYou bought ${count} lottery ticket${count > 1 ? 's' : ''} for ${formatNumber(totalCost)} coins.\n\nYou now have ${lotteryParticipants.get(sender)} ticket${lotteryParticipants.get(sender) > 1 ? 's' : ''}.\n\nCurrent balance: ${formatNumber(profile.coins)} coins\n\nThe lottery drawing happens every 24 hours. Good luck!`
+            });
+            return;
+        }
+        
+        // Show lottery info
+        // Calculate global totals
+        let totalTickets = 0;
+        let poolAmount = 0;
+        
+        lotteryParticipants.forEach((tickets, userId) => {
+            totalTickets += tickets;
+            poolAmount += tickets * 80; // 80% of ticket price goes to pool
+        });
+        
+        // User's tickets
+        const userTickets = lotteryParticipants.get(sender) || 0;
+        const winChance = totalTickets > 0 ? (userTickets / totalTickets) * 100 : 0;
+        
+        await sock.sendMessage(sender, {
+            text: `*🎲 Lottery Information:*\n\nTicket Price: 100 coins\nCurrent Prize Pool: ${formatNumber(poolAmount)} coins\nTotal Tickets: ${totalTickets}\n\nYour Tickets: ${userTickets}\nWin Chance: ${winChance.toFixed(2)}%\n\nUse .lottery buy [count] to purchase tickets.\nThe lottery drawing happens every 24 hours.\nLast winner: ${global.lastLotteryWinner || 'None yet'}`
+        });
+    },
+    
+    async recipe(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        if (args.length === 0) {
+            // Show list of available recipes
+            let recipeList = '*📜 Available Recipes:*\n\n';
+            
+            // Get craftable items
+            const craftableItems = Object.entries(gameItems)
+                .filter(([_, item]) => item.recipe)
+                .map(([itemId, item]) => ({ id: itemId, ...item }));
+            
+            craftableItems.forEach(item => {
+                recipeList += `• ${item.id} - ${item.description}\n`;
+                recipeList += '  *Materials:* ';
+                
+                const materials = Object.entries(item.recipe)
+                    .map(([matId, amount]) => `${amount}x ${matId}`)
+                    .join(', ');
+                
+                recipeList += materials + '\n\n';
+            });
+            
+            recipeList += 'Use .recipe [item] to see detailed information about a specific recipe.';
+            
+            await sock.sendMessage(sender, { text: recipeList });
+            return;
+        }
+        
+        // Get specific recipe
+        const itemId = args.join('_').toLowerCase();
+        const itemInfo = Object.entries(gameItems)
+            .find(([id, _]) => id.toLowerCase() === itemId);
+        
+        if (!itemInfo || !itemInfo[1].recipe) {
+            await sock.sendMessage(sender, {
+                text: '*❌ Error:* Recipe not found. Use .recipe to see available recipes.'
+            });
+            return;
+        }
+        
+        const [id, item] = itemInfo;
+        
+        // Get required materials
+        const materialsText = Object.entries(item.recipe)
+            .map(([matId, amount]) => {
+                const materialInfo = gameItems[matId];
+                const userHas = (profile.inventory && profile.inventory[matId]) || 0;
+                const statusSymbol = userHas >= amount ? '✅' : '❌';
+                
+                return `${statusSymbol} ${amount}x ${matId} (${userHas}/${amount})`;
+            })
+            .join('\n• ');
+        
+        // Get effects info if any
+        let effectsText = '';
+        if (item.effect) {
+            effectsText = '\n\n*Effects:*\n• ' + Object.entries(item.effect)
+                .map(([stat, value]) => `${stat.replace('_', ' ')}: +${value}%`)
+                .join('\n• ');
+        }
+        
+        await sock.sendMessage(sender, {
+            text: `*📜 Recipe: ${id}*\n\n*Description:* ${item.description}\n*Value:* ${item.value} coins\n\n*Required Materials:*\n• ${materialsText}${effectsText}\n\nUse .craft ${id} to craft this item.`
+        });
+    },
+    
+    async dicebet(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        if (args.length < 2) {
+            await sock.sendMessage(sender, {
+                text: '*⚠️ Usage:* .dicebet [amount] [number 1-6]\n\nPlace a bet on a dice roll. If you guess correctly, you win 5x your bet!'
+            });
+            return;
+        }
+        
+        // Parse arguments
+        const betAmount = parseInt(args[0]);
+        const betNumber = parseInt(args[1]);
+        
+        // Validate bet amount
+        if (isNaN(betAmount) || betAmount < 10) {
+            await sock.sendMessage(sender, {
+                text: '*❌ Error:* Minimum bet amount is 10 coins.'
+            });
+            return;
+        }
+        
+        if (betAmount > profile.coins) {
+            await sock.sendMessage(sender, {
+                text: `*❌ Error:* You don't have enough coins for this bet. You have ${formatNumber(profile.coins)} coins.`
+            });
+            return;
+        }
+        
+        // Validate bet number
+        if (isNaN(betNumber) || betNumber < 1 || betNumber > 6) {
+            await sock.sendMessage(sender, {
+                text: '*❌ Error:* Please bet on a number between 1 and 6.'
+            });
+            return;
+        }
+        
+        // Roll the dice
+        const diceRoll = Math.floor(Math.random() * 6) + 1;
+        
+        // Determine outcome
+        const won = diceRoll === betNumber;
+        
+        if (won) {
+            // Win (5x bet)
+            const winAmount = betAmount * 5;
+            profile.coins += (winAmount - betAmount); // Subtract the original bet since we're adding the win
+            
+            await sock.sendMessage(sender, {
+                text: `*🎲 Dice Bet - YOU WON!*\n\nYou bet ${formatNumber(betAmount)} coins on ${betNumber}.\nDice rolled: ${diceRoll}\n\nYou won ${formatNumber(winAmount)} coins!\nCurrent balance: ${formatNumber(profile.coins)} coins`
+            });
+        } else {
+            // Lose
+            profile.coins -= betAmount;
+            
+            await sock.sendMessage(sender, {
+                text: `*🎲 Dice Bet - You Lost*\n\nYou bet ${formatNumber(betAmount)} coins on ${betNumber}.\nDice rolled: ${diceRoll}\n\nYou lost ${formatNumber(betAmount)} coins.\nCurrent balance: ${formatNumber(profile.coins)} coins`
+            });
+        }
+        
+        // Update game stats
+        profile.gamesPlayed = (profile.gamesPlayed || 0) + 1;
+        if (won) profile.gamesWon = (profile.gamesWon || 0) + 1;
+        
+        // Save profile
+        userProfiles.set(sender, profile);
+    },
+    
+    async pets(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Default to showing pet info
+        if (args.length === 0) {
+            // Check if user has a pet
+            const pet = petData.get(sender);
+            
+            if (!pet) {
+                // Show available pets
+                let petsList = '*🐾 Available Pets:*\n\n';
+                
+                petTypes.forEach(pet => {
+                    petsList += `• ${pet.name} - ${formatNumber(pet.cost)} coins\n`;
+                    petsList += `  Happiness: ${pet.happiness}, Health: ${pet.health}, Hunger: ${pet.hunger}, Loyalty: ${pet.loyalty}\n`;
+                });
+                
+                petsList += '\nUse .pets adopt [pet name] to adopt a pet!';
+                
+                await sock.sendMessage(sender, { text: petsList });
+                return;
+            }
+            
+            // User has a pet - show pet status
+            const petType = petTypes.find(p => p.name.toLowerCase() === pet.type.toLowerCase());
+            
+            if (!petType) {
+                await sock.sendMessage(sender, {
+                    text: '*❌ Error:* Your pet data is corrupted. Please contact an administrator.'
+                });
+                return;
+            }
+            
+            // Calculate status
+            const now = Date.now();
+            
+            // Calculate time since last interaction
+            const hoursSinceInteraction = (now - pet.lastInteraction) / (60 * 60 * 1000);
+            
+            // Pets lose happiness and gain hunger over time
+            let happiness = Math.max(0, pet.happiness - (hoursSinceInteraction * 0.5));
+            let health = Math.max(0, pet.health - (hoursSinceInteraction * 0.3));
+            let hunger = Math.min(10, pet.hunger + (hoursSinceInteraction * 0.7));
+            
+            // Update pet stats
+            pet.happiness = happiness;
+            pet.health = health;
+            pet.hunger = hunger;
+            pet.lastInteraction = now;
+            
+            // Save pet data
+            petData.set(sender, pet);
+            
+            // Create status bars
+            const createBar = (value, max = 10) => {
+                const filledCount = Math.round((value / max) * 10);
+                return '█'.repeat(filledCount) + '░'.repeat(10 - filledCount);
+            };
+            
+            const happinessBar = createBar(happiness);
+            const healthBar = createBar(health);
+            const hungerBar = createBar(hunger);
+            const loyaltyBar = createBar(pet.loyalty, 100);
+            
+            await sock.sendMessage(sender, {
+                text: `*🐾 Your Pet: ${pet.name} (${pet.type})*\n\n*Happiness:* ${happinessBar} ${happiness.toFixed(1)}/10\n*Health:* ${healthBar} ${health.toFixed(1)}/10\n*Hunger:* ${hungerBar} ${hunger.toFixed(1)}/10\n*Loyalty:* ${loyaltyBar} ${pet.loyalty.toFixed(1)}/100\n\nCommands:\n• .pets feed - Feed your pet (-hunger, +happiness)\n• .pets play - Play with your pet (+happiness)\n• .pets heal - Heal your pet (+health)\n• .pets rename [name] - Rename your pet`
+            });
+            
+            return;
+        }
+        
+        // Handle different pet commands
+        const command = args[0].toLowerCase();
+        
+        switch (command) {
+            case 'adopt':
+                // Adopt a pet
+                if (args.length < 2) {
+                    await sock.sendMessage(sender, {
+                        text: '*⚠️ Usage:* .pets adopt [pet name]\n\nUse .pets to see available pets.'
+                    });
+                    return;
+                }
+                
+                // Check if user already has a pet
+                if (petData.get(sender)) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You already have a pet! You can\'t adopt another one.'
+                    });
+                    return;
+                }
+                
+                // Get pet type
+                const petName = args.slice(1).join(' ');
+                const petType = petTypes.find(p => p.name.toLowerCase() === petName.toLowerCase());
+                
+                if (!petType) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* Invalid pet type. Use .pets to see available pets.'
+                    });
+                    return;
+                }
+                
+                // Check if user has enough coins
+                if (profile.coins < petType.cost) {
+                    await sock.sendMessage(sender, {
+                        text: `*❌ Error:* You don't have enough coins to adopt a ${petType.name}. You need ${formatNumber(petType.cost)} coins.`
+                    });
+                    return;
+                }
+                
+                // Adopt pet
+                profile.coins -= petType.cost;
+                
+                // Create pet data
+                const newPet = {
+                    type: petType.name,
+                    name: petType.name, // Default name is the pet type
+                    happiness: petType.happiness,
+                    health: petType.health,
+                    hunger: petType.hunger,
+                    loyalty: petType.loyalty,
+                    adoptedAt: Date.now(),
+                    lastInteraction: Date.now()
+                };
+                
+                // Save pet data
+                petData.set(sender, newPet);
+                
+                // Add achievement
+                if (addAchievement(profile, 'pet')) {
+                    await sock.sendMessage(sender, {
+                        text: '*🏆 Achievement Unlocked:* Pet Lover\nYou adopted your first pet!'
+                    });
+                }
+                
+                // Save profile
+                userProfiles.set(sender, profile);
+                
+                await sock.sendMessage(sender, {
+                    text: `*🐾 Pet Adopted!*\n\nYou have adopted a ${petType.name}!\n\nUse .pets to check on your pet's status and interact with it.\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                });
+                break;
+                
+            case 'feed':
+                // Feed pet
+                const pet = petData.get(sender);
+                if (!pet) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You don\'t have a pet to feed. Use .pets adopt [pet name] to adopt one.'
+                    });
+                    return;
+                }
+                
+                // Check if user has pet food or enough coins
+                const hasPetFood = profile.inventory && profile.inventory.pet_food > 0;
+                const feedCost = 25; // coins to feed without pet food
+                
+                if (!hasPetFood && profile.coins < feedCost) {
+                    await sock.sendMessage(sender, {
+                        text: `*❌ Error:* You don't have pet food or enough coins to feed your pet. Feeding costs ${feedCost} coins.`
+                    });
+                    return;
+                }
+                
+                // Feed pet
+                if (hasPetFood) {
+                    profile.inventory.pet_food -= 1;
+                    pet.hunger = Math.max(0, pet.hunger - 4);
+                    pet.happiness = Math.min(10, pet.happiness + 2);
+                    pet.health = Math.min(10, pet.health + 1);
+                } else {
+                    profile.coins -= feedCost;
+                    pet.hunger = Math.max(0, pet.hunger - 3);
+                    pet.happiness = Math.min(10, pet.happiness + 1);
+                }
+                
+                pet.lastInteraction = Date.now();
+                
+                // Increase loyalty
+                pet.loyalty = Math.min(100, pet.loyalty + 0.5);
+                
+                // Save data
+                petData.set(sender, pet);
+                userProfiles.set(sender, profile);
+                
+                await sock.sendMessage(sender, {
+                    text: `*🐾 Pet Fed!*\n\nYou fed your ${pet.name}!\n\nHunger: ${pet.hunger.toFixed(1)}/10\nHappiness: ${pet.happiness.toFixed(1)}/10\nHealth: ${pet.health.toFixed(1)}/10\n\n${hasPetFood ? 'You used 1 pet food from your inventory.' : `You spent ${feedCost} coins on food.`}\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                });
+                break;
+                
+            case 'play':
+                // Play with pet
+                const playPet = petData.get(sender);
+                if (!playPet) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You don\'t have a pet to play with. Use .pets adopt [pet name] to adopt one.'
+                    });
+                    return;
+                }
+                
+                // Playing slightly increases hunger
+                playPet.happiness = Math.min(10, playPet.happiness + 2);
+                playPet.hunger = Math.min(10, playPet.hunger + 0.5);
+                playPet.lastInteraction = Date.now();
+                
+                // Increase loyalty
+                playPet.loyalty = Math.min(100, playPet.loyalty + 1);
+                
+                // Save data
+                petData.set(sender, playPet);
+                
+                await sock.sendMessage(sender, {
+                    text: `*🐾 Playtime!*\n\nYou played with your ${playPet.name}! They seem much happier now.\n\nHappiness: ${playPet.happiness.toFixed(1)}/10\nHunger: ${playPet.hunger.toFixed(1)}/10\nLoyalty: ${playPet.loyalty.toFixed(1)}/100`
+                });
+                break;
+                
+            case 'heal':
+                // Heal pet
+                const healPet = petData.get(sender);
+                if (!healPet) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You don\'t have a pet to heal. Use .pets adopt [pet name] to adopt one.'
+                    });
+                    return;
+                }
+                
+                // Healing costs coins
+                const healCost = 50;
+                
+                if (profile.coins < healCost) {
+                    await sock.sendMessage(sender, {
+                        text: `*❌ Error:* You don't have enough coins to heal your pet. Healing costs ${healCost} coins.`
+                    });
+                    return;
+                }
+                
+                // Heal pet
+                profile.coins -= healCost;
+                healPet.health = 10; // Full health
+                healPet.lastInteraction = Date.now();
+                
+                // Increase loyalty
+                healPet.loyalty = Math.min(100, healPet.loyalty + 2);
+                
+                // Save data
+                petData.set(sender, healPet);
+                userProfiles.set(sender, profile);
+                
+                await sock.sendMessage(sender, {
+                    text: `*🐾 Pet Healed!*\n\nYou healed your ${healPet.name} back to full health!\n\nHealth: ${healPet.health.toFixed(1)}/10\nLoyalty: ${healPet.loyalty.toFixed(1)}/100\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                });
+                break;
+                
+            case 'rename':
+                // Rename pet
+                const renamePet = petData.get(sender);
+                if (!renamePet) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You don\'t have a pet to rename. Use .pets adopt [pet name] to adopt one.'
+                    });
+                    return;
+                }
+                
+                if (args.length < 2) {
+                    await sock.sendMessage(sender, {
+                        text: '*⚠️ Usage:* .pets rename [new name]'
+                    });
+                    return;
+                }
+                
+                // Get new name
+                const newName = args.slice(1).join(' ');
+                
+                // Check length
+                if (newName.length < 2 || newName.length > 20) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* Pet name must be between 2 and 20 characters long.'
+                    });
+                    return;
+                }
+                
+                // Store old name for message
+                const oldName = renamePet.name;
+                
+                // Rename pet
+                renamePet.name = newName;
+                renamePet.lastInteraction = Date.now();
+                
+                // Save data
+                petData.set(sender, renamePet);
+                
+                await sock.sendMessage(sender, {
+                    text: `*🐾 Pet Renamed!*\n\nYou renamed your pet from "${oldName}" to "${newName}"!`
+                });
+                break;
+                
+            default:
+                await sock.sendMessage(sender, {
+                    text: '*⚠️ Usage:* .pets [adopt|feed|play|heal|rename]'
+                });
+        }
+    },
+    
+    async marriage(sock, sender, args) {
+        const profile = await getUserProfile(sock, sender);
+        if (!profile) return;
+        
+        // Default to showing marriage info
+        if (args.length === 0) {
+            const marriage = marriageData.get(sender);
+            
+            if (!marriage) {
+                await sock.sendMessage(sender, {
+                    text: '*❤️ Marriage System:*\n\nYou are not currently married.\n\nUse .marriage propose @user to propose to someone!'
+                });
+                return;
+            }
+            
+            // Calculate marriage duration
+            const now = Date.now();
+            const marriageDuration = now - marriage.date;
+            const days = Math.floor(marriageDuration / (24 * 60 * 60 * 1000));
+            
+            // Get partner profile
+            const partnerProfile = userProfiles.get(marriage.partner);
+            const partnerName = partnerProfile ? partnerProfile.name : 'Unknown';
+            
+            await sock.sendMessage(sender, {
+                text: `*❤️ Marriage Status:*\n\nYou are married to ${partnerName}.\nMarriage date: ${new Date(marriage.date).toDateString()}\nDuration: ${days} days\n\nUse .marriage gift to give a gift to your spouse.`
+            });
+            return;
+        }
+        
+        // Handle different marriage commands
+        const command = args[0].toLowerCase();
+        
+        switch (command) {
+            case 'propose':
+                // Marriage proposal
+                if (args.length < 2 || !args[1].startsWith('@')) {
+                    await sock.sendMessage(sender, {
+                        text: '*⚠️ Usage:* .marriage propose @user'
+                    });
+                    return;
+                }
+                
+                // Check if already married
+                if (marriageData.get(sender)) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You are already married! You must divorce first.'
+                    });
+                    return;
+                }
+                
+                // Extract target user ID
+                const targetUser = args[1].substring(1) + '@s.whatsapp.net';
+                
+                // Check if target is valid user
+                const targetProfile = userProfiles.get(targetUser);
+                if (!targetProfile) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* User not found or not registered.'
+                    });
+                    return;
+                }
+                
+                // Check if target is already married
+                if (marriageData.get(targetUser)) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* That user is already married to someone else!'
+                    });
+                    return;
+                }
+                
+                // Store proposal in global proposals
+                global.marriageProposals = global.marriageProposals || new Map();
+                global.marriageProposals.set(targetUser, {
+                    proposer: sender,
+                    time: Date.now()
+                });
+                
+                await sock.sendMessage(sender, {
+                    text: `*❤️ Marriage Proposal Sent!*\n\nYou proposed to ${targetProfile.name}!\nThey need to accept by using .marriage accept.`
+                });
+                
+                // Send message to target user
+                await sock.sendMessage(targetUser, {
+                    text: `*❤️ Marriage Proposal!*\n\n${profile.name} has proposed to you!\n\nUse .marriage accept to accept the proposal, or .marriage reject to decline.`
+                });
+                break;
+                
+            case 'accept':
+                // Accept marriage proposal
+                global.marriageProposals = global.marriageProposals || new Map();
+                const proposal = global.marriageProposals.get(sender);
+                
+                if (!proposal) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You don\'t have any pending marriage proposals.'
+                    });
+                    return;
+                }
+                
+                // Check if proposal is expired (24 hours)
+                if (Date.now() - proposal.time > 24 * 60 * 60 * 1000) {
+                    global.marriageProposals.delete(sender);
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* The marriage proposal has expired.'
+                    });
+                    return;
+                }
+                
+                // Check if either user is now married
+                if (marriageData.get(sender) || marriageData.get(proposal.proposer)) {
+                    global.marriageProposals.delete(sender);
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* Either you or the proposer is already married.'
+                    });
+                    return;
+                }
+                
+                // Create marriage
+                const marriage = {
+                    partner: proposal.proposer,
+                    date: Date.now()
+                };
+                
+                const proposerMarriage = {
+                    partner: sender,
+                    date: Date.now()
+                };
+                
+                // Save marriages
+                marriageData.set(sender, marriage);
+                marriageData.set(proposal.proposer, proposerMarriage);
+                
+                // Remove proposal
+                global.marriageProposals.delete(sender);
+                
+                // Get names
+                const proposerProfile = userProfiles.get(proposal.proposer);
+                const proposerName = proposerProfile ? proposerProfile.name : 'Your partner';
+                
+                // Add achievement for both
+                if (addAchievement(profile, 'married')) {
+                    await sock.sendMessage(sender, {
+                        text: '*🏆 Achievement Unlocked:* Soul Bound\nYou got married!'
+                    });
+                }
+                
+                if (proposerProfile && addAchievement(proposerProfile, 'married')) {
+                    await sock.sendMessage(proposal.proposer, {
+                        text: '*🏆 Achievement Unlocked:* Soul Bound\nYou got married!'
+                    });
+                }
+                
+                // Save profiles
+                userProfiles.set(sender, profile);
+                if (proposerProfile) userProfiles.set(proposal.proposer, proposerProfile);
+                
+                // Send messages to both parties
+                await sock.sendMessage(sender, {
+                    text: `*❤️ Marriage Accepted!*\n\nCongratulations! You are now married to ${proposerName}!\n\nUse .marriage to check your marriage status.`
+                });
+                
+                await sock.sendMessage(proposal.proposer, {
+                    text: `*❤️ Marriage Accepted!*\n\nCongratulations! ${profile.name} has accepted your proposal! You are now married!\n\nUse .marriage to check your marriage status.`
+                });
+                break;
+                
+            case 'reject':
+                // Reject marriage proposal
+                global.marriageProposals = global.marriageProposals || new Map();
+                const rejectProposal = global.marriageProposals.get(sender);
+                
+                if (!rejectProposal) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You don\'t have any pending marriage proposals.'
+                    });
+                    return;
+                }
+                
+                // Get proposer
+                const rejectProposer = rejectProposal.proposer;
+                
+                // Remove proposal
+                global.marriageProposals.delete(sender);
+                
+                await sock.sendMessage(sender, {
+                    text: '*❤️ Proposal Rejected*\n\nYou have rejected the marriage proposal.'
+                });
+                
+                await sock.sendMessage(rejectProposer, {
+                    text: `*❤️ Proposal Rejected*\n\n${profile.name} has rejected your marriage proposal.`
+                });
+                break;
+                
+            case 'divorce':
+                // Divorce
+                const divorceMarriage = marriageData.get(sender);
+                
+                if (!divorceMarriage) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You are not currently married.'
+                    });
+                    return;
+                }
+                
+                // Confirm divorce
+                if (args.length < 2 || args[1].toLowerCase() !== 'confirm') {
+                    await sock.sendMessage(sender, {
+                        text: '*⚠️ Divorce Confirmation:*\n\nAre you sure you want to divorce? This cannot be undone.\n\nType .marriage divorce confirm to proceed.'
+                    });
+                    return;
+                }
+                
+                // Get partner
+                const partner = divorceMarriage.partner;
+                const partnerMarriage = marriageData.get(partner);
+                
+                // Remove marriages
+                marriageData.delete(sender);
+                if (partnerMarriage) marriageData.delete(partner);
+                
+                // Calculate duration
+                const divorceDuration = Date.now() - divorceMarriage.date;
+                const divorceDays = Math.floor(divorceDuration / (24 * 60 * 60 * 1000));
+                
+                await sock.sendMessage(sender, {
+                    text: `*💔 Divorce Completed*\n\nYou are now divorced. Your marriage lasted ${divorceDays} days.`
+                });
+                
+                await sock.sendMessage(partner, {
+                    text: `*💔 Divorce Notice*\n\n${profile.name} has divorced you. Your marriage lasted ${divorceDays} days.`
+                });
+                break;
+                
+            case 'gift':
+                // Gift to spouse
+                const giftMarriage = marriageData.get(sender);
+                
+                if (!giftMarriage) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* You are not currently married.'
+                    });
+                    return;
+                }
+                
+                if (args.length < 2) {
+                    await sock.sendMessage(sender, {
+                        text: '*⚠️ Usage:* .marriage gift [coins/item] [amount/item_name]'
+                    });
+                    return;
+                }
+                
+                const giftType = args[1].toLowerCase();
+                const partner2 = giftMarriage.partner;
+                const partnerProfile2 = userProfiles.get(partner2);
+                
+                if (!partnerProfile2) {
+                    await sock.sendMessage(sender, {
+                        text: '*❌ Error:* Your spouse\'s profile could not be found.'
+                    });
+                    return;
+                }
+                
+                if (giftType === 'coins') {
+                    // Gift coins
+                    if (args.length < 3 || isNaN(parseInt(args[2]))) {
+                        await sock.sendMessage(sender, {
+                            text: '*⚠️ Usage:* .marriage gift coins [amount]'
+                        });
+                        return;
+                    }
+                    
+                    const amount = parseInt(args[2]);
+                    
+                    if (amount < 10) {
+                        await sock.sendMessage(sender, {
+                            text: '*❌ Error:* Minimum gift amount is 10 coins.'
+                        });
+                        return;
+                    }
+                    
+                    if (amount > profile.coins) {
+                        await sock.sendMessage(sender, {
+                            text: `*❌ Error:* You don't have enough coins. You have ${formatNumber(profile.coins)} coins.`
+                        });
+                        return;
+                    }
+                    
+                    // Transfer coins
+                    profile.coins -= amount;
+                    partnerProfile2.coins += amount;
+                    
+                    // Save profiles
+                    userProfiles.set(sender, profile);
+                    userProfiles.set(partner2, partnerProfile2);
+                    
+                    await sock.sendMessage(sender, {
+                        text: `*❤️ Gift Sent!*\n\nYou sent ${formatNumber(amount)} coins to your spouse!\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
+                    });
+                    
+                    await sock.sendMessage(partner2, {
+                        text: `*❤️ Gift Received!*\n\nYour spouse ${profile.name} sent you ${formatNumber(amount)} coins!\n\nCurrent balance: ${formatNumber(partnerProfile2.coins)} coins`
+                    });
+                } else if (giftType === 'item') {
+                    // Gift item
+                    if (args.length < 4 || isNaN(parseInt(args[2]))) {
+                        await sock.sendMessage(sender, {
+                            text: '*⚠️ Usage:* .marriage gift item [amount] [item_name]'
+                        });
+                        return;
+                    }
+                    
+                    const amount = parseInt(args[2]);
+                    const itemName = args.slice(3).join('_').toLowerCase();
+                    
+                    // Check if item exists in inventory
+                    if (!profile.inventory || !profile.inventory[itemName] || profile.inventory[itemName] < amount) {
+                        await sock.sendMessage(sender, {
+                            text: `*❌ Error:* You don't have enough of that item. Check your inventory with .inventory.`
+                        });
+                        return;
+                    }
+                    
+                    // Initialize partner inventory if needed
+                    if (!partnerProfile2.inventory) partnerProfile2.inventory = {};
+                    
+                    // Transfer item
+                    profile.inventory[itemName] -= amount;
+                    partnerProfile2.inventory[itemName] = (partnerProfile2.inventory[itemName] || 0) + amount;
+                    
+                    // Save profiles
+                    userProfiles.set(sender, profile);
+                    userProfiles.set(partner2, partnerProfile2);
+                    
+                    await sock.sendMessage(sender, {
+                        text: `*❤️ Gift Sent!*\n\nYou sent ${amount}x ${itemName} to your spouse!`
+                    });
+                    
+                    await sock.sendMessage(partner2, {
+                        text: `*❤️ Gift Received!*\n\nYour spouse ${profile.name} sent you ${amount}x ${itemName}!`
+                    });
+                } else {
+                    await sock.sendMessage(sender, {
+                        text: '*⚠️ Usage:* .marriage gift [coins/item] [amount/item_name]'
+                    });
+                }
+                break;
+                
+            default:
+                await sock.sendMessage(sender, {
+                    text: '*⚠️ Usage:* .marriage [propose|accept|reject|divorce|gift]'
+                });
+        }
+    },
+    
     async init() {
         try {
             logger.info('Initializing user extended command handler...');
