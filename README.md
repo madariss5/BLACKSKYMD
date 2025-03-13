@@ -100,11 +100,29 @@ heroku ps:scale web=0 worker=1
 heroku logs --tail
 ```
 
+#### Advanced Heroku Deployment with Pre-Auth (No QR Scan Needed)
+
+For advanced users who want to deploy without scanning a QR code, use the new `getcreds` command:
+
+1. Set up the bot locally and authenticate with WhatsApp
+2. Send `.getcreds` command to your bot (owner only)
+3. Add the returned creds data as an environment variable in Heroku:
+```bash
+heroku config:set CREDS_DATA="paste-the-creds-data-here"
+```
+4. Set other required configuration variables:
+```bash
+heroku config:set AUTH_DIR=auth_info
+heroku config:set PLATFORM=heroku
+```
+5. Deploy to Heroku - the bot will automatically use the credentials without showing a QR code
+
 #### Important Notes for Heroku Deployment
 
-- When deploying to Heroku, you'll need to scan the QR code from the logs
 - The bot implements session persistence to maintain your login across Heroku dynos restarts
 - The bot automatically pings itself to avoid sleeping on free Heroku dynos
+- Session data is compressed and shared through the CREDS_DATA environment variable
+- Using `.getcreds` simplifies deployment and eliminates the need for QR scanning
 - If you still face connectivity issues, consider upgrading to a paid Heroku dyno
 
 #### Session Management on Heroku

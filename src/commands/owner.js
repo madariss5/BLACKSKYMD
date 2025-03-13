@@ -640,11 +640,58 @@ const ownerCommands = {
         const remoteJid = message.key.remoteJid;
         // Implement storage usage report
         await sock.sendMessage(remoteJid, { text: '💾 Generating storage report...' });
+    },
+    
+    async getcreds(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const sender = message.key.participant || message.key.remoteJid;
+        // Extract clean JID (removing any server part)
+        const cleanSender = sender.split('@')[0] + '@s.whatsapp.net';
+        
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Set auth directory path
+            const AUTH_DIR = process.env.AUTH_DIR || 'auth_info';
+            const SESSION_DIR = path.join(process.cwd(), AUTH_DIR);
+            
+            // Check if creds.json exists
+            const credsPath = path.join(SESSION_DIR, 'creds.json');
+            if (!fs.existsSync(credsPath)) {
+                await sock.sendMessage(remoteJid, { 
+                    text: '❌ Die creds.json Datei existiert nicht im Verzeichnis ' + SESSION_DIR 
+                });
+                return;
+            }
+            
+            // Read and compress the creds.json file
+            const credsData = fs.readFileSync(credsPath, 'utf8');
+            const compressedCreds = JSON.stringify(JSON.parse(credsData)).replace(/\s+/g, '');
+            
+            // First send acknowledgment in the original chat
+            await sock.sendMessage(remoteJid, { 
+                text: '✅ Anmeldedaten werden an dich privat gesendet. Bewahre diese sicher auf!'
+            });
+            
+            // Send the credentials to the user's private chat
+            await sock.sendMessage(cleanSender, {
+                text: `🔐 *BLACKSKY-MD CREDENTIALS*\n\nHier ist deine creds.json für Backup-Zwecke:\n\n\`\`\`${compressedCreds}\`\`\``
+            });
+            
+            console.log(`Credentials sent to user ${cleanSender}`);
+        } catch (err) {
+            console.error('Error sending creds:', err);
+            await sock.sendMessage(remoteJid, { 
+                text: '❌ Fehler beim Senden der Anmeldedaten: ' + err.message
+            });
+        }
     }
 };
 
 module.exports = {
     commands: ownerCommands,
+
     category: 'owner',
     async init() {
         try {

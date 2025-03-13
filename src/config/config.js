@@ -15,7 +15,7 @@ const config = {
     // Session Configuration
     session: {
         id: process.env.SESSION_ID || 'whatsapp-bot',
-        authDir: './auth_info',
+        authDir: './auth_info_qr',
         backupDir: './sessions',
     },
 

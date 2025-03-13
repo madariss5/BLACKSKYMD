@@ -100,4 +100,38 @@ Die meisten API-Anbieter bieten kostenlose Stufen ihrer API an, die für den per
 
 ---
 
+## Heroku-Bereitstellung und Creds Management
+
+Für eine erfolgreiche Bereitstellung des Bots auf Heroku sind einige zusätzliche Schritte erforderlich.
+
+### Credentialsdaten sichern mit dem getcreds-Befehl
+
+Nach der Einrichtung des Bots lokal kannst du den `getcreds`-Befehl verwenden, um deine WhatsApp-Anmeldedaten zu sichern:
+
+1. Sende `.getcreds` an deinen Bot (nur als Besitzer)
+2. Der Bot sendet dir eine komprimierte Version der `creds.json`-Datei
+3. Speichere diese Daten sicher - du wirst sie für die Heroku-Bereitstellung benötigen
+
+### Heroku-Bereitstellung
+
+Zur Bereitstellung auf Heroku:
+
+1. Erstelle eine neue App auf [Heroku](https://dashboard.heroku.com/)
+2. Verbinde dein GitHub-Repository oder verwende die Heroku CLI zum Pushen des Codes
+3. Füge folgende Umgebungsvariablen in den Heroku-Einstellungen hinzu:
+   - Alle benötigten API-Keys (wie oben beschrieben)
+   - `NODE_ENV=production`
+   - `PLATFORM=heroku` 
+   - `AUTH_DIR=auth_info` (oder ein anderes Verzeichnis deiner Wahl)
+   - `CREDS_DATA=deine_creds_json_daten` (einfügen der Daten aus dem getcreds-Befehl)
+
+4. Starte die App und der Bot sollte automatisch mit den vorhandenen Anmeldeinformationen verbinden, ohne einen neuen QR-Code zu benötigen
+
+### Troubleshooting für Heroku
+
+- Wenn die App abstürzt, prüfe die Logs mit `heroku logs --tail`
+- Stelle sicher, dass alle erforderlichen Umgebungsvariablen korrekt gesetzt sind
+- Überprüfe, ob die `CREDS_DATA`-Variable die vollständigen, komprimierten Daten aus dem `getcreds`-Befehl enthält
+- Verwende den Eco-Dynos-Plan oder höher, um genügend Ressourcen für den Bot bereitzustellen
+
 Happy Botting! 🤖

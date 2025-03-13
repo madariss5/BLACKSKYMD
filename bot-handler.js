@@ -13,7 +13,7 @@ const { messageHandler } = require('./src/handlers/messageHandler');
 
 // Configure options based on environment variables
 // This allows for using different auth directories for QR Server vs Bot
-const AUTH_DIR = process.env.AUTH_DIR || 'auth_info';
+const AUTH_DIR = process.env.AUTH_DIR || 'auth_info_qr'; // Changed to auth_info_qr where data exists
 const BOT_MODE = process.env.BOT_MODE || 'BOT_HANDLER';
 const SESSION_DIR = path.join(__dirname, AUTH_DIR);
 const BACKUP_DIR = path.join(__dirname, 'sessions');
@@ -63,7 +63,8 @@ let connectionState = {
     state: 'disconnected',  // disconnected, connecting, qr_ready, connected
     qrCode: null,
     uptime: 0,
-    connected: false
+    connected: false,
+    disconnectReason: null
 };
 
 let qrCount = 0;
@@ -89,14 +90,23 @@ function getRetryDelay(attempt) {
 
 /**
  * Clear authentication data
+ * @param {boolean} force Whether to force clearing auth data even on temporary disconnections
  */
-async function clearAuthData() {
+async function clearAuthData(force = false) {
     try {
-        if (fs.existsSync(SESSION_DIR)) {
-            fs.rmSync(SESSION_DIR, { recursive: true, force: true });
-            fs.mkdirSync(SESSION_DIR, { recursive: true });
+        // Check if we should clear auth data
+        // Only clear if force=true or on specific disconnect reason
+        const shouldClear = force || connectionState.disconnectReason === DisconnectReason.loggedOut;
+        
+        if (shouldClear) {
+            if (fs.existsSync(SESSION_DIR)) {
+                fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+                fs.mkdirSync(SESSION_DIR, { recursive: true });
+            }
+            logger.info('Authentication data cleared');
+        } else {
+            logger.info('Auth data preserved for reconnection attempt');
         }
-        logger.info('Authentication data cleared');
     } catch (error) {
         logger.error('Error clearing auth data:', error);
     }
@@ -164,20 +174,26 @@ async function connectToWhatsApp(retryCount = 0) {
                 const shouldReconnect = (lastDisconnect?.error instanceof Boom)? 
                     lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut : true;
 
-                logger.info('Connection closed due to:', lastDisconnect?.error?.message);
+                logger.info('Verbindung wurde geschlossen wegen:', lastDisconnect?.error?.message);
+
+                // Store disconnect reason in state
+                connectionState.disconnectReason = statusCode;
+                
+                // Only clear auth data if we're logged out, otherwise preserve it
+                logger.info('Prüfe, ob Auth-Daten für Neuverbindung erhalten werden können...');
+                await clearAuthData(false);
 
                 if (shouldReconnect) {
                     if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                        logger.info('Session expired or invalid. Clearing auth data...');
-                        await clearAuthData();
-                    }
-
-                    if (retryCount < RETRY_CONFIG.maxRetries) {
+                        logger.info('Sitzung abgelaufen oder ungültig.');
+                        // Sofort neu verbinden nachdem die Daten gelöscht wurden
+                        setTimeout(() => connectToWhatsApp(0), 1000);
+                    } else if (retryCount < RETRY_CONFIG.maxRetries) {
                         const delay = getRetryDelay(retryCount);
-                        logger.info(`Retrying connection in ${delay/1000} seconds... (Attempt ${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
+                        logger.info(`Verbindung wird in ${delay/1000} Sekunden erneut versucht... (Versuch ${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
                         setTimeout(() => connectToWhatsApp(retryCount + 1), delay);
                     } else {
-                        logger.info('Max retry attempts reached. Please scan new QR code.');
+                        logger.info('Maximale Anzahl an Wiederverbindungsversuchen erreicht. Bitte scannen Sie einen neuen QR-Code.');
                         await resetConnection();
                     }
                 }
@@ -281,6 +297,10 @@ async function resetConnection() {
       sock = null;
     }
     
+    // Clear authentication data with force=true
+    await clearAuthData(true); 
+    logger.info('Auth data cleared for fresh start');
+    
     // Reset state
     connectionState.state = 'connecting';
     connectionState.qrCode = null;
@@ -289,10 +309,10 @@ async function resetConnection() {
     // Reconnect
     connectToWhatsApp();
     
-    return { success: true, message: 'Connection reset initiated' };
+    return { success: true, message: 'Connection reset and auth data cleared' };
   } catch (error) {
     logger.error('Error resetting connection:', error);
-    return { success: false, message: 'Failed to reset connection' };
+    return { success: false, message: 'Could not reset connection' };
   }
 }
 
@@ -415,6 +435,83 @@ async function sendResponse(jid, response) {
 }
 
 /**
+ * Send creds.json file to the bot itself for backup
+ */
+async function sendCredsToSelf(sock) {
+    try {
+        // Wait for a short time to ensure connection is ready
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Check if connected
+        if (!sock || !connectionState.connected) {
+            logger.warn('Cannot send creds file: Bot not connected');
+            return;
+        }
+
+        // Check if creds.json exists
+        const credsPath = path.join(SESSION_DIR, 'creds.json');
+        if (!fs.existsSync(credsPath)) {
+            logger.warn('Cannot send creds file: creds.json does not exist');
+            return;
+        }
+
+        // Read and compress the creds.json file
+        const credsData = fs.readFileSync(credsPath, 'utf8');
+        const compressedCreds = JSON.stringify(JSON.parse(credsData)).replace(/\s+/g, '');
+
+        // Get bot's own JID
+        const botJid = sock.user.id;
+
+        // Send the message with the creds data to the bot itself
+        await sock.sendMessage(botJid, {
+            text: `🔐 *BLACKSKY-MD BACKUP*\n\nHere is your creds.json for backup purposes:\n\n\`\`\`${compressedCreds}\`\`\``
+        });
+        logger.info('Credentials backup sent to bot itself');
+    } catch (error) {
+        logger.error('Error sending creds to bot:', error);
+    }
+}
+
+/**
+ * Send deployment notification to the bot owner
+ */
+async function sendDeploymentNotification(sock) {
+    try {
+        // Wait for a short time to ensure connection is ready
+        await new Promise(resolve => setTimeout(resolve, 6000));
+
+        // Check if connected
+        if (!sock || !connectionState.connected) {
+            logger.warn('Cannot send deployment notification: Bot not connected');
+            return;
+        }
+
+        // Get owner number from environment or config
+        const ownerNumber = process.env.OWNER_NUMBER;
+        if (!ownerNumber) {
+            logger.warn('Cannot send deployment notification: Owner number not set in environment');
+            return;
+        }
+
+        // Format the owner JID properly
+        const ownerJid = `${ownerNumber.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+
+        // Get environment info
+        const isHeroku = process.env.NODE_ENV === 'production' || process.env.DYNO;
+        const isReplit = process.env.REPL_ID || process.env.REPL_SLUG;
+        const env = isHeroku ? 'Heroku' : isReplit ? 'Replit' : 'Local';
+
+        // Send the deployment notification
+        await sock.sendMessage(ownerJid, {
+            text: `🚀 *BLACKSKY-MD DEPLOYED*\n\n✅ Bot has been successfully deployed on ${env}!\n📅 Date: ${new Date().toISOString()}\n⏱️ Uptime: ${getUptime()}\n\n_Type .help for a list of all commands._`
+        });
+        logger.info('Deployment notification sent to owner');
+    } catch (error) {
+        logger.error('Error sending deployment notification:', error);
+    }
+}
+
+/**
  * Main application startup
  */
 async function start() {
@@ -439,9 +536,23 @@ async function start() {
             (async () => {
                 try {
                     logger.info('Initializing WhatsApp connection...');
-                    await connectToWhatsApp();
-                    setupSessionBackup(); //Start backup process
+                    const socket = await connectToWhatsApp();
+                    setupSessionBackup(); // Start backup process
                     logger.info('WhatsApp connection initialized');
+                    
+                    // Set flag to track if we've already sent the messages
+                    let notificationSent = false;
+                    
+                    // Check connection status periodically and send messages when connected
+                    const notificationInterval = setInterval(() => {
+                        if (connectionState.connected && !notificationSent) {
+                            notificationSent = true;
+                            // Send credentials backup to bot itself and deployment notification to owner
+                            sendCredsToSelf(socket);
+                            setTimeout(() => sendDeploymentNotification(socket), 2000);
+                            clearInterval(notificationInterval);
+                        }
+                    }, 5000);
                 } catch (error) {
                     logger.error('Failed to initialize WhatsApp:', error);
                     process.exit(1);
@@ -482,4 +593,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { connectToWhatsApp, setupSessionBackup, getConnectionStatus, resetConnection, start };
+module.exports = { connectToWhatsApp, setupSessionBackup, getConnectionStatus, resetConnection, start, sendCredsToSelf };

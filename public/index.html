@@ -1,292 +1,129 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 QR Scanner</title>
+    <title>WhatsApp QR Code</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
+            font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 100vh;
-            background-color: #f0f2f5;
-            color: #333;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            padding: 20px;
+            box-sizing: border-box;
         }
         .container {
-            width: 100%;
-            max-width: 500px;
-            padding: 20px;
             background-color: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
             border-radius: 10px;
-            margin: 20px auto;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             text-align: center;
-        }
-        header {
-            background-color: #25D366;
-            color: white;
+            max-width: 600px;
             width: 100%;
-            padding: 20px 0;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         h1 {
-            margin: 0;
-            font-size: 24px;
+            color: #128C7E; /* WhatsApp green */
         }
         .qr-container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
             margin: 20px 0;
-        }
-        .qr-code {
-            width: 256px;
-            height: 256px;
-            margin: 0 auto;
-            background-color: #f5f5f5;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 5px;
-        }
-        .qr-code img {
-            max-width: 100%;
+            padding: 15px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            background-color: white;
+            display: inline-block;
         }
         .status {
+            margin: 20px 0;
             padding: 10px;
             border-radius: 5px;
-            margin: 10px 0;
             font-weight: bold;
         }
-        .status.disconnected {
-            background-color: #ffcccb;
-            color: #d32f2f;
+        .connected {
+            background-color: #DFF2BF;
+            color: #4F8A10;
         }
-        .status.connecting {
-            background-color: #fff9c4;
-            color: #f57f17;
+        .disconnected {
+            background-color: #FEEFB3;
+            color: #9F6000;
         }
-        .status.connected {
-            background-color: #c8e6c9;
-            color: #388e3c;
-        }
-        .status.qr-ready {
-            background-color: #bbdefb;
-            color: #1976d2;
+        .error {
+            background-color: #FFD2D2;
+            color: #D8000C;
         }
         .instructions {
-            margin: 20px 0;
             text-align: left;
-            padding: 0 20px;
+            margin: 20px 0;
+            background-color: #e9f7fe;
+            padding: 15px;
+            border-radius: 5px;
+            color: #3a87ad;
         }
-        .instructions ol {
-            padding-left: 20px;
-        }
-        .instructions li {
-            margin-bottom: 10px;
+        img {
+            max-width: 100%;
+            height: auto;
         }
         .timer {
             font-size: 14px;
             color: #666;
-            margin-top: 10px;
-        }
-        footer {
-            margin-top: auto;
-            padding: 20px;
-            text-align: center;
-            color: #666;
-            font-size: 12px;
-        }
-        .reconnect-btn {
-            background-color: #25D366;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            padding: 10px 20px;
-            margin: 15px auto 0;
-            cursor: pointer;
-            font-weight: bold;
-            display: block;
-            transition: background-color 0.3s;
-        }
-        .reconnect-btn:hover {
-            background-color: #128C7E;
+            margin-top: 5px;
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 QR Scanner</h1>
-    </header>
-    
     <div class="container">
-        <div id="status" class="status disconnected">Disconnected</div>
-        
-        <div class="qr-container">
-            <div class="qr-code" id="qrcode">
-                <p>Loading QR code...</p>
-            </div>
-            <div class="timer" id="timer"></div>
-            <button id="reconnect-btn" class="reconnect-btn" style="display: none;">Generate New QR Code</button>
-        </div>
-        
+        <h1>BLACKSKY-MD WhatsApp QR Code</h1>
         <div class="instructions">
-            <h3>How to scan:</h3>
+            <h3>Anleitung:</h3>
             <ol>
-                <li>Open WhatsApp on your phone</li>
-                <li>Go to Settings > Linked Devices</li>
-                <li>Tap "Link a Device"</li>
-                <li>Point your camera at the QR code above</li>
+                <li>Öffne WhatsApp auf deinem Smartphone</li>
+                <li>Tippe auf Einstellungen oder Menü und wähle "Verknüpfte Geräte"</li>
+                <li>Tippe auf "Gerät verknüpfen"</li>
+                <li>Scanne den QR-Code mit deinem Smartphone</li>
             </ol>
-            <p><strong>Note:</strong> QR codes are valid for 20 seconds only. If it expires, a new one will be generated automatically.</p>
-            <p>If you need a new QR code, click the "Generate New QR Code" button when it appears.</p>
+        </div>
+        <div class="qr-container">
+            <img id="qrcode" src="/qrcode.png" alt="QR Code">
+            <div class="timer">Der QR-Code aktualisiert sich automatisch alle 20 Sekunden</div>
+        </div>
+        <div id="status" class="status disconnected">
+            Status: Warte auf Scan des QR-Codes...
         </div>
     </div>
-    
-    <footer>
-        <p>WhatsApp Bot · <span id="uptime">Uptime: 0m 0s</span></p>
-    </footer>
 
     <script>
-        const qrcodeElement = document.getElementById('qrcode');
-        const statusElement = document.getElementById('status');
-        const timerElement = document.getElementById('timer');
-        const uptimeElement = document.getElementById('uptime');
-        const reconnectBtn = document.getElementById('reconnect-btn');
-        
-        // Track QR code expiration
-        let qrExpireTime = null;
-        let qrInterval = null;
-        let lastState = null;
-        let reconnectEnabled = false;
-        
-        // Update the status UI based on state
-        function updateStatus(statusText, state) {
-            statusElement.textContent = statusText;
-            statusElement.className = 'status ' + state;
+        // Auto-refresh the QR code image every 5 seconds
+        setInterval(() => {
+            const img = document.getElementById('qrcode');
+            const timestamp = new Date().getTime();
+            img.src = '/qrcode.png?t=' + timestamp;
             
-            // Show/hide reconnect button
-            if ((state === 'disconnected' || state === 'connecting') && 
-                (lastState === 'connected' || reconnectEnabled)) {
-                reconnectBtn.style.display = 'block';
-                reconnectEnabled = true;
-            } else if (state === 'qr-ready') {
-                reconnectBtn.style.display = 'none';
-            }
-            
-            // Update last state
-            lastState = state;
-            
-            if (state === 'qr-ready') {
-                // QR code is valid for 20 seconds
-                qrExpireTime = Date.now() + 20000;
-                
-                if (qrInterval) {
-                    clearInterval(qrInterval);
-                }
-                
-                qrInterval = setInterval(() => {
-                    const remaining = Math.max(0, Math.floor((qrExpireTime - Date.now()) / 1000));
-                    timerElement.textContent = `QR code expires in ${remaining} seconds`;
+            // Also check connection status
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusElement = document.getElementById('status');
+                    statusElement.textContent = 'Status: ' + data.message;
                     
-                    if (remaining <= 0) {
-                        timerElement.textContent = 'QR code expired. Waiting for new code...';
-                        clearInterval(qrInterval);
-                        // Show reconnect button when QR expires
-                        reconnectBtn.style.display = 'block';
-                        reconnectEnabled = true;
+                    // Remove old classes
+                    statusElement.classList.remove('connected', 'disconnected', 'error');
+                    
+                    // Add appropriate class
+                    if (data.state === 'connected') {
+                        statusElement.classList.add('connected');
+                    } else if (data.state === 'error') {
+                        statusElement.classList.add('error');
+                    } else {
+                        statusElement.classList.add('disconnected');
                     }
-                }, 1000);
-            } else {
-                // Clear timer when not in QR ready state
-                if (qrInterval) {
-                    clearInterval(qrInterval);
-                    qrInterval = null;
-                }
-                timerElement.textContent = '';
-            }
-        }
-        
-        // Handle manual reconnection
-        async function handleReconnect() {
-            try {
-                reconnectBtn.disabled = true;
-                reconnectBtn.textContent = 'Generating new QR code...';
-                
-                // Call reconnect endpoint
-                const response = await fetch('/api/reconnect', {
-                    method: 'POST'
-                });
-                
-                if (response.ok) {
-                    updateStatus('Connecting...', 'connecting');
-                    qrcodeElement.innerHTML = '<p>Generating new QR code, please wait...</p>';
-                } else {
-                    console.error('Reconnection failed:', await response.json());
-                    qrcodeElement.innerHTML = '<p>Failed to generate new QR code. Please try again.</p>';
-                }
-            } catch (error) {
-                console.error('Error triggering reconnection:', error);
-            } finally {
-                reconnectBtn.disabled = false;
-                reconnectBtn.textContent = 'Generate New QR Code';
-                // Fetch status immediately to update UI
-                setTimeout(fetchStatus, 1000);
-            }
-        }
-        
-        // Add event listener to reconnect button
-        reconnectBtn.addEventListener('click', handleReconnect);
-        
-        // Fetch status from server
-        async function fetchStatus() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                
-                // Update uptime
-                uptimeElement.textContent = `Uptime: ${data.uptime}`;
-                
-                // Update status based on state
-                switch(data.status) {
-                    case 'disconnected':
-                        updateStatus('Disconnected', 'disconnected');
-                        qrcodeElement.innerHTML = '<p>Waiting for QR code...</p>';
-                        break;
-                    case 'connecting':
-                        updateStatus('Connecting...', 'connecting');
-                        qrcodeElement.innerHTML = '<p>Generating QR code...</p>';
-                        break;
-                    case 'qr_ready':
-                        updateStatus('QR Code Ready to Scan', 'qr-ready');
-                        if (data.qrCode) {
-                            qrcodeElement.innerHTML = `<img src="${data.qrCode}" alt="WhatsApp QR Code">`;
-                        }
-                        break;
-                    case 'connected':
-                        updateStatus('Connected to WhatsApp', 'connected');
-                        qrcodeElement.innerHTML = '<p>Successfully connected!</p>';
-                        break;
-                    default:
-                        updateStatus('Unknown state', 'disconnected');
-                        break;
-                }
-            } catch (error) {
-                console.error('Error fetching status:', error);
-                updateStatus('Error connecting to server', 'disconnected');
-            }
-        }
-        
-        // Initial fetch
-        fetchStatus();
-        
-        // Poll for updates every 3 seconds
-        setInterval(fetchStatus, 3000);
+                })
+                .catch(err => console.error('Error fetching status:', err));
+        }, 5000);
     </script>
 </body>
 </html>
