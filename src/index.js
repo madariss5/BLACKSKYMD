@@ -5,11 +5,14 @@ const { commandLoader } = require('./utils/commandLoader');
 const commandModules = require('./commands/index');
 const logger = require('./utils/logger');
 const config = require('./config/config');
+const fs = require('node:fs');
+const { DisconnectReason } = require('@adiwajshing/baileys');
+
 
 async function startServer(sock) {
     const app = express();
     app.use(express.json());
-    
+
     // Store the sock instance for later use
     if (sock) {
         app.set('sock', sock);
@@ -19,13 +22,13 @@ async function startServer(sock) {
     app.get('/', (req, res) => {
         const currentSock = app.get('sock') || sock;
         let commandCount = 0;
-        
+
         try {
             commandCount = commandLoader.getAllCommands().length;
         } catch (err) {
             // Commands not loaded yet
         }
-        
+
         if (!currentSock) {
             // If we're initializing, show a link to the QR code
             res.send(`
@@ -179,6 +182,57 @@ async function startServer(sock) {
     return server;
 }
 
+// Add reconnection manager
+const reconnectManager = {
+    attempts: 0,
+    maxAttempts: 5,
+    baseDelay: 2000,
+    maxDelay: 60000,
+
+    async handleReconnect(error, lastDisconnect) {
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+
+        // Don't reconnect if explicitly logged out
+        if (statusCode === DisconnectReason.loggedOut) {
+            logger.info('User logged out, not attempting reconnection');
+            return false;
+        }
+
+        // Handle connection replacement
+        if (statusCode === DisconnectReason.connectionReplaced) {
+            logger.info('Connection replaced, clearing session and restarting...');
+            // Clear the session to force new QR code
+            if (fs.existsSync('auth_info_multi.json')) {
+                fs.unlinkSync('auth_info_multi.json');
+            }
+            process.exit(1); // Process manager will restart
+            return false;
+        }
+
+        // Implement exponential backoff
+        if (this.attempts >= this.maxAttempts) {
+            logger.error('Max reconnection attempts reached, restarting process...');
+            process.exit(1); // Process manager will restart
+            return false;
+        }
+
+        const delay = Math.min(
+            this.baseDelay * Math.pow(2, this.attempts),
+            this.maxDelay
+        );
+
+        this.attempts++;
+        logger.info(`Reconnection attempt ${this.attempts}/${this.maxAttempts} in ${delay}ms`);
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return true;
+    },
+
+    reset() {
+        this.attempts = 0;
+    }
+};
+
 async function main() {
     let server = null;
     let sock = null;
@@ -186,12 +240,12 @@ async function main() {
     try {
         // Clear console first
         process.stdout.write('\x1Bc');
-        
+
         // Start the API server immediately to make port 5000 available
         console.log('Starting API server first...');
-        server = await startServer(null); // Pass null for sock for now
+        server = await startServer(null);
         console.log('API server started on port 5000');
-        
+
         // Start WhatsApp connection to show QR code
         try {
             sock = await startConnection();
@@ -200,32 +254,40 @@ async function main() {
             throw err;
         }
 
-        // Only load commands after successful connection
+        // Handle connection updates with improved error handling
         sock.ev.on('connection.update', async (update) => {
-            const { connection } = update;
+            const { connection, lastDisconnect } = update;
 
-            if (connection === 'open') {
-                // Silence the logger temporarily
+            if (connection === 'close') {
+                const shouldReconnect = await reconnectManager.handleReconnect(
+                    lastDisconnect?.error,
+                    lastDisconnect
+                );
+
+                if (shouldReconnect) {
+                    sock = await startConnection();
+                }
+            } else if (connection === 'open') {
+                logger.info('Connection established successfully');
+                reconnectManager.reset(); // Reset attempt counter on successful connection
+
+                // Initialize command handlers
                 const originalLevel = logger.level;
                 logger.level = 'silent';
 
                 try {
                     await commandLoader.loadCommandHandlers();
                     await commandModules.initializeModules(sock);
-                    
+
                     // Update the express app with the sock instance
-                    // We can directly access the app via server
                     const expressApp = server._events.request;
                     if (expressApp && typeof expressApp.set === 'function') {
                         expressApp.set('sock', sock);
-                        console.log('Updated server with active WhatsApp connection');
-                    } else {
-                        console.log('Unable to update server with sock instance');
+                        logger.info('Updated server with active WhatsApp connection');
                     }
                 } catch (err) {
-                    console.error('Error during initialization:', err);
+                    logger.error('Error during initialization:', err);
                 } finally {
-                    // Restore logger level
                     logger.level = originalLevel;
                 }
             }
