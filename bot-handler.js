@@ -135,34 +135,44 @@ function isJidBroadcast(jid) {
     return jid?.endsWith('@broadcast');
 }
 
-// Message handler setup
+// Message handler setup with improved error checking
 async function setupMessageEventHandler(sock, handlerFunction) {
     try {
+        // Validate handler function
+        if (typeof handlerFunction !== 'function') {
+            throw new Error('Invalid message handler: not a function');
+        }
+
         // Create a wrapper function to process messages
         const messageProcessor = async ({ messages, type }) => {
-            if (type === 'notify') {
+            if (type === 'notify' && Array.isArray(messages)) {
                 for (const message of messages) {
-                    // Skip our own messages
-                    if (message.key.fromMe) continue;
+                    // Skip if message is invalid or from self
+                    if (!message || !message.key || message.key.fromMe) continue;
 
                     // Call the handler with error catching
                     try {
                         await handlerFunction(sock, message);
                     } catch (err) {
-                        console.error('Message handling error:', err.message);
+                        logger.error('Message handling error:', err);
                     }
                 }
             }
         };
 
-        // Remove existing handlers
-        sock.ev.off('messages.upsert');
+        // Safely remove existing handlers
+        try {
+            sock.ev.off('messages.upsert');
+        } catch (err) {
+            logger.warn('Error removing existing handlers:', err);
+        }
 
         // Set up new handler
         sock.ev.on('messages.upsert', messageProcessor);
+        logger.info('Message handler setup completed successfully');
         return true;
     } catch (err) {
-        console.error('Error setting up message event handler:', err);
+        logger.error('Error setting up message event handler:', err);
         return false;
     }
 }
@@ -216,7 +226,7 @@ async function connectToWhatsApp(retryCount = 0) {
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
-                                     retryCount < RETRY_CONFIG.maxRetries;
+                                         retryCount < RETRY_CONFIG.maxRetries;
 
                 connectionState.state = 'disconnected';
                 connectionState.connected = false;
@@ -240,29 +250,24 @@ async function connectToWhatsApp(retryCount = 0) {
                 connectionState.reconnectCount = 0;
 
                 try {
-                    // Initialize minimal handler first
-                    const minimalHandler = require('./src/handlers/minimalHandler');
-                    await minimalHandler.init();
-                    let currentHandler = minimalHandler.messageHandler;
+                    // Load and initialize the simple handler
+                    logger.info('Loading message handler...');
+                    const { messageHandler: simpleHandler, init } = require('./src/handlers/simpleMessageHandler');
 
-                    // Try to upgrade to simple handler
-                    try {
-                        const simpleHandler = require('./src/handlers/simpleMessageHandler');
-                        if (await simpleHandler.init()) {
-                            currentHandler = simpleHandler.messageHandler;
-                            logger.info('Using simple message handler');
-                        }
-                    } catch (err) {
-                        logger.warn('Continuing with minimal handler:', err.message);
+                    if (!simpleHandler || typeof simpleHandler !== 'function') {
+                        throw new Error('Invalid message handler loaded');
                     }
 
-                    // Set up message handling
-                    if (await setupMessageEventHandler(sock, currentHandler)) {
+                    // Initialize the handler
+                    await init();
+                    logger.info('Message handler initialized');
+
+                    // Set up the message event handler
+                    if (await setupMessageEventHandler(sock, simpleHandler)) {
                         logger.info('Message handler setup complete');
                     } else {
                         throw new Error('Failed to set up message handler');
                     }
-
                 } catch (err) {
                     logger.error('Handler initialization failed:', err);
 
@@ -270,16 +275,18 @@ async function connectToWhatsApp(retryCount = 0) {
                     const emergencyHandler = async (sock, message) => {
                         try {
                             const content = message.message?.conversation ||
-                                          message.message?.extendedTextMessage?.text;
+                                            message.message?.extendedTextMessage?.text;
 
                             if (content?.startsWith('!') && message.key?.remoteJid) {
                                 const sender = message.key.remoteJid;
                                 if (content.trim() === '!ping') {
-                                    await sock.sendMessage(sender, { text: '🏓 Pong! (Emergency Mode)' });
+                                    await sock.sendMessage(sender, { 
+                                        text: '🏓 Pong! (Emergency Mode)' 
+                                    });
                                 }
                             }
                         } catch (err) {
-                            console.error('Emergency handler error:', err.message);
+                            logger.error('Emergency handler error:', err);
                         }
                     };
 

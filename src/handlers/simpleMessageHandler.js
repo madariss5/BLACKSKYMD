@@ -2,101 +2,101 @@
  * Simple Message Handler for WhatsApp Bot - Optimized for Speed
  */
 
-let logger;
-try {
-    logger = require('../utils/logger');
-} catch (err) {
-    logger = {
-        info: console.log,
-        error: console.error,
-        warn: console.warn,
-        debug: console.debug
-    };
-}
+// Initialize logger
+const logger = console;
 
 // Use Map for faster command lookup
 const commands = new Map();
 
 // Add optimized ping command
 commands.set('ping', async (sock, message) => {
-    const sender = message.key.remoteJid;
-    await sock.sendMessage(sender, { text: '🏓 Pong!' });
+    try {
+        const sender = message.key.remoteJid;
+        await sock.sendMessage(sender, { text: '🏓 Pong!' });
+    } catch (err) {
+        logger.error('Error in ping command:', err);
+    }
 });
 
 // Add optimized help command
 commands.set('help', async (sock, message) => {
-    const sender = message.key.remoteJid;
-    const commandList = Array.from(commands.keys())
-        .map(name => `!${name}`)
-        .join('\n');
-    await sock.sendMessage(sender, {
-        text: `*Available Commands:*\n\n${commandList}`
-    });
-});
-
-// Add optimized info command
-commands.set('info', async (sock, message) => {
-    const sender = message.key.remoteJid;
-    await sock.sendMessage(sender, {
-        text: '🤖 *Bot Info*\nVersion: 1.0.0\nStatus: Active\nCommands: ' + commands.size
-    });
-});
-
-/**
- * Optimized command processor
- */
-async function processCommand(sock, message, commandText) {
-    const sender = message.key.remoteJid;
-    if (!commandText?.trim()) return;
-
-    const [commandName, ...args] = commandText.trim().split(' ');
-    const command = commands.get(commandName.toLowerCase());
-
-    if (!command) {
+    try {
+        const sender = message.key.remoteJid;
+        const commandList = Array.from(commands.keys())
+            .map(name => `!${name}`)
+            .join('\n');
         await sock.sendMessage(sender, {
-            text: `❌ Unknown command. Use !help to see available commands.`
+            text: `*Available Commands:*\n\n${commandList}`
         });
-        return;
+    } catch (err) {
+        logger.error('Error in help command:', err);
     }
-
-    await command(sock, message, args);
-}
+});
 
 /**
- * Optimized message handler
+ * Process incoming messages
  */
 async function messageHandler(sock, message) {
-    if (!message?.message || !message.key?.remoteJid) return;
+    try {
+        if (!message?.message || !message.key?.remoteJid) return;
 
-    const messageContent = message.message?.conversation ||
-                        message.message?.extendedTextMessage?.text ||
-                        message.message?.imageMessage?.caption ||
-                        message.message?.videoMessage?.caption;
+        const messageContent = message.message?.conversation ||
+                           message.message?.extendedTextMessage?.text ||
+                           message.message?.imageMessage?.caption ||
+                           message.message?.videoMessage?.caption;
 
-    if (!messageContent) return;
+        if (!messageContent) return;
 
-    // Process commands (using ! prefix)
-    if (messageContent.startsWith('!')) {
-        const commandText = messageContent.slice(1).trim();
-        if (commandText) {
-            await processCommand(sock, message, commandText);
+        // Process commands (using ! prefix)
+        if (messageContent.startsWith('!')) {
+            const commandText = messageContent.slice(1).trim();
+            if (!commandText) return;
+
+            const [commandName, ...args] = commandText.split(' ');
+            const command = commands.get(commandName.toLowerCase());
+
+            if (!command) {
+                const sender = message.key.remoteJid;
+                await sock.sendMessage(sender, {
+                    text: `❌ Unknown command. Use !help to see available commands.`
+                });
+                return;
+            }
+
+            await command(sock, message, args);
+        }
+    } catch (err) {
+        logger.error('Error in message handler:', err);
+        // Try to notify user of error
+        try {
+            const sender = message.key.remoteJid;
+            await sock.sendMessage(sender, {
+                text: '❌ Error processing command. Please try again.'
+            });
+        } catch (_) {
+            // Ignore nested errors
         }
     }
 }
 
 /**
- * Fast initialization
+ * Initialize the handler
  */
 async function init() {
     try {
         // Add status command
         commands.set('status', async (sock, message) => {
-            const sender = message.key.remoteJid;
-            await sock.sendMessage(sender, { 
-                text: '✅ Bot Online\n⚡ Fast Response Mode' 
-            });
+            try {
+                const sender = message.key.remoteJid;
+                await sock.sendMessage(sender, { 
+                    text: '✅ Bot Online\n⚡ Fast Response Mode' 
+                });
+            } catch (err) {
+                logger.error('Error in status command:', err);
+            }
         });
 
+        logger.info('Simple message handler initialized with commands:', Array.from(commands.keys()));
         return true;
     } catch (err) {
         logger.error('Handler initialization error:', err);
@@ -104,6 +104,7 @@ async function init() {
     }
 }
 
+// Export as named exports to prevent undefined issues
 module.exports = {
     messageHandler,
     init,
