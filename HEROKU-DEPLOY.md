@@ -41,6 +41,7 @@ Diese Anleitung erklärt, wie du deinen BLACKSKY-MD WhatsApp Bot auf Heroku bere
    ```bash
    heroku buildpacks:add heroku/nodejs
    heroku buildpacks:add https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git
+   heroku buildpacks:add https://github.com/clhuang/heroku-buildpack-webp-binaries.git
    ```
 
 5. Konfiguriere die Umgebungsvariablen:
@@ -136,3 +137,21 @@ Du kannst die Session auch über die Web-Oberfläche wiederherstellen:
   git commit -m "Fix Heroku deployment issues"
   git push heroku main
   ```
+
+### Probleme mit Heroku Stack-Kompatibilität
+
+Wenn du weiterhin Probleme mit dem Deployment hast, versuche einen anderen Heroku-Stack:
+
+```bash
+heroku stack:set heroku-20 -a deine-app-name
+git commit --allow-empty -m "Trigger rebuild"
+git push heroku main
+```
+
+Alternativ kannst du auch den neuesten Stack ausprobieren:
+
+```bash
+heroku stack:set heroku-22 -a deine-app-name
+git commit --allow-empty -m "Trigger rebuild"
+git push heroku main
+```
