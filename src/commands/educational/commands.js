@@ -75,8 +75,15 @@ async function createMathChart(equation, xRange = [-10, 10]) {
 
 // Ensure directory exists
 async function ensureDirectory(dirPath) {
-    if (!fs.existsSync(dirPath)) {
-        await fsPromises.mkdir(dirPath, { recursive: true });
+    try {
+        const fullPath = path.join(process.cwd(), dirPath);
+        if (!fs.existsSync(fullPath)) {
+            await fsPromises.mkdir(fullPath, { recursive: true });
+            logger.info(`✓ Created directory: ${dirPath}`);
+        }
+    } catch (err) {
+        logger.error(`Failed to create directory ${dirPath}:`, err);
+        throw err;
     }
 }
 
@@ -98,7 +105,7 @@ const commands = {
 
             // Target language should be a valid 2-letter ISO language code
             const validLanguageCodes = ['af', 'sq', 'am', 'ar', 'hy', 'az', 'eu', 'be', 'bn', 'bs', 'bg', 'ca', 'ceb', 'zh', 'zh-CN', 'zh-TW', 'co', 'hr', 'cs', 'da', 'nl', 'en', 'eo', 'et', 'fi', 'fr', 'fy', 'gl', 'ka', 'de', 'el', 'gu', 'ht', 'ha', 'haw', 'he', 'hi', 'hmn', 'hu', 'is', 'ig', 'id', 'ga', 'it', 'ja', 'jv', 'kn', 'kk', 'km', 'rw', 'ko', 'ku', 'ky', 'lo', 'la', 'lv', 'lt', 'lb', 'mk', 'mg', 'ms', 'ml', 'mt', 'mi', 'mr', 'mn', 'my', 'ne', 'no', 'ny', 'or', 'ps', 'fa', 'pl', 'pt', 'pa', 'ro', 'ru', 'sm', 'gd', 'sr', 'st', 'sn', 'sd', 'si', 'sk', 'sl', 'so', 'es', 'su', 'sw', 'sv', 'tl', 'tg', 'ta', 'tt', 'te', 'th', 'tr', 'tk', 'uk', 'ur', 'ug', 'uz', 'vi', 'cy', 'xh', 'yi', 'yo', 'zu'];
-            
+
             if (!validLanguageCodes.includes(targetLang.toLowerCase())) {
                 await sock.sendMessage(remoteJid, {
                     text: '*❌ Invalid target language code*\nPlease use a valid 2-letter ISO language code (e.g., "es" for Spanish).'
@@ -110,13 +117,13 @@ const commands = {
 
             // Use a free translation API
             const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(textToTranslate)}`;
-            
+
             const response = await axios.get(url);
-            
+
             if (response.data && response.data[0] && response.data[0][0]) {
                 const translation = response.data[0].map(item => item[0]).join('');
                 const detectedLang = response.data[2];
-                
+
                 await sock.sendMessage(remoteJid, {
                     text: `*🌐 Translation (${detectedLang} → ${targetLang})*\n\n${translation}`
                 });
@@ -129,7 +136,7 @@ const commands = {
             await handleError(sock, message.key.remoteJid, err, 'Error translating text');
         }
     },
-    
+
     // Grammar Checking Command
     async grammar(sock, message, args) {
         try {
@@ -149,7 +156,7 @@ const commands = {
                 // Since we don't want to use a paid API here, we'll implement a simple grammar checker
                 // with common grammar rules
                 const grammarIssues = [];
-                
+
                 // Check for common grammar mistakes
                 const rules = [
                     { pattern: /\b(i|we|they|you|he|she|it) (is)\b/i, fix: 'are', issue: 'subject-verb agreement' },
@@ -217,7 +224,7 @@ const commands = {
                     let response = `*📝 Grammar Check Results*\n\n`;
                     response += `*Original text:*\n${text}\n\n`;
                     response += `*Issues Found:* ${grammarIssues.length}\n\n`;
-                    
+
                     grammarIssues.forEach((issue, index) => {
                         response += `*${index + 1}. Issue:* ${issue.issue}\n`;
                         response += `*Suggestion:* ${issue.fix}\n\n`;
@@ -239,7 +246,7 @@ const commands = {
             await handleError(sock, message.key.remoteJid, err, 'Error checking grammar');
         }
     },
-    
+
     // Language Learning Commands
     async vocabulary(sock, message, args) {
         try {
@@ -475,7 +482,7 @@ const commands = {
             await handleError(sock, message.key.remoteJid, err, 'Error looking up definition');
         }
     },
-    
+
     async calculate(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
@@ -491,10 +498,10 @@ const commands = {
             try {
                 // Clean up the expression to prevent malicious code execution
                 const cleanExpression = expression.replace(/[^0-9+\-*/^().,%\s]/g, '');
-                
+
                 // Evaluate using mathjs which is safe against code execution
                 const result = mathjs.evaluate(cleanExpression);
-                
+
                 // Format different result types
                 let formattedResult;
                 if (typeof result === 'number') {
@@ -506,7 +513,7 @@ const commands = {
                 } else {
                     formattedResult = result.toString();
                 }
-                
+
                 await sock.sendMessage(remoteJid, {
                     text: `*🧮 Calculation Result:*\n\n*Expression:* ${cleanExpression}\n*Result:* ${formattedResult}`
                 });
@@ -538,46 +545,46 @@ const commands = {
                 // Use the Wikipedia API to get search results
                 const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1`;
                 const searchResponse = await axios.get(searchUrl);
-                
+
                 if (!searchResponse.data.query.search.length) {
                     await sock.sendMessage(remoteJid, {
                         text: `*❌ No Wikipedia articles found for:* ${query}`
                     });
                     return;
                 }
-                
+
                 // Get the first search result
                 const firstResult = searchResponse.data.query.search[0];
                 const pageId = firstResult.pageid;
-                
+
                 // Get the content of the page
                 const contentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${pageId}&format=json&utf8=1`;
                 const contentResponse = await axios.get(contentUrl);
-                
+
                 const page = contentResponse.data.query.pages[pageId];
                 const extract = page.extract || 'No extract available.';
-                
+
                 // Truncate if too long
                 const maxLength = 1500;
-                let truncatedExtract = extract.length > maxLength 
+                let truncatedExtract = extract.length > maxLength
                     ? extract.substring(0, maxLength) + '...\n\n(Content truncated, visit Wikipedia for more)'
                     : extract;
-                
+
                 // Get the URL for the article
                 const articleUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`;
-                
+
                 let response = `*📚 Wikipedia: ${page.title}*\n\n`;
                 response += truncatedExtract;
                 response += `\n\n*Read more:* ${articleUrl}`;
-                
+
                 await sock.sendMessage(remoteJid, { text: response });
-                
+
                 // If there are more search results, mention them
                 if (searchResponse.data.query.search.length > 1) {
                     const otherResults = searchResponse.data.query.search.slice(1, 4)
                         .map(result => result.title)
                         .join('\n• ');
-                        
+
                     await sock.sendMessage(remoteJid, {
                         text: `*📋 Other relevant articles:*\n\n• ${otherResults}\n\nTo view any of these, use .wikipedia followed by the article title.`
                     });
@@ -1181,55 +1188,316 @@ Example: .chemReaction H2 + O2 -> H2O
     async quiz(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const [subject, difficulty = 'medium'] = args;
+            const [subject] = args;
 
             if (!subject) {
                 await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* .quiz [subject] [difficulty]\nExample: .quiz math medium'
+                    text: '*📚 Usage:* .quiz [subject]\nAvailable subjects: math, science, history, geography'
                 });
                 return;
             }
 
             const quizzes = {
-                math: {
-                    easy: [
-                        {
-                            question: 'What is 2 + 2?',
-                            options: ['3', '4', '5', '6'],
-                            answer: 1
-                        }
-                    ],
-                    medium: [
-                        {
-                            question: 'Solve for x: 2x + 5 = 13',
-                            options: ['3', '4', '5', '6'],
-                            answer: 2
-                        }
-                    ],
-                    hard: [
-                        {
-                            question: 'What is the derivative of x²?',
-                            options: ['x', '2x', '2', 'x³'],
-                            answer: 1
-                        }
-                    ]
-                }
+                math: [
+                    {
+                        question: "What is the square root of 144?",
+                        options: ["10", "11", "12", "13"],
+                        correct: 2
+                    },
+                    {
+                        question: "What is 7 x 8?",
+                        options: ["54", "56", "58", "60"],
+                        correct: 1
+                    }
+                ],
+                science: [
+                    {
+                        question: "What is the chemical symbol for gold?",
+                        options: ["Au", "Ag", "Fe", "Cu"],
+                        correct: 0
+                    },
+                    {
+                        question: "What is the closest planet to the Sun?",
+                        options: ["Venus", "Mars", "Mercury", "Earth"],
+                        correct: 2
+                    }
+                ],
+                history: [
+                    {
+                        question: "In which year did World War II end?",
+                        options: ["1943", "1944", "1945", "1946"],
+                        correct: 2
+                    },
+                    {
+                        question: "Who was the first President of the United States?",
+                        options: ["John Adams", "Thomas Jefferson", "Benjamin Franklin", "George Washington"],
+                        correct: 3
+                    }
+                ],
+                geography: [
+                    {
+                        question: "What is the capital of Japan?",
+                        options: ["Seoul", "Beijing", "Tokyo", "Bangkok"],
+                        correct: 2
+                    },
+                    {
+                        question: "Which is the largest ocean on Earth?",
+                        options: ["Atlantic", "Indian", "Arctic", "Pacific"],
+                        correct: 3
+                    }
+                ]
             };
 
-            if (!quizzes[subject] || !quizzes[subject][difficulty]) {
+            if (!quizzes[subject]) {
                 await sock.sendMessage(remoteJid, {
-                    text: '*❌ No quiz available for this subject/difficulty*'
+                    text: '*❌ Invalid subject*\nAvailable subjects: ' + Object.keys(quizzes).join(', ')
                 });
                 return;
             }
 
-            const quiz = quizzes[subject][difficulty][0];
+            const quiz = quizzes[subject][Math.floor(Math.random() * quizzes[subject].length)];
+            const optionsText = quiz.options.map((opt, i) => `${i + 1}. ${opt}`).join('\n');
+
             await sock.sendMessage(remoteJid, {
-                text: `*📝 Quiz Question:*\n\n${quiz.question}\n\n${quiz.options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`
+                text: `*📝 Quiz - ${subject}*\n\n*Question:*\n${quiz.question}\n\n*Options:*\n${optionsText}\n\nReply with the number of your answer.`
             });
 
         } catch (err) {
             await handleError(sock, message.key.remoteJid, err, 'Error generating quiz');
+        }
+    },
+
+    async flashcards(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [action, subject, ...content] = args;
+
+            if (!action || !['create', 'review', 'list'].includes(action)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .flashcards [create|review|list] [subject] [front::back]\nExample: .flashcards create biology "What is photosynthesis?::The process by which plants convert light energy into chemical energy"'
+                });
+                return;
+            }
+
+            const flashcardsPath = path.join(__dirname, '../../../data/educational/flashcards', `${subject}.json`);
+            await ensureDirectory(path.dirname(flashcardsPath));
+
+            let flashcards = await safeFileOperation(async () => {
+                if (fs.existsSync(flashcardsPath)) {
+                    const data = await fsPromises.readFile(flashcardsPath, 'utf8');
+                    return JSON.parse(data);
+                }
+                return [];
+            }, []);
+
+            switch (action) {
+                case 'create':
+                    if (!subject || content.length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Please provide subject and flashcard content*'
+                        });
+                        return;
+                    }
+
+                    const [cardContent] = content;
+                    const [front, back] = cardContent.split('::');
+
+                    if (!front || !back) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ Invalid flashcard format*\nUse front::back format'
+                        });
+                        return;
+                    }
+
+                    flashcards.push({ front, back, created: new Date().toISOString() });
+                    await fsPromises.writeFile(flashcardsPath, JSON.stringify(flashcards, null, 2));
+
+                    await sock.sendMessage(remoteJid, {
+                        text: '*✅ Flashcard created successfully*'
+                    });
+                    break;
+
+                case 'review':
+                    if (!flashcards.length) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ No flashcards found for this subject*'
+                        });
+                        return;
+                    }
+
+                    const randomCard = flashcards[Math.floor(Math.random() * flashcards.length)];
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📚 Flashcard Review - ${subject}*\n\n*Question:*\n${randomCard.front}\n\n_Reply with .answer to see the solution_`
+                    });
+                    break;
+
+                case 'list':
+                    if (!flashcards.length) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '*❌ No flashcards found for this subject*'
+                        });
+                        return;
+                    }
+
+                    const cardsList = flashcards.map((card, i) =>
+                        `${i + 1}. ${card.front}`
+                    ).join('\n');
+
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📚 Flashcards - ${subject}*\n\n${cardsList}`
+                    });
+                    break;
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error managing flashcards');
+        }
+    },
+
+    async studytimer(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [minutes] = args;
+
+            if (!minutes || isNaN(minutes) || minutes <= 0 || minutes > 120) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*⏰ Usage:* .studytimer [minutes]\nSet a timer between 1-120 minutes'
+                });
+                return;
+            }
+
+            const durationMs = parseInt(minutes) * 60 * 1000;
+            await sock.sendMessage(remoteJid, {
+                text: `*⏰ Study Timer Started*\nDuration: ${minutes} minutes\n\nStay focused! I'll notify you when the time is up.`
+            });
+
+            // Set timeout for timer completion
+            setTimeout(async () => {
+                try {
+                    await sock.sendMessage(remoteJid, {
+                        text: `*⏰ Time's Up!*\n\nYou've completed your ${minutes}-minute study session!\n\nTake a short break before starting another session.`
+                    });
+                } catch (err) {
+                    logger.error('Error sending timer completion message:', err);
+                }
+            }, durationMs);
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error setting study timer');
+        }
+    },
+
+    async periodic(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const element = args.join(' ');
+
+            if (!element) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*⚛️ Usage:* .periodic [element]\nExample: .periodic Hydrogen'
+                });
+                return;
+            }
+
+            const periodicTable = {
+                "hydrogen": {
+                    symbol: "H",
+                    atomicNumber: 1,
+                    atomicMass: "1.008",
+                    category: "Nonmetal",
+                    properties: "Lightest and most abundant element in the universe"
+                },
+                "helium": {
+                    symbol: "He",
+                    atomicNumber: 2,
+                    atomicMass: "4.003",
+                    category: "Noble Gas",
+                    properties: "Inert gas used in balloons and cryogenics"
+                },
+                "lithium": {
+                    symbol: "Li",
+                    atomicNumber: 3,
+                    atomicMass: "6.941",
+                    category: "Alkali Metal",
+                    properties: "Soft, silvery-white metal used in batteries"
+                },
+                // Add more elements as needed
+            };
+
+            const elementData = periodicTable[element.toLowerCase()];
+            if (!elementData) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Element not found*\nPlease check the spelling and try again.'
+                });
+                return;
+            }
+
+            const response = `*⚛️ Periodic Table: ${element}*\n\n` +
+                           `*Symbol:* ${elementData.symbol}\n` +
+                           `*Atomic Number:* ${elementData.atomicNumber}\n` +
+                           `*Atomic Mass:* ${elementData.atomicMass}\n` +
+                           `*Category:* ${elementData.category}\n` +
+                           `*Properties:* ${elementData.properties}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error retrieving element information');
+        }
+    },
+
+    async history(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const query = args.join(' ');
+
+            if (!query) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📚 Usage:* .history [period|event]\nExample: .history World War 2'
+                });
+                return;
+            }
+
+            const historicalEvents = {
+                "world war 2": {
+                    period: "1939-1945",
+                    summary: "Global conflict that involved most of the world's nations",
+                    keyEvents: [
+                        "1939: Germany invades Poland",
+                        "1941: Pearl Harbor attack",
+                        "1945: Atomic bombs dropped on Japan",
+                        "1945: Germany and Japan surrender"
+                    ]
+                },
+                "industrial revolution": {
+                    period: "1760-1840",
+                    summary: "Transition to new manufacturing processes in Europe and America",
+                    keyEvents: [
+                        "1712: Steam engine invented",
+                        "1764: Spinning Jenny invented",
+                        "1800s: Factory system established",
+                        "1830s: Railways expand"
+                    ]
+                },
+                // Add more historical events as needed
+            };
+
+            const event = historicalEvents[query.toLowerCase()];
+            if (!event) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Historical event not found*\nPlease try a different query.'
+                });
+                return;
+            }
+
+            const response = `*📚 Historical Event: ${query}*\n\n` +
+                           `*Period:* ${event.period}\n\n` +
+                           `*Summary:*\n${event.summary}\n\n` +
+                           `*Key Events:*\n${event.keyEvents.join('\n')}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error retrieving historical information');
         }
     },
 
@@ -1428,7 +1696,7 @@ Example: .chemReaction H2 + O2 -> H2O
             await sock.sendMessage(remoteJid, {
                 text: `*📝 Citation (${style.toUpperCase()}):*\n\n${citation}`
             });
-        } catch (err) {
+        } catch (err){
             await handleError(sock, message.key.remoteJid, err, 'Error generating citation');
         }
     },
@@ -1559,7 +1827,7 @@ Example: .chemReaction H2 + O2 -> H2O
     async flashcards(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const [action = '', subject = '', ...content] = args;
+            const [action, subject, ...content] = args;
 
             if (!action || !['create', 'review', 'list'].includes(action)) {
                 await sock.sendMessage(remoteJid, {
@@ -1903,7 +2171,7 @@ Available periods:
 commands.init = async function() {
     try {
         logger.info('🔄 Initializing Educational Commands...');
-        
+
         // Initialize required directories
         await ensureDirectory('data/educational');
         await ensureDirectory('data/educational/flashcards');
@@ -1913,7 +2181,7 @@ commands.init = async function() {
         await ensureDirectory('data/educational/language_exercises');
         await ensureDirectory('data/educational/math_solutions');
         await ensureDirectory('data/educational/study_plans');
-        
+
         logger.info('✅ Educational Commands initialized successfully');
         return true;
     } catch (err) {
