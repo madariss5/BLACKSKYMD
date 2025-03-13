@@ -4,10 +4,19 @@ const config = {
     // Bot Owner Info
     owner: {
         name: process.env.OWNER_NAME || 'Bot Owner',  
-        // Convert owner number to proper format with WhatsApp suffix
+        // ============================================
+        // ENTER YOUR WHATSAPP NUMBER HERE
+        // ============================================
+        // Format: Country code + number (no spaces/symbols)
+        // Example: For number +1 (234) 567-8900
+        //    - Country code: 1
+        //    - Number: 2345678900
+        //    - Enter as: 12345678900
+        // 
+        // ⚠️ REPLACE THE NUMBER BELOW WITH YOURS ⚠️
         number: process.env.OWNER_NUMBER ? 
             `${process.env.OWNER_NUMBER.replace(/[^0-9]/g, '')}@s.whatsapp.net` : 
-            '12345678900@s.whatsapp.net', // Default number, will be overridden by env var
+            '4915561048015@s.whatsapp.net',
         email: process.env.OWNER_EMAIL || '',
     },
 
@@ -52,7 +61,9 @@ const config = {
 
         // Check required variables
         if (!process.env.OWNER_NUMBER) {
-            console.warn('OWNER_NUMBER not set in environment, using default number');
+            console.warn('⚠️ OWNER_NUMBER not set in environment. Please set your WhatsApp number in the config.js file.');
+            console.warn('Format: Country code + number without any special characters');
+            console.warn('Example: For +1 (234) 567-8900, set OWNER_NUMBER=12345678900');
         }
         if (!process.env.SESSION_ID) missingVars.push('SESSION_ID');
 

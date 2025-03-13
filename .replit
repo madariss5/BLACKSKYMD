@@ -23,6 +23,10 @@ args = "Check Commands"
 task = "workflow.run"
 args = "WhatsApp Bot"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "QR Server"
+
 [[workflows.workflow]]
 name = "Replit QR Server"
 author = "agent"
@@ -35,7 +39,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node compatible-qr.js"
+args = "node replit-qr.js"
 waitForPort = 5000
 
 [[workflows.workflow]]
@@ -64,11 +68,26 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "BOT_PORT=5001 node bot-handler.js"
+args = "node bot-handler.js"
 waitForPort = 5001
 
+[[workflows.workflow]]
+name = "QR Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node replit-qr.js"
+waitForPort = 5000
+
 [deployment]
-run = ["sh", "-c", "node compatible-qr.js"]
+run = ["sh", "-c", "node replit-qr.js"]
 
 [[ports]]
 localPort = 5000

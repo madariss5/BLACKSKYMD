@@ -1,8 +1,15 @@
 const { commandLoader } = require('../utils/commandLoader');
 const logger = require('../utils/logger');
+const config = require('../config/config');
 
 // Cooldown handling
 const cooldowns = new Map();
+
+// Helper function to normalize phone numbers for comparison
+function normalizePhoneNumber(number) {
+    // Remove any WhatsApp suffix and clean the number
+    return number.replace('@s.whatsapp.net', '').replace(/[^0-9]/g, '');
+}
 
 async function processCommand(sock, message, commandText) {
     try {
@@ -22,7 +29,7 @@ async function processCommand(sock, message, commandText) {
 
         // Fast command lookup
         const command = await commandLoader.getCommand(commandName.toLowerCase());
-        
+
         if (!command) {
             // Fast "command not found" response
             await sock.sendMessage(sender, { 
@@ -39,8 +46,30 @@ async function processCommand(sock, message, commandText) {
             return;
         }
 
-        // Optimized permission check
-        const hasPermission = await commandLoader.hasPermission(sender, command.config?.permissions || ['user']);        
+        // Enhanced permission check with better owner validation
+        const permissions = command.config?.permissions || ['user'];
+
+        // Special handling for owner permissions
+        if (permissions.includes('owner')) {
+            const senderNumber = normalizePhoneNumber(sender);
+            const ownerNumber = normalizePhoneNumber(config.owner.number);
+
+            logger.debug('Permission check:', {
+                sender: senderNumber,
+                owner: ownerNumber,
+                match: senderNumber === ownerNumber
+            });
+
+            if (senderNumber !== ownerNumber) {
+                await sock.sendMessage(sender, {
+                    text: '*⛔ This command requires owner permissions.*'
+                });
+                return;
+            }
+        }
+
+        // Regular permission check for non-owner commands
+        const hasPermission = await commandLoader.hasPermission(sender, permissions);
         if (!hasPermission) {
             await sock.sendMessage(sender, {
                 text: '*⛔ Permission denied.*'
