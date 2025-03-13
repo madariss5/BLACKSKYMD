@@ -950,7 +950,7 @@ const commands = {
         });
     },
     
-    async inventory(sock, message, args) {
+    async extendedInventory(sock, message, args) {
         const sender = message.key.remoteJid;
         const profile = await getUserProfile(sock, sender);
         if (!profile) return;
