@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const globalConfig = require('../config/globalConfig');
 const os = require('os');
 
 const ownerCommands = {
@@ -105,8 +106,16 @@ const ownerCommands = {
             await sock.sendMessage(remoteJid, { text: '⚠️ Please provide a prefix' });
             return;
         }
-        // Implement prefix change
-        await sock.sendMessage(remoteJid, { text: `✅ Prefix changed to: ${prefix}` });
+
+        try {
+            // Update prefix using the global config
+            globalConfig.prefix = prefix;
+            logger.info(`Bot prefix changed to: ${prefix}`);
+            await sock.sendMessage(remoteJid, { text: `✅ Prefix updated to: ${prefix}` });
+        } catch (err) {
+            logger.error('Error setting prefix:', err);
+            await sock.sendMessage(remoteJid, { text: '❌ Error updating prefix. Please try again.' });
+        }
     },
 
     async setlanguage(sock, message, args) {

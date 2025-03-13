@@ -2,62 +2,14 @@
  * Simple Message Handler for WhatsApp Bot - Optimized for Speed
  */
 
-// Initialize logger
-const logger = console;
+const { commandLoader } = require('../utils/commandLoader');
+const logger = require('../utils/logger');
 
-// Use Map for faster command lookup
-const commands = new Map();
-
-// Add optimized ping command
-commands.set('ping', async (sock, message) => {
-    try {
-        const sender = message.key.remoteJid;
-        await sock.sendMessage(sender, { text: '🏓 Pong!' });
-    } catch (err) {
-        logger.error('Error in ping command:', err);
-    }
-});
-
-// Add optimized help command
-commands.set('help', async (sock, message) => {
-    try {
-        const sender = message.key.remoteJid;
-        const commandList = Array.from(commands.keys())
-            .map(name => `!${name}`)
-            .join('\n');
-        await sock.sendMessage(sender, {
-            text: `*Available Commands:*\n\n${commandList}`
-        });
-    } catch (err) {
-        logger.error('Error in help command:', err);
-    }
-});
-
-// Add menu1 command
-commands.set('menu1', async (sock, message) => {
-    try {
-        const sender = message.key.remoteJid;
-        const menuText = `*🤖 Bot Menu*\n
-🔰 *Main Commands*
-├ !ping - Check bot response
-├ !help - Show all commands
-├ !menu1 - Show this menu
-└ !status - Check bot status
-
-📝 *Usage*
-Just type any command starting with "!"
-Example: !ping
-
-⚡ *Status*: Active
-🔄 *Response*: Fast Mode`;
-
-        await sock.sendMessage(sender, {
-            text: menuText
-        });
-    } catch (err) {
-        logger.error('Error in menu1 command:', err);
-    }
-});
+// Bot configuration
+const config = {
+    prefix: process.env.BOT_PREFIX || '!',
+    owner: process.env.OWNER_NUMBER || ''
+};
 
 /**
  * Process incoming messages
@@ -73,35 +25,44 @@ async function messageHandler(sock, message) {
 
         if (!messageContent) return;
 
-        // Process commands (using ! prefix)
-        if (messageContent.startsWith('!')) {
-            const commandText = messageContent.slice(1).trim();
+        // Process commands
+        if (messageContent.startsWith(config.prefix)) {
+            const commandText = messageContent.slice(config.prefix.length).trim();
             if (!commandText) return;
 
             const [commandName, ...args] = commandText.split(' ');
-            const command = commands.get(commandName.toLowerCase());
+            const command = await commandLoader.getCommand(commandName.toLowerCase());
 
             if (!command) {
                 const sender = message.key.remoteJid;
                 await sock.sendMessage(sender, {
-                    text: `❌ Unknown command. Use !help to see available commands.`
+                    text: `❌ Unknown command. Use ${config.prefix}help to see available commands.`
                 });
                 return;
             }
 
-            await command(sock, message, args);
+            // Check permissions before executing command
+            const sender = message.key.remoteJid;
+            const hasPermission = await commandLoader.hasPermission(sender, command.config.permissions);
+
+            if (!hasPermission) {
+                await sock.sendMessage(sender, {
+                    text: '❌ You do not have permission to use this command.'
+                });
+                return;
+            }
+
+            try {
+                await command.execute(sock, message, args);
+            } catch (err) {
+                logger.error(`Error executing command ${commandName}:`, err);
+                await sock.sendMessage(sender, {
+                    text: '❌ Error executing command. Please try again.'
+                });
+            }
         }
     } catch (err) {
         logger.error('Error in message handler:', err);
-        // Try to notify user of error
-        try {
-            const sender = message.key.remoteJid;
-            await sock.sendMessage(sender, {
-                text: '❌ Error processing command. Please try again.'
-            });
-        } catch (_) {
-            // Ignore nested errors
-        }
     }
 }
 
@@ -110,19 +71,15 @@ async function messageHandler(sock, message) {
  */
 async function init() {
     try {
-        // Add status command
-        commands.set('status', async (sock, message) => {
-            try {
-                const sender = message.key.remoteJid;
-                await sock.sendMessage(sender, { 
-                    text: '✅ Bot Online\n⚡ Fast Response Mode' 
-                });
-            } catch (err) {
-                logger.error('Error in status command:', err);
-            }
-        });
+        // Load all commands using the command loader
+        const success = await commandLoader.loadCommandHandlers();
+        if (!success) {
+            throw new Error('Failed to load commands');
+        }
 
-        logger.info('Simple message handler initialized with commands:', Array.from(commands.keys()));
+        const stats = commandLoader.getCommandStats();
+        logger.info('Command loading statistics:', stats);
+        logger.info(`Simple message handler initialized with ${stats.totalCommands} commands`);
         return true;
     } catch (err) {
         logger.error('Handler initialization error:', err);
@@ -130,9 +87,9 @@ async function init() {
     }
 }
 
-// Export as named exports to prevent undefined issues
+// Export handler functions
 module.exports = {
     messageHandler,
     init,
-    commands
+    config
 };
