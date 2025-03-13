@@ -1,112 +1,200 @@
-// Import the command loader
-const { commandLoader } = require('./src/utils/commandLoader');
+/**
+ * Command Verification Tool
+ * Checks that all command modules load correctly without errors
+ */
 
-// Save original console methods
-const originalConsole = { 
-  log: console.log,
-  info: console.info,
-  debug: console.debug,
-  warn: console.warn,
-  error: console.error
+const fs = require('fs');
+const path = require('path');
+
+// Colors for terminal output
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  green: '\x1b[32m',
+  red: '\x1b[31m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m'
 };
 
-// Override all logging methods to disable them
-console.log = () => {};
-console.info = () => {};
-console.debug = () => {};
-console.warn = () => {};
-console.error = () => {};
-
-// Also disable the logger if it's being used
-try {
-  const logger = require('./src/utils/logger');
-  if (logger) {
-    logger.info = () => {};
-    logger.debug = () => {};
-    logger.error = () => {};
-    logger.warn = () => {};
-  }
-} catch (e) {
-  // Logger module might not exist or have a different structure
-}
-
-// Run the command loading
 async function checkCommands() {
+  console.log(`${colors.bright}${colors.blue}=== WhatsApp Bot Command Verification ===\n${colors.reset}`);
+  
+  // Directory containing command modules
+  const commandsDir = path.join(__dirname, 'src', 'commands');
+  
   try {
-    // First load the commands
-    await commandLoader.loadCommandHandlers();
+    // Get list of command files
+    const files = fs.readdirSync(commandsDir);
     
-    // Restore console
-    Object.assign(console, originalConsole);
+    // Filter out non-JavaScript files and subdirectories
+    const jsFiles = files.filter(file => 
+      fs.statSync(path.join(commandsDir, file)).isFile() && 
+      file.endsWith('.js') && 
+      !file.endsWith('.tmp') && 
+      !file.endsWith('.bak') &&
+      !file.endsWith('.new')
+    );
     
-    // Get loaded commands
-    const commands = commandLoader.getAllCommands();
+    console.log(`${colors.cyan}Found ${jsFiles.length} command files to check${colors.reset}\n`);
     
-    // Get categories
-    const categories = {};
-    commands.forEach(cmd => {
-      categories[cmd.category] = (categories[cmd.category] || 0) + 1;
-    });
+    // Test each command file
+    let successCount = 0;
+    let failCount = 0;
+    let commandCount = 0;
     
-    // Get file list to compare
-    const fs = require('fs');
-    const path = require('path');
-    const commandsDir = path.join(__dirname, 'src/commands');
-    const configDir = path.join(__dirname, 'src/config/commands');
-    
-    const jsFiles = fs.readdirSync(commandsDir)
-      .filter(file => file.endsWith('.js') && file !== 'index.js')
-      .map(file => file.replace('.js', ''));
-    
-    const jsonFiles = fs.readdirSync(configDir)
-      .filter(file => file.endsWith('.json'))
-      .map(file => file.replace('.json', ''));
-    
-    // Find categories not in loaded commands
-    const missingCategories = jsFiles.filter(file => 
-      !Object.keys(categories).includes(file) && file !== 'group_new');
-    
-    // Display results
-    console.log('\n==================================================');
-    console.log('          WhatsApp Bot Command Status              ');
-    console.log('==================================================');
-    console.log(`✅ Total commands loaded: ${commands.length}`);
-    
-    console.log('\nCommands by category:');
-    Object.entries(categories)
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([category, count]) => {
-        console.log(`- ${category}: ${count} commands`);
-      });
-    
-    console.log('\nCommand files in filesystem:');
-    jsFiles.forEach(file => {
-      const loaded = Object.keys(categories).includes(file) ? '✅' : '❌';
-      console.log(`${loaded} ${file}${file === 'group_new' ? ' (likely merged with group)' : ''}`);
-    });
-    
-    if (missingCategories.length > 0) {
-      console.log('\n⚠️ Some command categories were not loaded:');
-      missingCategories.forEach(category => {
-        console.log(`- ${category}`);
-      });
-    } else {
-      console.log('\n✅ All command categories successfully loaded!');
+    for (const file of jsFiles) {
+      const modulePath = path.join(commandsDir, file);
+      console.log(`${colors.yellow}Testing ${file}...${colors.reset}`);
+      
+      try {
+        // Attempt to load the module
+        const commandModule = require(modulePath);
+        
+        // Check if module has expected structure
+        if (!commandModule) {
+          console.log(`${colors.red}❌ Failed: Module is null or undefined${colors.reset}`);
+          failCount++;
+          continue;
+        }
+        
+        // Different module formats
+        const hasCommands = commandModule.commands && typeof commandModule.commands === 'object';
+        const isLegacyFormat = typeof commandModule === 'object' && Object.values(commandModule).some(v => typeof v === 'function');
+        
+        if (!hasCommands && !isLegacyFormat) {
+          console.log(`${colors.red}❌ Failed: Module does not have commands object or functions${colors.reset}`);
+          failCount++;
+          continue;
+        }
+        
+        // Count commands
+        let moduleCommandCount = 0;
+        if (hasCommands) {
+          moduleCommandCount = Object.keys(commandModule.commands).filter(
+            cmd => typeof commandModule.commands[cmd] === 'function' && cmd !== 'init'
+          ).length;
+        } else if (isLegacyFormat) {
+          moduleCommandCount = Object.keys(commandModule).filter(
+            cmd => typeof commandModule[cmd] === 'function' && cmd !== 'init'
+          ).length;
+        }
+        
+        commandCount += moduleCommandCount;
+        
+        // Check if module has init function
+        const hasInit = (hasCommands && typeof commandModule.init === 'function') || 
+                       (isLegacyFormat && typeof commandModule.init === 'function');
+        
+        console.log(`${colors.green}✅ Success: ${moduleCommandCount} commands found`);
+        if (hasInit) {
+          console.log(`${colors.green}✅ init() function found${colors.reset}`);
+        } else {
+          console.log(`${colors.yellow}⚠️ No init() function found${colors.reset}`);
+        }
+        
+        successCount++;
+      } catch (err) {
+        console.log(`${colors.red}❌ Failed to load: ${err.message}${colors.reset}`);
+        console.error(err.stack);
+        failCount++;
+      }
+      
+      console.log(''); // Add spacing between modules
     }
     
-    if (commands.length > 0) {
-      console.log('\n✅ Command system is working properly!');
-      console.log(`   Successfully loaded ${commands.length} commands across ${Object.keys(categories).length} categories`);
-    } else {
-      console.log('\n❌ No commands were loaded!');
+    // Check subdirectories
+    const subdirs = files.filter(file => fs.statSync(path.join(commandsDir, file)).isDirectory());
+    if (subdirs.length > 0) {
+      console.log(`${colors.cyan}Found ${subdirs.length} subdirectories with additional commands${colors.reset}\n`);
+      
+      for (const dir of subdirs) {
+        const subdirPath = path.join(commandsDir, dir);
+        console.log(`${colors.yellow}Checking subdirectory: ${dir}${colors.reset}`);
+        
+        try {
+          const subFiles = fs.readdirSync(subdirPath)
+            .filter(file => fs.statSync(path.join(subdirPath, file)).isFile() && file.endsWith('.js'));
+          
+          console.log(`${colors.cyan}Found ${subFiles.length} command files in ${dir}${colors.reset}`);
+          
+          for (const file of subFiles) {
+            const modulePath = path.join(subdirPath, file);
+            console.log(`${colors.yellow}Testing ${dir}/${file}...${colors.reset}`);
+            
+            try {
+              const commandModule = require(modulePath);
+              if (!commandModule) {
+                console.log(`${colors.red}❌ Failed: Module is null or undefined${colors.reset}`);
+                failCount++;
+                continue;
+              }
+              
+              const hasCommands = commandModule.commands && typeof commandModule.commands === 'object';
+              const isLegacyFormat = typeof commandModule === 'object' && Object.values(commandModule).some(v => typeof v === 'function');
+              
+              if (!hasCommands && !isLegacyFormat) {
+                console.log(`${colors.red}❌ Failed: Module does not have commands object or functions${colors.reset}`);
+                failCount++;
+                continue;
+              }
+              
+              let moduleCommandCount = 0;
+              if (hasCommands) {
+                moduleCommandCount = Object.keys(commandModule.commands).filter(
+                  cmd => typeof commandModule.commands[cmd] === 'function' && cmd !== 'init'
+                ).length;
+              } else if (isLegacyFormat) {
+                moduleCommandCount = Object.keys(commandModule).filter(
+                  cmd => typeof commandModule[cmd] === 'function' && cmd !== 'init'
+                ).length;
+              }
+              
+              commandCount += moduleCommandCount;
+              console.log(`${colors.green}✅ Success: ${moduleCommandCount} commands found${colors.reset}`);
+              successCount++;
+            } catch (err) {
+              console.log(`${colors.red}❌ Failed to load: ${err.message}${colors.reset}`);
+              console.error(err.stack);
+              failCount++;
+            }
+            
+            console.log(''); // Add spacing between modules
+          }
+        } catch (err) {
+          console.log(`${colors.red}❌ Failed to read subdirectory: ${err.message}${colors.reset}`);
+          failCount++;
+        }
+      }
     }
-    console.log('==================================================\n');
-  } catch (error) {
-    // Restore console in case of error
-    Object.assign(console, originalConsole);
-    console.error('Error checking commands:', error);
+    
+    // Print summary
+    console.log(`${colors.bright}${colors.blue}=== Verification Summary ===\n${colors.reset}`);
+    console.log(`${colors.cyan}Total command files checked: ${jsFiles.length + (subdirs.length || 0)}${colors.reset}`);
+    console.log(`${colors.green}✅ Successfully loaded: ${successCount}${colors.reset}`);
+    console.log(`${colors.red}❌ Failed to load: ${failCount}${colors.reset}`);
+    console.log(`${colors.cyan}Total commands found: ${commandCount}${colors.reset}`);
+    
+    if (failCount === 0) {
+      console.log(`\n${colors.bright}${colors.green}All command modules loaded successfully!${colors.reset}`);
+      return true;
+    } else {
+      console.log(`\n${colors.bright}${colors.red}Some command modules failed to load. Please fix the errors above.${colors.reset}`);
+      return false;
+    }
+  } catch (err) {
+    console.error(`${colors.red}Fatal error reading commands directory: ${err.message}${colors.reset}`);
+    console.error(err.stack);
+    return false;
   }
 }
 
-// Run check
-checkCommands();
+// Run the command checker
+checkCommands().then(success => {
+  if (!success) {
+    process.exit(1);
+  }
+}).catch(err => {
+  console.error('Unhandled error:', err);
+  process.exit(1);
+});
