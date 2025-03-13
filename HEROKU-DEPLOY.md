@@ -25,31 +25,37 @@ Diese Anleitung erklärt, wie du deinen BLACKSKY-MD WhatsApp Bot auf Heroku bere
    cd BLACKSKY
    ```
 
-2. Logge dich in Heroku ein und erstelle eine neue App:
+2. Verwende die spezielle Heroku-package.json:
+   ```bash
+   # Wichtig: Ersetze die standard package.json mit der Heroku-Version
+   mv heroku-package.json package.json
+   ```
+
+3. Logge dich in Heroku ein und erstelle eine neue App:
    ```bash
    heroku login
    heroku create dein-bot-name
    ```
 
-3. Füge die erforderlichen Buildpacks hinzu:
+4. Füge die erforderlichen Buildpacks hinzu:
    ```bash
    heroku buildpacks:add heroku/nodejs
    heroku buildpacks:add https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git
    ```
 
-4. Konfiguriere die Umgebungsvariablen:
+5. Konfiguriere die Umgebungsvariablen:
    ```bash
    heroku config:set OWNER_NUMBER=491234567890
    heroku config:set PREFIX=.
    # Weitere Variablen nach Bedarf hinzufügen
    ```
 
-5. Pushe den Code zu Heroku:
+6. Pushe den Code zu Heroku:
    ```bash
    git push heroku main
    ```
 
-6. Öffne die App im Browser:
+7. Öffne die App im Browser:
    ```bash
    heroku open
    ```
@@ -118,3 +124,15 @@ Du kannst die Session auch über die Web-Oberfläche wiederherstellen:
 
 - Erzeuge einen neuen QR-Code und scanne ihn
 - Speichere den neuen Session String in den Config Vars
+
+### "Push rejected, failed to compile Node.js app"
+
+- Stelle sicher, dass du die package.json-Datei mit heroku-package.json ersetzt hast
+- Überprüfe, ob das Procfile korrekt ist und auf `heroku-deploy.js` verweist
+- Führe folgende Befehle aus, um das Deployment zu korrigieren:
+  ```bash
+  mv heroku-package.json package.json
+  git add package.json Procfile
+  git commit -m "Fix Heroku deployment issues"
+  git push heroku main
+  ```
