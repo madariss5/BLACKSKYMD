@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
-    "node": "20.x"
+    "node": "18.x",
+    "npm": "9.x"
   },
   "keywords": ["whatsapp", "bot", "md", "multi-device"],
   "author": "BLACKSKY Team",
@@ -27,15 +28,15 @@
     "dotenv": "^16.3.1",
     "exiftool-vendored": "^22.0.0",
     "express": "^4.18.2",
-    "file-type": "^18.5.0",
+    "file-type": "^16.5.4",
     "fluent-ffmpeg": "^2.1.2",
     "form-data": "^4.0.0",
     "genius-lyrics-api": "^3.2.1",
     "jimp": "^0.16.3",
-    "mathjs": "^12.0.0",
+    "mathjs": "^11.8.0",
     "moment": "^2.29.4",
     "node-cron": "^3.0.2",
-    "node-fetch": "^3.3.2",
+    "node-fetch": "^2.6.7",
     "node-webpmux": "^3.1.7",
     "pino": "^8.15.0",
     "pino-pretty": "^10.2.0",
