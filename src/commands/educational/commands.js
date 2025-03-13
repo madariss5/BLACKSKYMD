@@ -82,6 +82,164 @@ async function ensureDirectory(dirPath) {
 
 // Command implementations
 const commands = {
+    // Language Translation Command
+    async translate(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [targetLang, ...textParts] = args;
+            const textToTranslate = textParts.join(' ');
+
+            if (!targetLang || !textToTranslate) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🌐 Usage:* .translate [target_language] [text]\nExample: .translate es Hello, how are you?'
+                });
+                return;
+            }
+
+            // Target language should be a valid 2-letter ISO language code
+            const validLanguageCodes = ['af', 'sq', 'am', 'ar', 'hy', 'az', 'eu', 'be', 'bn', 'bs', 'bg', 'ca', 'ceb', 'zh', 'zh-CN', 'zh-TW', 'co', 'hr', 'cs', 'da', 'nl', 'en', 'eo', 'et', 'fi', 'fr', 'fy', 'gl', 'ka', 'de', 'el', 'gu', 'ht', 'ha', 'haw', 'he', 'hi', 'hmn', 'hu', 'is', 'ig', 'id', 'ga', 'it', 'ja', 'jv', 'kn', 'kk', 'km', 'rw', 'ko', 'ku', 'ky', 'lo', 'la', 'lv', 'lt', 'lb', 'mk', 'mg', 'ms', 'ml', 'mt', 'mi', 'mr', 'mn', 'my', 'ne', 'no', 'ny', 'or', 'ps', 'fa', 'pl', 'pt', 'pa', 'ro', 'ru', 'sm', 'gd', 'sr', 'st', 'sn', 'sd', 'si', 'sk', 'sl', 'so', 'es', 'su', 'sw', 'sv', 'tl', 'tg', 'ta', 'tt', 'te', 'th', 'tr', 'tk', 'uk', 'ur', 'ug', 'uz', 'vi', 'cy', 'xh', 'yi', 'yo', 'zu'];
+            
+            if (!validLanguageCodes.includes(targetLang.toLowerCase())) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Invalid target language code*\nPlease use a valid 2-letter ISO language code (e.g., "es" for Spanish).'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '🔄 Translating...' });
+
+            // Use a free translation API
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(textToTranslate)}`;
+            
+            const response = await axios.get(url);
+            
+            if (response.data && response.data[0] && response.data[0][0]) {
+                const translation = response.data[0].map(item => item[0]).join('');
+                const detectedLang = response.data[2];
+                
+                await sock.sendMessage(remoteJid, {
+                    text: `*🌐 Translation (${detectedLang} → ${targetLang})*\n\n${translation}`
+                });
+            } else {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Translation failed*\nPlease try again with a different text or language.'
+                });
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error translating text');
+        }
+    },
+    
+    // Grammar Checking Command
+    async grammar(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const text = args.join(' ');
+
+            if (!text) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .grammar [text]\nExample: .grammar I have went to the store yesterday.'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '🔍 Checking grammar...' });
+
+            try {
+                // Since we don't want to use a paid API here, we'll implement a simple grammar checker
+                // with common grammar rules
+                const grammarIssues = [];
+                
+                // Check for common grammar mistakes
+                const rules = [
+                    { pattern: /\b(i|we|they|you|he|she|it) (is)\b/i, fix: 'are', issue: 'subject-verb agreement' },
+                    { pattern: /\b(he|she|it) (are)\b/i, fix: 'is', issue: 'subject-verb agreement' },
+                    { pattern: /\bhave went\b/i, fix: 'have gone', issue: 'incorrect past participle' },
+                    { pattern: /\btheir is\b/i, fix: 'there is', issue: 'homophones' },
+                    { pattern: /\btheir are\b/i, fix: 'there are', issue: 'homophones' },
+                    { pattern: /\byour welcome\b/i, fix: "you're welcome", issue: 'contraction' },
+                    { pattern: /\bits yours\b/i, fix: "it's yours", issue: 'contraction' },
+                    { pattern: /\bit's color\b/i, fix: "its color", issue: 'possessive pronoun' },
+                    { pattern: /\balot\b/i, fix: "a lot", issue: 'compound word' },
+                    { pattern: /\bcould of\b/i, fix: "could have", issue: 'verb phrase' },
+                    { pattern: /\bshould of\b/i, fix: "should have", issue: 'verb phrase' },
+                    { pattern: /\bwould of\b/i, fix: "would have", issue: 'verb phrase' },
+                    { pattern: /\bmust of\b/i, fix: "must have", issue: 'verb phrase' },
+                    { pattern: /\bi seen\b/i, fix: "I saw", issue: 'past tense' },
+                    { pattern: /\bless people\b/i, fix: "fewer people", issue: 'countable nouns' },
+                    { pattern: /\bmore better\b/i, fix: "better", issue: 'comparative adjective' },
+                    { pattern: /\bmost easiest\b/i, fix: "easiest", issue: 'superlative adjective' }
+                ];
+
+                for (const rule of rules) {
+                    if (rule.pattern.test(text)) {
+                        grammarIssues.push({
+                            issue: rule.issue,
+                            fix: text.replace(rule.pattern, rule.fix)
+                        });
+                    }
+                }
+
+                // Check for double negatives
+                if (/\b(not|no|never|none|nobody|nowhere|neither)\b.*\b(not|no|never|none|nobody|nowhere|neither)\b/i.test(text)) {
+                    grammarIssues.push({
+                        issue: 'double negative',
+                        fix: 'Remove one of the negatives'
+                    });
+                }
+
+                // Check for missing apostrophes in common contractions
+                const contractions = [
+                    { pattern: /\bdont\b/i, fix: "don't" },
+                    { pattern: /\bcant\b/i, fix: "can't" },
+                    { pattern: /\bwont\b/i, fix: "won't" },
+                    { pattern: /\bhasnt\b/i, fix: "hasn't" },
+                    { pattern: /\bhavent\b/i, fix: "haven't" },
+                    { pattern: /\bwouldnt\b/i, fix: "wouldn't" },
+                    { pattern: /\bcouldnt\b/i, fix: "couldn't" },
+                    { pattern: /\bshouldnt\b/i, fix: "shouldn't" },
+                    { pattern: /\bwasnt\b/i, fix: "wasn't" },
+                    { pattern: /\bisnt\b/i, fix: "isn't" },
+                    { pattern: /\barent\b/i, fix: "aren't" },
+                    { pattern: /\bthats\b/i, fix: "that's" }
+                ];
+
+                for (const contraction of contractions) {
+                    if (contraction.pattern.test(text)) {
+                        grammarIssues.push({
+                            issue: 'missing apostrophe',
+                            fix: text.replace(contraction.pattern, contraction.fix)
+                        });
+                    }
+                }
+
+                if (grammarIssues.length > 0) {
+                    let response = `*📝 Grammar Check Results*\n\n`;
+                    response += `*Original text:*\n${text}\n\n`;
+                    response += `*Issues Found:* ${grammarIssues.length}\n\n`;
+                    
+                    grammarIssues.forEach((issue, index) => {
+                        response += `*${index + 1}. Issue:* ${issue.issue}\n`;
+                        response += `*Suggestion:* ${issue.fix}\n\n`;
+                    });
+
+                    await sock.sendMessage(remoteJid, { text: response });
+                } else {
+                    await sock.sendMessage(remoteJid, {
+                        text: `*✅ Grammar Check*\n\nNo common grammatical issues found in your text. Note that this is a simple check and may not catch all errors.`
+                    });
+                }
+            } catch (error) {
+                await sock.sendMessage(remoteJid, {
+                    text: `*❌ Grammar check failed*\nAn error occurred while checking your text.`
+                });
+                logger.error(`Grammar check error: ${error.message}`);
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error checking grammar');
+        }
+    },
+    
     // Language Learning Commands
     async vocabulary(sock, message, args) {
         try {
@@ -315,6 +473,123 @@ const commands = {
             }
         } catch (err) {
             await handleError(sock, message.key.remoteJid, err, 'Error looking up definition');
+        }
+    },
+    
+    async calculate(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const expression = args.join(' ');
+
+            if (!expression) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🧮 Usage:* .calculate [expression]\nExample: .calculate 5 * (3 + 2) / 4'
+                });
+                return;
+            }
+
+            try {
+                // Clean up the expression to prevent malicious code execution
+                const cleanExpression = expression.replace(/[^0-9+\-*/^().,%\s]/g, '');
+                
+                // Evaluate using mathjs which is safe against code execution
+                const result = mathjs.evaluate(cleanExpression);
+                
+                // Format different result types
+                let formattedResult;
+                if (typeof result === 'number') {
+                    // Format the number to avoid excessive decimal places
+                    formattedResult = result % 1 === 0 ? result.toString() : result.toFixed(6).replace(/\.?0+$/, '');
+                } else if (typeof result === 'object' && result !== null) {
+                    // Handle matrix results
+                    formattedResult = mathjs.format(result, { precision: 6 });
+                } else {
+                    formattedResult = result.toString();
+                }
+                
+                await sock.sendMessage(remoteJid, {
+                    text: `*🧮 Calculation Result:*\n\n*Expression:* ${cleanExpression}\n*Result:* ${formattedResult}`
+                });
+            } catch (error) {
+                await sock.sendMessage(remoteJid, {
+                    text: `*❌ Calculation Error:*\n\n${error.message}\n\nPlease check your expression and try again.`
+                });
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error performing calculation');
+        }
+    },
+
+    async wikipedia(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const query = args.join(' ');
+
+            if (!query) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*🔍 Usage:* .wikipedia [search term]\nExample: .wikipedia Albert Einstein'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '🔍 Searching Wikipedia...' });
+
+            try {
+                // Use the Wikipedia API to get search results
+                const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1`;
+                const searchResponse = await axios.get(searchUrl);
+                
+                if (!searchResponse.data.query.search.length) {
+                    await sock.sendMessage(remoteJid, {
+                        text: `*❌ No Wikipedia articles found for:* ${query}`
+                    });
+                    return;
+                }
+                
+                // Get the first search result
+                const firstResult = searchResponse.data.query.search[0];
+                const pageId = firstResult.pageid;
+                
+                // Get the content of the page
+                const contentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${pageId}&format=json&utf8=1`;
+                const contentResponse = await axios.get(contentUrl);
+                
+                const page = contentResponse.data.query.pages[pageId];
+                const extract = page.extract || 'No extract available.';
+                
+                // Truncate if too long
+                const maxLength = 1500;
+                let truncatedExtract = extract.length > maxLength 
+                    ? extract.substring(0, maxLength) + '...\n\n(Content truncated, visit Wikipedia for more)'
+                    : extract;
+                
+                // Get the URL for the article
+                const articleUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`;
+                
+                let response = `*📚 Wikipedia: ${page.title}*\n\n`;
+                response += truncatedExtract;
+                response += `\n\n*Read more:* ${articleUrl}`;
+                
+                await sock.sendMessage(remoteJid, { text: response });
+                
+                // If there are more search results, mention them
+                if (searchResponse.data.query.search.length > 1) {
+                    const otherResults = searchResponse.data.query.search.slice(1, 4)
+                        .map(result => result.title)
+                        .join('\n• ');
+                        
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📋 Other relevant articles:*\n\n• ${otherResults}\n\nTo view any of these, use .wikipedia followed by the article title.`
+                    });
+                }
+            } catch (error) {
+                await sock.sendMessage(remoteJid, {
+                    text: `*❌ Error searching Wikipedia:*\n\n${error.message}`
+                });
+                logger.error(`Wikipedia search error: ${error.message}`);
+            }
+        } catch (err) {
+            await handleError(sock, message.key.remoteJid, err, 'Error searching Wikipedia');
         }
     },
 

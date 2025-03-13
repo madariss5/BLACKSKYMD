@@ -14,7 +14,7 @@ const { messageHandler } = require('./src/handlers/messageHandler');
 // Configure options
 const SESSION_DIR = path.join(__dirname, 'auth_info');
 const BACKUP_DIR = path.join(__dirname, 'sessions');
-const PORT = parseInt(process.env.PORT || '5000', 10);
+const PORT = parseInt(process.env.BOT_PORT || '5001', 10); // Use a different port to avoid conflict with QR Server
 
 // Set up pino logger properly
 const logger = pino({
