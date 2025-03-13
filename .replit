@@ -17,11 +17,7 @@ args = "Check Commands"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "WhatsApp Bot"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "QR Web Display"
+args = "Unified WhatsApp Bot"
 
 [[workflows.workflow]]
 name = "Check Commands"
@@ -38,7 +34,7 @@ task = "shell.exec"
 args = "node check-commands.js"
 
 [[workflows.workflow]]
-name = "WhatsApp Bot"
+name = "Unified WhatsApp Bot"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -49,21 +45,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node bot-handler.js"
-
-[[workflows.workflow]]
-name = "QR Web Display"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node qr-web-display.js"
+args = "node connected-bot.js"
 waitForPort = 5000
 
 [deployment]
