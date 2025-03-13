@@ -21,24 +21,16 @@ const commands = new Map();
 try {
     Object.entries(commandModules).forEach(([name, func]) => {
         if (typeof func === 'function' && name !== 'init') {
-            commands.set(name, async (sock, message) => {
-                try {
-                    // Extract args from message
-                    const content = message.message.conversation || 
-                                  message.message.extendedTextMessage?.text || '';
-                    
-                    // Parse arguments
-                    const args = content.slice(1).trim().split(' ').slice(1);
-                    
-                    // Call the command with proper arguments
-                    await func(sock, message, args);
-                } catch (err) {
-                    console.error(`Error executing command ${name}:`, err);
-                }
-            });
+            // Direct mapping of command functions
+            // Our messageHandler will handle argument extraction
+            commands.set(name, func);
         }
     });
     console.log(`Successfully mapped ${commands.size} commands`);
+    
+    // Print out some of the mapped commands for debugging
+    const sampleCommands = Array.from(commands.keys()).slice(0, 10);
+    console.log(`Sample commands: ${sampleCommands.join(', ')}`);
 } catch (loadErr) {
     console.error('Error processing command modules:', loadErr);
 }
@@ -140,24 +132,73 @@ async function messageHandler(sock, message) {
         
         console.log('Ultra minimal handler received message:', content);
         
-        if (!content || !content.startsWith('!')) return;
+        if (!content) return;
         
-        console.log('Processing command:', content);
-        
-        // Extract command
-        const command = content.slice(1).trim().split(' ')[0].toLowerCase();
-        
-        console.log('Extracted command:', command, 'Available commands:', Array.from(commands.keys()));
-        
-        // Run command if it exists
-        if (commands.has(command)) {
-            console.log('Executing command:', command);
-            await commands.get(command)(sock, message);
+        // Check for command prefix (! or .)
+        if (content.startsWith('!') || content.startsWith('.')) {
+            console.log('Processing command:', content);
+            
+            // Extract command (remove the prefix)
+            const prefix = content.charAt(0);
+            const command = content.slice(1).trim().split(' ')[0].toLowerCase();
+            const args = content.slice(prefix.length + command.length + 1).trim().split(' ');
+            
+            console.log('Extracted command:', command);
+            
+            // Send "typing..." indicator to improve user experience
+            try {
+                await sock.sendPresenceUpdate('composing', message.key.remoteJid);
+                setTimeout(async () => {
+                    try {
+                        await sock.sendPresenceUpdate('paused', message.key.remoteJid);
+                    } catch (err) {
+                        // Ignore errors from presence updates
+                    }
+                }, 2000);
+            } catch (e) {
+                // Ignore errors from presence updates
+            }
+            
+            // Run command if it exists
+            if (commands.has(command)) {
+                console.log('Executing command:', command);
+                try {
+                    await commands.get(command)(sock, message, args);
+                    console.log(`Command ${command} executed successfully`);
+                } catch (cmdErr) {
+                    console.error(`Error executing command ${command}:`, cmdErr);
+                    // Try to send error message to user
+                    try {
+                        await sock.sendMessage(message.key.remoteJid, { 
+                            text: `❌ Error executing command: ${cmdErr.message || 'Unknown error'}`
+                        });
+                    } catch (sendErr) {
+                        console.error('Failed to send error message:', sendErr);
+                    }
+                }
+            } else {
+                console.log('Command not found:', command);
+                // Let user know command was not found
+                try {
+                    await sock.sendMessage(message.key.remoteJid, { 
+                        text: `⚠️ Command *!${command}* not found. Try *!help* to see available commands.`
+                    });
+                } catch (notFoundErr) {
+                    console.error('Failed to send command not found message:', notFoundErr);
+                }
+            }
         } else {
-            console.log('Command not found:', command);
+            // Not a command, could implement other message handling here
         }
     } catch (err) {
         console.error('Error in ultra minimal handler:', err);
+        try {
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: '❌ An error occurred while processing your message. Please try again.'
+            });
+        } catch (sendErr) {
+            console.error('Failed to send error message:', sendErr);
+        }
     }
 }
 

@@ -212,9 +212,28 @@ async function connectToWhatsApp() {
                                     setTimeout(() => {
                                         try {
                                             handler.messageHandler(sock, message)
-                                                .catch(err => console.error('Async message handler error:', err));
+                                                .then(() => console.log('Message handled successfully'))
+                                                .catch(err => {
+                                                    console.error('Async message handler error:', err);
+                                                    // Try to notify the user about the error
+                                                    try {
+                                                        sock.sendMessage(message.key.remoteJid, { 
+                                                            text: '❌ Something went wrong processing your request. Please try again.'
+                                                        }).catch(() => {});
+                                                    } catch (_) {
+                                                        // Ignore nested errors
+                                                    }
+                                                });
                                         } catch (syncErr) {
                                             console.error('Sync message handler error:', syncErr);
+                                            // Try to notify the user about the error
+                                            try {
+                                                sock.sendMessage(message.key.remoteJid, { 
+                                                    text: '❌ Something went wrong processing your request. Please try again.'
+                                                }).catch(() => {});
+                                            } catch (_) {
+                                                // Ignore nested errors
+                                            }
                                         }
                                     }, 0);
                                 }
