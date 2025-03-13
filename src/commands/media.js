@@ -898,7 +898,7 @@ const mediaCommands = {
                 return;
             }
 
-            const sigma = parseFloat(args[0]);
+            const sigma = parseFloat(args[0]) || 5;
             if (isNaN(sigma) || sigma < 0.3 || sigma > 20) {
                 await sock.sendMessage(remoteJid, { text: '*❌ Error:* Blur sigma must be between 0.3 and 20' });
                 return;
@@ -1091,14 +1091,20 @@ const mediaCommands = {
     async grayscale(sock, message) {
         try {
             const remoteJid = message.key.remoteJid;
+
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to an image with .grayscale' 
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* Reply to an image with .grayscale'
                 });
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Converting to grayscale...' });
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Converting image to grayscale...' });
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1112,14 +1118,264 @@ const mediaCommands = {
 
             await sock.sendMessage(remoteJid, {
                 image: { url: outputPath },
-                caption: '✅ Image converted to grayscale'
+                caption: '✅ Image converted to grayscale!'
             });
 
             await fsPromises.unlink(outputPath);
 
         } catch (err) {
             logger.error('Error in grayscale command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to convert to grayscale' });
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '*❌ Error:* Failed to convert image to grayscale'
+            });
+        }
+    },
+
+    async rotate(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+
+            if (!message.message?.imageMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .rotate [degrees]\nExample: .rotate 90'
+                });
+                return;
+            }
+
+            const degrees = parseInt(args[0]) || 90;
+            if (![90, 180, 270].includes(degrees)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Error:* Rotation degrees must be 90, 180, or 270'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Rotating image...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fsPromises.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .rotate(degrees)
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: `✅ Image rotated ${degrees}°!`
+            });
+
+            await fsPromises.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in rotate command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '*❌ Error:* Failed to rotate image'
+            });
+        }
+    },
+
+    async flip(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+
+            if (!message.message?.imageMessage || !args[0]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .flip [horizontal|vertical]'
+                });
+                return;
+            }
+
+            const direction = args[0].toLowerCase();
+            if (!['horizontal', 'vertical'].includes(direction)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Error:* Direction must be "horizontal" or "vertical"'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Flipping image...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fsPromises.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .flip(direction === 'vertical')
+                .flop(direction === 'horizontal')
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: `✅ Image flipped ${direction}ly!`
+            });
+
+            await fsPromises.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in flip command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '*❌ Error:* Failed to flip image'
+            });
+        }
+    },
+
+    async negate(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+
+            if (!message.message?.imageMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* Reply to an image with .negate'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Inverting image colors...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fsPromises.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .negate()
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: '✅ Image colors inverted!'
+            });
+
+            await fsPromises.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in negate command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '*❌ Error:* Failed to invert image colors'
+            });
+        }
+    },
+
+    async blur(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+
+            if (!message.message?.imageMessage) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .blur [sigma]\nExample: .blur 5'
+                });
+                return;
+            }
+
+            const sigma = parseFloat(args[0]) || 5;
+            if (sigma < 0.3 || sigma > 20) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Error:* Blur sigma must be between 0.3 and 20'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Applying blur effect...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fsPromises.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .blur(sigma)
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: `✅ Image blurred with sigma ${sigma}!`
+            });
+
+            await fsPromises.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in blur command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '*❌ Error:* Failed to blur image'
+            });
+        }
+    },
+
+    async tint(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            // Check if media commands are enabled for this group
+            if (!(await areMediaCommandsEnabled(sock, remoteJid))) {
+                return;
+            }
+
+            if (!message.message?.imageMessage || args.length !== 3) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📝 Usage:* .tint [red] [green] [blue]\nExample: .tint 255 0 0'
+                });
+                return;
+            }
+
+            const [r, g, b] = args.map(Number);
+            if ([r, g, b].some(v => isNaN(v) || v < 0 || v > 255)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*❌ Error:* Color values must be between 0 and 255'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Applying color tint...' });
+
+            const buffer = await downloadMediaMessage(message, 'buffer', {});
+            const tempDir = path.join(__dirname, '../../temp');
+            await fsPromises.mkdir(tempDir, { recursive: true });
+
+            const outputPath = path.join(tempDir, `${Date.now()}.png`);
+
+            await sharp(buffer)
+                .tint({ r, g, b })
+                .toFile(outputPath);
+
+            await sock.sendMessage(remoteJid, {
+                image: { url: outputPath },
+                caption: `✅ Image tinted with RGB(${r}, ${g}, ${b})!`
+            });
+
+            await fsPromises.unlink(outputPath);
+
+        } catch (err) {
+            logger.error('Error in tint command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '*❌ Error:* Failed to tint image'
+            });
         }
     }
 

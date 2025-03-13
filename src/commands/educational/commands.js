@@ -658,22 +658,251 @@ const commands = {
     async interactiveQuiz(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            // Add your interactive quiz logic here.  This is a placeholder.
-            await sock.sendMessage(remoteJid, { text: 'This interactive quiz feature is under development.' });
+            const [subject = '', difficulty = 'medium'] = args;
+
+            if (!subject) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*📚 Interactive Quiz*\n\nAvailable subjects:\n• Math\n• Science\n• Language\n• History\n\nUsage: .interactiveQuiz [subject] [easy|medium|hard]'
+                });
+                return;
+            }
+
+            const questions = {
+                math: {
+                    easy: [
+                        {
+                            question: "What is 15 + 7?",
+                            options: ["21", "22", "23", "24"],
+                            correct: 1,
+                            explanation: "15 + 7 = 22"
+                        },
+                        {
+                            question: "What is 8 × 4?",
+                            options: ["28", "30", "32", "34"],
+                            correct: 2,
+                            explanation: "8 × 4 = 32"
+                        }
+                    ],
+                    medium: [
+                        {
+                            question: "Solve: 3x + 5 = 20",
+                            options: ["x = 3", "x = 5", "x = 7", "x = 8"],
+                            correct: 1,
+                            explanation: "3x + 5 = 20\n3x = 15\nx = 5"
+                        }
+                    ],
+                    hard: [
+                        {
+                            question: "Find the derivative of x² + 3x",
+                            options: ["2x + 3", "x + 3", "2x", "x² + 3"],
+                            correct: 0,
+                            explanation: "The derivative of x² is 2x, and the derivative of 3x is 3"
+                        }
+                    ]
+                },
+                science: {
+                    easy: [
+                        {
+                            question: "What is the chemical symbol for water?",
+                            options: ["H2O", "CO2", "O2", "N2"],
+                            correct: 0,
+                            explanation: "Water's chemical formula is H2O (two hydrogen atoms and one oxygen atom)"
+                        }
+                    ],
+                    medium: [
+                        {
+                            question: "Which planet is known as the Red Planet?",
+                            options: ["Venus", "Mars", "Jupiter", "Saturn"],
+                            correct: 1,
+                            explanation: "Mars appears red due to iron oxide (rust) on its surface"
+                        }
+                    ],
+                    hard: [
+                        {
+                            question: "What is the speed of light in meters per second?",
+                            options: ["299,792,458", "300,000,000", "199,792,458", "250,000,000"],
+                            correct: 0,
+                            explanation: "Light travels at exactly 299,792,458 meters per second in a vacuum"
+                        }
+                    ]
+                }
+            };
+
+            if (!questions[subject.toLowerCase()]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ Invalid subject. Available subjects: Math, Science'
+                });
+                return;
+            }
+
+            if (!['easy', 'medium', 'hard'].includes(difficulty.toLowerCase())) {
+                difficulty = 'medium';
+            }
+
+            const subjectQuestions = questions[subject.toLowerCase()][difficulty.toLowerCase()];
+            if (!subjectQuestions || subjectQuestions.length === 0) {
+                await sock.sendMessage(remoteJid, {
+                    text: `❌ No questions available for ${subject} (${difficulty})`
+                });
+                return;
+            }
+
+            const randomQuestion = subjectQuestions[Math.floor(Math.random() * subjectQuestions.length)];
+
+            // Store the question and answer for later verification
+            if (!global.quizzes) global.quizzes = new Map();
+            global.quizzes.set(remoteJid, {
+                question: randomQuestion,
+                timestamp: Date.now(),
+                attempts: 0
+            });
+
+            let quizMessage = `*📚 ${subject} Quiz (${difficulty})*\n\n`;
+            quizMessage += `*Question:*\n${randomQuestion.question}\n\n`;
+            quizMessage += `*Options:*\n${randomQuestion.options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}\n\n`;
+            quizMessage += 'Reply with .answer [number] to submit your answer!';
+
+            await sock.sendMessage(remoteJid, { text: quizMessage });
         } catch (err) {
-            await handleError(sock, message.key.remoteJid, err, 'Error with interactive quiz');
+            logger.error('Error in interactive quiz:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error creating quiz. Please try again.'
+            });
+        }
+    },
+
+    async answer(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const answer = parseInt(args[0]);
+
+            if (!global.quizzes || !global.quizzes.has(remoteJid)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ No active quiz found. Use .interactiveQuiz to start a new quiz!'
+                });
+                return;
+            }
+
+            const quiz = global.quizzes.get(remoteJid);
+
+            // Check if quiz has expired (5 minutes)
+            if (Date.now() - quiz.timestamp > 5 * 60 * 1000) {
+                global.quizzes.delete(remoteJid);
+                await sock.sendMessage(remoteJid, {
+                    text: '⏰ Quiz has expired. Use .interactiveQuiz to start a new one!'
+                });
+                return;
+            }
+
+            if (isNaN(answer) || answer < 1 || answer > quiz.question.options.length) {
+                await sock.sendMessage(remoteJid, {
+                    text: `❌ Invalid answer. Please choose a number between 1 and ${quiz.question.options.length}`
+                });
+                return;
+            }
+
+            quiz.attempts++;
+
+            if (answer - 1 === quiz.question.correct) {
+                let response = `✅ Correct answer!\n\n`;
+                response += `*Explanation:*\n${quiz.question.explanation}\n\n`;
+                response += `You got it in ${quiz.attempts} attempt${quiz.attempts > 1 ? 's' : ''}!`;
+
+                await sock.sendMessage(remoteJid, { text: response });
+                global.quizzes.delete(remoteJid);
+            } else {
+                const attemptsLeft = 3 - quiz.attempts;
+                if (attemptsLeft > 0) {
+                    await sock.sendMessage(remoteJid, {
+                        text: `❌ Wrong answer. You have ${attemptsLeft} attempt${attemptsLeft > 1 ? 's' : ''} left!`
+                    });
+                } else {
+                    let response = `❌ Wrong answer. The correct answer was: ${quiz.question.options[quiz.question.correct]}\n\n`;
+                    response += `*Explanation:*\n${quiz.question.explanation}`;
+
+                    await sock.sendMessage(remoteJid, { text: response });
+                    global.quizzes.delete(remoteJid);
+                }
+            }
+        } catch (err) {
+            logger.error('Error in quiz answer:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error processing answer. Please try again.'
+            });
         }
     },
 
     async chemReaction(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            // Add your chemical reaction balancing logic here. This is a placeholder.
-            await sock.sendMessage(remoteJid, { text: 'This chemical reaction balancer is under development.' });
+            const reaction = args.join(' ');
+
+            if (!reaction) {
+                await sock.sendMessage(remoteJid, {
+                    text: `*⚗️ Chemical Reaction Balancer*
+Usage: .chemReaction [reaction]
+Example: .chemReaction H2 + O2 -> H2O
+
+*Supported Formats:*
+• Use + between reactants
+• Use -> or = for products
+• Use numbers for coefficients
+• Use subscripts as numbers (H2O)`
+                });
+                return;
+            }
+
+            // Parse reaction components
+            const [reactants, products] = reaction.split(/->|=/);
+            if (!reactants || !products) {
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ Invalid reaction format. Use -> or = between reactants and products.'
+                });
+                return;
+            }
+
+            // Split reactants and products
+            const reactantList = reactants.split('+').map(r => r.trim());
+            const productList = products.split('+').map(p => p.trim());
+
+            // Simple balancing for common reactions
+            const commonReactions = {
+                'H2 O2': {
+                    balanced: '2H2 + O2 -> 2H2O',
+                    explanation: 'This is the formation of water. We need 2 hydrogen molecules and 1 oxygen molecule to form 2 water molecules.'
+                },
+                'CH4 O2': {
+                    balanced: 'CH4 + 2O2 -> CO2 + 2H2O',
+                    explanation: 'This is the combustion of methane. Carbon and hydrogen are oxidized to form carbon dioxide and water.'
+                },
+                'Na Cl2': {
+                    balanced: '2Na + Cl2 -> 2NaCl',
+                    explanation: 'This is the formation of table salt. Two sodium atoms react with one chlorine molecule.'
+                }
+            };
+
+            // Simplified matching
+            const key = reactantList.map(r => r.replace(/[0-9]/g, '')).join(' ');
+            const matchedReaction = commonReactions[key];
+
+            if (matchedReaction) {
+                await sock.sendMessage(remoteJid, {
+                    text: `*⚗️ Balanced Reaction:*\n${matchedReaction.balanced}\n\n*Explanation:*\n${matchedReaction.explanation}`
+                });
+            } else {
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ Sorry, I can only balance common reactions at the moment. Try H2 + O2, CH4 + O2, or Na + Cl2'
+                });
+            }
+
         } catch (err) {
-            await handleError(sock, message.key.remoteJid, err, 'Error with chemical reaction');
+            logger.error('Error in chemical reaction:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error balancing reaction. Please check your input.'
+            });
         }
     },
+
     async quiz(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
@@ -1051,7 +1280,348 @@ const commands = {
         } catch (err) {
             await handleError(sock, message.key.remoteJid, err, 'Error explaining math problem');
         }
+    },
+    async flashcards(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [action = '', subject = '', ...content] = args;
+
+            if (!action || !['create', 'review', 'list'].includes(action)) {
+                await sock.sendMessage(remoteJid, {
+                    text: `*📚 Flashcards*\n\nUsage:\n.flashcards create [subject] [front::back]\n.flashcards review [subject]\n.flashcards list [subject]`
+                });
+                return;
+            }
+
+            const flashcardsPath = path.join(__dirname, '../../../data/educational/flashcards.json');
+            await ensureDirectory(path.dirname(flashcardsPath));
+
+            let flashcards = await safeFileOperation(async () => {
+                if (fs.existsSync(flashcardsPath)) {
+                    const data = await fsPromises.readFile(flashcardsPath, 'utf8');
+                    return JSON.parse(data);
+                }
+                return {};
+            }, {});
+
+            switch (action) {
+                case 'create':
+                    if (!subject || content.length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '❌ Please provide subject and content (front::back)'
+                        });
+                        return;
+                    }
+
+                    const [front, back] = content.join(' ').split('::').map(s => s.trim());
+                    if (!front || !back) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '❌ Invalid format. Use front::back'
+                        });
+                        return;
+                    }
+
+                    flashcards[subject] = flashcards[subject] || [];
+                    flashcards[subject].push({
+                        front,
+                        back,
+                        created: new Date().toISOString(),
+                        reviews: 0
+                    });
+
+                    await fsPromises.writeFile(flashcardsPath, JSON.stringify(flashcards, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: '✅ Flashcard created successfully'
+                    });
+                    break;
+
+                case 'review':
+                    if (!subject || !flashcards[subject] || flashcards[subject].length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '❌ No flashcards found for this subject'
+                        });
+                        return;
+                    }
+
+                    const card = flashcards[subject][Math.floor(Math.random() * flashcards[subject].length)];
+                    card.reviews++;
+
+                    await fsPromises.writeFile(flashcardsPath, JSON.stringify(flashcards, null, 2));
+                    await sock.sendMessage(remoteJid, {
+                        text: `*📝 Flashcard Review*\n\n*Front:*\n${card.front}\n\n_Send .reveal to see the answer_`
+                    });
+
+                    // Store current card for reveal command
+                    if (!global.flashcardReviews) global.flashcardReviews = new Map();
+                    global.flashcardReviews.set(remoteJid, {
+                        card,
+                        timestamp: Date.now()
+                    });
+                    break;
+
+                case 'list':
+                    if (!subject && Object.keys(flashcards).length === 0) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '❌ No flashcards found'
+                        });
+                        return;
+                    }
+
+                    if (!subject) {
+                        const subjects = Object.keys(flashcards);
+                        let response = '*📚 Available Subjects:*\n\n';
+                        subjects.forEach(s => {
+                            response += `• ${s} (${flashcards[s].length} cards)\n`;
+                        });
+                        await sock.sendMessage(remoteJid, { text: response });
+                        return;
+                    }
+
+                    if (!flashcards[subject]) {
+                        await sock.sendMessage(remoteJid, {
+                            text: '❌ No flashcards found for this subject'
+                        });
+                        return;
+                    }
+
+                    let response = `*📚 Flashcards for ${subject}:*\n\n`;
+                    flashcards[subject].forEach((card, i) => {
+                        response += `${i + 1}. ${card.front}\n`;
+                    });
+                    await sock.sendMessage(remoteJid, { text: response });
+                    break;
+            }
+        } catch (err) {
+            logger.error('Error in flashcards command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error managing flashcards'
+            });
+        }
+    },
+
+    async reveal(sock, message) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!global.flashcardReviews || !global.flashcardReviews.has(remoteJid)) {
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ No active flashcard review. Use .flashcards review [subject] to start'
+                });
+                return;
+            }
+
+            const review = global.flashcardReviews.get(remoteJid);
+            if (Date.now() - review.timestamp > 5 * 60 * 1000) {
+                global.flashcardReviews.delete(remoteJid);
+                await sock.sendMessage(remoteJid, {
+                    text: '⏰ Review expired. Start a new review with .flashcards review'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, {
+                text: `*📝 Answer:*\n${review.card.back}\n\n_Use .flashcards review to get another card_`
+            });
+            global.flashcardReviews.delete(remoteJid);
+
+        } catch (err) {
+            logger.error('Error in reveal command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error revealing answer'
+            });
+        }
+    },
+
+    async studytimer(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [minutes = '25'] = args;
+            const duration = parseInt(minutes);
+
+            if (isNaN(duration) || duration < 1 || duration > 120) {
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ Please provide a valid duration (1-120 minutes)\n\nUsage: .studytimer [minutes]'
+                });
+                return;
+            }
+
+            if (!global.studyTimers) global.studyTimers = new Map();
+
+            // Clear existing timer
+            if (global.studyTimers.has(remoteJid)) {
+                clearTimeout(global.studyTimers.get(remoteJid).timer);
+            }
+
+            await sock.sendMessage(remoteJid, {
+                text: `⏰ Starting ${duration} minute study session`
+            });
+
+            const timer = setTimeout(async () => {
+                await sock.sendMessage(remoteJid, {
+                    text: `✅ Study session complete!\n\nTime to take a break.`
+                });
+                global.studyTimers.delete(remoteJid);
+            }, duration * 60 * 1000);
+
+            global.studyTimers.set(remoteJid, {
+                timer,
+                startTime: Date.now(),
+                duration: duration * 60 * 1000
+            });
+
+        } catch (err) {
+            logger.error('Error in studytimer command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error starting study timer'
+            });
+        }
+    },
+
+    async periodic(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const element = args.join(' ').trim();
+
+            if (!element) {
+                await sock.sendMessage(remoteJid, {
+                    text: '*⚛️ Periodic Table*\n\nUsage: .periodic [element]\nExample: .periodic Hydrogen'
+                });
+                return;
+            }
+
+            const elements = {
+                'hydrogen': {
+                    symbol: 'H',
+                    number: 1,
+                    mass: 1.008,
+                    category: 'Nonmetal',
+                    properties: 'Lightest and most abundant element in the universe'
+                },
+                'helium': {
+                    symbol: 'He',
+                    number: 2,
+                    mass: 4.003,
+                    category: 'Noble Gas',
+                    properties: 'Unreactive, used in balloons and cooling'
+                },
+                'carbon': {
+                    symbol: 'C',
+                    number: 6,
+                    mass: 12.011,
+                    category: 'Nonmetal',
+                    properties: 'Basis for organic chemistry and life'
+                },
+                'oxygen': {
+                    symbol: 'O',
+                    number: 8,
+                    mass: 15.999,
+                    category: 'Nonmetal',
+                    properties: 'Essential for respiration'
+                },
+                'sodium': {
+                    symbol: 'Na',
+                    number: 11,
+                    mass: 22.990,
+                    category: 'Alkali Metal',
+                    properties: 'Highly reactive metal, important in biology'
+                }
+            };
+
+            const elementData = elements[element.toLowerCase()];
+            if (!elementData) {
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ Element not found in database.\n\nAvailable elements: ' + Object.keys(elements).join(', ')
+                });
+                return;
+            }
+
+            const response = `*⚛️ ${element.toUpperCase()}*
+Symbol: ${elementData.symbol}
+Atomic Number: ${elementData.number}
+Atomic Mass: ${elementData.mass}
+Category: ${elementData.category}
+Properties: ${elementData.properties}`;
+
+            await sock.sendMessage(remoteJid, { text: response });
+
+        } catch (err) {
+            logger.error('Error in periodic command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error fetching element data'
+            });
+        }
+    },
+
+    async history(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+            const [period = '', ...event] = args;
+            const eventQuery = event.join(' ');
+
+            if (!period) {
+                await sock.sendMessage(remoteJid, {
+                    text: `*📜 Historical Events*
+
+Usage: .history [period] [event]
+Example: .history ancient egypt
+
+Available periods:
+• ancient
+• medieval
+• modern
+• contemporary`
+                });
+                return;
+            }
+
+            const historicalEvents = {
+                'ancient': {
+                    'egypt': 'Ancient Egypt (3100 BCE - 30 BCE)\n\nFamous for pyramids, hieroglyphs, and pharaohs. The civilization developed along the Nile River.',
+                    'rome': 'Ancient Rome (753 BCE - 476 CE)\n\nStarted as a small town, became one of the largest empires in history. Known for its architecture, law, and military.',
+                    'greece': 'Ancient Greece (800 BCE - 146 BCE)\n\nBirthplace of democracy, philosophy, and the Olympic Games. Major influence on modern civilization.'
+                },
+                'medieval': {
+                    'crusades': 'The Crusades (1095 - 1291)\n\nSeries of religious wars between Christians and Muslims for control of holy sites in Jerusalem.',
+                    'plague': 'The Black Death (1347 - 1351)\n\nDeadly pandemic that killed 30-60% of Europe\'s population. Changed the social structure of medieval society.'
+                },
+                'modern': {
+                    'revolution': 'Industrial Revolution (1760 - 1840)\n\nTransition to new manufacturing processes. Changed economic and social systems forever.',
+                    'wwii': 'World War II (1939 - 1945)\n\nLargest conflict in human history. Involved most of the world\'s nations.'
+                }
+            };
+
+            if (!historicalEvents[period.toLowerCase()]) {
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ Invalid period. Available periods: ancient, medieval, modern'
+                });
+                return;
+            }
+
+            if (!eventQuery) {
+                const events = Object.keys(historicalEvents[period.toLowerCase()]);
+                await sock.sendMessage(remoteJid, {
+                    text: `*📜 Available ${period} Events:*\n\n${events.join('\n')}`
+                });
+                return;
+            }
+
+            const event = historicalEvents[period.toLowerCase()][eventQuery.toLowerCase()];
+            if (!event) {
+                await sock.sendMessage(remoteJid, {
+                    text: '❌ Event not found for this period'
+                });
+                return;
+            }
+
+            await sock.sendMessage(remoteJid, { text: `*📜 Historical Event*\n\n${event}` });
+
+        } catch (err) {
+            logger.error('Error in history command:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error fetching historical data'
+            });
+        }
     }
 };
 
-module.exports = commands;
+module.exports = { commands };

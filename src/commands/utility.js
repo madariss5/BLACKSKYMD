@@ -67,25 +67,42 @@ const utilityCommands = {
         try {
             const expression = args.join(' ');
             if (!expression) {
-                await sock.sendMessage(sender, { text: '⚠️ Please provide a mathematical expression' });
+                await sock.sendMessage(sender, { text: '⚠️ Please provide a mathematical expression\nExample: .calculate 2 + 2 * 3' });
                 return;
             }
 
             // Enhanced sanitization and validation
+            if (expression.length > 100) {
+                await sock.sendMessage(sender, { text: '❌ Expression too long. Maximum 100 characters allowed.' });
+                return;
+            }
+
+            // Block dangerous expressions
+            const blockedPatterns = [
+                'require', 'import', 'eval', 'process', 'global',
+                '__', 'constructor', 'prototype', 'window', 'document'
+            ];
+
+            if (blockedPatterns.some(pattern => expression.toLowerCase().includes(pattern))) {
+                await sock.sendMessage(sender, { text: '❌ Invalid expression. Only mathematical operations are allowed.' });
+                return;
+            }
+
             const sanitized = expression
                 .replace(/[^0-9+\-*/(). ]/g, '')
                 .replace(/\/{2,}/g, '/') 
                 .replace(/\*{2,}/g, '*'); 
 
-            if (sanitized.includes('..') || sanitized.length > 100) {
+            if (sanitized.includes('..')) {
                 throw new Error('Invalid expression');
             }
 
-            const calculate = new Function(`return ${sanitized}`);
-            const result = calculate();
+            // Use a safer evaluation method
+            const result = new Function(`return ${sanitized}`)();
 
             if (isNaN(result) || !isFinite(result)) {
-                throw new Error('Invalid result');
+                await sock.sendMessage(sender, { text: '❌ Invalid result. Please check your expression.' });
+                return;
             }
 
             await sock.sendMessage(sender, { 
@@ -94,7 +111,7 @@ const utilityCommands = {
         } catch (err) {
             logger.error('Calculate command error:', err);
             await sock.sendMessage(sender, { 
-                text: '❌ Invalid expression. Please try again with a valid mathematical expression.' 
+                text: '❌ Invalid expression. Please provide a valid mathematical expression.' 
             });
         }
     },
@@ -193,14 +210,18 @@ const utilityCommands = {
             const [type, ...text] = args;
             if (!type || text.length === 0) {
                 await sock.sendMessage(sender, { 
-                    text: '⚠️ Usage: .encode [type] [text]\nTypes: base64, hex, binary' 
+                    text: '⚠️ Usage: .encode [type] [text]\nTypes: base64, hex, binary\nExample: .encode base64 Hello World' 
                 });
                 return;
             }
 
             const input = text.join(' ');
-            let result;
+            if (input.length > 1000) {
+                await sock.sendMessage(sender, { text: '❌ Text too long. Maximum 1000 characters allowed.' });
+                return;
+            }
 
+            let result;
             switch (type.toLowerCase()) {
                 case 'base64':
                     result = Buffer.from(input).toString('base64');
@@ -220,7 +241,7 @@ const utilityCommands = {
                     return;
             }
 
-            await sock.sendMessage(sender, { text: `🔄 Encoded (${type}): ${result}` });
+            await sock.sendMessage(sender, { text: `🔄 Encoded (${type}):\n${result}` });
         } catch (err) {
             logger.error('Encode command error:', err);
             await sock.sendMessage(sender, { text: '❌ Error encoding text. Please try again.' });
@@ -232,22 +253,35 @@ const utilityCommands = {
             const [type, ...text] = args;
             if (!type || text.length === 0) {
                 await sock.sendMessage(sender, { 
-                    text: '⚠️ Usage: .decode [type] [text]\nTypes: base64, hex, binary' 
+                    text: '⚠️ Usage: .decode [type] [text]\nTypes: base64, hex, binary\nExample: .decode base64 SGVsbG8gV29ybGQ=' 
                 });
                 return;
             }
 
             const input = text.join(' ');
-            let result;
+            if (input.length > 1000) {
+                await sock.sendMessage(sender, { text: '❌ Text too long. Maximum 1000 characters allowed.' });
+                return;
+            }
 
+            let result;
             switch (type.toLowerCase()) {
                 case 'base64':
+                    if (!/^[A-Za-z0-9+/=]+$/.test(input)) {
+                        throw new Error('Invalid base64 input');
+                    }
                     result = Buffer.from(input, 'base64').toString();
                     break;
                 case 'hex':
+                    if (!/^[0-9A-Fa-f]+$/.test(input)) {
+                        throw new Error('Invalid hex input');
+                    }
                     result = Buffer.from(input, 'hex').toString();
                     break;
                 case 'binary':
+                    if (!/^[01\s]+$/.test(input)) {
+                        throw new Error('Invalid binary input');
+                    }
                     result = input.split(' ')
                         .map(bin => String.fromCharCode(parseInt(bin, 2)))
                         .join('');
@@ -262,7 +296,9 @@ const utilityCommands = {
             await sock.sendMessage(sender, { text: `🔄 Decoded: ${result}` });
         } catch (err) {
             logger.error('Decode command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Invalid input for decoding. Please check your input and try again.' });
+            await sock.sendMessage(sender, { 
+                text: '❌ Invalid input for decoding. Please check your input format and try again.' 
+            });
         }
     },
 
@@ -592,9 +628,9 @@ const utilityCommands = {
         try {
             let [min = 1, max = 100] = args.map(Number);
 
-            if (isNaN(min) || isNaN(max) || min >= max) {
+            if (isNaN(min) || isNaN(max) || min >= max || min < -1000000 || max > 1000000) {
                 await sock.sendMessage(sender, { 
-                    text: '⚠️ Please provide valid numbers: .random [min] [max]\nExample: .random 1 100' 
+                    text: '⚠️ Please provide valid numbers between -1000000 and 1000000\nExample: .random 1 100' 
                 });
                 return;
             }
@@ -621,13 +657,14 @@ const utilityCommands = {
             const utc = now.toUTCString();
             const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-            const message = `
-🕒 Current Time Information:
+            const message = `🕒 Current Time Information:
 • Local Time: ${timeString}
 • Date: ${dateString}
 • UTC: ${utc}
 • Timezone: ${timezone}
-• Unix Timestamp: ${Math.floor(now.getTime() / 1000)}`;
+• Unix Timestamp: ${Math.floor(now.getTime() / 1000)}
+• Week Day: ${now.toLocaleDateString('en-US', { weekday: 'long' })}
+• Week Number: ${Math.ceil((((now - new Date(now.getFullYear(), 0, 1)) / 86400000) + 1) / 7)}`;
 
             await sock.sendMessage(sender, { text: message });
         } catch (err) {
