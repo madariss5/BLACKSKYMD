@@ -79,7 +79,6 @@ const config = {
             missingVars
         };
     },
-
     // Other settings
     settings: {
         autoRead: true,

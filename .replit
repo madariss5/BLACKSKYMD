@@ -69,7 +69,6 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node bot-handler.js"
-waitForPort = 5001
 
 [[workflows.workflow]]
 name = "QR Server"
