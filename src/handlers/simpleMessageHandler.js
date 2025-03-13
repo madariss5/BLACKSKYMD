@@ -33,6 +33,32 @@ commands.set('help', async (sock, message) => {
     }
 });
 
+// Add menu1 command
+commands.set('menu1', async (sock, message) => {
+    try {
+        const sender = message.key.remoteJid;
+        const menuText = `*🤖 Bot Menu*\n
+🔰 *Main Commands*
+├ !ping - Check bot response
+├ !help - Show all commands
+├ !menu1 - Show this menu
+└ !status - Check bot status
+
+📝 *Usage*
+Just type any command starting with "!"
+Example: !ping
+
+⚡ *Status*: Active
+🔄 *Response*: Fast Mode`;
+
+        await sock.sendMessage(sender, {
+            text: menuText
+        });
+    } catch (err) {
+        logger.error('Error in menu1 command:', err);
+    }
+});
+
 /**
  * Process incoming messages
  */
