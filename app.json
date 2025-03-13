@@ -77,11 +77,5 @@
       "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
     }
   ],
-  "stack": "heroku-22",
-  "formation": {
-    "web": {
-      "quantity": 1,
-      "size": "eco"
-    }
-  }
+  "stack": "heroku-20"
 }
