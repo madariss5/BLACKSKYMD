@@ -1,3 +1,4 @@
+const path = require('node:path');
 const express = require('express');
 const { startConnection } = require('./connection');
 const { messageHandler } = require('./handlers/messageHandler');
@@ -8,16 +9,18 @@ const config = require('./config/config');
 const fs = require('node:fs');
 const { DisconnectReason } = require('@whiskeysockets/baileys');
 
-// Global connection lock
+// Global state management
 let isConnecting = false;
 let connectionTimeout = null;
+let reconnectTimer = null;
+let sessionInvalidated = false;
 
-// Add reconnection manager
+// Enhanced reconnection manager
 const reconnectManager = {
     attempts: 0,
     maxAttempts: 5,
-    baseDelay: 10000, // Increased significantly
-    maxDelay: 300000, // 5 minutes max delay
+    baseDelay: 10000,
+    maxDelay: 300000,
     isReconnecting: false,
     connectionLock: false,
 
@@ -30,7 +33,6 @@ const reconnectManager = {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         logger.info(`Handling disconnect with status code: ${statusCode}`);
 
-        // Set connection lock
         this.connectionLock = true;
         this.isReconnecting = true;
 
@@ -39,18 +41,25 @@ const reconnectManager = {
             if (statusCode === DisconnectReason.loggedOut || 
                 statusCode === DisconnectReason.connectionReplaced ||
                 statusCode === DisconnectReason.connectionClosed ||
-                statusCode === DisconnectReason.timedOut) {
+                statusCode === DisconnectReason.timedOut ||
+                statusCode === DisconnectReason.connectionLost) {
 
                 logger.info('Critical connection error, clearing session...');
                 await this.clearSession();
 
-                // Force process restart
-                logger.info('Session cleared, restarting process...');
+                // Force restart on critical errors
                 process.exit(1);
                 return false;
             }
 
-            // Implement exponential backoff with increased delays
+            // Handle stream conflicts (440)
+            if (statusCode === 440) {
+                logger.info('Stream conflict detected, clearing session and restarting...');
+                await this.clearSession();
+                process.exit(1);
+                return false;
+            }
+
             if (this.attempts >= this.maxAttempts) {
                 logger.error('Max reconnection attempts reached, clearing session and restarting...');
                 await this.clearSession();
@@ -72,7 +81,6 @@ const reconnectManager = {
         } catch (err) {
             logger.error('Error during reconnection:', err);
             return false;
-
         } finally {
             this.isReconnecting = false;
             this.connectionLock = false;
@@ -99,18 +107,18 @@ const reconnectManager = {
                 }
             }
 
-            // Also clear the auth_info directory if it exists
-            const authDir = './auth_info';
-            if (fs.existsSync(authDir)) {
-                try {
-                    fs.rmdirSync(authDir, { recursive: true });
-                    logger.info('Cleared auth_info directory');
-                } catch (err) {
-                    logger.error('Error clearing auth_info directory:', err);
+            // Also clear the auth_info directory
+            const authDirs = ['auth_info', 'auth_info_baileys', 'auth_info_multi'];
+            for (const dir of authDirs) {
+                const dirPath = path.join(process.cwd(), dir);
+                if (fs.existsSync(dirPath)) {
+                    await fs.promises.rm(dirPath, { recursive: true, force: true });
+                    logger.info(`Cleared directory: ${dirPath}`);
                 }
             }
 
-            logger.info('All session files cleared successfully');
+            sessionInvalidated = true;
+            logger.info('Session cleanup completed');
         } catch (err) {
             logger.error('Error in clearSession:', err);
         }
@@ -120,6 +128,11 @@ const reconnectManager = {
         this.attempts = 0;
         this.isReconnecting = false;
         this.connectionLock = false;
+        sessionInvalidated = false;
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
         if (connectionTimeout) {
             clearTimeout(connectionTimeout);
             connectionTimeout = null;
@@ -127,6 +140,35 @@ const reconnectManager = {
         logger.info('Reset reconnection manager state');
     }
 };
+
+// Start WhatsApp connection with improved error handling
+async function startWhatsAppConnection() {
+    if (isConnecting) {
+        logger.info('Connection attempt already in progress, skipping...');
+        return;
+    }
+
+    isConnecting = true;
+    try {
+        const sock = await startConnection();
+
+        // Set connection timeout
+        if (connectionTimeout) {
+            clearTimeout(connectionTimeout);
+        }
+        connectionTimeout = setTimeout(() => {
+            logger.error('Connection timeout reached, restarting...');
+            process.exit(1);
+        }, 300000); // 5 minutes timeout
+
+        return sock;
+    } catch (err) {
+        logger.error('Fatal error establishing WhatsApp connection:', err);
+        throw err;
+    } finally {
+        isConnecting = false;
+    }
+}
 
 async function startServer(sock) {
     const app = express();
@@ -229,35 +271,12 @@ async function main() {
         server = await startServer(null);
         logger.info('API server started on port 5000');
 
-        // Start WhatsApp connection with timeout protection
-        const startWhatsAppConnection = async () => {
-            if (isConnecting) {
-                logger.info('Connection attempt already in progress, skipping...');
-                return;
-            }
-
-            isConnecting = true;
-            try {
-                sock = await startConnection();
-
-                // Set connection timeout
-                if (connectionTimeout) {
-                    clearTimeout(connectionTimeout);
-                }
-                connectionTimeout = setTimeout(() => {
-                    logger.error('Connection timeout reached, restarting...');
-                    process.exit(1);
-                }, 300000); // 5 minutes timeout
-
-            } catch (err) {
-                logger.error('Fatal error establishing WhatsApp connection:', err);
-                throw err;
-            } finally {
-                isConnecting = false;
-            }
-        };
-
-        await startWhatsAppConnection();
+        try {
+            sock = await startWhatsAppConnection();
+        } catch (err) {
+            logger.error('Initial connection failed:', err);
+            process.exit(1);
+        }
 
         // Handle connection updates with improved error handling
         sock.ev.on('connection.update', async (update) => {
@@ -274,7 +293,7 @@ async function main() {
                 if (shouldReconnect) {
                     try {
                         logger.info('Attempting to establish new connection...');
-                        await startWhatsAppConnection();
+                        sock = await startWhatsAppConnection();
                     } catch (err) {
                         logger.error('Failed to establish new connection:', err);
                     }
@@ -283,7 +302,7 @@ async function main() {
                 logger.info('Connection established successfully');
                 reconnectManager.reset();
 
-                // Initialize command handlers
+                // Initialize command handlers with error protection
                 const originalLevel = logger.level;
                 logger.level = 'silent';
 
