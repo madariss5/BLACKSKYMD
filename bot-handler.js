@@ -1,341 +1,175 @@
-// Load environment variables first
-require('dotenv').config();
-
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const express = require('express');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
-const pino = require('pino');
+const qrcode = require('qrcode');
 
-// Configure logging first
+// Configure logging
 const logger = pino({
-    level: process.env.LOG_LEVEL || 'info',
+    level: 'info',
     transport: {
         target: 'pino-pretty',
-        options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname'
-        }
+        options: { colorize: true }
     }
 });
-
-// Load message handlers with proper error handling
-let messageHandler;
-let commandHandler;
-
-try {
-    logger.info('Loading message and command handlers...');
-
-    // Load command handler first since message handler depends on it
-    commandHandler = require('./src/handlers/commandHandler');
-    if (!commandHandler || !commandHandler.processCommand) {
-        throw new Error('Command handler failed to load properly');
-    }
-    logger.info('Command handler loaded successfully');
-
-    // Load the simpler message handler to avoid dependency issues
-    try {
-        logger.info('Loading simple message handler...');
-        const simpleHandler = require('./src/handlers/simpleMessageHandler');
-        messageHandler = simpleHandler.messageHandler;
-
-        if (!messageHandler) {
-            throw new Error('Simple message handler failed to load properly');
-        }
-
-        logger.info('Simple message handler loaded successfully with basic commands');
-    } catch (simpleHandlerErr) {
-        logger.error('Failed to load simple message handler:', simpleHandlerErr);
-
-        // Fallback to original handler if simple one fails
-        logger.warn('Attempting to load original message handler as fallback...');
-        const messageHandlerModule = require('./src/handlers/messageHandler');
-        messageHandler = messageHandlerModule.messageHandler;
-
-        if (!messageHandler) {
-            throw new Error('All message handlers failed to load properly');
-        }
-
-        logger.info('Original message handler loaded as fallback');
-    }
-
-} catch (err) {
-    logger.error('Failed to load handlers:', err);
-    process.exit(1);
-}
-
-// Configure options based on environment variables
-const AUTH_DIR = process.env.AUTH_DIR || 'auth_info_qr';
-const SESSION_DIR = path.join(__dirname, AUTH_DIR);
-const PORT = parseInt(process.env.PORT || '5000', 10);
 
 // Initialize express app
 const app = express();
 app.use(express.json());
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.status(200).json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        port: PORT,
-        commandsLoaded: commandHandler.commands.size
-    });
-});
-
-// Root endpoint for web interface
-app.get('/', (req, res) => {
-    res.send(`
-        <html>
-            <head>
-                <title>WhatsApp Bot Status</title>
-            </head>
-            <body>
-                <h1>WhatsApp Bot Status</h1>
-                <p>Status: Active</p>
-                <p>Port: ${PORT}</p>
-                <p>Commands Loaded: ${commandHandler.commands.size}</p>
-            </body>
-        </html>
-    `);
-});
-
-// Configure retry settings
-const RETRY_CONFIG = {
-    maxRetries: 5,
-    baseDelay: 10000, // 10 seconds
-    maxDelay: 60000,  // 1 minute
-    connectionTimeout: 30000 // 30 seconds
-};
+app.use(express.static('public'));
+const PORT = process.env.PORT || 5000;
+const SESSION_DIR = './auth_info_qr';
 
 // Connection state tracking
-let connectionState = {
-    state: 'disconnected',
+const connectionState = {
+    sock: null,
+    isConnected: false,
+    isConnecting: false,
     qrCode: null,
-    connected: false,
-    lastError: null,
-    reconnectCount: 0,
-    reconnectTimer: null,
-    isReconnecting: false
+    lastQrCode: null,
+    retryCount: 0
 };
 
-/**
- * Calculate exponential backoff delay
- */
-function getRetryDelay(attempt) {
-    const delay = Math.min(
-        RETRY_CONFIG.maxDelay,
-        RETRY_CONFIG.baseDelay * Math.pow(2, attempt)
-    );
-    // Add some randomness to prevent thundering herd
-    return delay + (Math.random() * 1000);
-}
+// Retry configuration
+const RETRY_CONFIG = {
+    maxRetries: 5,
+    baseDelay: 10000,
+    maxDelay: 60000
+};
 
-/**
- * Helper function to check broadcast JIDs
- */
-function isJidBroadcast(jid) {
-    return jid?.endsWith('@broadcast');
-}
-
-// Message handler setup with improved error checking
-async function setupMessageEventHandler(sock, handlerFunction) {
-    try {
-        // Validate handler function
-        if (typeof handlerFunction !== 'function') {
-            throw new Error('Invalid message handler: not a function');
-        }
-
-        // Create a wrapper function to process messages
-        const messageProcessor = async ({ messages, type }) => {
-            if (type === 'notify' && Array.isArray(messages)) {
-                for (const message of messages) {
-                    // Skip if message is invalid or from self
-                    if (!message || !message.key || message.key.fromMe) continue;
-
-                    // Call the handler with error catching
-                    try {
-                        await handlerFunction(sock, message);
-                    } catch (err) {
-                        logger.error('Message handling error:', err);
-                    }
-                }
-            }
-        };
-
-        // Safely remove existing handlers
+// Clean up existing connection
+async function cleanupConnection() {
+    if (connectionState.sock) {
         try {
-            sock.ev.off('messages.upsert');
+            connectionState.sock.ev.removeAllListeners();
+            if (typeof connectionState.sock.end === 'function') {
+                await connectionState.sock.end();
+            }
+            connectionState.sock = null;
         } catch (err) {
-            logger.warn('Error removing existing handlers:', err);
+            logger.warn('Error during connection cleanup:', err);
         }
-
-        // Set up new handler
-        sock.ev.on('messages.upsert', messageProcessor);
-        logger.info('Message handler setup completed successfully');
-        return true;
-    } catch (err) {
-        logger.error('Error setting up message event handler:', err);
-        return false;
     }
+    connectionState.isConnected = false;
+    connectionState.isConnecting = false;
 }
 
-/**
- * Safe reconnection handler
- */
-async function handleReconnection(retryCount = 0) {
-    // Prevent multiple reconnection attempts
-    if (connectionState.isReconnecting) {
-        logger.warn('Reconnection already in progress, skipping...');
+// Initialize WhatsApp connection
+async function connectToWhatsApp() {
+    if (connectionState.isConnecting) {
+        logger.warn('Connection attempt already in progress');
         return;
     }
 
     try {
-        connectionState.isReconnecting = true;
-        connectionState.state = 'connecting';
-        logger.info(`Attempting reconnection (attempt ${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
+        connectionState.isConnecting = true;
+        logger.info('Starting WhatsApp connection...');
 
-        // Clear any existing timer
-        if (connectionState.reconnectTimer) {
-            clearTimeout(connectionState.reconnectTimer);
-            connectionState.reconnectTimer = null;
+        // Ensure session directory exists
+        if (!fs.existsSync(SESSION_DIR)) {
+            fs.mkdirSync(SESSION_DIR, { recursive: true });
         }
 
-        // Initialize WhatsApp connection
-        const sock = await connectToWhatsApp(retryCount);
-
-        if (!sock) {
-            throw new Error('Failed to create socket connection');
-        }
-
-        return sock;
-    } catch (error) {
-        logger.error('Reconnection attempt failed:', error);
-
-        // Schedule next retry if within limits
-        if (retryCount < RETRY_CONFIG.maxRetries) {
-            const delay = getRetryDelay(retryCount);
-            logger.info(`Scheduling next reconnection attempt in ${delay/1000} seconds...`);
-
-            connectionState.reconnectTimer = setTimeout(() => {
-                handleReconnection(retryCount + 1);
-            }, delay);
-        } else {
-            logger.error('Maximum reconnection attempts reached');
-            connectionState.state = 'failed';
-        }
-    } finally {
-        connectionState.isReconnecting = false;
-    }
-}
-
-// Initialize WhatsApp connection with retry logic
-async function connectToWhatsApp(retryCount = 0) {
-    try {
         // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
-        // Create WhatsApp socket connection with optimized settings
+        // Create WhatsApp socket
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
             logger: pino({ level: 'silent' }),
-            browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Chrome', '121.0.0'],
-            connectTimeoutMs: RETRY_CONFIG.connectionTimeout,
+            browser: ['BLACKSKY-MD', 'Chrome', '121.0.0'],
+            connectTimeoutMs: 30000,
             defaultQueryTimeoutMs: 20000,
-            markOnlineOnConnect: true,
             keepAliveIntervalMs: 15000,
             emitOwnEvents: false,
-            syncFullHistory: false,
-            patchMessageBeforeSending: false,
-            shouldIgnoreJid: jid => isJidBroadcast(jid)
+            syncFullHistory: false
         });
+
+        // Store socket reference
+        connectionState.sock = sock;
 
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
+            logger.info('Connection update:', { connection, hasQR: !!qr });
 
             if (qr) {
-                connectionState.state = 'qr_ready';
                 connectionState.qrCode = qr;
-                logger.info('New QR code generated');
+                connectionState.lastQrCode = Date.now();
+                logger.info('New QR code received');
             }
 
             if (connection === 'connecting') {
-                connectionState.state = 'connecting';
                 logger.info('Connecting to WhatsApp...');
+            }
+
+            if (connection === 'open') {
+                logger.info('🟢 Connected to WhatsApp!');
+                connectionState.isConnected = true;
+                connectionState.isConnecting = false;
+                connectionState.retryCount = 0;
+                connectionState.qrCode = null;
+
+                // Initialize message handler
+                try {
+                    const { messageHandler, init } = require('./src/handlers/simpleMessageHandler');
+                    await init();
+
+                    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                        if (type === 'notify') {
+                            for (const message of messages) {
+                                if (!message?.key?.fromMe) {
+                                    try {
+                                        await messageHandler(sock, message);
+                                    } catch (err) {
+                                        logger.error('Message handling error:', err);
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    logger.info('Message handler initialized');
+                } catch (err) {
+                    logger.error('Failed to initialize message handler:', err);
+                }
             }
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
-                                     retryCount < RETRY_CONFIG.maxRetries &&
-                                     !connectionState.isReconnecting;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
+                                     connectionState.retryCount < RETRY_CONFIG.maxRetries;
 
-                connectionState.state = 'disconnected';
-                connectionState.connected = false;
-                connectionState.lastError = lastDisconnect?.error;
+                connectionState.isConnected = false;
+                connectionState.isConnecting = false;
 
                 if (shouldReconnect) {
-                    handleReconnection(retryCount);
+                    const delay = Math.min(
+                        RETRY_CONFIG.maxDelay,
+                        RETRY_CONFIG.baseDelay * Math.pow(2, connectionState.retryCount)
+                    );
+
+                    connectionState.retryCount++;
+                    logger.info(`Reconnecting in ${delay/1000} seconds (attempt ${connectionState.retryCount})`);
+
+                    setTimeout(async () => {
+                        await cleanupConnection();
+                        connectToWhatsApp();
+                    }, delay);
                 } else {
                     logger.error('Connection closed permanently:', lastDisconnect?.error);
-                }
-            }
-
-            if (connection === 'open') {
-                logger.info('🟢 WhatsApp connection established!');
-                connectionState.state = 'connected';
-                connectionState.connected = true;
-                connectionState.reconnectCount = 0;
-                connectionState.lastError = null;
-
-                try {
-                    // Initialize handlers
-                    logger.info('Loading message handler...');
-                    const { messageHandler: simpleHandler, init } = require('./src/handlers/simpleMessageHandler');
-
-                    if (!simpleHandler || typeof simpleHandler !== 'function') {
-                        throw new Error('Invalid message handler loaded');
-                    }
-
-                    // Initialize the handler
-                    await init();
-                    logger.info('Message handler initialized');
-
-                    // Set up the message event handler
-                    if (await setupMessageEventHandler(sock, simpleHandler)) {
-                        logger.info('Message handler setup complete');
-                    } else {
-                        throw new Error('Failed to set up message handler');
-                    }
-                } catch (err) {
-                    logger.error('Handler initialization failed:', err);
-
-                    // Setup emergency handler
-                    const emergencyHandler = async (sock, message) => {
+                    if (statusCode === DisconnectReason.loggedOut) {
                         try {
-                            const content = message.message?.conversation ||
-                                         message.message?.extendedTextMessage?.text;
-
-                            if (content?.startsWith('!') && message.key?.remoteJid) {
-                                const sender = message.key.remoteJid;
-                                if (content.trim() === '!ping') {
-                                    await sock.sendMessage(sender, { 
-                                        text: '🏓 Pong! (Emergency Mode)' 
-                                    });
-                                }
-                            }
+                            fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+                            fs.mkdirSync(SESSION_DIR, { recursive: true });
+                            logger.info('Auth data cleared');
+                            connectToWhatsApp();
                         } catch (err) {
-                            logger.error('Emergency handler error:', err);
+                            logger.error('Error clearing auth data:', err);
                         }
-                    };
-
-                    // Set up emergency handler
-                    await setupMessageEventHandler(sock, emergencyHandler);
-                    logger.info('Emergency handler activated');
+                    }
                 }
             }
         });
@@ -344,30 +178,99 @@ async function connectToWhatsApp(retryCount = 0) {
         sock.ev.on('creds.update', saveCreds);
 
         return sock;
-    } catch (error) {
-        logger.error('Error in WhatsApp connection:', error);
-        throw error;
+    } catch (err) {
+        logger.error('Connection error:', err);
+        connectionState.isConnecting = false;
+        throw err;
     }
 }
 
-// Start the bot
-async function start() {
-    try {
-        logger.info('Starting 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻...');
+// Serve QR code page
+app.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>WhatsApp Bot Status</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+                #qrcode { margin: 20px auto; }
+                .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+                .connected { background: #d4edda; color: #155724; }
+                .disconnected { background: #f8d7da; color: #721c24; }
+                .connecting { background: #fff3cd; color: #856404; }
+            </style>
+        </head>
+        <body>
+            <h1>WhatsApp Bot Status</h1>
+            <div id="status"></div>
+            <div id="qrcode"></div>
+            <script>
+                function updateStatus() {
+                    fetch('/api/status')
+                        .then(res => res.json())
+                        .then(data => {
+                            const statusDiv = document.getElementById('status');
+                            const qrcodeDiv = document.getElementById('qrcode');
 
-        // Create required directories
-        if (!fs.existsSync(SESSION_DIR)) {
-            fs.mkdirSync(SESSION_DIR, { recursive: true });
+                            let statusClass = 'disconnected';
+                            if (data.connected) statusClass = 'connected';
+                            if (data.connecting) statusClass = 'connecting';
+
+                            statusDiv.className = 'status ' + statusClass;
+                            statusDiv.textContent = 'Status: ' + (data.connected ? 'Connected' : data.connecting ? 'Connecting...' : 'Disconnected');
+
+                            if (data.qrCode) {
+                                qrcodeDiv.innerHTML = '<img src="' + data.qrCode + '" alt="QR Code">';
+                            } else if (data.connected) {
+                                qrcodeDiv.innerHTML = '<p>Connected successfully!</p>';
+                            } else {
+                                qrcodeDiv.innerHTML = '<p>Waiting for QR code...</p>';
+                            }
+                        })
+                        .catch(console.error);
+                }
+
+                setInterval(updateStatus, 1000);
+                updateStatus();
+            </script>
+        </body>
+        </html>
+    `);
+});
+
+// Status API endpoint
+app.get('/api/status', async (req, res) => {
+    try {
+        const response = {
+            connected: connectionState.isConnected,
+            connecting: connectionState.isConnecting,
+            qrCode: null
+        };
+
+        if (connectionState.qrCode && !connectionState.isConnected) {
+            try {
+                response.qrCode = await qrcode.toDataURL(connectionState.qrCode);
+            } catch (err) {
+                logger.error('Error generating QR code:', err);
+            }
         }
 
-        // Start HTTP server
-        const server = app.listen(PORT, '0.0.0.0', () => {
-            logger.info(`Server started on port ${PORT}`);
+        res.json(response);
+    } catch (err) {
+        logger.error('Error in status API:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
-            // Initialize WhatsApp connection
-            connectToWhatsApp().catch(error => {
-                logger.error('Failed to initialize WhatsApp:', error);
-                process.exit(1);
+// Start server and bot
+async function start() {
+    try {
+        const server = app.listen(PORT, '0.0.0.0', () => {
+            logger.info(`Server running on port ${PORT}`);
+            connectToWhatsApp().catch(err => {
+                logger.error('Failed to start WhatsApp connection:', err);
             });
         });
 
@@ -375,41 +278,28 @@ async function start() {
             logger.error('Server error:', err);
             process.exit(1);
         });
-
-    } catch (error) {
-        logger.error('Failed to start application:', error);
+    } catch (err) {
+        logger.error('Failed to start application:', err);
         process.exit(1);
     }
 }
 
-// Handle uncaught errors
-process.on('uncaughtException', (err) => {
-    logger.error('Uncaught Exception - recovering if possible:', err);
-    console.error('Uncaught Exception occurred:', err);
+// Handle process termination
+process.on('SIGINT', async () => {
+    logger.info('Shutting down...');
+    await cleanupConnection();
+    process.exit(0);
+});
 
-    // Only exit for severe errors that we can't recover from
-    if (err.code === 'EADDRINUSE' ||
-        err.code === 'EACCES' ||
-        err.message.includes('Cannot find module')) {
-        process.exit(1);
-    }
-    // For other errors, try to continue
+process.on('uncaughtException', (err) => {
+    logger.error('Uncaught Exception:', err);
 });
 
 process.on('unhandledRejection', (err) => {
-    logger.error('Unhandled Rejection - bot will continue running:', err);
-    console.error('Unhandled Promise Rejection:', err);
-    // Don't exit process - log and continue
+    logger.error('Unhandled Rejection:', err);
 });
 
-// Start application
-start().catch((error) => {
-    logger.error('Fatal error during startup:', error);
-    process.exit(1);
-});
+// Start the application
+start();
 
-module.exports = {
-    connectToWhatsApp,
-    start,
-    isJidBroadcast
-};
+module.exports = { connectToWhatsApp, start };
