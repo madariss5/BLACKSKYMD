@@ -17,7 +17,7 @@
     "SESSION_ID": {
       "description": "Unique session ID for multi-device support",
       "required": true,
-      "generator": "secret"
+      "value": "enter your session id"
     },
     "BOT_PREFIX": {
       "description": "Command prefix for the bot (default: .)",
