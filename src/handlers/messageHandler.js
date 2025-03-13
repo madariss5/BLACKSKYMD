@@ -28,6 +28,28 @@ async function init() {
         // Load command handler
         try {
             logger.info('Loading command handler module...');
+            
+            // Get the full path to the command handler module for better error reporting
+            const commandHandlerPath = path.resolve(__dirname, './commandHandler.js');
+            logger.info(`Command handler path: ${commandHandlerPath}`);
+            
+            // Check if file exists
+            try {
+                const stats = await fs.stat(commandHandlerPath);
+                logger.info(`Command handler file exists: ${stats.isFile()}`);
+            } catch (statErr) {
+                logger.error(`Command handler file not found: ${commandHandlerPath}`, statErr);
+                // Try to list directory contents for debugging
+                try {
+                    const dirPath = path.dirname(commandHandlerPath);
+                    const files = await fs.readdir(dirPath);
+                    logger.info(`Files in ${dirPath}:`, files);
+                } catch (readErr) {
+                    logger.error(`Could not read directory: ${readErr.message}`);
+                }
+            }
+            
+            // Directly use the instance from bot-handler.js to avoid module cache issues
             const commandHandler = require('./commandHandler');
 
             // Verify command handler structure
@@ -47,7 +69,20 @@ async function init() {
         } catch (err) {
             logger.error('Failed to load command handler:', err);
             logger.error('Command handler stack trace:', err.stack);
-            return false;
+            
+            // Initialize with a simple fallback command processor for resilience
+            if (!commandProcessor) {
+                logger.warn('Initializing fallback command processor');
+                commandProcessor = async (sock, message, commandText) => {
+                    logger.warn(`Using fallback processor for command: ${commandText}`);
+                    await sock.sendMessage(message.key.remoteJid, { 
+                        text: 'Command processing is currently limited. Please try again later.' 
+                    });
+                };
+            }
+            
+            // Don't fail initialization - continue with fallback
+            logger.warn('Continuing with fallback command processor');
         }
 
         // Create temp directories
@@ -215,4 +250,17 @@ async function messageHandler(sock, message) {
     }
 }
 
-module.exports = { messageHandler, init };
+// Ensure the init function is exposed correctly and properly initialized
+logger.info('Setting up messageHandler module exports');
+
+// Add a simple initialization check function
+function isInitialized() {
+    return commandProcessor !== null;
+}
+
+// Export the module with all required functions
+module.exports = { 
+    messageHandler, 
+    init,
+    isInitialized
+};

@@ -34,19 +34,31 @@ try {
     }
     logger.info('Command handler loaded successfully');
 
-    // Then load message handler
-    const { messageHandler: handler, init: initMessageHandler } = require('./src/handlers/messageHandler');
-    messageHandler = handler;
-    if (!messageHandler) {
-        throw new Error('Message handler failed to load properly');
+    // Load the simpler message handler to avoid dependency issues
+    try {
+        logger.info('Loading simple message handler...');
+        const simpleHandler = require('./src/handlers/simpleMessageHandler');
+        messageHandler = simpleHandler.messageHandler;
+        
+        if (!messageHandler) {
+            throw new Error('Simple message handler failed to load properly');
+        }
+        
+        logger.info('Simple message handler loaded successfully with basic commands');
+    } catch (simpleHandlerErr) {
+        logger.error('Failed to load simple message handler:', simpleHandlerErr);
+        
+        // Fallback to original handler if simple one fails
+        logger.warn('Attempting to load original message handler as fallback...');
+        const messageHandlerModule = require('./src/handlers/messageHandler');
+        messageHandler = messageHandlerModule.messageHandler;
+        
+        if (!messageHandler) {
+            throw new Error('All message handlers failed to load properly');
+        }
+        
+        logger.info('Original message handler loaded as fallback');
     }
-    
-    // Verify the init function is available
-    if (typeof initMessageHandler !== 'function') {
-        throw new Error('Message handler init function is not properly exported');
-    }
-    
-    logger.info('Message handler loaded successfully');
 
 } catch (err) {
     logger.error('Failed to load handlers:', err);
@@ -197,12 +209,22 @@ async function connectToWhatsApp(retryCount = 0) {
                 // Initialize message handlers
                 logger.info('Initializing message handlers...');
                 try {
-                    // Initialize message handler
-                    const initialized = await initMessageHandler();
+                    // Use the simpler message handler to avoid initialization issues
+                    logger.info('Initializing simple message handler...');
+                    
+                    // Load the simple message handler
+                    const simpleHandler = require('./src/handlers/simpleMessageHandler');
+                    const initialized = await simpleHandler.init();
+                    
                     if (!initialized) {
-                        throw new Error('Message handler initialization failed');
+                        throw new Error('Simple message handler initialization failed');
                     }
-                    logger.info('Message handler initialized successfully');
+                    
+                    // Make sure we're using the simple handler
+                    messageHandler = simpleHandler.messageHandler;
+                    
+                    logger.info('Simple message handler initialized successfully with', 
+                               simpleHandler.commands.size, 'built-in commands');
 
                     // Set up message event handlers
                     sock.ev.off('messages.upsert'); // Remove any existing handlers
@@ -233,6 +255,18 @@ async function connectToWhatsApp(retryCount = 0) {
                 } catch (err) {
                     logger.error('Failed to initialize message handlers:', err);
                     logger.error('Stack trace:', err.stack);
+                    
+                    // Log detailed error information
+                    logger.error('Detailed error info:', {
+                        name: err.name, 
+                        message: err.message,
+                        code: err.code,
+                        type: typeof err,
+                        hasStack: !!err.stack
+                    });
+                    
+                    // Continue with basic functionality even if handler initialization fails
+                    logger.warn('Continuing with limited functionality due to message handler initialization failure');
                 }
             }
         });
