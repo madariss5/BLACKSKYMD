@@ -88,9 +88,12 @@ function validateMention(mention) {
         return true; // It's a valid phone number
     }
     
-    // If it includes @ but doesn't match the patterns above, it might be an invalid mention
-    if (mention.includes('@')) {
-        return false;
+    // If it's a message mention tag (potential formats)
+    if (mention.startsWith('@') || 
+        mention.match(/^[a-zA-Z0-9._-]+$/) ||  // Allow alphanumeric usernames
+        mention === 'everyone' || 
+        mention === 'all') {
+        return true;
     }
     
     // Default case: try to handle it as a potential mention
@@ -157,33 +160,50 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
         let targetName = null;
         
         if (target) {
-            // If it's just a number, format it as a WhatsApp JID
-            if (/^\d+$/.test(target)) {
-                targetJid = `${target}@s.whatsapp.net`;
-                targetName = target;
-            } else {
-                // Extract the name part from the JID
+            // Clean up the target - remove @ if present
+            if (target.startsWith('@')) {
+                targetName = target.substring(1);
+            } else if (target.includes('@')) {
+                // If it's a JID format
                 targetName = target.split('@')[0];
+            } else {
+                targetName = target;
+            }
+            
+            // If it's just a number, format it as a WhatsApp JID
+            if (/^\d+$/.test(targetName)) {
+                targetJid = `${targetName}@s.whatsapp.net`;
+            } else if (!target.includes('@')) {
+                // Try to normalize as a proper JID if not already
+                targetJid = `${targetName}@s.whatsapp.net`;
             }
         }
 
         let message;
         if (target) {
             if (!validateMention(target)) {
+                logger.warn(`Invalid mention format: "${target}"`);
                 await sock.sendMessage(chatJid, {
                     text: `❌ Please mention a valid user to ${type}`
                 });
                 return;
             }
-            message = `${senderName} ${type}s ${targetName} ${emoji}`;
+            
+            // Handle special cases for 'everyone' or 'all'
+            if (targetName === 'everyone' || targetName === 'all') {
+                message = `${senderName} ${type}s everyone ${emoji}`;
+            } else {
+                message = `${senderName} ${type}s ${targetName} ${emoji}`;
+            }
         } else {
             message = `${senderName} ${type}s ${emoji}`;
         }
 
         logger.debug(`Sending reaction message: ${message} to ${chatJid}`);
+        logger.debug(`Target info - Name: ${targetName}, JID: ${targetJid}`);
 
-        // Prepare mentions array only if we're in a group chat
-        const mentions = (isGroup && target) ? [targetJid] : undefined;
+        // Prepare mentions array only if we're in a group chat and we have a valid target
+        const mentions = (isGroup && targetJid && targetJid.includes('@')) ? [targetJid] : undefined;
 
         if (gifUrl) {
             await sock.sendMessage(chatJid, {
@@ -264,7 +284,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('cuddle');
         await sendReactionMessage(sock, sender, target, 'cuddle', gifUrl, '🤗');
     },
-    async poke(sock, sender, args) {
+    async poke(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👉 Please mention someone to poke' });
@@ -273,7 +295,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('poke');
         await sendReactionMessage(sock, sender, target, 'poke', gifUrl, '👉');
     },
-    async slap(sock, sender, args) {
+    async slap(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👋 Please mention someone to slap' });
@@ -282,7 +306,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('slap');
         await sendReactionMessage(sock, sender, target, 'slap', gifUrl, '👋');
     },
-    async tickle(sock, sender, args) {
+    async tickle(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🤗 Please mention someone to tickle' });
@@ -291,7 +317,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('tickle');
         await sendReactionMessage(sock, sender, target, 'tickle', gifUrl, '🤗');
     },
-    async boop(sock, sender, args) {
+    async boop(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👉 Please mention someone to boop' });
