@@ -112,17 +112,17 @@ const ownerCommands = {
     async setlanguage(sock, message, args) {
         const remoteJid = message.key.remoteJid;
         const lang = args[0]?.toLowerCase();
-        
+
         try {
             if (!lang) {
                 await sock.sendMessage(remoteJid, { text: '⚠️ Please specify language code (e.g., en, de)' });
                 return;
             }
-            
+
             // Get reference to language manager
             const { languageManager } = require('../utils/language');
             const config = require('../config/config');
-            
+
             // Check if language is supported
             if (!languageManager.isLanguageSupported(lang)) {
                 const availableLangs = languageManager.getAvailableLanguages().join(', ');
@@ -131,10 +131,10 @@ const ownerCommands = {
                 });
                 return;
             }
-            
+
             // Update language in config
             config.bot.language = lang;
-            
+
             // Use the appropriate translation to respond
             const response = languageManager.getText('system.language_changed', lang);
             await sock.sendMessage(remoteJid, { text: `✅ ${response}` });

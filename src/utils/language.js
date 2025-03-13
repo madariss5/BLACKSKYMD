@@ -7,21 +7,38 @@ class LanguageManager {
     constructor() {
         this.translations = new Map();
         this.defaultLanguage = 'en';
+        this.supportedLanguages = ['en', 'de']; // Explicitly define supported languages
+        logger.info(`Language Manager initialized with supported languages: ${this.supportedLanguages.join(', ')}`);
     }
 
     async loadTranslations() {
         try {
             const translationsDir = path.join(__dirname, '../translations');
+            logger.info(`Loading translations from directory: ${translationsDir}`);
             const files = await fs.readdir(translationsDir);
 
             for (const file of files) {
                 if (file.endsWith('.json')) {
                     const language = file.replace('.json', '');
-                    const content = await fs.readFile(path.join(translationsDir, file), 'utf8');
+                    const filePath = path.join(translationsDir, file);
+                    logger.info(`Loading translations file: ${filePath}`);
+                    const content = await fs.readFile(filePath, 'utf8');
                     this.translations.set(language, JSON.parse(content));
-                    logger.info(`Loaded translations for ${language}`);
+                    logger.info(`Successfully loaded translations for ${language}`);
                 }
             }
+
+            // Validate all required languages are loaded
+            for (const lang of this.supportedLanguages) {
+                if (!this.translations.has(lang)) {
+                    logger.error(`Required language '${lang}' translations not found`);
+                } else {
+                    logger.info(`Validated translations for ${lang}`);
+                }
+            }
+
+            // Log loaded languages
+            logger.info(`Available languages: ${Array.from(this.translations.keys()).join(', ')}`);
 
             // Ensure default language exists
             if (!this.translations.has(this.defaultLanguage)) {
@@ -37,30 +54,6 @@ class LanguageManager {
 
     getText(key, lang = null, ...args) {
         try {
-            // Check if the first argument is a JID (user identifier)
-            let userJid = null;
-            let userLang = null;
-            
-            // If lang looks like a JID, try to get user's preferred language
-            if (typeof lang === 'string' && lang.includes('@')) {
-                userJid = lang;
-                
-                // Try to get user's preferred language from user database
-                try {
-                    const { getUserProfile } = require('./userDatabase');
-                    const profile = getUserProfile(userJid);
-                    if (profile && profile.language) {
-                        userLang = profile.language;
-                        logger.debug(`Using user's preferred language: ${userLang} for ${userJid}`);
-                    }
-                } catch (e) {
-                    logger.debug(`Could not get user language profile: ${e.message}`);
-                }
-                
-                // Reset lang to null to continue with normal fallbacks
-                lang = userLang;
-            }
-            
             // Use provided language, fallback to config, then default
             const language = lang || config.bot.language || this.defaultLanguage;
 
@@ -108,11 +101,13 @@ class LanguageManager {
     }
 
     isLanguageSupported(language) {
-        return this.translations.has(language);
+        const isSupported = this.supportedLanguages.includes(language);
+        logger.debug(`Language support check: ${language} -> ${isSupported}`);
+        return isSupported;
     }
 
     getAvailableLanguages() {
-        return Array.from(this.translations.keys());
+        return this.supportedLanguages;
     }
 }
 

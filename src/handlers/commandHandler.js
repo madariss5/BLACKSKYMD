@@ -7,24 +7,59 @@ const cooldowns = new Map();
 
 // Helper function to normalize phone numbers for comparison
 function normalizePhoneNumber(number) {
+    if (!number) return '';
     // Remove any WhatsApp suffix and clean the number
-    const cleaned = number.replace('@s.whatsapp.net', '').replace(/[^0-9]/g, '');
-    logger.debug(`Normalized phone number: ${number} -> ${cleaned}`);
-    return cleaned;
+    return number.replace(/@s\.whatsapp\.net|@g\.us/g, '').replace(/[^0-9]/g, '').trim();
+}
+
+// Helper function to get actual sender ID
+function getActualSenderId(message) {
+    try {
+        // For group messages, use the participant field
+        if (message.key.participant) {
+            const sender = message.key.participant;
+            logger.debug('Group message sender:', sender);
+            return sender;
+        }
+
+        // For private messages, use the remoteJid
+        const sender = message.key.remoteJid;
+        logger.debug('Private message sender:', sender);
+        return sender;
+    } catch (error) {
+        logger.error('Error getting actual sender ID:', error);
+        return null;
+    }
 }
 
 async function processCommand(sock, message, commandText) {
     try {
-        // FAST PATH: Immediate processing of the command
-        const [commandName, ...args] = commandText.trim().split(' ');
+        // Get both prefixes
+        const prefix = config.bot.prefix || '!';
+        const altPrefix = '.'; // Allow both . and ! prefixes
+
+        // Clean and normalize the command text
+        const withoutPrefix = commandText.startsWith(prefix) ? 
+            commandText.slice(prefix.length) : 
+            (commandText.startsWith(altPrefix) ? commandText.slice(altPrefix.length) : commandText);
+
+        const [commandName, ...args] = withoutPrefix.trim().split(' ');
         const sender = message.key.remoteJid;
 
-        if (!commandName) return; // Skip empty commands immediately
+        if (!commandName) return; // Skip empty commands
+
+        logger.debug('Processing command:', {
+            original: commandText,
+            withoutPrefix,
+            commandName,
+            args,
+            sender
+        });
 
         // Skip full verification for speed - assume command loader is available
         if (!commandLoader?.commands) {
             await sock.sendMessage(sender, { 
-                text: '*⚡ Bot initializing...* Please try again in a moment.'
+                text: '*⏳ Bot initializing...* Please try again in a moment.'
             });
             return;
         }
@@ -33,9 +68,8 @@ async function processCommand(sock, message, commandText) {
         const command = await commandLoader.getCommand(commandName.toLowerCase());
 
         if (!command) {
-            // Fast "command not found" response
             await sock.sendMessage(sender, { 
-                text: `*❌ Unknown:* ${commandName}\nUse ${process.env.BOT_PREFIX || '.'}help to see commands.`
+                text: `*❌ Unknown command:* ${commandName}\nUse ${prefix}help to see available commands.`
             });
             return;
         }
@@ -53,64 +87,42 @@ async function processCommand(sock, message, commandText) {
 
         // Special handling for owner permissions
         if (permissions.includes('owner')) {
-            const senderNumber = normalizePhoneNumber(sender);
+            const actualSenderId = getActualSenderId(message);
+            if (!actualSenderId) {
+                logger.error('Could not determine sender ID for permission check');
+                await sock.sendMessage(sender, {
+                    text: '*❌ Error:* Could not verify permissions.'
+                });
+                return;
+            }
+
+            const senderNumber = normalizePhoneNumber(actualSenderId);
             const ownerNumber = normalizePhoneNumber(config.owner.number);
 
-            logger.debug('Permission check:', {
-                sender: senderNumber,
-                owner: ownerNumber,
-                match: senderNumber === ownerNumber,
-                originalSender: sender,
-                originalOwner: config.owner.number
+            logger.debug('Owner Permission Check:', {
+                rawSenderId: actualSenderId,
+                normalizedSender: senderNumber,
+                configOwnerNumber: config.owner.number,
+                normalizedOwner: ownerNumber,
+                matches: senderNumber === ownerNumber,
+                messageKey: message.key
             });
 
             if (senderNumber !== ownerNumber) {
                 logger.warn('Owner permission denied:', {
                     senderNumber,
                     ownerNumber,
-                    command: commandName
+                    command: commandName,
+                    actualSenderId
                 });
                 await sock.sendMessage(sender, {
-                    text: '*⛔ This command requires owner permissions.*'
+                    text: '*⛔ Owner permission required.*'
                 });
                 return;
             }
         }
 
-        // Regular permission check for non-owner commands
-        const hasPermission = await commandLoader.hasPermission(sender, permissions);
-        if (!hasPermission) {
-            await sock.sendMessage(sender, {
-                text: '*⛔ Permission denied.*'
-            });
-            return;
-        }
-
-        // Faster cooldown check with simpler logic
-        const { cooldown = 3 } = command.config || {};
-        const now = Date.now();
-        const timestamps = cooldowns.get(commandName);
-        const cooldownAmount = cooldown * 1000;
-
-        if (timestamps?.has(sender)) {
-            const expirationTime = timestamps.get(sender) + cooldownAmount;
-            if (now < expirationTime) {
-                const timeLeft = Math.ceil((expirationTime - now) / 1000);
-                await sock.sendMessage(sender, { 
-                    text: `*⏳ Cooldown:* Wait ${timeLeft}s.`
-                });
-                return;
-            }
-            timestamps.delete(sender);
-        }
-
-        // Set cooldown and execute immediately without confirmation
-        if (!timestamps) {
-            cooldowns.set(commandName, new Map());
-        }
-        cooldowns.get(commandName).set(sender, now);
-
-        // Direct execution without confirmation message
+        // Execute the command
         try {
             await command.execute(sock, message, args);
         } catch (execErr) {
@@ -124,17 +136,6 @@ async function processCommand(sock, message, commandText) {
             });
         }
 
-        // Remove cooldown after command execution
-        setTimeout(() => {
-            const timestamps = cooldowns.get(commandName);
-            if (timestamps) {
-                timestamps.delete(sender);
-                if (timestamps.size === 0) {
-                    cooldowns.delete(commandName);
-                }
-            }
-        }, cooldownAmount);
-
     } catch (err) {
         logger.error('Error processing command:', {
             error: err.message,
@@ -142,9 +143,8 @@ async function processCommand(sock, message, commandText) {
             command: commandText
         });
         try {
-            await sock.sendMessage(message.key.remoteJid, { 
-                text: '*❌ Error:* Failed to process command. Please try again.' 
-            });
+            const errorJid = sender.includes('@g.us') ? sender : sender;
+            await sock.sendMessage(errorJid, { text: '*❌ Error:* Command failed. Try again.' });
         } catch (sendErr) {
             logger.error('Failed to send error message:', sendErr);
         }

@@ -3,24 +3,18 @@ const config = {
     owner: {
         name: process.env.OWNER_NAME || 'Bot Owner',  
         // ============================================
-        // ENTER YOUR WHATSAPP NUMBER HERE
+        // Number format: Country code + number (no spaces/symbols)
+        // Example: 4915561048015
         // ============================================
-        // Format: Country code + number (no spaces/symbols)
-        // Example: For number +1 (234) 567-8900
-        //    - Country code: 1
-        //    - Number: 2345678900
-        //    - Enter as: 12345678900
-        // 
-        // ⚠️ REPLACE THE NUMBER BELOW WITH YOURS ⚠️
         number: process.env.OWNER_NUMBER ? 
-            `${process.env.OWNER_NUMBER.replace(/[^0-9]/g, '')}@s.whatsapp.net` : 
-            '4915561048015@s.whatsapp.net',
+            process.env.OWNER_NUMBER.replace(/[^0-9]/g, '') : 
+            '4915561048015',
         email: process.env.OWNER_EMAIL || '',
     },
 
     // Session Configuration
     session: {
-        id: process.env.SESSION_ID || 'whatsapp-bot', // Provide a default session ID
+        id: process.env.SESSION_ID || 'whatsapp-bot',
         authDir: './auth_info',
         backupDir: './sessions',
     },
@@ -29,7 +23,7 @@ const config = {
     bot: {
         name: process.env.BOT_NAME || '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻',
         version: process.env.BOT_VERSION || '1.0.0',
-        prefix: process.env.BOT_PREFIX || '.',
+        prefix: process.env.BOT_PREFIX || '!', // Changed default to ! to match owner commands
         language: process.env.BOT_LANGUAGE || 'en',
         debug: process.env.NODE_ENV !== 'production',
     },
@@ -59,7 +53,7 @@ const config = {
 
         // Check required variables
         if (!process.env.OWNER_NUMBER) {
-            console.warn('⚠️ OWNER_NUMBER not set in environment. Please set your WhatsApp number in the config.js file.');
+            console.warn('⚠️ OWNER_NUMBER not set in environment. Using default from config.js');
             console.warn('Format: Country code + number without any special characters');
             console.warn('Example: For +1 (234) 567-8900, set OWNER_NUMBER=12345678900');
         }
@@ -79,7 +73,6 @@ const config = {
             missingVars
         };
     },
-    // Other settings
     settings: {
         autoRead: true,
         autoTyping: true,
