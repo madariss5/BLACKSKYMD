@@ -3,48 +3,40 @@ node_modules/
 
 # Environment variables
 .env
-.env.*
-!.env.example
+
+# Auth data & sessions
+auth_info/
+auth_info_qr/
+sessions/
+creds.json
 
 # Logs
-*.log
 logs/
+*.log
 npm-debug.log*
 
-# WhatsApp session files
-auth_info/
-sessions/
-*.json.bak
-*.db
-baileys_store.json
-baileys_store_multi.json
-
-# Media files
-media/
+# Temporary files
 temp/
-uploads/
-downloads/
+tmp/
 
-# Editor files
-.vscode/
-.idea/
-*.sublime-*
-*.swp
-
-# OS files
+# OS specific files
 .DS_Store
 Thumbs.db
-*.tmp
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Dependencies
+package-lock.json
+yarn.lock
 
 # Build files
 dist/
 build/
-*.tsbuildinfo
+.build/
 
-# Coverage
-coverage/
-
-# API Keys and Secrets
-config.*.json
-auth.json
-credentials.json
+# Cache
+.cache/
