@@ -205,7 +205,8 @@ class CommandLoader {
                     lastUsed: info.lastUsed
                 }))
                 .sort((a, b) => b.usageCount - a.usageCount)
-                .slice(0, 10)
+                .slice(0, 10),
+            disabledCommands: Array.from(this.commands.values()).filter(cmd => !cmd.config.enabled).length
         };
     }
     async loadCommandConfigs() {
