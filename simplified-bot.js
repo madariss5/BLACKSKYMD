@@ -6,7 +6,6 @@
 // External modules
 const path = require('path');
 const handler = require(path.join(__dirname, 'src/handlers/ultra-minimal-handler'));
-const makeWASocket = require('@whiskeysockets/baileys').default;
 const { DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const fs = require('fs');
@@ -185,16 +184,21 @@ async function connectToWhatsApp() {
         // Get authentication state
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
-        // Create socket connection
+        // Create socket connection with enhanced configuration
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            keepAliveIntervalMs: 30000,
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 30000,
-            emitOwnEvents: false,
+            logger: console.log,
+            // More reliable connection settings
+            connectTimeoutMs: 30000,
+            keepAliveIntervalMs: 15000,
+            retryRequestDelayMs: 3000,
+            maxRetries: 5,
+            // Browser profile
             browser: ['BLACKSKY-MD', 'Chrome', '104.0.0.0'],
+            // Connection behavior
             markOnlineOnConnect: true,
+            emitOwnEvents: false,
             syncFullHistory: false
         });
 
@@ -204,153 +208,71 @@ async function connectToWhatsApp() {
         let connectionLock = false;
         let messageHandlerInitialized = false;
 
-        // Set up automatic reconnection after network errors
-        const reconnectAfterNetworkError = () => {
-            // Prevent multiple reconnection attempts
-            if (connectionLock) return;
-            connectionLock = true;
-            
-            // Incremental backoff for reconnection attempts
-            const delaySeconds = Math.min(30, Math.pow(2, reconnectAttempt));
-            reconnectAttempt++;
-            
-            console.log(`Reconnecting in ${delaySeconds} seconds (attempt ${reconnectAttempt})...`);
-            setTimeout(() => {
-                console.log('Attempting reconnection...');
-                connectionLock = false;
-                connectToWhatsApp();
-            }, delaySeconds * 1000);
-        };
-        
-
-        // Connection update handler
+        // Connection update handler with enhanced logging
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
+            console.log('Connection update:', update); // Log all updates
 
-            // Update bot status based on connection state
+            // Update bot status
             if (connection) {
-                botStats.status = connection; // connecting, open, close
-                console.log(`Connection status: ${connection}`);
+                botStats.status = connection;
+                console.log(`Connection status changed to: ${connection}`);
             }
-            
-            if (connection === 'close') {
-                console.log('Connection closed, analyzing reason...');
-                
-                let shouldReconnect = true;
-                let clearCredentials = false;
-                
-                if (lastDisconnect?.error instanceof Boom) {
-                    const statusCode = lastDisconnect.error.output.statusCode;
-                    const reason = lastDisconnect.error.output.payload.error;
-                    console.log(`Disconnected with status code ${statusCode} (${reason})`);
-                    
-                    // Handle specific error codes
-                    if (statusCode === 440 || statusCode === 401) {
-                        console.log('Session ended or invalid, clearing credentials...');
-                        clearCredentials = true;
-                    } else if (statusCode === 428) {
-                        console.log('Connection closed due to another connection opened');
-                    } else if (statusCode === 503) {
-                        console.log('Server error, waiting before reconnect');
-                    }
-                } else if (lastDisconnect?.error) {
-                    // Handle network errors
-                    if (lastDisconnect.error.message?.includes('network')) {
-                        console.log('Network error detected, will retry');
-                    }
-                }
-                
-                // Clear credentials if needed
-                if (clearCredentials) {
-                    try {
-                        const credsPath = path.join(SESSION_DIR, 'creds.json');
-                        if (fs.existsSync(credsPath)) {
-                            // Backup the creds file before deleting it
-                            const backupDir = path.join(SESSION_DIR, 'backup');
-                            if (!fs.existsSync(backupDir)) {
-                                fs.mkdirSync(backupDir, { recursive: true });
-                            }
-                            
-                            const timestamp = new Date().toISOString().replace(/:/g, '-');
-                            const backupPath = path.join(backupDir, `creds-${timestamp}.json`);
-                            fs.copyFileSync(credsPath, backupPath);
-                            console.log(`Backed up credentials to ${backupPath}`);
-                            
-                            // Now delete the original
-                            fs.unlinkSync(credsPath);
-                            console.log('Credentials cleared successfully');
-                        }
-                    } catch (err) {
-                        console.error('Error handling credentials:', err);
-                        botStats.errors++;
-                        botStats.lastError = err.message;
-                    }
-                }
-                
-                // Reconnect if needed
-                if (shouldReconnect) {
-                    reconnectAfterNetworkError();
-                }
-            } else if (connection === 'open') {
-                console.log('🟢 WhatsApp connection established!');
-                isConnected = true;
-                reconnectAttempt = 0;
-                
+
+            if (connection === 'open') {
+                console.log('🟢 Connected to WhatsApp');
 
                 try {
                     // Initialize message handler if not already initialized
                     if (!messageHandlerInitialized) {
                         await handler.init();
-                        console.log('Message handler initialized');
+                        console.log('✅ Message handler initialized');
                         messageHandlerInitialized = true;
                     }
 
-                    // Set up message processor
-                    const safeMessageProcessor = ({ messages, type }) => {
-                        if (type === 'notify' && Array.isArray(messages)) {
-                            messages.forEach(message => {
+                    // Clear any existing message handlers
+                    sock.ev.removeAllListeners('messages.upsert');
+
+                    // Register new message handler
+                    sock.ev.on('messages.upsert', async (m) => {
+                        console.log('Received message update:', m.type);
+                        if (m.type === 'notify') {
+                            for (const msg of m.messages) {
                                 try {
-                                    if (!message?.key?.fromMe) {
-                                        botStats.messagesReceived++;
-                                        const content = message.message?.conversation || 
-                                                      message.message?.extendedTextMessage?.text || 
-                                                      'Media message';
-
-                                        botStats.lastMessage = `${content.substring(0, 30)}${content.length > 30 ? '...' : ''} (from ${message.key.remoteJid})`;
-
-                                        // Process command
-                                        if (content && (content.startsWith('!') || content.startsWith('.'))) {
-                                            botStats.commandsProcessed++;
-                                            const command = content.slice(1).trim().split(' ')[0].toLowerCase();
-                                            botStats.lastCommand = `!${command} (from ${message.key.remoteJid})`;
-                                        }
-
-                                        // Handle message
-                                        handler.messageHandler(sock, message)
-                                            .catch(err => {
-                                                console.error('Message handler error:', err);
-                                                botStats.errors++;
-                                                botStats.lastError = err.message;
-                                            });
-                                    }
+                                    console.log('Processing message:', msg.key.id);
+                                    await handler.messageHandler(sock, msg);
                                 } catch (err) {
                                     console.error('Error processing message:', err);
                                     botStats.errors++;
                                     botStats.lastError = err.message;
                                 }
-                            });
+                            }
                         }
-                    };
+                    });
 
-                    // Register message handler
-                    sock.ev.off('messages.upsert'); // Remove any existing handlers
-                    sock.ev.on('messages.upsert', safeMessageProcessor);
-                    console.log('Message handler registered successfully');
+                    // Send test message to confirm handler is working
+                    try {
+                        const remoteJid = sock.user.id;
+                        await sock.sendMessage(remoteJid, { text: '🤖 Bot is online and ready!' });
+                        console.log('Test message sent successfully');
+                    } catch (err) {
+                        console.error('Failed to send test message:', err);
+                        botStats.errors++;
+                        botStats.lastError = err.message;
+                    }
 
                 } catch (err) {
                     console.error('Error in connection setup:', err);
                     botStats.errors++;
                     botStats.lastError = err.message;
+                }
+            } else if (connection === 'close') {
+                console.log('🔴 Connection closed');
+                // Handle reconnection
+                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                if (shouldReconnect) {
+                    console.log('Attempting to reconnect...');
+                    connectToWhatsApp();
                 }
             } else if (connection === 'connecting') {
                 console.log('Connecting to WhatsApp...');
