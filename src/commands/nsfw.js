@@ -68,7 +68,10 @@ const API_ENDPOINTS = {
     HMTAI: 'https://hmtai.hatsunia.cfd/v2',
     NEKOS: 'https://nekos.life/api/v2',
     ANIME_PICS: 'https://anime-api.hisoka17.repl.co',
-    ANIME_IMAGES: 'https://anime-api.xyz/api/v2'
+    ANIME_IMAGES: 'https://anime-api.xyz/api/v2',
+    // Fallback APIs in case main ones don't work
+    WAIFU_IM: 'https://api.waifu.im',
+    WAIFU_PICS: 'https://waifu.pics/api'
 };
 
 // Stored user verifications (in memory)
@@ -188,16 +191,44 @@ async function downloadMedia(url) {
 }
 
 /**
- * Fetch from an API with error handling
- * @param {string} url API URL
- * @returns {Promise<any>} API response or null
+ * Fetch from an API with error handling and fallbacks
+ * @param {string} url Primary API URL to attempt
+ * @param {Array<string>} fallbacks Optional fallback URLs to try if primary fails
+ * @returns {Promise<any>} API response object or null if all attempts fail
  */
-async function fetchApi(url) {
+async function fetchApi(url, fallbacks = []) {
+    // Try the primary URL first
     try {
-        const response = await axios.get(url);
+        const response = await axios.get(url, { 
+            timeout: 5000,  // 5 second timeout
+            headers: { 'User-Agent': 'WhatsApp-MD-Bot/1.0' }
+        });
         return response.data;
     } catch (err) {
-        logger.error(`API fetch error (${url}):`, err.message);
+        logger.warn(`Primary API fetch error (${url}):`, err.message);
+        
+        // If we have fallbacks, try them in sequence
+        if (fallbacks && fallbacks.length > 0) {
+            logger.info(`Attempting ${fallbacks.length} fallback APIs`);
+            
+            for (const fallbackUrl of fallbacks) {
+                try {
+                    logger.info(`Trying fallback API: ${fallbackUrl}`);
+                    const response = await axios.get(fallbackUrl, { 
+                        timeout: 5000,
+                        headers: { 'User-Agent': 'WhatsApp-MD-Bot/1.0' }
+                    });
+                    logger.info(`Fallback API success: ${fallbackUrl}`);
+                    return response.data;
+                } catch (fallbackErr) {
+                    logger.warn(`Fallback API fetch error (${fallbackUrl}):`, fallbackErr.message);
+                    // Continue to next fallback
+                }
+            }
+        }
+        
+        // If all attempts failed, return null
+        logger.error(`All API fetch attempts failed for ${url}`);
         return null;
     }
 }
@@ -453,21 +484,49 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: 'Fetching waifu image...' });
             
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/waifu`);
-            if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
+            // Primary API URL
+            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/waifu`;
+            
+            // Fallback URLs if the primary fails
+            const fallbacks = [
+                `${API_ENDPOINTS.WAIFU_PICS}/nsfw/waifu`,
+                `${API_ENDPOINTS.WAIFU_IM}/search/?included_tags=waifu&is_nsfw=true`
+            ];
+            
+            // Try primary first, then fallbacks
+            const response = await fetchApi(primaryUrl, fallbacks);
+            
+            // Handle different API response formats
+            let imageUrl = null;
+            if (response) {
+                if (response.url) {
+                    // HMTAI format
+                    imageUrl = response.url;
+                } else if (response.images && response.images.length > 0) {
+                    // WAIFU_IM format
+                    imageUrl = response.images[0].url;
+                } else if (response.url) {
+                    // WAIFU_PICS format
+                    imageUrl = response.url;
+                }
+            }
+            
+            if (!imageUrl) {
+                await sock.sendMessage(sender, { 
+                    text: 'Failed to fetch image. All API endpoints are down. Please try again later.' 
+                });
                 return;
             }
             
             await sock.sendMessage(sender, {
-                image: { url: response.url },
+                image: { url: imageUrl },
                 caption: '🎭 NSFW Waifu'
             });
             
             logger.info(`NSFW waifu image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in waifu:', err);
-            await sock.sendMessage(sender, { text: 'Failed to fetch waifu image.' });
+            await sock.sendMessage(sender, { text: 'Failed to fetch waifu image due to server error.' });
         }
     },
     
@@ -1286,12 +1345,6 @@ NSFW Statistics:
         }
     },
     
-    // Initialize function
-    async init() {
-        logger.info('NSFW module initialized with enhanced commands');
-        await initDirectories();
-        return this;
-    }
 };
 
 // Export the commands object directly to ensure it's accessible
@@ -1302,7 +1355,7 @@ module.exports = {
     category: 'nsfw',
     async init() {
         try {
-            logger.moduleInit('NSFW');
+            logger.info('NSFW module initialized with enhanced commands');
             await initDirectories();
             logger.moduleSuccess('NSFW');
             return true;
