@@ -37,7 +37,6 @@ const ANIME_GIF_API = {
     stare: 'https://api.waifu.pics/sfw/stare',
     sleep: 'https://api.waifu.pics/sfw/sleep',
     nervous: 'https://api.waifu.pics/sfw/nervous',
-    confused: 'https://api.waifu.pics/sfw/confused',
     celebrate: 'https://api.waifu.pics/sfw/celebrate',
     dizzy: 'https://api.waifu.pics/sfw/dizzy'
 };
@@ -268,30 +267,34 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
             finalGifUrl = fallbacks[type] || genericFallback;
         }
 
-        await sock.sendMessage(chatJid, {
-            video: { url: finalGifUrl },
-            caption: message,
-            mentions: mentions,
-            gifPlayback: true,
-            mimetype: 'video/mp4'
-        }).catch(async (err) => {
-            logger.error(`Error sending message with GIF (${Date.now() - startTime}ms):`, err);
+        try {
+            // Try sending as video first
+            await sock.sendMessage(chatJid, {
+                video: { url: finalGifUrl },
+                caption: message,
+                mentions: mentions,
+                gifPlayback: true,
+                mimetype: 'video/mp4'
+            });
+        } catch (videoErr) {
+            logger.warn(`Failed to send as video, trying as image: ${videoErr.message}`);
             try {
-                // First fallback: Try sending as image
+                // Try sending as image
                 await sock.sendMessage(chatJid, {
                     image: { url: finalGifUrl },
                     caption: message,
                     mentions: mentions
                 });
             } catch (imgErr) {
-                logger.error('Error sending as image, falling back to text-only:', imgErr);
-                // Second fallback: Text-only message
+                logger.error(`Failed to send as image: ${imgErr.message}`);
+                // Fallback to text-only message
                 await sock.sendMessage(chatJid, {
                     text: message,
                     mentions: mentions
                 });
             }
-        });
+        }
+
         logger.debug(`Reaction message sent successfully (${Date.now() - startTime}ms)`);
     } catch (error) {
         logger.error('Error sending reaction message:', error);
@@ -700,11 +703,13 @@ const reactionCommands = {
                 logger.warn(`Commands missing API endpoints: ${missingEndpoints.join(', ')}`);
             }
 
+            // Test all endpoints
             logger.info('Testing API endpoints...');
             const testedEndpoints = new Set();
             const results = await Promise.allSettled(
                 commandNames.map(async cmd => {
                     try {
+                        // Map special cases to their base endpoints
                         let endpoint = ANIME_GIF_API[cmd];
                         if (cmd === 'hifive') endpoint = ANIME_GIF_API['highfive'];
                         if (cmd === 'grouphug') endpoint = ANIME_GIF_API['hug'];
@@ -733,7 +738,7 @@ const reactionCommands = {
 
             if (failed.length > 0) {
                 logger.warn(`Failed to fetch test GIFs for commands: ${failed.join(', ')}`);
-                logger.warn('These commands may not work properly.');
+                logger.warn('These commands will use fallback GIFs');
 
                 results
                     .filter(r => r.status === 'fulfilled' && !r.value.success)
@@ -743,7 +748,7 @@ const reactionCommands = {
             }
 
             const workingEndpoints = results
-                .filter(r => r.status === 'fulfilled' && r.value.value.success)
+                .filter(r => r.status === 'fulfilled' && r.value.success)
                 .length;
 
             logger.info(`Successfully tested ${workingEndpoints} API endpoints`);
