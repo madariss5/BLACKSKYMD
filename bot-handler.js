@@ -40,6 +40,12 @@ try {
     if (!messageHandler) {
         throw new Error('Message handler failed to load properly');
     }
+    
+    // Verify the init function is available
+    if (typeof initMessageHandler !== 'function') {
+        throw new Error('Message handler init function is not properly exported');
+    }
+    
     logger.info('Message handler loaded successfully');
 
 } catch (err) {
