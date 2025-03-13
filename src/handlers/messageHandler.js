@@ -1,41 +1,16 @@
-const { processCommand } = require('./commandHandler');
 const logger = require('../utils/logger');
+const { processCommand } = require('./commandHandler');
 const config = require('../config/config');
+const { languageManager } = require('../utils/language');
 const levelingSystem = require('../utils/levelingSystem');
 const userDatabase = require('../utils/userDatabase');
-const { languageManager } = require('../utils/language');
-const menuCommands = require('../commands/menu').commands;
-const reactionCommands = require('../commands/reactions');
 
-// Cache for help messages to prevent spam
-const helpMessageCache = new Map();
-const HELP_MESSAGE_COOLDOWN = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Determines the user's preferred language
- * @param {string} sender - The sender's JID
- * @returns {string} The language code (e.g., 'en', 'de')
+ * Main message handler for WhatsApp messages
+ * @param {Object} sock - WhatsApp socket connection
+ * @param {Object} message - Message object from WhatsApp
  */
-function getUserLanguage(sender) {
-    try {
-        // Check if user has a profile with language preference
-        const userProfile = userDatabase.getUserProfile(sender);
-        
-        if (userProfile && userProfile.language) {
-            console.log(`User ${sender} has language preference: ${userProfile.language}`);
-            return userProfile.language;
-        }
-        
-        // Fallback to bot default language
-        console.log(`User ${sender} has no language preference, using default: ${config.bot.language || 'en'}`);
-        return config.bot.language || 'en';
-    } catch (err) {
-        console.error(`Error determining language for user ${sender}:`, err);
-        return 'en'; // Default fallback
-    }
-}
-
-// Handle message processing
 async function messageHandler(sock, message) {
     try {
         // FAST PATH: Skip protocol messages immediately
@@ -55,12 +30,6 @@ async function messageHandler(sock, message) {
             messageContent = message.message.imageMessage.caption;
         } else if (message.message?.videoMessage?.caption) {
             messageContent = message.message.videoMessage.caption;
-        } else if (message.message?.documentWithCaptionMessage?.message?.documentMessage?.caption) {
-            messageContent = message.message.documentWithCaptionMessage.message.documentMessage.caption;
-        } else if (message.message?.buttonsResponseMessage?.selectedButtonId) {
-            messageContent = message.message.buttonsResponseMessage.selectedButtonId;
-        } else if (message.message?.listResponseMessage?.singleSelectReply?.selectedRowId) {
-            messageContent = message.message.listResponseMessage.singleSelectReply.selectedRowId;
         } else {
             // For other message types that don't contain text
             messageContent = null;
@@ -73,48 +42,29 @@ async function messageHandler(sock, message) {
             return;
         }
 
-        const isGroup = sender.endsWith('@g.us');
         const prefix = config.bot.prefix || '.';
 
         // FAST PATH: Skip empty messages immediately
         if (!messageContent) return;
 
-        // FAST PATH: Command processing - highest priority
+        // Command processing
         if (messageContent.startsWith(prefix)) {
             const commandText = messageContent.slice(prefix.length).trim();
             if (commandText) {
                 logger.debug(`Processing command: ${commandText}`);
                 try {
-                    // Split command and arguments
-                    const [cmd, ...args] = commandText.split(' ');
-
-                    // Check for menu commands first
-                    if (menuCommands[cmd]) {
-                        logger.info(`Executing menu command: ${cmd}`);
-                        await menuCommands[cmd](sock, message, args);
-                        return;
-                    }
-
-                    // Check for reaction commands
-                    if (reactionCommands[cmd]) {
-                        logger.info(`Executing reaction command: ${cmd}`);
-                        await reactionCommands[cmd](sock, sender, args);
-                        return;
-                    }
-
-                    // Process other commands
                     await processCommand(sock, message, commandText);
                 } catch (err) {
                     logger.error('Command execution failed:', err);
                     await sock.sendMessage(sender, { 
-                        text: '❌ Command failed. Try again.' 
+                        text: '❌ Command failed. Please try again.' 
                     });
                 }
             }
             return;
         }
 
-        // Handle other message types...
+        // Handle normal messages here if needed
 
     } catch (err) {
         logger.error('Error in message handler:', err);
@@ -219,6 +169,30 @@ ${levelUpNext}
         }
     } catch (error) {
         logger.error('Error sending level up notification:', error);
+    }
+}
+
+/**
+ * Determines the user's preferred language
+ * @param {string} sender - The sender's JID
+ * @returns {string} The language code (e.g., 'en', 'de')
+ */
+function getUserLanguage(sender) {
+    try {
+        // Check if user has a profile with language preference
+        const userProfile = userDatabase.getUserProfile(sender);
+        
+        if (userProfile && userProfile.language) {
+            console.log(`User ${sender} has language preference: ${userProfile.language}`);
+            return userProfile.language;
+        }
+        
+        // Fallback to bot default language
+        console.log(`User ${sender} has no language preference, using default: ${config.bot.language || 'en'}`);
+        return config.bot.language || 'en';
+    } catch (err) {
+        console.error(`Error determining language for user ${sender}:`, err);
+        return 'en'; // Default fallback
     }
 }
 
