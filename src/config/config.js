@@ -4,13 +4,18 @@ const config = {
     // Bot Owner Info
     owner: {
         name: process.env.OWNER_NAME || 'Bot Owner',  
-        number: process.env.OWNER_NUMBER ? (process.env.OWNER_NUMBER.includes('@') ? process.env.OWNER_NUMBER : `${process.env.OWNER_NUMBER}@s.whatsapp.net`) : undefined,
+        // Convert owner number to proper format with WhatsApp suffix
+        number: process.env.OWNER_NUMBER ? 
+            (process.env.OWNER_NUMBER.includes('@') ? 
+                process.env.OWNER_NUMBER : 
+                `${process.env.OWNER_NUMBER}@s.whatsapp.net`) : 
+            '12345678900@s.whatsapp.net', // Default number, will be overridden by env var
         email: process.env.OWNER_EMAIL || '',
     },
 
     // Session Configuration
     session: {
-        id: process.env.SESSION_ID, // Will be required for proper functioning
+        id: process.env.SESSION_ID || 'whatsapp-bot', // Provide a default session ID
         authDir: './auth_info',
         backupDir: './sessions',
     },
@@ -48,12 +53,15 @@ const config = {
         const missingVars = [];
 
         // Check required variables
-        if (!process.env.OWNER_NUMBER) missingVars.push('OWNER_NUMBER');
+        if (!process.env.OWNER_NUMBER) {
+            console.warn('OWNER_NUMBER not set in environment, using default number');
+        }
         if (!process.env.SESSION_ID) missingVars.push('SESSION_ID');
 
         // Additional validation for owner number format
         if (process.env.OWNER_NUMBER && !process.env.OWNER_NUMBER.match(/^\d+(@s\.whatsapp\.net)?$/)) {
             missingVars.push('OWNER_NUMBER (invalid format)');
+            console.error('Invalid OWNER_NUMBER format. Please use only digits, optionally followed by @s.whatsapp.net');
         }
 
         return {
