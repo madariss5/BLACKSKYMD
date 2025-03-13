@@ -4,6 +4,7 @@ const config = require('../config/config');
 const levelingSystem = require('../utils/levelingSystem');
 const userDatabase = require('../utils/userDatabase');
 const { languageManager } = require('../utils/language');
+const reactionCommands = require('../commands/reactions');
 
 // Cache for help messages to prevent spam
 const helpMessageCache = new Map();
@@ -72,11 +73,11 @@ async function handleLevelUp(sock, sender, levelUpData, userData) {
         // Create level up message
         const levelUpMessage = `
 🎉 *${levelUpTitle}*
-        
+
 ${levelUpCongrats}
 🏆 ${levelUpReward}
 ⭐ ${levelUpTip}
-        
+
 ${levelUpCurrent}
 ${levelUpNext}
         `.trim();
@@ -127,21 +128,17 @@ function getMessageType(message) {
     return 'message'; // Default
 }
 
+// Handle message processing
 async function messageHandler(sock, message) {
     try {
         // FAST PATH: Skip protocol messages immediately
         if (message.message?.protocolMessage) {
             return;
         }
-        
-        // Process messages even if they're marked as fromMe during testing
-        if (message.key.fromMe) {
-            // We continue execution instead of returning for testing
-        }
 
         // Extract message content with optimized path for common types
         let messageContent;
-        
+
         // Fast path for most common message types (ordered by frequency)
         if (message.message?.conversation) {
             messageContent = message.message.conversation;
@@ -168,52 +165,9 @@ async function messageHandler(sock, message) {
             logger.warn('Message without remoteJid, skipping');
             return;
         }
-        
+
         const isGroup = sender.endsWith('@g.us');
         const prefix = config.bot.prefix || '.';
-        
-        // Get user ID - for groups, we need participant (sender)
-        let userId = sender;
-        if (isGroup) {
-            if (message.participant) {
-                userId = message.participant;
-            } else if (message.key.participant) {
-                userId = message.key.participant;
-            } else {
-                logger.warn('Group message without participant ID, using group ID as fallback');
-            }
-        }
-        
-        // Get user profile for the sender if they are registered
-        const userData = userDatabase.getUserProfile(userId);
-        
-        // Track activity and award XP if user is registered
-        if (userData) {
-            // Determine activity type
-            let activityType = getMessageType(message);
-            
-            // If it's a command, use the command type instead
-            if (messageContent && messageContent.startsWith(prefix)) {
-                activityType = 'command';
-            }
-            
-            // Add XP and check for level up (pass group JID if in a group)
-            const groupJid = isGroup ? sender : null;
-            const levelUpData = await levelingSystem.addXP(userId, activityType, groupJid);
-            
-            // Handle level up event if it occurred
-            if (levelUpData) {
-                await handleLevelUp(sock, userId, levelUpData, userData);
-            }
-        } else {
-            // Auto-register new users with minimal details so they can start earning XP
-            userDatabase.initializeUserProfile(userId, {
-                name: 'User', // Default name, they can update it later
-                registeredAt: new Date().toISOString()
-            });
-            
-            logger.info(`Auto-registered new user: ${userId}`);
-        }
 
         // FAST PATH: Skip empty messages immediately
         if (!messageContent) return;
@@ -222,67 +176,33 @@ async function messageHandler(sock, message) {
         if (messageContent.startsWith(prefix)) {
             const commandText = messageContent.slice(prefix.length).trim();
             if (commandText) {
+                logger.debug(`Processing command: ${commandText}`);
                 try {
-                    // Process command directly without logging for speed
+                    // Check if it's a reaction command
+                    const [cmd, ...args] = commandText.split(' ');
+                    if (reactionCommands[cmd]) {
+                        logger.info(`Executing reaction command: ${cmd}`);
+                        await reactionCommands[cmd](sock, sender, args);
+                        return;
+                    }
+
+                    // Process other commands
                     await processCommand(sock, message, commandText);
                 } catch (err) {
-                    // Minimal error response
+                    logger.error('Command execution failed:', err);
                     await sock.sendMessage(sender, { 
                         text: '❌ Command failed. Try again.' 
                     });
                 }
             }
-            return; // Exit early after command processing
-        } 
-        
-        // ONLY FOR DMs: Show welcome message with help info
-        if (!isGroup) {
-            const now = Date.now();
-            const lastHelpMessage = helpMessageCache.get(sender);
-
-            if (!lastHelpMessage || (now - lastHelpMessage) > HELP_MESSAGE_COOLDOWN) {
-                helpMessageCache.set(sender, now);
-                
-                // Get welcome message in user's preferred language
-                let welcomeMessage;
-                if (userData && userData.language) {
-                    // If user has a language preference, use it
-                    const translationKey = 'system.welcome_message';
-                    welcomeMessage = languageManager.getText(translationKey, userData.language, prefix);
-                    
-                    // If translation not found, fallback to a basic message
-                    if (welcomeMessage === translationKey) {
-                        welcomeMessage = `Use ${prefix}help to see available commands.`;
-                    }
-                } else {
-                    // Default welcome message
-                    welcomeMessage = `Use ${prefix}help to see available commands.`;
-                    
-                    // Add language suggestion if user doesn't have a language set
-                    welcomeMessage += `\n\nTip: You can change the language with ${prefix}language`;
-                }
-                
-                // Send welcome message
-                await sock.sendMessage(sender, { text: welcomeMessage });
-                
-                // Clean cache in background
-                setTimeout(() => {
-                    try {
-                        for (const [key, timestamp] of helpMessageCache.entries()) {
-                            if (Date.now() - timestamp > HELP_MESSAGE_COOLDOWN * 2) {
-                                helpMessageCache.delete(key);
-                            }
-                        }
-                    } catch (e) {
-                        // Ignore cache errors
-                    }
-                }, 0);
-            }
+            return;
         }
+
+        // Handle other message types...
 
     } catch (err) {
         logger.error('Error in message handler:', err);
     }
 }
 
-module.exports = { messageHandler };
+module.exports = { messageHandler, handleLevelUp };

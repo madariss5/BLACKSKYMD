@@ -14,7 +14,7 @@
       "name": "pat",
       "description": "Pat someone gently",
       "usage": "!pat @user",
-      "example": "!pat @user",
+      "example": "!pat @user", 
       "cooldown": 5,
       "permissions": ["user"],
       "handler": "reactions.pat"
