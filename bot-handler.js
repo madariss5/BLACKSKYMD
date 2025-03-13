@@ -209,48 +209,66 @@ async function connectToWhatsApp(retryCount = 0) {
                 // Initialize message handlers
                 logger.info('Initializing message handlers...');
                 try {
-                    // Use the simpler message handler to avoid initialization issues
-                    logger.info('Initializing simple message handler...');
+                    // Try the minimal handler first
+                    logger.info('Attempting to load minimal message handler...');
+                    const minimalHandler = require('./src/handlers/minimalHandler');
+                    await minimalHandler.init();
                     
-                    // Load the simple message handler
-                    const simpleHandler = require('./src/handlers/simpleMessageHandler');
-                    const initialized = await simpleHandler.init();
+                    // Set the minimal handler as our handler (guaranteed to work)
+                    messageHandler = minimalHandler.messageHandler;
+                    logger.info(`Using minimal message handler with ${minimalHandler.commands.size} basic commands`);
                     
-                    if (!initialized) {
-                        throw new Error('Simple message handler initialization failed');
+                    // Now try loading the simple handler if possible
+                    try {
+                        logger.info('Attempting to load the simple message handler...');
+                        const simpleHandler = require('./src/handlers/simpleMessageHandler');
+                        const initialized = await simpleHandler.init();
+                        
+                        if (initialized) {
+                            // Use the simple handler instead if it initializes
+                            messageHandler = simpleHandler.messageHandler;
+                            logger.info(`Upgraded to simple message handler with ${simpleHandler.commands.size} commands`);
+                        }
+                    } catch (simpleErr) {
+                        // Continue with minimal handler if simple handler fails
+                        logger.warn('Failed to load simple handler, continuing with minimal handler:', simpleErr.message);
                     }
-                    
-                    // Make sure we're using the simple handler
-                    messageHandler = simpleHandler.messageHandler;
-                    
-                    logger.info('Simple message handler initialized successfully with', 
-                               simpleHandler.commands.size, 'built-in commands');
 
-                    // Set up message event handlers
-                    sock.ev.off('messages.upsert'); // Remove any existing handlers
-                    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-                        if (type === 'notify') {
-                            for (const message of messages) {
-                                if (message.key.fromMe) continue;
+                    // Final verification before setting up event handlers
+                    if (typeof messageHandler !== 'function') {
+                        throw new Error('Message handler is not a function, cannot register event handler');
+                    }
 
-                                try {
-                                    logger.debug('Processing message:', {
-                                        type: message.message ? Object.keys(message.message)[0] : null,
-                                        from: message.key.remoteJid,
-                                        content: message.message?.conversation || 
-                                                message.message?.extendedTextMessage?.text ||
-                                                message.message?.imageMessage?.caption ||
-                                                message.message?.videoMessage?.caption
-                                    });
+                    // Get message handler reference for use in event handler
+                    const finalMessageHandler = messageHandler;
 
-                                    await messageHandler(sock, message);
-                                } catch (err) {
-                                    logger.error('Message handling error:', err);
+                    try {
+                        // Set up message event handlers
+                        sock.ev.off('messages.upsert'); // Remove any existing handlers
+                        sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                            if (type === 'notify') {
+                                for (const message of messages) {
+                                    if (message.key.fromMe) continue;
+
+                                    try {
+                                        // Do minimal extracting of details here
+                                        const msgType = message.message ? Object.keys(message.message)[0] : null;
+                                        const fromJid = message.key.remoteJid;
+                                        
+                                        // Call the message handler function
+                                        await finalMessageHandler(sock, message);
+                                    } catch (err) {
+                                        console.error('Message handling error:', err.message);
+                                        logger.error('Message handling error:', err);
+                                    }
                                 }
                             }
-                        }
-                    });
-                    logger.info('Message event handler registered successfully');
+                        });
+                        logger.info('Message event handler registered successfully');
+                    } catch (evErr) {
+                        logger.error('Failed to set up event handler:', evErr);
+                        throw evErr;
+                    }
 
                 } catch (err) {
                     logger.error('Failed to initialize message handlers:', err);
@@ -267,6 +285,49 @@ async function connectToWhatsApp(retryCount = 0) {
                     
                     // Continue with basic functionality even if handler initialization fails
                     logger.warn('Continuing with limited functionality due to message handler initialization failure');
+                    
+                    // Set up a bare-minimum message handler as a last resort
+                    const emergencyHandler = async (sock, message) => {
+                        try {
+                            // Only handle text messages with ! prefix
+                            const content = message.message?.conversation || 
+                                          message.message?.extendedTextMessage?.text;
+                            
+                            if (content && content.startsWith('!') && message.key?.remoteJid) {
+                                const sender = message.key.remoteJid;
+                                const command = content.slice(1).trim().toLowerCase();
+                                
+                                if (command === 'ping') {
+                                    await sock.sendMessage(sender, { text: '🏓 Pong! (Emergency Handler)' });
+                                } else if (command === 'help') {
+                                    await sock.sendMessage(sender, { 
+                                        text: '*Emergency Mode Commands:*\n!ping - Check if bot is online\n!help - Show this help' 
+                                    });
+                                }
+                            }
+                        } catch (err) {
+                            console.error('Emergency handler error:', err.message);
+                        }
+                    };
+                    
+                    // Use the emergency handler
+                    messageHandler = emergencyHandler;
+                    
+                    // Set up basic event handler
+                    try {
+                        sock.ev.off('messages.upsert'); // Remove any existing handlers
+                        sock.ev.on('messages.upsert', ({ messages, type }) => {
+                            if (type === 'notify') {
+                                for (const message of messages) {
+                                    if (message.key.fromMe) continue;
+                                    emergencyHandler(sock, message).catch(console.error);
+                                }
+                            }
+                        });
+                        logger.info('Emergency message handler registered');
+                    } catch (evErr) {
+                        logger.error('Failed to set up emergency handler:', evErr);
+                    }
                 }
             }
         });

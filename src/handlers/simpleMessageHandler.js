@@ -3,7 +3,20 @@
  * A lightweight alternative that avoids complex module dependencies
  */
 
-const logger = require('../utils/logger');
+// Setup basic logging even if logger module fails
+let logger;
+try {
+    logger = require('../utils/logger');
+} catch (err) {
+    // Fallback to basic console logging if logger module fails
+    logger = {
+        info: console.log,
+        error: console.error,
+        warn: console.warn,
+        debug: console.debug
+    };
+    console.warn('Using fallback logger due to error:', err);
+}
 
 // Simple command registry - we'll add basic commands here
 const commands = new Map();
@@ -125,12 +138,27 @@ async function messageHandler(sock, message) {
  * Initialize message handler
  */
 async function init() {
-    logger.info('Initializing simple message handler...');
-    
-    // No complex initialization needed
-    logger.info('Simple message handler initialized with', commands.size, 'built-in commands');
-    
-    return true;
+    try {
+        logger.info('Initializing simple message handler...');
+        
+        // Add status command
+        if (!commands.has('status')) {
+            commands.set('status', async (sock, message) => {
+                const sender = message.key.remoteJid;
+                await sock.sendMessage(sender, { 
+                    text: '✅ System Status: Online\n⏱️ Using Simple Message Handler\n🤖 Basic commands available' 
+                });
+            });
+        }
+        
+        // Log the successful initialization
+        logger.info(`Simple message handler initialized with ${commands.size} built-in commands`);
+        
+        return true;
+    } catch (err) {
+        logger.error('Simple message handler initialization error:', err);
+        return false;
+    }
 }
 
 module.exports = {
