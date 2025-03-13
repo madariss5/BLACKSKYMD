@@ -8,7 +8,9 @@ const cooldowns = new Map();
 // Helper function to normalize phone numbers for comparison
 function normalizePhoneNumber(number) {
     // Remove any WhatsApp suffix and clean the number
-    return number.replace('@s.whatsapp.net', '').replace(/[^0-9]/g, '');
+    const cleaned = number.replace('@s.whatsapp.net', '').replace(/[^0-9]/g, '');
+    logger.debug(`Normalized phone number: ${number} -> ${cleaned}`);
+    return cleaned;
 }
 
 async function processCommand(sock, message, commandText) {
@@ -57,10 +59,17 @@ async function processCommand(sock, message, commandText) {
             logger.debug('Permission check:', {
                 sender: senderNumber,
                 owner: ownerNumber,
-                match: senderNumber === ownerNumber
+                match: senderNumber === ownerNumber,
+                originalSender: sender,
+                originalOwner: config.owner.number
             });
 
             if (senderNumber !== ownerNumber) {
+                logger.warn('Owner permission denied:', {
+                    senderNumber,
+                    ownerNumber,
+                    command: commandName
+                });
                 await sock.sendMessage(sender, {
                     text: '*⛔ This command requires owner permissions.*'
                 });
@@ -105,6 +114,11 @@ async function processCommand(sock, message, commandText) {
         try {
             await command.execute(sock, message, args);
         } catch (execErr) {
+            logger.error('Command execution error:', {
+                command: commandName,
+                error: execErr.message,
+                stack: execErr.stack
+            });
             await sock.sendMessage(sender, {
                 text: '*❌ Error:* Command failed. Try again.'
             });

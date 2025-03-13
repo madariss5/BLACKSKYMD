@@ -1,5 +1,3 @@
-require('dotenv').config();
-
 const config = {
     // Bot Owner Info
     owner: {
