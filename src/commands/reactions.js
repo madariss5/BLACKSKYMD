@@ -103,21 +103,34 @@ function validateMention(mention) {
 // Helper function to fetch anime GIFs with retries
 async function fetchAnimeGif(type, retries = 3) {
     try {
-        // Type-specific fallback GIFs for common reactions (these are stable URLs)
+        // Enhanced set of type-specific fallback GIFs (reliable, well-tested GIFs)
         const fallbacks = {
-            'hug': 'https://c.tenor.com/FzEfrj9RKqEAAAAd/anime-hug.gif',
-            'pat': 'https://c.tenor.com/Dbj9bAT9S-YAAAAC/anime-pat.gif',
-            'kiss': 'https://c.tenor.com/Fu-vx6npJicAAAAC/anime-kiss.gif',
-            'slap': 'https://c.tenor.com/PeJyQRCSHHkAAAAC/saki-saki-mukai-naoya.gif',
-            'cuddle': 'https://c.tenor.com/ItpTQW2UKPYAAAAC/cuddle-anime.gif',
-            'panic': 'https://c.tenor.com/KOMV7S7Zf28AAAAC/anime-panic.gif',
-            'yeet': 'https://c.tenor.com/1FYdZLkHY9wAAAAC/anime-throw.gif',
-            'sad': 'https://c.tenor.com/6q-ickMeKnYAAAAC/crying-anime.gif',
-            'happy': 'https://c.tenor.com/QxIL-aeHRmMAAAAC/happy-anime.gif'
+            // Common reactions with high-quality fallbacks
+            'hug': 'https://media.tenor.com/images/a9bb4d55b2a08d3a964ddb39c0e96f3d/tenor.gif',
+            'pat': 'https://media.tenor.com/images/1d37a873edfeb81a1f5403f4a3bfa185/tenor.gif',
+            'kiss': 'https://media.tenor.com/images/02d9cae34993e48ab5bb27763f46b32e/tenor.gif',
+            'slap': 'https://media.tenor.com/images/9ea4fb41d066737c0e3f2d626c13f230/tenor.gif',
+            'cuddle': 'https://media.tenor.com/images/5603e24395b61245a08fe0299574f1e3/tenor.gif',
+            'panic': 'https://media.tenor.com/images/9c42c0f3a448561bdb573049e11c6466/tenor.gif',
+            'yeet': 'https://media.tenor.com/images/d88b38c6698c568e7347ef365ae6b348/tenor.gif',
+            'sad': 'https://media.tenor.com/images/7e623e17dd8c776eee5c044d4fe8a305/tenor.gif',
+            'happy': 'https://media.tenor.com/images/a5cab07318215c706bbdd819fca2b60d/tenor.gif',
+            'shoot': 'https://media.tenor.com/images/12cb6396c5c1dd2e9042da1d2f74a551/tenor.gif',
+            'punch': 'https://media.tenor.com/images/4f8e6c925e0c4556b9a4417c6e6d3710/tenor.gif',
+            'kick': 'https://media.tenor.com/images/4dd99934786573b92d56a6a96d96d99f/tenor.gif',
+            'dance': 'https://media.tenor.com/images/81c0b8d3c0617d2a8bf42650b181b97e/tenor.gif',
+            'cry': 'https://media.tenor.com/images/e69ebde3631408c200777ebe10f84367/tenor.gif',
+            'angry': 'https://media.tenor.com/images/bb33cc1bdd6a9d6a7eff0a5e5bfa7012/tenor.gif',
+            'bonk': 'https://media.tenor.com/images/79644a28bfcb95a9c9bd5073235dfa8e/tenor.gif',
+            'excited': 'https://media.tenor.com/images/ff7d22e3aa44144810c12bb743a48569/tenor.gif',
+            'pout': 'https://media.tenor.com/images/c718238122f3eae93bc96583f89d98f2/tenor.gif',
+            'confused': 'https://media.tenor.com/images/f2e7957f59d71bcf8ca3a6fe406a53a5/tenor.gif',
+            'bully': 'https://media.tenor.com/images/dd8058fa55f2b208350e00f329cdfa9a/tenor.gif',
+            'stare': 'https://media.tenor.com/images/9e6e8f42500512dd18dc99c1d054b909/tenor.gif'
         };
         
-        // Generic fallback for all other types
-        const genericFallback = 'https://i.imgur.com/hew1cmf.gif';
+        // Generic fallback for other reactions - must be reliable
+        const genericFallback = 'https://media.tenor.com/images/2b9cba7b488142d61559145bf1d406c3/tenor.gif';
         
         // Get type-specific fallback or use generic
         const fallbackGifUrl = fallbacks[type] || genericFallback;
@@ -135,8 +148,27 @@ async function fetchAnimeGif(type, retries = 3) {
             try {
                 const response = await axios.get(endpoint);
                 if (response.status === 200 && response.data && response.data.url) {
-                    logger.debug(`Successfully fetched ${type} GIF from API`);
-                    return response.data.url;
+                    // Verify the URL is actually a GIF or animated image format
+                    const url = response.data.url;
+                    
+                    // Simple check to see if the URL has a known animation format extension
+                    if (url.toLowerCase().endsWith('.gif') || 
+                        url.toLowerCase().endsWith('.webp') || 
+                        url.toLowerCase().includes('gif') ||
+                        url.toLowerCase().includes('tenor') ||
+                        url.toLowerCase().includes('giphy')) {
+                            
+                        logger.debug(`Successfully fetched ${type} GIF from API: ${url}`);
+                        return url;
+                    } else {
+                        // If the URL doesn't seem to be a GIF, log this and try another API call
+                        logger.warn(`Received non-GIF URL for ${type}: ${url}`);
+                        
+                        // If this is the last retry, return the URL anyway - better to try
+                        if (i === retries - 1) {
+                            return url;
+                        }
+                    }
                 } else {
                     throw new Error(`Invalid response format for ${type}`);
                 }
@@ -159,9 +191,27 @@ async function fetchAnimeGif(type, retries = 3) {
 // Helper function to send reaction message
 async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
     try {
-        // Always use fallback if gifUrl is null
-        if (!gifUrl) {
-            gifUrl = 'https://i.imgur.com/hew1cmf.gif';
+        // Enhanced fallbacks for more reliable GIFs
+        const fallbacks = {
+            'hug': 'https://media.tenor.com/images/a9bb4d55b2a08d3a964ddb39c0e96f3d/tenor.gif',
+            'pat': 'https://media.tenor.com/images/1d37a873edfeb81a1f5403f4a3bfa185/tenor.gif',
+            'kiss': 'https://media.tenor.com/images/02d9cae34993e48ab5bb27763f46b32e/tenor.gif',
+            'slap': 'https://media.tenor.com/images/9ea4fb41d066737c0e3f2d626c13f230/tenor.gif',
+            'cuddle': 'https://media.tenor.com/images/5603e24395b61245a08fe0299574f1e3/tenor.gif',
+            'shoot': 'https://media.tenor.com/images/12cb6396c5c1dd2e9042da1d2f74a551/tenor.gif'
+        };
+        
+        // Always use fallback if gifUrl is null or not ending with a standard image extension
+        if (!gifUrl || 
+            !(gifUrl.toLowerCase().endsWith('.gif') || 
+              gifUrl.toLowerCase().endsWith('.webp') ||
+              gifUrl.toLowerCase().endsWith('.png') ||
+              gifUrl.toLowerCase().endsWith('.jpg') ||
+              gifUrl.toLowerCase().endsWith('.jpeg'))) {
+            
+            // Use type-specific fallback or default to a generic one
+            gifUrl = fallbacks[type] || 'https://media.tenor.com/images/2b9cba7b488142d61559145bf1d406c3/tenor.gif';
+            logger.info(`Using fallback GIF for ${type}: ${gifUrl}`);
         }
         
         // Get the chat context (either group or private chat)
