@@ -4,13 +4,12 @@
  */
 
 // External modules
+const path = require('path');
+const handler = require(path.join(__dirname, 'src/handlers/ultra-minimal-handler'));
 const makeWASocket = require('@whiskeysockets/baileys').default;
 const { DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const fs = require('fs');
-const path = require('path');
-
-// Express for web server
 const express = require('express');
 const app = express();
 
@@ -27,7 +26,7 @@ const botStats = {
     lastMessage: null,
     lastCommand: null,
     lastError: null,
-    status: 'initializing' // initializing, connecting, connected, disconnected, error
+    status: 'initializing'
 };
 
 // Serve static files
@@ -140,8 +139,23 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Load our ultra minimal handler
-const handler = require('./src/handlers/ultra-minimal-handler');
+// Initialize directories
+async function initializeDirectories() {
+    const directories = [
+        SESSION_DIR,
+        './data',
+        './data/educational',
+        './data/educational/flashcards',
+        './data/temp'
+    ];
+
+    for (const dir of directories) {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+            console.log(`Created directory: ${dir}`);
+        }
+    }
+}
 
 // Save session data
 const saveCreds = (creds) => {
@@ -152,39 +166,44 @@ const saveCreds = (creds) => {
         );
     } catch (err) {
         console.error('Error saving credentials:', err);
+        botStats.lastError = `Failed to save credentials: ${err.message}`;
+        botStats.errors++;
     }
 };
 
 // Initialize WhatsApp connection
 async function connectToWhatsApp() {
     try {
-        // Ensure auth directory exists
-        if (!fs.existsSync(SESSION_DIR)) {
-            fs.mkdirSync(SESSION_DIR, { recursive: true });
-        }
-        
+        // Ensure directories exist
+        await initializeDirectories();
+
+        // Initialize handler first
+        console.log('Initializing message handler...');
+        await handler.init();
+        console.log('Message handler initialized successfully');
+
         // Get authentication state
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
-        
-        // Create socket connection with better timeout and keepalive settings
+
+        // Create socket connection
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            keepAliveIntervalMs: 30000, // Send a ping every 30 seconds
-            connectTimeoutMs: 60000,    // Wait up to 60 seconds for connection
-            defaultQueryTimeoutMs: 30000, // Default timeout for queries
-            emitOwnEvents: false,       // Don't process our own messages
-            browser: ['BLACKSKY-MD', 'Chrome', '104.0.0.0'], // Standard browser signature
-            markOnlineOnConnect: true,  // Mark as online when connected
-            syncFullHistory: false      // Don't sync full history to save resources
+            keepAliveIntervalMs: 30000,
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 30000,
+            emitOwnEvents: false,
+            browser: ['BLACKSKY-MD', 'Chrome', '104.0.0.0'],
+            markOnlineOnConnect: true,
+            syncFullHistory: false
         });
-        
+
         // Track connection state
         let isConnected = false;
         let reconnectAttempt = 0;
-        let connectionLock = false; // Prevent multiple reconnection attempts
+        let connectionLock = false;
         let messageHandlerInitialized = false;
-        
+
         // Set up automatic reconnection after network errors
         const reconnectAfterNetworkError = () => {
             // Prevent multiple reconnection attempts
@@ -203,13 +222,15 @@ async function connectToWhatsApp() {
             }, delaySeconds * 1000);
         };
         
+
         // Connection update handler
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            
+
             // Update bot status based on connection state
             if (connection) {
                 botStats.status = connection; // connecting, open, close
+                console.log(`Connection status: ${connection}`);
             }
             
             if (connection === 'close') {
@@ -261,6 +282,8 @@ async function connectToWhatsApp() {
                         }
                     } catch (err) {
                         console.error('Error handling credentials:', err);
+                        botStats.errors++;
+                        botStats.lastError = err.message;
                     }
                 }
                 
@@ -273,157 +296,61 @@ async function connectToWhatsApp() {
                 isConnected = true;
                 reconnectAttempt = 0;
                 
+
                 try {
                     // Initialize message handler if not already initialized
                     if (!messageHandlerInitialized) {
                         await handler.init();
-                        console.log('Ultra minimal message handler initialized');
+                        console.log('Message handler initialized');
                         messageHandlerInitialized = true;
-                        
-                        // Send a self-test message after a short delay
-                        setTimeout(async () => {
-                            try {
-                                const selfJid = sock.user.id;
-                                console.log(`Attempting to send test message to self: ${selfJid}`);
-                                
-                                // Check available commands
-                                const commandList = Array.from(handler.commands.keys());
-                                const commandCountMsg = `Available commands: ${commandList.length}`;
-                                console.log(commandCountMsg);
-                                console.log('Command list:', commandList.join(', '));
-                                
-                                // Send self-test message with command info
-                                await sock.sendMessage(selfJid, { 
-                                    text: `🧪 Bot Self-Test: The bot is online with ${commandList.length} commands loaded.\n\nAvailable commands: ${commandList.slice(0, 10).join(', ')}${commandList.length > 10 ? '...' : ''}` 
-                                });
-                                console.log('Self-test message sent successfully');
-                            } catch (testErr) {
-                                console.error('Failed to send self-test message:', testErr);
-                            }
-                        }, 5000);
                     }
-                    
-                    // Extra safety: wrap the event handler setup
-                    try {
-                        // Define a safer message processor function
-                        const safeMessageProcessor = ({ messages, type }) => {
-                            if (type === 'notify') {
-                                // Process each message individually to prevent batch failures
-                                if (!Array.isArray(messages)) {
-                                    console.warn('Expected messages array but got:', typeof messages);
-                                    return;
-                                }
-                                
-                                // Process each message in isolation
-                                for (const message of messages) {
-                                    // Skip processing invalid messages or our own messages
-                                    if (!message || !message.key) continue;
-                                    if (message.key.fromMe) continue;
-                                    
-                                    // Update bot statistics
-                                    botStats.messagesReceived++;
-                                    
-                                    // Get message content for stats
-                                    const content = message.message?.conversation || 
-                                                  message.message?.extendedTextMessage?.text || 
-                                                  'Media or other content';
-                                    
-                                    // Save last message info (with privacy in mind)
-                                    botStats.lastMessage = `${content.substring(0, 30)}${content.length > 30 ? '...' : ''} (from ${message.key.remoteJid})`;
-                                    
-                                    // Check if this is a command and update stats
-                                    if (content && (content.startsWith('!') || content.startsWith('.'))) {
-                                        botStats.commandsProcessed++;
-                                        const command = content.slice(1).trim().split(' ')[0].toLowerCase();
-                                        botStats.lastCommand = `!${command} (from ${message.key.remoteJid})`;
-                                    }
-                                    
-                                    // Debug incoming messages
-                                    console.log(`Received message:`, JSON.stringify({
-                                        jid: message.key.remoteJid,
-                                        fromMe: message.key.fromMe,
-                                        id: message.key.id,
-                                        content: content
-                                    }, null, 2));
-                                    
-                                    // Process with maximum error protection
-                                    setTimeout(() => {
-                                        try {
-                                            handler.messageHandler(sock, message)
-                                                .then(() => console.log('Message handled successfully'))
-                                                .catch(err => {
-                                                    console.error('Async message handler error:', err);
-                                                    // Try to notify the user about the error
-                                                    try {
-                                                        sock.sendMessage(message.key.remoteJid, { 
-                                                            text: '❌ Something went wrong processing your request. Please try again.'
-                                                        }).catch(() => {});
-                                                    } catch (_) {
-                                                        // Ignore nested errors
-                                                    }
-                                                });
-                                        } catch (syncErr) {
-                                            console.error('Sync message handler error:', syncErr);
-                                            // Try to notify the user about the error
-                                            try {
-                                                sock.sendMessage(message.key.remoteJid, { 
-                                                    text: '❌ Something went wrong processing your request. Please try again.'
-                                                }).catch(() => {});
-                                            } catch (_) {
-                                                // Ignore nested errors
-                                            }
-                                        }
-                                    }, 0);
-                                }
-                            }
-                        };
-                        
-                        // First safely remove any existing handlers
-                        try {
-                            sock.ev.off('messages.upsert');
-                        } catch (removeErr) {
-                            console.warn('Could not remove existing handlers, continuing:', removeErr.message);
-                        }
-                        
-                        // Now register our safe handler
-                        sock.ev.on('messages.upsert', safeMessageProcessor);
-                        console.log('Secure message event handler registered successfully');
-                    } catch (handlerSetupErr) {
-                        console.error('Failed to set up primary handler, trying fallback:', handlerSetupErr);
-                        
-                        // Emergency fallback - absolute minimal handler
-                        try {
-                            const emergencyHandler = (update) => {
+
+                    // Set up message processor
+                    const safeMessageProcessor = ({ messages, type }) => {
+                        if (type === 'notify' && Array.isArray(messages)) {
+                            messages.forEach(message => {
                                 try {
-                                    if (update && update.messages && Array.isArray(update.messages)) {
-                                        for (const msg of update.messages) {
-                                            if (msg && msg.message && msg.key && !msg.key.fromMe) {
-                                                const text = msg.message.conversation || 
-                                                         msg.message.extendedTextMessage?.text;
-                                                
-                                                if (text === '!ping' && msg.key.remoteJid) {
-                                                    sock.sendMessage(msg.key.remoteJid, { 
-                                                        text: '🆘 Emergency Pong (Fallback Mode)' 
-                                                    }).catch(() => {});
-                                                }
-                                            }
+                                    if (!message?.key?.fromMe) {
+                                        botStats.messagesReceived++;
+                                        const content = message.message?.conversation || 
+                                                      message.message?.extendedTextMessage?.text || 
+                                                      'Media message';
+
+                                        botStats.lastMessage = `${content.substring(0, 30)}${content.length > 30 ? '...' : ''} (from ${message.key.remoteJid})`;
+
+                                        // Process command
+                                        if (content && (content.startsWith('!') || content.startsWith('.'))) {
+                                            botStats.commandsProcessed++;
+                                            const command = content.slice(1).trim().split(' ')[0].toLowerCase();
+                                            botStats.lastCommand = `!${command} (from ${message.key.remoteJid})`;
                                         }
+
+                                        // Handle message
+                                        handler.messageHandler(sock, message)
+                                            .catch(err => {
+                                                console.error('Message handler error:', err);
+                                                botStats.errors++;
+                                                botStats.lastError = err.message;
+                                            });
                                     }
-                                } catch (_) {
-                                    // Silently continue on any errors
+                                } catch (err) {
+                                    console.error('Error processing message:', err);
+                                    botStats.errors++;
+                                    botStats.lastError = err.message;
                                 }
-                            };
-                            
-                            sock.ev.on('messages.upsert', emergencyHandler);
-                            console.log('Emergency fallback handler registered');
-                        } catch (emergencyErr) {
-                            console.error('CRITICAL: Even emergency handler failed:', emergencyErr);
+                            });
                         }
-                    }
-                    
-                    console.log('Message event handler registered successfully');
+                    };
+
+                    // Register message handler
+                    sock.ev.off('messages.upsert'); // Remove any existing handlers
+                    sock.ev.on('messages.upsert', safeMessageProcessor);
+                    console.log('Message handler registered successfully');
+
                 } catch (err) {
-                    console.error('Error setting up message handler:', err);
+                    console.error('Error in connection setup:', err);
+                    botStats.errors++;
+                    botStats.lastError = err.message;
                 }
             } else if (connection === 'connecting') {
                 console.log('Connecting to WhatsApp...');
@@ -435,9 +362,10 @@ async function connectToWhatsApp() {
             }
         });
         
+
         // Handle credentials update
         sock.ev.on('creds.update', saveCreds);
-        
+
         // Handle group participants update
         sock.ev.on('group-participants.update', async (update) => {
             try {
@@ -447,6 +375,8 @@ async function connectToWhatsApp() {
                 // We could implement group-specific logic here if needed
             } catch (err) {
                 console.error('Error handling group update:', err);
+                botStats.errors++;
+                botStats.lastError = err.message;
             }
         });
         
@@ -458,13 +388,18 @@ async function connectToWhatsApp() {
                     // We could implement call handling logic here
                 } catch (err) {
                     console.error('Error handling call:', err);
+                    botStats.errors++;
+                    botStats.lastError = err.message;
                 }
             }
         });
         
+
         return sock;
     } catch (err) {
         console.error('Fatal error in WhatsApp connection:', err);
+        botStats.errors++;
+        botStats.lastError = err.message;
         // Try to reconnect after error
         setTimeout(() => {
             console.log('Retrying connection after fatal error...');
@@ -509,6 +444,8 @@ async function performHealthCheck() {
             }
         } catch (handlerErr) {
             console.error('❌ Command handler check failed:', handlerErr);
+            botStats.errors++;
+            botStats.lastError = handlerErr.message;
         }
         
         // Check uptime
@@ -522,6 +459,8 @@ async function performHealthCheck() {
         setTimeout(performHealthCheck, 30 * 60 * 1000); // Run every 30 minutes
     } catch (err) {
         console.error('❌ Health check failed:', err);
+        botStats.errors++;
+        botStats.lastError = err.message;
         // Schedule another check even if this one failed
         setTimeout(performHealthCheck, 30 * 60 * 1000);
     }
@@ -545,19 +484,27 @@ async function start() {
         
         server.on('error', (err) => {
             console.error('❌ Server error:', err);
+            botStats.errors++;
+            botStats.lastError = err.message;
         });
     } catch (err) {
         console.error('❌ Failed to start application:', err);
+        botStats.errors++;
+        botStats.lastError = err.message;
     }
 }
 
 // Handle errors
 process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception - continuing if possible:', err);
+    console.error('Uncaught Exception:', err);
+    botStats.errors++;
+    botStats.lastError = err.message;
 });
 
 process.on('unhandledRejection', (err) => {
-    console.error('Unhandled Rejection - continuing if possible:', err);
+    console.error('Unhandled Rejection:', err);
+    botStats.errors++;
+    botStats.lastError = err.message;
 });
 
 // Start application
