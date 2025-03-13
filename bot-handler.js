@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
 
-// Import message handlers with error handling
+// Load message handlers with error handling
 let messageHandler;
 try {
     const { messageHandler: handler } = require('./src/handlers/messageHandler');
@@ -19,7 +19,7 @@ try {
 }
 
 // Load command handler
-const { getAllCommands } = require('./src/handlers/commandHandler');
+const { commands } = require('./src/handlers/commandHandler');
 
 // Configure options based on environment variables
 const AUTH_DIR = process.env.AUTH_DIR || 'auth_info_qr';
@@ -42,7 +42,7 @@ const logger = pino({
 });
 
 // Verify command handler initialization
-const availableCommands = getAllCommands();
+const availableCommands = Array.from(commands.keys());
 logger.info('Command handler initialized with commands:', {
     count: availableCommands.length,
     commands: availableCommands

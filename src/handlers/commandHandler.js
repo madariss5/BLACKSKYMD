@@ -4,45 +4,70 @@ const config = require('../config/config');
 // Simple command storage
 const commands = new Map();
 
-// Register basic commands
-commands.set('ping', {
-    execute: async (sock, message, args) => {
-        const sender = message.key.remoteJid;
-        logger.info(`Executing ping command for ${sender}`);
-        await sock.sendMessage(sender, {
-            text: '🏓 Pong! Bot is active and responding.'
-        });
-        logger.info(`Ping command completed for ${sender}`);
-    }
-});
+// Initialize basic commands with error handling
+try {
+    // Register ping command
+    commands.set('ping', {
+        execute: async (sock, message, args) => {
+            try {
+                const sender = message.key.remoteJid;
+                logger.info(`Executing ping command for ${sender}`);
+                await sock.sendMessage(sender, {
+                    text: '🏓 Pong! Bot is active and responding.'
+                });
+                logger.info(`Ping command completed for ${sender}`);
+            } catch (err) {
+                logger.error('Error executing ping command:', err);
+                throw err;
+            }
+        }
+    });
 
-commands.set('help', {
-    execute: async (sock, message, args) => {
-        const sender = message.key.remoteJid;
-        logger.info(`Executing help command for ${sender}`);
-        const commandList = Array.from(commands.keys())
-            .map(cmd => `!${cmd}`)
-            .join('\n');
-        await sock.sendMessage(sender, {
-            text: `*Available Commands:*\n\n${commandList}`
-        });
-        logger.info(`Help command completed for ${sender}`);
-    }
-});
+    // Register help command
+    commands.set('help', {
+        execute: async (sock, message, args) => {
+            try {
+                const sender = message.key.remoteJid;
+                logger.info(`Executing help command for ${sender}`);
+                const commandList = Array.from(commands.keys())
+                    .map(cmd => `!${cmd}`)
+                    .join('\n');
+                await sock.sendMessage(sender, {
+                    text: `*Available Commands:*\n\n${commandList}`
+                });
+                logger.info(`Help command completed for ${sender}`);
+            } catch (err) {
+                logger.error('Error executing help command:', err);
+                throw err;
+            }
+        }
+    });
 
-commands.set('info', {
-    execute: async (sock, message, args) => {
-        const sender = message.key.remoteJid;
-        logger.info(`Executing info command for ${sender}`);
-        await sock.sendMessage(sender, {
-            text: '*Bot Info*\n\n' +
-                  '🤖 BLACKSKY-MD Bot\n' +
-                  '📱 A WhatsApp Multi-Device Bot\n' +
-                  '🔧 Created with @whiskeysockets/baileys'
-        });
-        logger.info(`Info command completed for ${sender}`);
-    }
-});
+    // Register info command
+    commands.set('info', {
+        execute: async (sock, message, args) => {
+            try {
+                const sender = message.key.remoteJid;
+                logger.info(`Executing info command for ${sender}`);
+                await sock.sendMessage(sender, {
+                    text: '*Bot Info*\n\n' +
+                          '🤖 BLACKSKY-MD Bot\n' +
+                          '📱 A WhatsApp Multi-Device Bot\n' +
+                          '🔧 Created with @whiskeysockets/baileys'
+                });
+                logger.info(`Info command completed for ${sender}`);
+            } catch (err) {
+                logger.error('Error executing info command:', err);
+                throw err;
+            }
+        }
+    });
+
+    logger.info(`Successfully registered ${commands.size} basic commands`);
+} catch (err) {
+    logger.error('Error initializing commands:', err);
+    throw err;
+}
 
 /**
  * Process incoming commands
@@ -50,11 +75,6 @@ commands.set('info', {
 async function processCommand(sock, message, commandText) {
     try {
         const sender = message.key.remoteJid;
-
-        logger.info('Command processing started:', {
-            text: commandText,
-            sender: sender
-        });
 
         // Skip if no command text
         if (!commandText?.trim()) {
@@ -65,11 +85,10 @@ async function processCommand(sock, message, commandText) {
         // Split command and args
         const [commandName, ...args] = commandText.trim().split(' ');
 
-        logger.info('Command details:', {
+        logger.info('Processing command:', {
             command: commandName,
             args: args,
-            sender: sender,
-            availableCommands: Array.from(commands.keys())
+            sender: sender
         });
 
         // Get command handler
@@ -84,25 +103,32 @@ async function processCommand(sock, message, commandText) {
         }
 
         // Execute command
-        logger.info(`Executing command: ${commandName}`);
-        await command.execute(sock, message, args);
-        logger.info(`Command executed successfully: ${commandName}`);
+        try {
+            await command.execute(sock, message, args);
+            logger.info(`Command executed successfully: ${commandName}`);
+        } catch (execErr) {
+            logger.error('Command execution error:', {
+                command: commandName,
+                error: execErr.message,
+                stack: execErr.stack
+            });
+            await sock.sendMessage(sender, {
+                text: '❌ Command failed. Please try again.'
+            });
+        }
 
     } catch (err) {
-        logger.error('Command processing error:', {
-            error: err.message,
-            stack: err.stack,
-            command: commandText,
-            sender: message.key.remoteJid
-        });
-
-        await sock.sendMessage(message.key.remoteJid, {
-            text: '❌ An error occurred while processing your command. Please try again.'
-        });
+        logger.error('Command processing error:', err);
+        try {
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ An error occurred while processing your command.'
+            });
+        } catch (sendErr) {
+            logger.error('Failed to send error message:', sendErr);
+        }
     }
 }
 
-// Export functions
 module.exports = {
     processCommand,
     commands
