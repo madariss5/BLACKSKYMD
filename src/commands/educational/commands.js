@@ -1830,8 +1830,8 @@ Properties: ${elementData.properties}`;
     async history(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const [period = '', ...event] = args;
-            const eventQuery = event.join(' ');
+            const [period = '', ...eventNameParts] = args;
+            const eventName = eventNameParts.join(' ');
 
             if (!period) {
                 await sock.sendMessage(remoteJid, {
@@ -1872,23 +1872,23 @@ Available periods:
                 return;
             }
 
-            if (!eventQuery) {
-                const events = Object.keys(historicalEvents[period.toLowerCase()]);
+            if (!eventName) {
+                const eventsList = Object.keys(historicalEvents[period.toLowerCase()]);
                 await sock.sendMessage(remoteJid, {
-                    text: `*📜 Available ${period} Events:*\n\n${events.join('\n')}`
+                    text: `*📜 Available ${period} Events:*\n\n${eventsList.join('\n')}`
                 });
                 return;
             }
 
-            const event = historicalEvents[period.toLowerCase()][eventQuery.toLowerCase()];
-            if (!event) {
+            const historicalEvent = historicalEvents[period.toLowerCase()][eventName.toLowerCase()];
+            if (!historicalEvent) {
                 await sock.sendMessage(remoteJid, {
                     text: '❌ Event not found for this period'
                 });
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: `*📜 Historical Event*\n\n${event}` });
+            await sock.sendMessage(remoteJid, { text: `*📜 Historical Event*\n\n${historicalEvent}` });
 
         } catch (err) {
             logger.error('Error in history command:', err);
