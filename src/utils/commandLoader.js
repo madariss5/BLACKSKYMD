@@ -81,6 +81,22 @@ class CommandLoader {
                         loadedHandlers[currentCategory].total++;
                         logger.info(`Processing command: ${name} in ${entry.name}`);
 
+                        // Special debugging for user_extended.js module
+                        if (entry.name === 'user_extended.js') {
+                            logger.info(`DEBUG - Checking user_extended command: ${name}, type: ${typeof handler}`);
+                            // Inspect the handler in greater detail
+                            if (typeof handler !== 'function') {
+                                logger.error(`Invalid handler type in user_extended.js for command '${name}': ${typeof handler}`);
+                                if (handler === null) {
+                                    logger.error(`Handler is null for command '${name}'`);
+                                } else if (handler === undefined) {
+                                    logger.error(`Handler is undefined for command '${name}'`);
+                                } else if (typeof handler === 'object') {
+                                    logger.error(`Handler is object for command '${name}': ${JSON.stringify(handler)}`);
+                                }
+                            }
+                        }
+
                         if (typeof handler !== 'function') {
                             loadedHandlers[currentCategory].failed++;
                             logger.warn(`Skipping non-function handler for ${name} in ${entry.name}, type: ${typeof handler}`);
@@ -164,12 +180,26 @@ class CommandLoader {
                     if (module && module.commands) {
                         const commandNames = Object.keys(module.commands);
                         logger.info(`DEBUG - User_extended commands: ${commandNames.join(', ')}`);
+                        logger.info(`DEBUG - User_extended total commands: ${commandNames.length}`);
                         
-                        // Check each command
+                        // Validate each command
+                        let validCount = 0;
+                        let invalidCount = 0;
+                        let invalidCommands = [];
+                        
                         for (const [name, handler] of Object.entries(module.commands)) {
                             if (typeof handler !== 'function') {
+                                invalidCount++;
+                                invalidCommands.push(name);
                                 logger.error(`Invalid handler in user_extended.js for command '${name}': ${typeof handler}`);
+                            } else {
+                                validCount++;
                             }
+                        }
+                        
+                        logger.info(`DEBUG - User_extended summary: Valid: ${validCount}, Invalid: ${invalidCount}`);
+                        if (invalidCount > 0) {
+                            logger.error(`Invalid commands in user_extended.js: ${invalidCommands.join(', ')}`);
                         }
                     } else {
                         logger.error(`Invalid module format in user_extended.js: ${Object.keys(module || {}).join(', ')}`);
