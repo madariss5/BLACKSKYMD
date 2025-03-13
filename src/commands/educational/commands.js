@@ -1937,4 +1937,8 @@ async function ensureDirectory(dirPath) {
     }
 }
 
-module.exports = commands;
+// Export using the expected module structure
+module.exports = {
+    commands: commands,
+    category: 'educational'
+};
