@@ -27,11 +27,11 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node qr-web-display.js"
+args = "node connected-bot.js"
 waitForPort = 5000
 
 [deployment]
-run = ["sh", "-c", "node qr-web-display.js"]
+run = ["sh", "-c", "node connected-bot.js"]
 
 [[ports]]
 localPort = 5000
