@@ -11,10 +11,15 @@ const pino = require('pino');
 // Import message handlers
 const { messageHandler } = require('./src/handlers/messageHandler');
 
-// Configure options
-const SESSION_DIR = path.join(__dirname, 'auth_info');
+// Configure options based on environment variables
+// This allows for using different auth directories for QR Server vs Bot
+const AUTH_DIR = process.env.AUTH_DIR || 'auth_info';
+const BOT_MODE = process.env.BOT_MODE || 'BOT_HANDLER';
+const SESSION_DIR = path.join(__dirname, AUTH_DIR);
 const BACKUP_DIR = path.join(__dirname, 'sessions');
 const PORT = parseInt(process.env.BOT_PORT || '5001', 10); // Use a different port to avoid conflict with QR Server
+
+console.log(`Starting in ${BOT_MODE} mode with auth directory: ${AUTH_DIR}`);
 
 // Set up pino logger properly
 const logger = pino({
