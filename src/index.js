@@ -6,14 +6,132 @@ const commandModules = require('./commands/index');
 const logger = require('./utils/logger');
 const config = require('./config/config');
 const fs = require('node:fs');
-const { DisconnectReason } = require('@adiwajshing/baileys');
+const { DisconnectReason } = require('@whiskeysockets/baileys');
 
+// Global connection lock
+let isConnecting = false;
+let connectionTimeout = null;
+
+// Add reconnection manager
+const reconnectManager = {
+    attempts: 0,
+    maxAttempts: 5,
+    baseDelay: 10000, // Increased significantly
+    maxDelay: 300000, // 5 minutes max delay
+    isReconnecting: false,
+    connectionLock: false,
+
+    async handleReconnect(error, lastDisconnect) {
+        if (this.isReconnecting || this.connectionLock) {
+            logger.info('Connection attempt already in progress, skipping...');
+            return false;
+        }
+
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        logger.info(`Handling disconnect with status code: ${statusCode}`);
+
+        // Set connection lock
+        this.connectionLock = true;
+        this.isReconnecting = true;
+
+        try {
+            // Clear session and exit on critical errors
+            if (statusCode === DisconnectReason.loggedOut || 
+                statusCode === DisconnectReason.connectionReplaced ||
+                statusCode === DisconnectReason.connectionClosed ||
+                statusCode === DisconnectReason.timedOut) {
+
+                logger.info('Critical connection error, clearing session...');
+                await this.clearSession();
+
+                // Force process restart
+                logger.info('Session cleared, restarting process...');
+                process.exit(1);
+                return false;
+            }
+
+            // Implement exponential backoff with increased delays
+            if (this.attempts >= this.maxAttempts) {
+                logger.error('Max reconnection attempts reached, clearing session and restarting...');
+                await this.clearSession();
+                process.exit(1);
+                return false;
+            }
+
+            const delay = Math.min(
+                this.baseDelay * Math.pow(2, this.attempts),
+                this.maxDelay
+            );
+
+            this.attempts++;
+            logger.info(`Reconnection attempt ${this.attempts}/${this.maxAttempts} in ${delay}ms`);
+
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return true;
+
+        } catch (err) {
+            logger.error('Error during reconnection:', err);
+            return false;
+
+        } finally {
+            this.isReconnecting = false;
+            this.connectionLock = false;
+        }
+    },
+
+    async clearSession() {
+        try {
+            const sessionFiles = [
+                'auth_info_multi.json',
+                'auth_info_baileys.json',
+                'auth_info.json',
+                'auth_info_qr.json'
+            ];
+
+            for (const file of sessionFiles) {
+                try {
+                    if (fs.existsSync(file)) {
+                        fs.unlinkSync(file);
+                        logger.info(`Cleared session file: ${file}`);
+                    }
+                } catch (err) {
+                    logger.error(`Error clearing session file ${file}:`, err);
+                }
+            }
+
+            // Also clear the auth_info directory if it exists
+            const authDir = './auth_info';
+            if (fs.existsSync(authDir)) {
+                try {
+                    fs.rmdirSync(authDir, { recursive: true });
+                    logger.info('Cleared auth_info directory');
+                } catch (err) {
+                    logger.error('Error clearing auth_info directory:', err);
+                }
+            }
+
+            logger.info('All session files cleared successfully');
+        } catch (err) {
+            logger.error('Error in clearSession:', err);
+        }
+    },
+
+    reset() {
+        this.attempts = 0;
+        this.isReconnecting = false;
+        this.connectionLock = false;
+        if (connectionTimeout) {
+            clearTimeout(connectionTimeout);
+            connectionTimeout = null;
+        }
+        logger.info('Reset reconnection manager state');
+    }
+};
 
 async function startServer(sock) {
     const app = express();
     app.use(express.json());
 
-    // Store the sock instance for later use
     if (sock) {
         app.set('sock', sock);
     }
@@ -30,7 +148,6 @@ async function startServer(sock) {
         }
 
         if (!currentSock) {
-            // If we're initializing, show a link to the QR code
             res.send(`
                 <html>
                     <head>
@@ -92,216 +209,55 @@ async function startServer(sock) {
         }
     });
 
-    // Debug endpoint to check command loading
-    app.get('/debug/commands', (req, res) => {
-        const stats = commandLoader.getCommandStats();
-        const commands = commandLoader.getAllCommands();
-        const commandsByCategory = {};
-
-        // Group commands by category
-        commands.forEach(cmd => {
-            if (!commandsByCategory[cmd.category]) {
-                commandsByCategory[cmd.category] = [];
-            }
-            commandsByCategory[cmd.category].push(cmd.name);
-        });
-
-        res.json({
-            total: commands.length,
-            stats,
-            categories: Object.keys(commandsByCategory).map(category => ({
-                name: category,
-                commandCount: commandsByCategory[category].length,
-                commands: commandsByCategory[category]
-            }))
-        });
-    });
-
-    // Advanced debug endpoint to check command loading errors
-    app.get('/debug/command-modules', async (req, res) => {
-        try {
-            const commandsPath = require('path').join(__dirname, 'commands');
-            const files = require('fs').readdirSync(commandsPath);
-
-            const moduleStatus = [];
-
-            for (const file of files) {
-                if (!file.endsWith('.js') || file === 'index.js') continue;
-
-                try {
-                    // Try to require the module directly for diagnostic purposes
-                    const modulePath = require('path').join(commandsPath, file);
-                    delete require.cache[require.resolve(modulePath)]; // Clear cache
-                    const moduleData = require(modulePath);
-
-                    moduleStatus.push({
-                        file,
-                        loaded: true,
-                        hasCommands: !!moduleData.commands,
-                        commandCount: moduleData.commands ? Object.keys(moduleData.commands).length : 0,
-                        category: moduleData.category || file.replace('.js', ''),
-                        hasInit: typeof moduleData.init === 'function',
-                        error: null
-                    });
-                } catch (err) {
-                    moduleStatus.push({
-                        file,
-                        loaded: false,
-                        hasCommands: false,
-                        commandCount: 0,
-                        category: file.replace('.js', ''),
-                        hasInit: false,
-                        error: {
-                            message: err.message,
-                            stack: err.stack
-                        }
-                    });
-                }
-            }
-
-            res.json({
-                totalModules: moduleStatus.length,
-                moduleStatus
-            });
-        } catch (err) {
-            res.status(500).json({
-                error: err.message,
-                stack: err.stack
-            });
-        }
-    });
-
-    // Use port 5000 for the API server (separate from QR code server)
     const PORT = 5000;
     const server = app.listen(PORT, '0.0.0.0')
         .on('error', (err) => {
-            console.error('Failed to start HTTP server:', err);
+            logger.error('Failed to start HTTP server:', err);
             process.exit(1);
         });
 
     return server;
 }
 
-// Add reconnection manager
-const reconnectManager = {
-    attempts: 0,
-    maxAttempts: 5,
-    baseDelay: 5000, // Increased from 2000
-    maxDelay: 120000, // Increased from 60000
-    isReconnecting: false,
-
-    async handleReconnect(error, lastDisconnect) {
-        if (this.isReconnecting) {
-            logger.info('Already attempting to reconnect, skipping...');
-            return false;
-        }
-
-        const statusCode = lastDisconnect?.error?.output?.statusCode;
-        logger.info(`Handling disconnect with status code: ${statusCode}`);
-
-        // Clear session and exit on critical errors
-        if (statusCode === DisconnectReason.loggedOut || 
-            statusCode === DisconnectReason.connectionReplaced ||
-            statusCode === DisconnectReason.connectionClosed) {
-            logger.info('Critical connection error, clearing session...');
-
-            // Clear all session files
-            const sessionFiles = [
-                'auth_info_multi.json',
-                'auth_info_baileys.json',
-                'auth_info.json'
-            ];
-
-            for (const file of sessionFiles) {
-                try {
-                    if (fs.existsSync(file)) {
-                        fs.unlinkSync(file);
-                        logger.info(`Cleared session file: ${file}`);
-                    }
-                } catch (err) {
-                    logger.error(`Error clearing session file ${file}:`, err);
-                }
-            }
-
-            logger.info('Session cleared, restarting process...');
-            process.exit(1); // Process manager will restart
-            return false;
-        }
-
-        // Implement exponential backoff with increased delays
-        if (this.attempts >= this.maxAttempts) {
-            logger.error('Max reconnection attempts reached, clearing session and restarting...');
-            await this.clearSession();
-            process.exit(1);
-            return false;
-        }
-
-        this.isReconnecting = true;
-        const delay = Math.min(
-            this.baseDelay * Math.pow(2, this.attempts),
-            this.maxDelay
-        );
-
-        this.attempts++;
-        logger.info(`Reconnection attempt ${this.attempts}/${this.maxAttempts} in ${delay}ms`);
-
-        try {
-            await new Promise(resolve => setTimeout(resolve, delay));
-            this.isReconnecting = false;
-            return true;
-        } catch (err) {
-            logger.error('Error during reconnection delay:', err);
-            this.isReconnecting = false;
-            return false;
-        }
-    },
-
-    async clearSession() {
-        try {
-            const sessionFiles = [
-                'auth_info_multi.json',
-                'auth_info_baileys.json',
-                'auth_info.json'
-            ];
-
-            for (const file of sessionFiles) {
-                if (fs.existsSync(file)) {
-                    fs.unlinkSync(file);
-                }
-            }
-            logger.info('Session files cleared successfully');
-        } catch (err) {
-            logger.error('Error clearing session files:', err);
-        }
-    },
-
-    reset() {
-        this.attempts = 0;
-        this.isReconnecting = false;
-        logger.info('Reset reconnection manager state');
-    }
-};
-
 async function main() {
     let server = null;
     let sock = null;
 
     try {
-        // Clear console first
         process.stdout.write('\x1Bc');
-
-        // Start the API server immediately to make port 5000 available
-        console.log('Starting API server first...');
+        logger.info('Starting API server first...');
         server = await startServer(null);
-        console.log('API server started on port 5000');
+        logger.info('API server started on port 5000');
 
-        // Start WhatsApp connection to show QR code
-        try {
-            sock = await startConnection();
-        } catch (err) {
-            console.error('Fatal error establishing WhatsApp connection:', err);
-            throw err;
-        }
+        // Start WhatsApp connection with timeout protection
+        const startWhatsAppConnection = async () => {
+            if (isConnecting) {
+                logger.info('Connection attempt already in progress, skipping...');
+                return;
+            }
+
+            isConnecting = true;
+            try {
+                sock = await startConnection();
+
+                // Set connection timeout
+                if (connectionTimeout) {
+                    clearTimeout(connectionTimeout);
+                }
+                connectionTimeout = setTimeout(() => {
+                    logger.error('Connection timeout reached, restarting...');
+                    process.exit(1);
+                }, 300000); // 5 minutes timeout
+
+            } catch (err) {
+                logger.error('Fatal error establishing WhatsApp connection:', err);
+                throw err;
+            } finally {
+                isConnecting = false;
+            }
+        };
+
+        await startWhatsAppConnection();
 
         // Handle connection updates with improved error handling
         sock.ev.on('connection.update', async (update) => {
@@ -318,7 +274,7 @@ async function main() {
                 if (shouldReconnect) {
                     try {
                         logger.info('Attempting to establish new connection...');
-                        sock = await startConnection();
+                        await startWhatsAppConnection();
                     } catch (err) {
                         logger.error('Failed to establish new connection:', err);
                     }
@@ -348,59 +304,22 @@ async function main() {
             }
         });
 
-        // Enhanced graceful shutdown
-        const cleanup = async (signal) => {
-            console.log(`\nReceived ${signal} signal. Cleaning up...`);
-
-            if (server) {
-                await new Promise((resolve) => {
-                    server.close(() => {
-                        console.log('HTTP server closed');
-                        resolve();
-                    });
-                });
-            }
-
-            if (sock) {
-                try {
-                    await sock.logout();
-                    console.log('WhatsApp logout successful');
-                } catch (err) {
-                    console.error('Error during WhatsApp logout:', err);
-                }
-            }
-
-            process.exit(0);
-        };
-
-        process.on('SIGTERM', () => cleanup('SIGTERM'));
-        process.on('SIGINT', () => cleanup('SIGINT'));
-
-        // Implement periodic memory cleanup to keep the bot running smoothly 24/7
+        // Implement periodic memory cleanup
         const MEMORY_CLEANUP_INTERVAL = 3600000; // 1 hour
         setInterval(() => {
             try {
                 if (global.gc) {
                     global.gc();
-                    logger.info('Performed garbage collection to free memory');
+                    logger.info('Performed garbage collection');
                 }
 
-                // Check for possible memory leaks
                 const memoryUsage = process.memoryUsage();
-                logger.info('Memory usage stats:', {
-                    rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
-                    heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
-                    heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`
-                });
-
-                // If memory usage is too high, implement more aggressive cleanup
                 if (memoryUsage.heapUsed > 1024 * 1024 * 500) { // 500MB threshold
                     logger.warn('High memory usage detected, performing additional cleanup');
-                    // Clear command cache to free memory
                     commandLoader.reloadCommands();
                 }
-            } catch (memErr) {
-                logger.error('Memory cleanup error:', memErr);
+            } catch (err) {
+                logger.error('Memory cleanup error:', err);
             }
         }, MEMORY_CLEANUP_INTERVAL);
 
@@ -468,13 +387,24 @@ async function main() {
         }
 
     } catch (err) {
-        console.error('Fatal error starting bot:', err);
+        logger.error('Fatal error starting bot:', err);
         process.exit(1);
     }
 }
 
+// Handle uncaught errors
+process.on('uncaughtException', (err) => {
+    logger.error('Uncaught Exception:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (err) => {
+    logger.error('Unhandled Rejection:', err);
+    process.exit(1);
+});
+
 // Start the bot
 main().catch(err => {
-    console.error('Fatal error starting bot:', err);
+    logger.error('Fatal error starting bot:', err);
     process.exit(1);
 });
