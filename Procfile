@@ -1,1 +1,1 @@
-worker: node start.js
+web: node heroku-deploy.js

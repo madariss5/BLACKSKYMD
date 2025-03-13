@@ -1,90 +1,62 @@
 {
-  "name": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻",
-  "description": "A comprehensive WhatsApp bot with multi-device support and extensive features",
-  "keywords": [
-    "whatsapp",
-    "bot",
-    "baileys",
-    "multi-device"
-  ],
-  "repository": "https://github.com/yourusername/whatsapp-bot",
-  "success_url": "/",
+  "name": "BLACKSKY-MD WhatsApp Bot",
+  "description": "A sophisticated WhatsApp multi-device bot delivering intelligent, interactive, and educational messaging experiences with advanced personalization and user engagement capabilities.",
+  "repository": "https://github.com/madariss5/BLACKSKY",
+  "logo": "https://raw.githubusercontent.com/madariss5/BLACKSKY/main/generated-icon.png",
+  "keywords": ["whatsapp", "bot", "multi-device", "baileys", "md-bot", "blacksky"],
   "env": {
-    "OWNER_NUMBER": {
-      "description": "WhatsApp number of the bot owner (format: 1234567890)",
+    "SESSION_STRING": {
+      "description": "WhatsApp session credentials (Base64 encoded). You can leave this blank and add it via the web interface after deployment.",
+      "required": false
+    },
+    "PREFIX": {
+      "description": "Command prefix (e.g., '.')",
+      "value": ".",
       "required": true
     },
-    "SESSION_ID": {
-      "description": "Unique session ID for multi-device support",
-      "required": true,
-      "generator": "secret"
-    },
-    "BOT_PREFIX": {
-      "description": "Command prefix for the bot (default: .)",
-      "required": true,
-      "value": "."
+    "OWNER_NUMBER": {
+      "description": "Your WhatsApp number with country code (example: 491234567890)",
+      "required": true
     },
     "BOT_NAME": {
-      "description": "Custom name for your bot (default: 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻)",
-      "required": false,
-      "value": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻"
-    },
-    "NODE_ENV": {
-      "description": "Environment mode",
-      "value": "production"
-    },
-    "HEROKU_APP_NAME": {
-      "description": "The name of your Heroku app for keep-alive pings",
-      "required": true
-    },
-    "APP_URL": {
-      "description": "Custom URL for your app if not using the default Heroku domain (optional)",
+      "description": "Name for your bot",
+      "value": "BLACKSKY-MD",
       "required": false
     },
-    "KEEP_ALIVE": {
-      "description": "Set to false to disable keep-alive pings (default: true)",
-      "required": false,
-      "value": "true"
-    },
-    "BACKUP_INTERVAL": {
-      "description": "Interval in minutes between session backups (default: 15)",
-      "required": false,
-      "value": "15"
-    },
-    "OPENWEATHERMAP_API_KEY": {
-      "description": "API key for weather commands (from openweathermap.org)",
+    "LANGUAGE": {
+      "description": "Primary and secondary languages (comma-separated)",
+      "value": "en,de",
       "required": false
     },
-    "GOOGLE_API_KEY": {
-      "description": "API key for Google services",
+    "STICKER_PACKNAME": {
+      "description": "Name for sticker packs",
+      "value": "BLACKSKY-MD",
       "required": false
     },
-    "WOLFRAM_APP_ID": {
-      "description": "App ID for Wolfram Alpha queries",
+    "STICKER_AUTHOR": {
+      "description": "Author name for stickers",
+      "value": "Bot",
       "required": false
     },
-    "NEWS_API_KEY": {
-      "description": "API key for news commands",
+    "ENABLE_NSFW": {
+      "description": "Enable NSFW features (true/false)",
+      "value": "false",
       "required": false
     },
-    "SPOTIFY_CLIENT_ID": {
-      "description": "Spotify Developer client ID for music-related functions",
+    "ENABLE_GAMES": {
+      "description": "Enable games features (true/false)",
+      "value": "true",
       "required": false
     },
-    "SPOTIFY_CLIENT_SECRET": {
-      "description": "Spotify Developer client secret for music-related functions",
+    "ENABLE_MEDIA": {
+      "description": "Enable media processing features (true/false)",
+      "value": "true",
       "required": false
     },
-    "LOG_LEVEL": {
-      "description": "Logging level (error, warn, info, debug)",
-      "required": false,
-      "value": "info"
-    }
-  },
-  "formation": {
-    "worker": {
-      "quantity": 1,
-      "size": "eco"
+    "ENABLE_EDUCATIONAL": {
+      "description": "Enable educational features (true/false)",
+      "value": "true",
+      "required": false
     }
   },
   "buildpacks": [
@@ -95,5 +67,10 @@
       "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
     }
   ],
-  "stack": "heroku-22"
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  }
 }
