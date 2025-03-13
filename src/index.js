@@ -186,36 +186,57 @@ async function startServer(sock) {
 const reconnectManager = {
     attempts: 0,
     maxAttempts: 5,
-    baseDelay: 2000,
-    maxDelay: 60000,
+    baseDelay: 5000, // Increased from 2000
+    maxDelay: 120000, // Increased from 60000
+    isReconnecting: false,
 
     async handleReconnect(error, lastDisconnect) {
+        if (this.isReconnecting) {
+            logger.info('Already attempting to reconnect, skipping...');
+            return false;
+        }
+
         const statusCode = lastDisconnect?.error?.output?.statusCode;
+        logger.info(`Handling disconnect with status code: ${statusCode}`);
 
-        // Don't reconnect if explicitly logged out
-        if (statusCode === DisconnectReason.loggedOut) {
-            logger.info('User logged out, not attempting reconnection');
-            return false;
-        }
+        // Clear session and exit on critical errors
+        if (statusCode === DisconnectReason.loggedOut || 
+            statusCode === DisconnectReason.connectionReplaced ||
+            statusCode === DisconnectReason.connectionClosed) {
+            logger.info('Critical connection error, clearing session...');
 
-        // Handle connection replacement
-        if (statusCode === DisconnectReason.connectionReplaced) {
-            logger.info('Connection replaced, clearing session and restarting...');
-            // Clear the session to force new QR code
-            if (fs.existsSync('auth_info_multi.json')) {
-                fs.unlinkSync('auth_info_multi.json');
+            // Clear all session files
+            const sessionFiles = [
+                'auth_info_multi.json',
+                'auth_info_baileys.json',
+                'auth_info.json'
+            ];
+
+            for (const file of sessionFiles) {
+                try {
+                    if (fs.existsSync(file)) {
+                        fs.unlinkSync(file);
+                        logger.info(`Cleared session file: ${file}`);
+                    }
+                } catch (err) {
+                    logger.error(`Error clearing session file ${file}:`, err);
+                }
             }
+
+            logger.info('Session cleared, restarting process...');
             process.exit(1); // Process manager will restart
             return false;
         }
 
-        // Implement exponential backoff
+        // Implement exponential backoff with increased delays
         if (this.attempts >= this.maxAttempts) {
-            logger.error('Max reconnection attempts reached, restarting process...');
-            process.exit(1); // Process manager will restart
+            logger.error('Max reconnection attempts reached, clearing session and restarting...');
+            await this.clearSession();
+            process.exit(1);
             return false;
         }
 
+        this.isReconnecting = true;
         const delay = Math.min(
             this.baseDelay * Math.pow(2, this.attempts),
             this.maxDelay
@@ -224,12 +245,40 @@ const reconnectManager = {
         this.attempts++;
         logger.info(`Reconnection attempt ${this.attempts}/${this.maxAttempts} in ${delay}ms`);
 
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return true;
+        try {
+            await new Promise(resolve => setTimeout(resolve, delay));
+            this.isReconnecting = false;
+            return true;
+        } catch (err) {
+            logger.error('Error during reconnection delay:', err);
+            this.isReconnecting = false;
+            return false;
+        }
+    },
+
+    async clearSession() {
+        try {
+            const sessionFiles = [
+                'auth_info_multi.json',
+                'auth_info_baileys.json',
+                'auth_info.json'
+            ];
+
+            for (const file of sessionFiles) {
+                if (fs.existsSync(file)) {
+                    fs.unlinkSync(file);
+                }
+            }
+            logger.info('Session files cleared successfully');
+        } catch (err) {
+            logger.error('Error clearing session files:', err);
+        }
     },
 
     reset() {
         this.attempts = 0;
+        this.isReconnecting = false;
+        logger.info('Reset reconnection manager state');
     }
 };
 
@@ -259,17 +308,24 @@ async function main() {
             const { connection, lastDisconnect } = update;
 
             if (connection === 'close') {
+                logger.info('Connection closed, checking reconnection possibility...');
+
                 const shouldReconnect = await reconnectManager.handleReconnect(
                     lastDisconnect?.error,
                     lastDisconnect
                 );
 
                 if (shouldReconnect) {
-                    sock = await startConnection();
+                    try {
+                        logger.info('Attempting to establish new connection...');
+                        sock = await startConnection();
+                    } catch (err) {
+                        logger.error('Failed to establish new connection:', err);
+                    }
                 }
             } else if (connection === 'open') {
                 logger.info('Connection established successfully');
-                reconnectManager.reset(); // Reset attempt counter on successful connection
+                reconnectManager.reset();
 
                 // Initialize command handlers
                 const originalLevel = logger.level;
@@ -279,7 +335,6 @@ async function main() {
                     await commandLoader.loadCommandHandlers();
                     await commandModules.initializeModules(sock);
 
-                    // Update the express app with the sock instance
                     const expressApp = server._events.request;
                     if (expressApp && typeof expressApp.set === 'function') {
                         expressApp.set('sock', sock);
