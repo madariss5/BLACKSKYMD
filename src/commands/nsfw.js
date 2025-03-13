@@ -909,23 +909,45 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: 'Fetching GIF...' });
             
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/boobjob`);
+            // Primary GIF endpoint
+            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/boobjob`;
+            
+            // Fallback URLs for GIFs
+            const fallbacks = [
+                `${API_ENDPOINTS.HMTAI}/nsfw/tits`, // Alternative endpoint
+                `${API_ENDPOINTS.ANIME_IMAGES}/nsfw/gif` // Generic NSFW GIF source
+            ];
+            
+            // Try primary first, then fallbacks
+            const response = await fetchApi(primaryUrl, fallbacks);
+            
             if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. Please try again later.' });
+                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. All API endpoints are down. Please try again later.' });
                 return;
             }
             
-            // Send as video for better compatibility
-            await sock.sendMessage(sender, {
-                video: { url: response.url },
-                caption: '🔞 Boobs GIF',
-                gifPlayback: true
-            });
+            // Detect if URL ends with gif, mp4, webm, or other video format
+            const isAnimated = /\.(gif|mp4|webm|webp)(\?.*)?$/i.test(response.url);
             
-            logger.info(`NSFW GIF sent to ${sender}`);
+            if (isAnimated) {
+                // Send as video for better compatibility
+                await sock.sendMessage(sender, {
+                    video: { url: response.url },
+                    caption: '🔞 Boobs GIF',
+                    gifPlayback: true
+                });
+                logger.info(`NSFW GIF sent to ${sender}`);
+            } else {
+                // Fallback to image if we didn't get a GIF
+                await sock.sendMessage(sender, {
+                    image: { url: response.url },
+                    caption: '🔞 Boobs (Static image - GIF not available)'
+                });
+                logger.info(`NSFW image sent to ${sender} (fallback from GIF)`);
+            }
         } catch (err) {
             logger.error('Error in gifboobs:', err);
-            await sock.sendMessage(sender, { text: 'Failed to fetch GIF.' });
+            await sock.sendMessage(sender, { text: 'Failed to fetch GIF due to server error.' });
         }
     },
     
@@ -955,24 +977,45 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: 'Fetching GIF...' });
             
-            // Use the appropriate endpoint for GIFs
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/pgif`);
+            // Primary URL for animated content
+            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/pgif`;
+            
+            // Fallback URLs in case primary fails
+            const fallbacks = [
+                `${API_ENDPOINTS.HMTAI}/nsfw/anal`,  // May return GIF
+                `${API_ENDPOINTS.ANIME_IMAGES}/nsfw/ass/gif` // More likely to be animated
+            ];
+            
+            // Try primary first, then fallbacks
+            const response = await fetchApi(primaryUrl, fallbacks);
+            
             if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. Please try again later.' });
+                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. All API endpoints are down. Please try again later.' });
                 return;
             }
             
-            // Send as video with gifPlayback for better compatibility
-            await sock.sendMessage(sender, {
-                video: { url: response.url },
-                caption: '🔞 Ass GIF',
-                gifPlayback: true
-            });
+            // Detect if URL ends with gif, mp4, webm, or other video format
+            const isAnimated = /\.(gif|mp4|webm|webp)(\?.*)?$/i.test(response.url);
             
-            logger.info(`NSFW GIF sent to ${sender}`);
+            if (isAnimated) {
+                // Send as video with gifPlayback for better compatibility
+                await sock.sendMessage(sender, {
+                    video: { url: response.url },
+                    caption: '🔞 Ass GIF',
+                    gifPlayback: true
+                });
+                logger.info(`NSFW GIF sent to ${sender}`);
+            } else {
+                // Fallback to image if we didn't get a GIF
+                await sock.sendMessage(sender, {
+                    image: { url: response.url },
+                    caption: '🔞 Ass (Static image - GIF not available)'
+                });
+                logger.info(`NSFW image sent to ${sender} (fallback from GIF)`);
+            }
         } catch (err) {
             logger.error('Error in gifass:', err);
-            await sock.sendMessage(sender, { text: 'Failed to fetch GIF.' });
+            await sock.sendMessage(sender, { text: 'Failed to fetch GIF due to server error.' });
         }
     },
     
@@ -1002,23 +1045,45 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: 'Fetching GIF...' });
             
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/gif`);
+            // Primary URL for animated content
+            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/gif`;
+            
+            // Fallback URLs in case primary fails
+            const fallbacks = [
+                `${API_ENDPOINTS.HMTAI}/nsfw/classic`,  // May return GIF
+                `${API_ENDPOINTS.ANIME_IMAGES}/nsfw/gif` // Generic GIF endpoint
+            ];
+            
+            // Try primary first, then fallbacks
+            const response = await fetchApi(primaryUrl, fallbacks);
+            
             if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. Please try again later.' });
+                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. All API endpoints are down. Please try again later.' });
                 return;
             }
             
-            // Send as video for better compatibility
-            await sock.sendMessage(sender, {
-                video: { url: response.url },
-                caption: '🔞 Hentai GIF',
-                gifPlayback: true
-            });
+            // Detect if URL ends with gif, mp4, webm, or other video format
+            const isAnimated = /\.(gif|mp4|webm|webp)(\?.*)?$/i.test(response.url);
             
-            logger.info(`NSFW GIF sent to ${sender}`);
+            if (isAnimated) {
+                // Send as video with gifPlayback for better compatibility
+                await sock.sendMessage(sender, {
+                    video: { url: response.url },
+                    caption: '🔞 Hentai GIF',
+                    gifPlayback: true
+                });
+                logger.info(`NSFW GIF sent to ${sender}`);
+            } else {
+                // Fallback to image if we didn't get a GIF
+                await sock.sendMessage(sender, {
+                    image: { url: response.url },
+                    caption: '🔞 Hentai (Static image - GIF not available)'
+                });
+                logger.info(`NSFW image sent to ${sender} (fallback from GIF)`);
+            }
         } catch (err) {
             logger.error('Error in gifhentai:', err);
-            await sock.sendMessage(sender, { text: 'Failed to fetch GIF.' });
+            await sock.sendMessage(sender, { text: 'Failed to fetch GIF due to server error.' });
         }
     },
     
@@ -1048,17 +1113,27 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: 'Fetching GIF...' });
             
-            // Use an endpoint known to return GIFs
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/blowjob`);
+            // Primary URL for animated content
+            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/blowjob`;
+            
+            // Fallback URLs in case primary fails
+            const fallbacks = [
+                `${API_ENDPOINTS.WAIFU_IM}/search/?included_tags=oral&is_nsfw=true`,
+                `${API_ENDPOINTS.ANIME_IMAGES}/nsfw/blowjob/gif`
+            ];
+            
+            // Try primary first, then fallbacks
+            const response = await fetchApi(primaryUrl, fallbacks);
+            
             if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. Please try again later.' });
+                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. All API endpoints are down. Please try again later.' });
                 return;
             }
             
-            // Try to determine if it's a GIF or static image
-            const fileType = response.url.toLowerCase().endsWith('.gif') ? 'gif' : 'image';
+            // Detect if URL ends with gif, mp4, webm, or other video format
+            const isAnimated = /\.(gif|mp4|webm|webp)(\?.*)?$/i.test(response.url);
             
-            if (fileType === 'gif') {
+            if (isAnimated) {
                 // Send as video with gifPlayback for better compatibility
                 await sock.sendMessage(sender, {
                     video: { url: response.url },
@@ -1070,13 +1145,13 @@ NSFW Statistics:
                 // Send as image if it's not animated
                 await sock.sendMessage(sender, {
                     image: { url: response.url },
-                    caption: '🔞 Blowjob'
+                    caption: '🔞 Blowjob (Static image - GIF not available)'
                 });
-                logger.info(`NSFW image sent to ${sender}`);
+                logger.info(`NSFW image sent to ${sender} (fallback from GIF)`);
             }
         } catch (err) {
             logger.error('Error in gifblowjob:', err);
-            await sock.sendMessage(sender, { text: 'Failed to fetch GIF.' });
+            await sock.sendMessage(sender, { text: 'Failed to fetch GIF due to server error.' });
         }
     },
     
