@@ -4,7 +4,7 @@ const config = {
     // Bot Owner Info
     owner: {
         name: process.env.OWNER_NAME || 'Bot Owner',  
-        number: process.env.OWNER_NUMBER, // Will be required for proper functioning
+        number: process.env.OWNER_NUMBER ? (process.env.OWNER_NUMBER.includes('@') ? process.env.OWNER_NUMBER : `${process.env.OWNER_NUMBER}@s.whatsapp.net`) : undefined,
         email: process.env.OWNER_EMAIL || '',
     },
 
@@ -50,6 +50,11 @@ const config = {
         // Check required variables
         if (!process.env.OWNER_NUMBER) missingVars.push('OWNER_NUMBER');
         if (!process.env.SESSION_ID) missingVars.push('SESSION_ID');
+
+        // Additional validation for owner number format
+        if (process.env.OWNER_NUMBER && !process.env.OWNER_NUMBER.match(/^\d+(@s\.whatsapp\.net)?$/)) {
+            missingVars.push('OWNER_NUMBER (invalid format)');
+        }
 
         return {
             isValid: missingVars.length === 0,
