@@ -177,20 +177,15 @@ function handleWordleGuess(word, guess) {
 
 // Command exports
 const funCommands = {
-    // Text Fun
+    // Fun Text Commands
     async quote(sock, sender) {
         try {
             const quotes = [
                 "Be yourself; everyone else is already taken. - Oscar Wilde",
                 "Two things are infinite: the universe and human stupidity; and I'm not sure about the universe. - Albert Einstein",
                 "Be the change that you wish to see in the world. - Mahatma Gandhi",
-                "In three words I can sum up everything I've learned about life: it goes on. - Robert Frost",
                 "Life is what happens when you're busy making other plans. - John Lennon",
-                "Success is not final, failure is not fatal: it is the courage to continue that counts. - Winston Churchill",
-                "The only way to do great work is to love what you do. - Steve Jobs",
-                "If you want to live a happy life, tie it to a goal, not to people or things. - Albert Einstein",
-                "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
-                "It does not matter how slowly you go as long as you do not stop. - Confucius"
+                "The only way to do great work is to love what you do. - Steve Jobs"
             ];
             const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
             await sock.sendMessage(sender, { text: `📜 Quote of the moment:\n\n${randomQuote}` });
@@ -233,8 +228,9 @@ const funCommands = {
     },
 
     // Games
-    async tictactoe(sock, sender, args) {
+    async tictactoe(sock, message, args) {
         try {
+            const sender = message.key.remoteJid;
             if (!(await areGamesEnabled(sock, sender))) return;
             
             if (!global.games) global.games = new Map();

@@ -7,7 +7,6 @@ const basicCommands = {
         try {
             // If specific command help is requested, forward to menu.js help
             if (args.length > 0) {
-                // Import menu commands
                 const menuModule = require('./menu');
                 if (menuModule.commands && menuModule.commands.help) {
                     return await menuModule.commands.help(sock, message, args);
@@ -29,12 +28,11 @@ Welcome to 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻! Here are some commands to g
 *Quick Start:*
 • ${prefix}ping - Check if bot is online
 • ${prefix}info - Get bot information
-• ${prefix}weather [city] - Get weather information
-• ${prefix}translate [text] - Translate text
+• ${prefix}stats - View bot statistics
 
 *For more commands, type:* ${prefix}menu
 
-This bot has over 300 commands across various categories!`.trim();
+Type ${prefix}help [command] for detailed help on any command.`.trim();
 
             await sock.sendMessage(message.key.remoteJid, {
                 text: helpText,
@@ -51,11 +49,11 @@ This bot has over 300 commands across various categories!`.trim();
     async ping(sock, message) {
         try {
             const start = Date.now();
-            await sock.sendMessage(message.key.remoteJid, { text: 'Pong! 🏓' });
+            await sock.sendMessage(message.key.remoteJid, { text: 'Pinging... 🏓' });
             const ping = Date.now() - start;
 
             await sock.sendMessage(message.key.remoteJid, {
-                text: `*🏓 Pong!*\n\n*Speed:* ${ping}ms\n*Status:* Active`
+                text: `*🏓 Pong!*\n\n*Speed:* ${ping}ms\n*Status:* Active ✅`
             });
         } catch (err) {
             logger.error('Error in ping command:', err);
@@ -76,7 +74,7 @@ This bot has over 300 commands across various categories!`.trim();
 *Platform:* ${process.platform}
 *Memory:* ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
 *Uptime:* ${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m
-*Status:* Online
+*Status:* Online ✅
 *Commands:* ${Object.keys(basicCommands).length} basic commands`.trim();
 
             await sock.sendMessage(message.key.remoteJid, {
@@ -90,43 +88,6 @@ This bot has over 300 commands across various categories!`.trim();
         }
     },
 
-    async botinfo(sock, sender) {
-        const stats = {
-            users: 0,
-            groups: 0,
-            commands: Object.keys(basicCommands).length,
-            uptime: process.uptime()
-        };
-
-        const info = `
-📊 Bot Statistics:
-• Users: ${stats.users}
-• Groups: ${stats.groups}
-• Commands: ${stats.commands}
-• Uptime: ${Math.floor(stats.uptime / 3600)}h ${Math.floor((stats.uptime % 3600) / 60)}m
-• Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
-• Platform: ${process.platform}
-• Node.js: ${process.version}
-• CPU Usage: ${Math.round(process.cpuUsage().user / 1000000)}%
-        `.trim();
-
-        await sock.sendMessage(sender, { text: info });
-    },
-
-    async dashboard(sock, sender) {
-        const dashboard = `
-📈 Bot Dashboard:
-• Status: Online
-• Performance: Good
-• Error Rate: 0%
-• API Status: Online
-• Database: Connected
-• Cache: Active
-• Last Restart: ${new Date().toLocaleString()}
-        `.trim();
-
-        await sock.sendMessage(sender, { text: dashboard });
-    },
     async status(sock, message) {
         try {
             const status = {
@@ -138,11 +99,11 @@ This bot has over 300 commands across various categories!`.trim();
             const statusText = `
 *🤖 Bot Status*
 
-*System:* Online
+*System:* Online ✅
 *CPU Usage:* ${Math.round(status.cpu.user / 1000000)}%
 *Memory:* ${Math.round(status.memory.heapUsed / 1024 / 1024)}MB / ${Math.round(status.memory.heapTotal / 1024 / 1024)}MB
 *Uptime:* ${Math.floor(status.uptime / 3600)}h ${Math.floor((status.uptime % 3600) / 60)}m
-*Connection:* Stable`.trim();
+*Connection:* Stable 🟢`.trim();
 
             await sock.sendMessage(message.key.remoteJid, {
                 text: statusText
@@ -172,6 +133,7 @@ A powerful WhatsApp bot with useful features and commands.
 • Group Management
 • Fun Commands
 • Utilities
+• Educational Tools
 • And more!
 
 For support, contact the bot owner.`.trim();
@@ -186,142 +148,132 @@ For support, contact the bot owner.`.trim();
             });
         }
     },
+    async botinfo(sock, sender) {
+        const stats = {
+            users: 0,
+            groups: 0,
+            commands: Object.keys(basicCommands).length,
+            uptime: process.uptime()
+        };
 
-    async rules(sock, message) {
-        try {
-            const rules = `
-*📜 Bot Rules*
+        const info = `
+        📊 Bot Statistics:
+        • Users: ${stats.users}
+        • Groups: ${stats.groups}
+        • Commands: ${stats.commands}
+        • Uptime: ${Math.floor(stats.uptime / 3600)}h ${Math.floor((stats.uptime % 3600) / 60)}m
+        • Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
+        • Platform: ${process.platform}
+        • Node.js: ${process.version}
+        • CPU Usage: ${Math.round(process.cpuUsage().user / 1000000)}%
+                `.trim();
 
-1. No spam or flooding
-2. Be respectful to others
-3. Don't abuse bot features
-4. Follow group rules
-5. Report bugs responsibly
-6. Keep NSFW content in appropriate groups
-7. Don't exploit vulnerabilities
-8. Respect cooldown times
-9. Don't share harmful content
-10. Follow WhatsApp's TOS
-
-*Note:* Breaking rules may result in bot access restriction.`.trim();
-
-            await sock.sendMessage(message.key.remoteJid, {
-                text: rules
-            });
-        } catch (err) {
-            logger.error('Error in rules command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error showing rules'
-            });
-        }
+        await sock.sendMessage(sender, { text: info });
     },
 
-    async uptime(sock, message) {
-        try {
-            const uptime = process.uptime();
-            const hours = Math.floor(uptime / 3600);
-            const minutes = Math.floor((uptime % 3600) / 60);
-            const seconds = Math.floor(uptime % 60);
+    async dashboard(sock, sender) {
+        const dashboard = `
+        📈 Bot Dashboard:
+        • Status: Online
+        • Performance: Good
+        • Error Rate: 0%
+        • API Status: Online
+        • Database: Connected
+        • Cache: Active
+        • Last Restart: ${new Date().toLocaleString()}
+                `.trim();
 
-            await sock.sendMessage(message.key.remoteJid, {
-                text: `*⏱️ Bot Uptime:* ${hours}h ${minutes}m ${seconds}s`
-            });
-        } catch (err) {
-            logger.error('Error in uptime command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error showing uptime'
-            });
-        }
+        await sock.sendMessage(sender, { text: dashboard });
     },
     async changelog(sock, sender) {
         const changelog = `
-📝 Recent Updates:
-v1.0.0 (Current):
-• Added dynamic command loading
-• Improved error handling
-• Added media commands
-• Enhanced group features
-• Added fun commands
-• Improved stability
-
-v0.9.0:
-• Initial release
-• Basic functionality
-• Group management
-• Simple commands
-        `.trim();
+        📝 Recent Updates:
+        v1.0.0 (Current):
+        • Added dynamic command loading
+        • Improved error handling
+        • Added media commands
+        • Enhanced group features
+        • Added fun commands
+        • Improved stability
+        
+        v0.9.0:
+        • Initial release
+        • Basic functionality
+        • Group management
+        • Simple commands
+                `.trim();
 
         await sock.sendMessage(sender, { text: changelog });
     },
 
     async faq(sock, sender) {
         const faq = `
-❓ Frequently Asked Questions:
-Q: How do I use the bot?
-A: Start with .help command
-
-Q: Is the bot free?
-A: Yes, basic features are free
-
-Q: How do I report bugs?
-A: Use .report command
-
-Q: Can I add bot to my group?
-A: Yes, use .invite command
-
-Q: What's premium access?
-A: Premium gives extra features
-        `.trim();
+        ❓ Frequently Asked Questions:
+        Q: How do I use the bot?
+        A: Start with .help command
+        
+        Q: Is the bot free?
+        A: Yes, basic features are free
+        
+        Q: How do I report bugs?
+        A: Use .report command
+        
+        Q: Can I add bot to my group?
+        A: Yes, use .invite command
+        
+        Q: What's premium access?
+        A: Premium gives extra features
+                `.trim();
 
         await sock.sendMessage(sender, { text: faq });
     },
     async privacy(sock, sender) {
         const privacy = `
-🔒 Privacy Policy:
-1. Data Collection:
-   • User IDs
-   • Group IDs
-   • Command usage
-   • Message timestamps
-
-2. Data Usage:
-   • Improve bot features
-   • Track usage patterns
-   • Debug issues
-   • Generate statistics
-
-3. Data Protection:
-   • Encrypted storage
-   • Regular backups
-   • Access control
-   • Secure transmission
-        `.trim();
+        🔒 Privacy Policy:
+        1. Data Collection:
+           • User IDs
+           • Group IDs
+           • Command usage
+           • Message timestamps
+        
+        2. Data Usage:
+           • Improve bot features
+           • Track usage patterns
+           • Debug issues
+           • Generate statistics
+        
+        3. Data Protection:
+           • Encrypted storage
+           • Regular backups
+           • Access control
+           • Secure transmission
+                `.trim();
 
         await sock.sendMessage(sender, { text: privacy });
     },
 
     async terms(sock, sender) {
         const terms = `
-📋 Terms of Service:
-1. Acceptance
-By using this bot, you agree to these terms.
-
-2. Usage
-• Follow bot rules
-• Don't abuse services
-• Respect rate limits
-• No illegal activities
-
-3. Liability
-Bot developers aren't liable for:
-• Service interruptions
-• Data loss
-• User conflicts
-• External content
-
-4. Modifications
-Terms may change without notice
-        `.trim();
+        📋 Terms of Service:
+        1. Acceptance
+        By using this bot, you agree to these terms.
+        
+        2. Usage
+        • Follow bot rules
+        • Don't abuse services
+        • Respect rate limits
+        • No illegal activities
+        
+        3. Liability
+        Bot developers aren't liable for:
+        • Service interruptions
+        • Data loss
+        • User conflicts
+        • External content
+        
+        4. Modifications
+        Terms may change without notice
+                `.trim();
 
         await sock.sendMessage(sender, { text: terms });
     },
@@ -333,55 +285,55 @@ Terms may change without notice
         const speed = end - start;
 
         const speedTest = `
-🚀 Speed Test Results:
-• Response Time: ${speed}ms
-• Message Processing: ${speed - 10}ms
-• API Latency: ~${Math.round(speed * 0.7)}ms
-• Database Query: ~${Math.round(speed * 0.3)}ms
-        `.trim();
+        🚀 Speed Test Results:
+        • Response Time: ${speed}ms
+        • Message Processing: ${speed - 10}ms
+        • API Latency: ~${Math.round(speed * 0.7)}ms
+        • Database Query: ~${Math.round(speed * 0.3)}ms
+                `.trim();
 
         await sock.sendMessage(sender, { text: speedTest });
     },
     async system(sock, sender) {
         const systemInfo = `
-🖥️ System Information:
-• OS: ${os.type()} ${os.release()}
-• Architecture: ${os.arch()}
-• CPU Cores: ${os.cpus().length}
-• Total Memory: ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(2)} GB
-• Free Memory: ${(os.freemem() / 1024 / 1024 / 1024).toFixed(2)} GB
-• Platform: ${os.platform()}
-• Hostname: ${os.hostname()}
-• Kernel: ${os.version()}
-        `.trim();
+        🖥️ System Information:
+        • OS: ${os.type()} ${os.release()}
+        • Architecture: ${os.arch()}
+        • CPU Cores: ${os.cpus().length}
+        • Total Memory: ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(2)} GB
+        • Free Memory: ${(os.freemem() / 1024 / 1024 / 1024).toFixed(2)} GB
+        • Platform: ${os.platform()}
+        • Hostname: ${os.hostname()}
+        • Kernel: ${os.version()}
+                `.trim();
 
         await sock.sendMessage(sender, { text: systemInfo });
     },
 
     async owner(sock, sender) {
         const ownerInfo = `
-👑 Bot Owner Information:
-• Name: ${process.env.OWNER_NAME || 'Bot Owner'}
-• Number: ${process.env.OWNER_NUMBER || 'Not specified'}
-• Website: ${process.env.OWNER_WEBSITE || 'Not specified'}
-• Email: ${process.env.OWNER_EMAIL || 'Not specified'}
-
-For business inquiries or support:
-Please contact the owner directly.
-        `.trim();
+        👑 Bot Owner Information:
+        • Name: ${process.env.OWNER_NAME || 'Bot Owner'}
+        • Number: ${process.env.OWNER_NUMBER || 'Not specified'}
+        • Website: ${process.env.OWNER_WEBSITE || 'Not specified'}
+        • Email: ${process.env.OWNER_EMAIL || 'Not specified'}
+        
+        For business inquiries or support:
+        Please contact the owner directly.
+                `.trim();
 
         await sock.sendMessage(sender, { text: ownerInfo });
     },
 
     async donate(sock, sender) {
         const donateInfo = `
-💝 Support Bot Development:
-• PayPal: ${process.env.PAYPAL || 'Not available'}
-• Ko-fi: ${process.env.KOFI || 'Not available'}
-• Patreon: ${process.env.PATREON || 'Not available'}
-
-Your support helps keep the bot running and improving!
-        `.trim();
+        💝 Support Bot Development:
+        • PayPal: ${process.env.PAYPAL || 'Not available'}
+        • Ko-fi: ${process.env.KOFI || 'Not available'}
+        • Patreon: ${process.env.PATREON || 'Not available'}
+        
+        Your support helps keep the bot running and improving!
+                `.trim();
 
         await sock.sendMessage(sender, { text: donateInfo });
     },
@@ -418,15 +370,15 @@ Your support helps keep the bot running and improving!
 
     async source(sock, sender) {
         const sourceInfo = `
-📦 Bot Source Information:
-• Version: ${process.env.BOT_VERSION || '1.0.0'}
-• Framework: @whiskeysockets/baileys
-• License: MIT
-• Repository: ${process.env.REPO_URL || 'Private'}
-• Contributors: ${process.env.CONTRIBUTORS || 'Various'}
-
-Want to contribute? Contact the owner!
-        `.trim();
+        📦 Bot Source Information:
+        • Version: ${process.env.BOT_VERSION || '1.0.0'}
+        • Framework: @whiskeysockets/baileys
+        • License: MIT
+        • Repository: ${process.env.REPO_URL || 'Private'}
+        • Contributors: ${process.env.CONTRIBUTORS || 'Various'}
+        
+        Want to contribute? Contact the owner!
+                `.trim();
 
         await sock.sendMessage(sender, { text: sourceInfo });
     },
@@ -439,60 +391,60 @@ Want to contribute? Contact the owner!
         const seconds = Math.floor(runtime % 60);
 
         const runtimeInfo = `
-⏰ Bot Runtime Details:
-• Days: ${days}
-• Hours: ${hours}
-• Minutes: ${minutes}
-• Seconds: ${seconds}
-
-Total Uptime: ${days}d ${hours}h ${minutes}m ${seconds}s
-        `.trim();
+        ⏰ Bot Runtime Details:
+        • Days: ${days}
+        • Hours: ${hours}
+        • Minutes: ${minutes}
+        • Seconds: ${seconds}
+        
+        Total Uptime: ${days}d ${hours}h ${minutes}m ${seconds}s
+                `.trim();
 
         await sock.sendMessage(sender, { text: runtimeInfo });
     },
 
     async premium(sock, sender) {
         const premiumInfo = `
-💎 Premium Features:
-• Priority Support
-• Unlimited Usage
-• Exclusive Commands
-• No Cooldowns
-• Custom Features
-• Early Access
-
-Contact owner to upgrade!
-        `.trim();
+        💎 Premium Features:
+        • Priority Support
+        • Unlimited Usage
+        • Exclusive Commands
+        • No Cooldowns
+        • Custom Features
+        • Early Access
+        
+        Contact owner to upgrade!
+                `.trim();
 
         await sock.sendMessage(sender, { text: premiumInfo });
     },
 
     async support(sock, sender) {
         const supportInfo = `
-🆘 Need Help?
-• Use .help for commands
-• Use .report for bugs
-• Use .feedback for suggestions
-• Join support group: ${process.env.SUPPORT_GROUP || 'Not available'}
-• Contact owner: .owner
-        `.trim();
+        🆘 Need Help?
+        • Use .help for commands
+        • Use .report for bugs
+        • Use .feedback for suggestions
+        • Join support group: ${process.env.SUPPORT_GROUP || 'Not available'}
+        • Contact owner: .owner
+                `.trim();
 
         await sock.sendMessage(sender, { text: supportInfo });
     },
 
     async credits(sock, sender) {
         const creditsInfo = `
-👏 Credits & Acknowledgments:
-• @whiskeysockets/baileys - Core Library
-• Node.js Community
-• Bot Contributors
-• API Providers
-• Resource Providers
-• Beta Testers
-• Active Users
-
-Special thanks to everyone who helped make this bot possible!
-        `.trim();
+        👏 Credits & Acknowledgments:
+        • @whiskeysockets/baileys - Core Library
+        • Node.js Community
+        • Bot Contributors
+        • API Providers
+        • Resource Providers
+        • Beta Testers
+        • Active Users
+        
+        Special thanks to everyone who helped make this bot possible!
+                `.trim();
 
         await sock.sendMessage(sender, { text: creditsInfo });
     }

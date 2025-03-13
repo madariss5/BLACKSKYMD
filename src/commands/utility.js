@@ -67,22 +67,35 @@ const utilityCommands = {
         try {
             const expression = args.join(' ');
             if (!expression) {
-                await sock.sendMessage(sender, { text: 'Please provide a mathematical expression' });
+                await sock.sendMessage(sender, { text: '⚠️ Please provide a mathematical expression' });
                 return;
             }
 
-            // Basic sanitization and evaluation
-            const sanitized = expression.replace(/[^0-9+\-*/(). ]/g, '');
-            const result = eval(sanitized);
+            // Enhanced sanitization and validation
+            const sanitized = expression
+                .replace(/[^0-9+\-*/(). ]/g, '')
+                .replace(/\/{2,}/g, '/') 
+                .replace(/\*{2,}/g, '*'); 
 
-            if (isNaN(result)) {
+            if (sanitized.includes('..') || sanitized.length > 100) {
                 throw new Error('Invalid expression');
             }
 
-            await sock.sendMessage(sender, { text: `${expression} = ${result}` });
+            const calculate = new Function(`return ${sanitized}`);
+            const result = calculate();
+
+            if (isNaN(result) || !isFinite(result)) {
+                throw new Error('Invalid result');
+            }
+
+            await sock.sendMessage(sender, { 
+                text: `🧮 ${expression} = ${Number(result.toFixed(8))}` 
+            });
         } catch (err) {
             logger.error('Calculate command error:', err);
-            await sock.sendMessage(sender, { text: 'Invalid expression. Please try again with a valid mathematical expression.' });
+            await sock.sendMessage(sender, { 
+                text: '❌ Invalid expression. Please try again with a valid mathematical expression.' 
+            });
         }
     },
 
@@ -180,13 +193,13 @@ const utilityCommands = {
             const [type, ...text] = args;
             if (!type || text.length === 0) {
                 await sock.sendMessage(sender, { 
-                    text: 'Usage: !encode [type] [text]\nTypes: base64, hex, binary' 
+                    text: '⚠️ Usage: .encode [type] [text]\nTypes: base64, hex, binary' 
                 });
                 return;
             }
 
-            let result;
             const input = text.join(' ');
+            let result;
 
             switch (type.toLowerCase()) {
                 case 'base64':
@@ -196,17 +209,21 @@ const utilityCommands = {
                     result = Buffer.from(input).toString('hex');
                     break;
                 case 'binary':
-                    result = input.split('').map(char => char.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
+                    result = input.split('').map(char => 
+                        char.charCodeAt(0).toString(2).padStart(8, '0')
+                    ).join(' ');
                     break;
                 default:
-                    await sock.sendMessage(sender, { text: 'Invalid encoding type. Available types: base64, hex, binary' });
+                    await sock.sendMessage(sender, { 
+                        text: '❌ Invalid encoding type. Available types: base64, hex, binary' 
+                    });
                     return;
             }
 
-            await sock.sendMessage(sender, { text: `Encoded (${type}): ${result}` });
+            await sock.sendMessage(sender, { text: `🔄 Encoded (${type}): ${result}` });
         } catch (err) {
             logger.error('Encode command error:', err);
-            await sock.sendMessage(sender, { text: 'Error encoding text. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error encoding text. Please try again.' });
         }
     },
 
@@ -215,13 +232,13 @@ const utilityCommands = {
             const [type, ...text] = args;
             if (!type || text.length === 0) {
                 await sock.sendMessage(sender, { 
-                    text: 'Usage: !decode [type] [text]\nTypes: base64, hex, binary' 
+                    text: '⚠️ Usage: .decode [type] [text]\nTypes: base64, hex, binary' 
                 });
                 return;
             }
 
-            let result;
             const input = text.join(' ');
+            let result;
 
             switch (type.toLowerCase()) {
                 case 'base64':
@@ -236,14 +253,16 @@ const utilityCommands = {
                         .join('');
                     break;
                 default:
-                    await sock.sendMessage(sender, { text: 'Invalid decoding type. Available types: base64, hex, binary' });
+                    await sock.sendMessage(sender, { 
+                        text: '❌ Invalid decoding type. Available types: base64, hex, binary' 
+                    });
                     return;
             }
 
-            await sock.sendMessage(sender, { text: `Decoded: ${result}` });
+            await sock.sendMessage(sender, { text: `🔄 Decoded: ${result}` });
         } catch (err) {
             logger.error('Decode command error:', err);
-            await sock.sendMessage(sender, { text: 'Invalid input for decoding. Please check your input and try again.' });
+            await sock.sendMessage(sender, { text: '❌ Invalid input for decoding. Please check your input and try again.' });
         }
     },
 
@@ -459,15 +478,15 @@ const utilityCommands = {
         try {
             const text = args.join(' ');
             if (!text) {
-                await sock.sendMessage(sender, { text: 'Please provide text to reverse' });
+                await sock.sendMessage(sender, { text: '⚠️ Please provide text to reverse' });
                 return;
             }
 
             const reversed = text.split('').reverse().join('');
-            await sock.sendMessage(sender, { text: reversed });
+            await sock.sendMessage(sender, { text: `🔄 ${reversed}` });
         } catch (err) {
             logger.error('Reverse command error:', err);
-            await sock.sendMessage(sender, { text: 'Error reversing text. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error reversing text' });
         }
     },
 
@@ -475,7 +494,7 @@ const utilityCommands = {
         try {
             const text = args.join(' ');
             if (!text) {
-                await sock.sendMessage(sender, { text: 'Please provide text to mock' });
+                await sock.sendMessage(sender, { text: '⚠️ Please provide text to mock' });
                 return;
             }
 
@@ -485,10 +504,10 @@ const utilityCommands = {
                 .map((char, i) => i % 2 === 0 ? char : char.toUpperCase())
                 .join('');
 
-            await sock.sendMessage(sender, { text: mocked });
+            await sock.sendMessage(sender, { text: `🔡 ${mocked}` });
         } catch (err) {
             logger.error('Mock command error:', err);
-            await sock.sendMessage(sender, { text: 'Error mocking text. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error mocking text' });
         }
     },
 
@@ -496,53 +515,60 @@ const utilityCommands = {
         try {
             const sides = parseInt(args[0]) || 6;
             if (sides < 2 || sides > 100) {
-                await sock.sendMessage(sender, { text: 'Please specify a number of sides between 2 and 100' });
+                await sock.sendMessage(sender, { 
+                    text: '⚠️ Please specify a number of sides between 2 and 100' 
+                });
                 return;
             }
 
             const result = Math.floor(Math.random() * sides) + 1;
-            await sock.sendMessage(sender, { text: `🎲 You rolled a ${result} (d${sides})` });
+            await sock.sendMessage(sender, { 
+                text: `🎲 You rolled a ${result} (d${sides})` 
+            });
         } catch (err) {
             logger.error('Roll command error:', err);
-            await sock.sendMessage(sender, { text: 'Error rolling dice. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error rolling dice' });
         }
     },
 
     async flip(sock, sender) {
         try {
             const result = Math.random() < 0.5 ? 'Heads' : 'Tails';
-            await sock.sendMessage(sender, { text: `🪙 Coin flip: ${result}!` });
+            const emoji = result === 'Heads' ? '🪙' : '💫';
+            await sock.sendMessage(sender, { 
+                text: `${emoji} Coin flip: ${result}!` 
+            });
         } catch (err) {
             logger.error('Flip command error:', err);
-            await sock.sendMessage(sender, { text: 'Error flipping coin. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error flipping coin' });
         }
     },
 
     async choose(sock, sender, args) {
         try {
-            const options = args.join(' ').split('|').map(opt => opt.trim());
+            const options = args.join(' ').split('|').map(opt => opt.trim()).filter(Boolean);
             if (options.length < 2) {
                 await sock.sendMessage(sender, { 
-                    text: 'Please provide at least 2 options separated by | \nExample: !choose option1 | option2 | option3' 
+                    text: '⚠️ Please provide at least 2 options separated by |\nExample: .choose pizza | burger | salad' 
                 });
                 return;
             }
 
             const choice = options[Math.floor(Math.random() * options.length)];
-            await sock.sendMessage(sender, { text: `🎯 I choose: ${choice}` });
+            await sock.sendMessage(sender, { 
+                text: `🎯 I choose: ${choice}\n\nOptions were:\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}` 
+            });
         } catch (err) {
             logger.error('Choose command error:', err);
-            await sock.sendMessage(sender, { text: 'Error making a choice. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error making a choice' });
         }
     },
 
-    // This function will be removed since it's duplicated below
-    // The improved version at line ~666 will be kept
     async wordcount(sock, sender, args) {
         try {
             const text = args.join(' ');
             if (!text) {
-                await sock.sendMessage(sender, { text: 'Please provide text to count' });
+                await sock.sendMessage(sender, { text: '⚠️ Please provide text to count' });
                 return;
             }
 
@@ -551,32 +577,39 @@ const utilityCommands = {
             const chars_no_space = text.replace(/\s+/g, '').length;
 
             const message = `📊 Word Count:
-Words: ${words}
-Characters (with spaces): ${chars}
-Characters (no spaces): ${chars_no_space}`;
+• Words: ${words}
+• Characters (with spaces): ${chars}
+• Characters (no spaces): ${chars_no_space}`;
 
             await sock.sendMessage(sender, { text: message });
         } catch (err) {
             logger.error('Word count command error:', err);
-            await sock.sendMessage(sender, { text: 'Error counting words. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error counting words' });
         }
     },
 
     async random(sock, sender, args) {
         try {
-            const [min = 1, max = 100] = args.map(Number);
-            if (isNaN(min) || isNaN(max)) {
+            let [min = 1, max = 100] = args.map(Number);
+
+            if (isNaN(min) || isNaN(max) || min >= max) {
                 await sock.sendMessage(sender, { 
-                    text: 'Please provide valid numbers\nUsage: .random [min] [max]' 
+                    text: '⚠️ Please provide valid numbers: .random [min] [max]\nExample: .random 1 100' 
                 });
                 return;
             }
 
+            min = Math.ceil(min);
+            max = Math.floor(max);
+            [min, max] = [Math.min(min, max), Math.max(min, max)];
+
             const result = Math.floor(Math.random() * (max - min + 1)) + min;
-            await sock.sendMessage(sender, { text: `🎲 Random number between ${min} and ${max}: ${result}` });
+            await sock.sendMessage(sender, { 
+                text: `🎲 Random number between ${min} and ${max}: ${result}` 
+            });
         } catch (err) {
             logger.error('Random command error:', err);
-            await sock.sendMessage(sender, { text: 'Error generating random number. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error generating random number' });
         }
     },
 
@@ -586,16 +619,20 @@ Characters (no spaces): ${chars_no_space}`;
             const timeString = now.toLocaleTimeString();
             const dateString = now.toLocaleDateString();
             const utc = now.toUTCString();
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-            const message = `🕒 Current Time:
-Local: ${timeString}
-Date: ${dateString}
-UTC: ${utc}`;
+            const message = `
+🕒 Current Time Information:
+• Local Time: ${timeString}
+• Date: ${dateString}
+• UTC: ${utc}
+• Timezone: ${timezone}
+• Unix Timestamp: ${Math.floor(now.getTime() / 1000)}`;
 
             await sock.sendMessage(sender, { text: message });
         } catch (err) {
             logger.error('Time command error:', err);
-            await sock.sendMessage(sender, { text: 'Error getting current time. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error getting current time' });
         }
     },
 
@@ -604,7 +641,7 @@ UTC: ${utc}`;
             const [type, ...text] = args;
             if (!type || !text.length) {
                 await sock.sendMessage(sender, { 
-                    text: 'Usage: .case <upper|lower> [text]' 
+                    text: '⚠️ Usage: .case <upper|lower> [text]' 
                 });
                 return;
             }
@@ -620,14 +657,14 @@ UTC: ${utc}`;
                     result = input.toLowerCase();
                     break;
                 default:
-                    await sock.sendMessage(sender, { text: 'Invalid case type. Use "upper" or "lower"' });
+                    await sock.sendMessage(sender, { text: '❌ Invalid case type. Use "upper" or "lower"' });
                     return;
             }
 
-            await sock.sendMessage(sender, { text: result });
+            await sock.sendMessage(sender, { text: `🔡 ${result}` });
         } catch (err) {
             logger.error('Case command error:', err);
-            await sock.sendMessage(sender, { text: 'Error converting case. Please try again.' });
+            await sock.sendMessage(sender, { text: '❌ Error converting case' });
         }
     },
     
@@ -689,7 +726,7 @@ module.exports = {
     category: 'utility',
     async init() {
         try {
-            logger.info('Initializing utility command handler...');
+            logger.info('Initializing utility commands...');
             return true;
         } catch (error) {
             logger.error('Failed to initialize utility commands:', error);

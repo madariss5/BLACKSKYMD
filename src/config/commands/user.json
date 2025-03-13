@@ -32,6 +32,38 @@
       "example": ".daily",
       "cooldown": 86400,
       "permissions": ["user"]
+    },
+    {
+      "name": "settitle",
+      "description": "Set your custom title",
+      "usage": ".settitle [text]",
+      "example": ".settitle Master Coder",
+      "cooldown": 300,
+      "permissions": ["user"]
+    },
+    {
+      "name": "settheme",
+      "description": "Set your profile theme",
+      "usage": ".settheme [theme]",
+      "example": ".settheme blue",
+      "cooldown": 0,
+      "permissions": ["user"]
+    },
+    {
+      "name": "setprofilepic",
+      "description": "Set your profile picture",
+      "usage": ".setprofilepic [reply to image]",
+      "example": "Reply to an image with .setprofilepic",
+      "cooldown": 300,
+      "permissions": ["user"]
+    },
+    {
+      "name": "level",
+      "description": "Check your current level and XP",
+      "usage": ".level",
+      "example": ".level",
+      "cooldown": 10,
+      "permissions": ["user"]
     }
   ]
 }
