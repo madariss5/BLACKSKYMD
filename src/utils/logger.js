@@ -1,10 +1,10 @@
 const pino = require('pino');
 
-let originalLevel = 'debug';
+let originalLevel = 'info'; // Changed from debug to reduce noise
 
 // Create a consistent logger instance with enhanced configuration
 const logger = pino({
-    level: 'silent', // Start with silent logging
+    level: originalLevel,
     transport: {
         target: 'pino-pretty',
         options: {
@@ -18,9 +18,7 @@ const logger = pino({
     },
     formatters: {
         level: (label) => {
-            return {
-                level: label
-            };
+            return { level: label };
         }
     },
     serializers: {
@@ -30,9 +28,26 @@ const logger = pino({
             stack: err.stack,
             code: err.code,
             details: err.details || {}
+        }),
+        // Add WhatsApp specific serializers
+        connection: (conn) => ({
+            state: conn.state,
+            isOnline: conn.isOnline,
+            lastSeen: conn.lastSeen,
+            platform: conn.platform
+        }),
+        message: (msg) => ({
+            id: msg.key?.id,
+            type: msg.type,
+            from: msg.key?.remoteJid,
+            timestamp: msg.messageTimestamp
         })
     },
-    timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`
+    timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`,
+    // Reduce noise from WebSocket
+    mixin: () => ({
+        appName: 'BLACKSKY-MD'
+    })
 });
 
 // Prevent unnecessary warnings
@@ -50,7 +65,7 @@ logger.restoreLogging = () => {
 
 // Add custom methods for module loading
 logger.moduleInit = (moduleName) => {
-    logger.info(`🔄 Initializing ${moduleName} module...`);
+    logger.debug(`🔄 Initializing ${moduleName} module...`);
 };
 
 logger.moduleSuccess = (moduleName) => {
@@ -58,16 +73,35 @@ logger.moduleSuccess = (moduleName) => {
 };
 
 logger.moduleError = (moduleName, error) => {
-    logger.error(`❌ Error initializing ${moduleName} module: ${error.message}`);
-    logger.error('Stack trace:', error.stack);
-    if (error.details) {
-        logger.error('Additional details:', error.details);
-    }
+    logger.error({
+        msg: `❌ Error initializing ${moduleName} module: ${error.message}`,
+        err: error,
+        module: moduleName
+    });
+};
+
+// Add connection logging
+logger.connectionUpdate = (state, details = {}) => {
+    logger.info({
+        msg: `Connection ${state}`,
+        connection: {
+            state,
+            ...details
+        }
+    });
+};
+
+logger.connectionError = (error, attempt = null) => {
+    logger.error({
+        msg: 'Connection error occurred',
+        err: error,
+        reconnectAttempt: attempt
+    });
 };
 
 // Add command execution logging
 logger.commandStart = (commandName, user) => {
-    logger.info(`🎯 Executing command: ${commandName} by ${user}`);
+    logger.debug(`🎯 Executing command: ${commandName} by ${user}`);
 };
 
 logger.commandSuccess = (commandName) => {
@@ -75,8 +109,11 @@ logger.commandSuccess = (commandName) => {
 };
 
 logger.commandError = (commandName, error) => {
-    logger.error(`❌ Error executing command ${commandName}: ${error.message}`);
-    logger.error('Stack trace:', error.stack);
+    logger.error({
+        msg: `❌ Error executing command ${commandName}`,
+        err: error,
+        command: commandName
+    });
 };
 
 module.exports = logger;

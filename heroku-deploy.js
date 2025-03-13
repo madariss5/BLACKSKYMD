@@ -419,6 +419,10 @@ async function connectToWhatsApp() {
         connectionState.state = 'connecting';
         connectionState.message = 'Initializing WhatsApp connection...';
 
+        let retryCount = 0;
+        const MAX_RETRIES = 5;
+        const INITIAL_RETRY_INTERVAL = 2000;
+
         // Set up custom auth state
         let creds = await loadSessionData();
 
@@ -439,7 +443,7 @@ async function connectToWhatsApp() {
             };
         };
 
-        // Create WhatsApp socket
+        // Create WhatsApp socket with more conservative settings
         sock = makeWASocket({
             auth: {
                 creds: creds || undefined,
@@ -452,10 +456,15 @@ async function connectToWhatsApp() {
             defaultQueryTimeoutMs: 60000,
             markOnlineOnConnect: true,
             emitOwnEvents: false,
-            syncFullHistory: false
+            syncFullHistory: false,
+            retryRequestDelayMs: 2000,
+            fireInitQueries: true,
+            shouldSyncHistoryMessage: false,
+            downloadHistory: false,
+            patchMessageBeforeSending: true
         });
 
-        // Handle connection updates
+        // Handle connection updates with improved error handling
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
@@ -475,21 +484,35 @@ async function connectToWhatsApp() {
                 connectionState.connected = false;
                 connectionState.message = `Connection closed (${statusCode}). Please refresh the page.`;
 
-                // If logged out, clear credentials
-                if (statusCode === DisconnectReason.loggedOut) {
+                // Handle specific disconnect reasons
+                if (statusCode === DisconnectReason.loggedOut || 
+                    statusCode === DisconnectReason.connectionReplaced) {
+                    logger.info('Session ended, clearing credentials');
                     creds = null;
                     await saveState(null);
-                    logger.info('Logged out. Credentials cleared.');
+                    process.exit(1); // Force restart to clear session
+                    return;
                 }
 
-                // Reconnect except if logged out
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                // Implement exponential backoff for reconnection
+                if (retryCount < MAX_RETRIES) {
+                    const delay = INITIAL_RETRY_INTERVAL * Math.pow(2, retryCount);
+                    retryCount++;
 
-                if (shouldReconnect) {
-                    logger.info('Attempting to reconnect...');
-                    setTimeout(connectToWhatsApp, 5000);
+                    logger.info(`Attempting reconnection ${retryCount}/${MAX_RETRIES} in ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+
+                    try {
+                        await connectToWhatsApp();
+                    } catch (err) {
+                        logger.error('Reconnection attempt failed:', err);
+                    }
+                } else {
+                    logger.error('Max reconnection attempts reached');
+                    process.exit(1); // Force restart after max retries
                 }
             } else if (connection === 'open') {
+                retryCount = 0; // Reset retry counter on successful connection
                 logger.info('WhatsApp connection established!');
                 connectionState.state = 'connected';
                 connectionState.connected = true;
@@ -503,9 +526,11 @@ async function connectToWhatsApp() {
         });
 
         // Handle credential updates
-        sock.ev.on('creds.update', saveState);
+        sock.ev.on('creds.update', async (newCreds) => {
+            await saveState(newCreds);
+        });
 
-        // Handle messages
+        // Handle messages with error handling
         sock.ev.on('messages.upsert', async ({ messages, type }) => {
             if (type === 'notify') {
                 for (const message of messages) {
