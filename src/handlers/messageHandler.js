@@ -1,63 +1,201 @@
 const logger = require('../utils/logger');
 const config = require('../config/config');
-const { processCommand } = require('./commandHandler');
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+const fs = require('fs').promises;
+const path = require('path');
 
-// Initialize message handler
+// Message rate limiting
+const messageRateLimit = new Map();
+const RATE_LIMIT = 10; // messages per minute
+const RATE_WINDOW = 60000; // 1 minute in milliseconds
+
+// Command cooldowns
+const commandCooldowns = new Map();
+
+// Typing indicators
+const typingStates = new Map();
+
+// Store command handler reference
+let commandProcessor = null;
+
+/**
+ * Initialize message handler
+ */
 async function init() {
     try {
         logger.info('Starting message handler initialization...');
 
-        // Debug logging for dependencies
-        logger.info('Command handler check:', {
-            hasProcessCommand: typeof processCommand === 'function',
-            hasCommands: !!processCommand.commands,
-            commandCount: processCommand.commands?.size,
-            prefix: config?.bot?.prefix || '!'
-        });
+        // Load command handler with detailed logging
+        try {
+            logger.info('Loading command handler module...');
+            const commandHandler = require('./commandHandler');
 
-        // Verify minimum requirements
-        if (typeof processCommand !== 'function') {
-            logger.error('Command processor validation failed:', {
-                type: typeof processCommand,
-                value: processCommand
+            // Verify command handler structure
+            logger.info('Command handler module loaded, verifying structure:', {
+                moduleType: typeof commandHandler,
+                hasProcessCommand: typeof commandHandler.processCommand === 'function',
+                hasCommands: typeof commandHandler.commands === 'object',
+                commandCount: commandHandler.commands?.size || 0
             });
+
+            if (!commandHandler || typeof commandHandler.processCommand !== 'function') {
+                throw new Error('Invalid command handler structure');
+            }
+
+            commandProcessor = commandHandler.processCommand;
+            logger.info('Command handler verification successful');
+        } catch (err) {
+            logger.error('Failed to load command handler:', err);
+            logger.error('Command handler stack trace:', err.stack);
             return false;
         }
 
-        if (!config?.bot?.prefix) {
-            logger.warn('Bot prefix not found in config, using default: !');
+        // Create temp directories with error handling
+        try {
+            const tempDir = path.join(__dirname, '../../temp');
+            await fs.mkdir(tempDir, { recursive: true });
+            logger.info('Temp directory created:', tempDir);
+        } catch (err) {
+            logger.warn('Failed to create temp directory:', err);
+            // Non-critical error, continue initialization
         }
 
-        logger.info('Message handler initialization completed');
+        // Verify configuration
+        if (!config || !config.bot) {
+            logger.warn('Bot configuration not found, using defaults:', {
+                configExists: !!config,
+                botConfigExists: !!config?.bot,
+                defaultPrefix: '!'
+            });
+        }
+
+        logger.info('Message handler initialization completed successfully');
         return true;
     } catch (err) {
         logger.error('Message handler initialization failed:', err);
-        logger.error('Stack trace:', err.stack);
+        logger.error('Full error details:', {
+            name: err.name,
+            message: err.message,
+            stack: err.stack,
+            code: err.code
+        });
         return false;
     }
 }
 
+/**
+ * Check rate limit for a user
+ */
+function checkRateLimit(userId) {
+    const now = Date.now();
+    const userRates = messageRateLimit.get(userId) || [];
+    const validRates = userRates.filter(time => now - time < RATE_WINDOW);
+
+    if (validRates.length >= RATE_LIMIT) {
+        return false;
+    }
+
+    validRates.push(now);
+    messageRateLimit.set(userId, validRates);
+    return true;
+}
+
+/**
+ * Check command cooldown
+ */
+function checkCommandCooldown(userId, command) {
+    const now = Date.now();
+    const key = `${userId}:${command}`;
+    const cooldownExpiry = commandCooldowns.get(key);
+
+    if (cooldownExpiry && now < cooldownExpiry) {
+        return Math.ceil((cooldownExpiry - now) / 1000);
+    }
+
+    commandCooldowns.set(key, now + 3000);
+    return 0;
+}
+
+/**
+ * Show typing indicator
+ */
+async function showTypingIndicator(sock, jid) {
+    try {
+        if (!typingStates.get(jid)) {
+            typingStates.set(jid, true);
+            await sock.sendPresenceUpdate('composing', jid);
+
+            setTimeout(async () => {
+                await sock.sendPresenceUpdate('paused', jid);
+                typingStates.set(jid, false);
+            }, 1000);
+        }
+    } catch (err) {
+        logger.error('Error showing typing indicator:', err);
+    }
+}
+
+/**
+ * Extract message content
+ */
+function extractMessageContent(message) {
+    // Log message structure for debugging
+    logger.debug('Extracting content from message:', {
+        hasMessage: !!message.message,
+        messageTypes: message.message ? Object.keys(message.message) : [],
+        hasRemoteJid: !!message.key?.remoteJid
+    });
+
+    // Direct text message
+    if (message.message?.conversation) {
+        return message.message.conversation;
+    }
+
+    // Extended text message
+    if (message.message?.extendedTextMessage?.text) {
+        return message.message.extendedTextMessage.text;
+    }
+
+    // Media message with caption
+    if (message.message?.imageMessage?.caption) {
+        return message.message.imageMessage.caption;
+    }
+
+    if (message.message?.videoMessage?.caption) {
+        return message.message.videoMessage.caption;
+    }
+
+    return null;
+}
+
+/**
+ * Handle incoming messages
+ */
 async function messageHandler(sock, message) {
     try {
-        // Skip if no message content
-        if (!message?.message) {
+        // Log incoming message for debugging
+        logger.debug('Received message:', {
+            type: message.message ? Object.keys(message.message)[0] : null,
+            from: message.key.remoteJid
+        });
+
+        // Basic validation
+        if (!message?.message || !message.key?.remoteJid) {
             return;
         }
 
-        // Get message content
-        const messageContent = message.message?.conversation ||
-                             message.message?.extendedTextMessage?.text ||
-                             message.message?.imageMessage?.caption ||
-                             message.message?.videoMessage?.caption;
-
-        // Get sender information
         const sender = message.key.remoteJid;
-        if (!sender) {
+        const isGroup = sender.endsWith('@g.us');
+
+        // Extract message content
+        const messageContent = extractMessageContent(message);
+        if (!messageContent) {
             return;
         }
 
-        // Skip empty messages
-        if (!messageContent) {
+        // Check rate limit
+        if (!checkRateLimit(sender)) {
+            logger.warn(`Rate limit exceeded for ${sender}`);
             return;
         }
 
@@ -67,28 +205,59 @@ async function messageHandler(sock, message) {
         // Process commands
         if (messageContent.startsWith(prefix)) {
             const commandText = messageContent.slice(prefix.length).trim();
-            if (commandText) {
+            if (!commandText) {
+                return;
+            }
+
+            // Command cooldown check
+            const command = commandText.split(' ')[0];
+            const cooldown = checkCommandCooldown(sender, command);
+            if (cooldown > 0) {
+                await sock.sendMessage(sender, {
+                    text: `⏳ Please wait ${cooldown} seconds before using this command again.`
+                });
+                return;
+            }
+
+            // Show typing indicator
+            await showTypingIndicator(sock, sender);
+
+            try {
+                // Verify command processor is available
+                if (!commandProcessor) {
+                    throw new Error('Command processor not initialized');
+                }
+
+                // Log command processing
                 logger.info('Processing command:', {
-                    text: commandText,
-                    sender: sender
+                    command: commandText,
+                    sender: sender,
+                    isGroup: isGroup
                 });
 
-                try {
-                    await processCommand(sock, message, commandText);
-                } catch (err) {
-                    logger.error('Command execution failed:', err);
-                    await sock.sendMessage(sender, {
-                        text: '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
-                    });
-                }
+                // Process command
+                await commandProcessor(sock, message, commandText, { isGroup });
+
+                logger.info('Command processed successfully:', {
+                    command: command,
+                    sender: sender
+                });
+            } catch (err) {
+                logger.error('Command execution failed:', {
+                    error: err.message,
+                    stack: err.stack,
+                    command: commandText,
+                    sender: sender
+                });
+                await sock.sendMessage(sender, {
+                    text: '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
+                });
             }
         }
     } catch (err) {
         logger.error('Error in message handler:', err);
+        logger.error('Stack trace:', err.stack);
     }
 }
 
-module.exports = { 
-    messageHandler,
-    init 
-};
+module.exports = { messageHandler, init };

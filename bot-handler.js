@@ -27,7 +27,7 @@ let commandHandler;
 try {
     logger.info('Loading message and command handlers...');
 
-    // Load command handler first
+    // Load command handler first since message handler depends on it
     commandHandler = require('./src/handlers/commandHandler');
     if (!commandHandler || !commandHandler.processCommand) {
         throw new Error('Command handler failed to load properly');
@@ -55,12 +55,6 @@ const PORT = parseInt(process.env.PORT || '5000', 10);
 // Initialize express app
 const app = express();
 app.use(express.json());
-
-// Add request logging
-app.use((req, res, next) => {
-    logger.debug(`${req.method} ${req.path}`);
-    next();
-});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -153,11 +147,6 @@ async function connectToWhatsApp(retryCount = 0) {
                 connectionState.connected = false;
                 connectionState.disconnectReason = statusCode;
                 isConnecting = false;
-
-                logger.warn('Connection closed:', {
-                    statusCode,
-                    reason: lastDisconnect?.error?.message
-                });
 
                 if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
                     setTimeout(() => connectToWhatsApp(0), 5000);

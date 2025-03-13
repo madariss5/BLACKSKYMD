@@ -28,6 +28,7 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node bot-handler.js"
+waitForPort = 5000
 
 [deployment]
 run = ["sh", "-c", "node replit-qr.js"]
