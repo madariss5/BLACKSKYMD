@@ -358,7 +358,8 @@ const adventureLocations = [
     }
 ];
 
-module.exports = {
+// Define the commands object
+const commands = {
     // 1. Economy System - Crime and Work
     async crime(sock, sender) {
         const profile = await getUserProfile(sock, sender);
@@ -4541,4 +4542,10 @@ module.exports = {
             return false;
         }
     }
+};
+
+// Export using the expected module structure
+module.exports = {
+    commands: commands,
+    category: 'user_extended'
 };
