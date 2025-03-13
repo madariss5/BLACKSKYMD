@@ -92,14 +92,23 @@ async function messageHandler(sock, message) {
         const content = message.message.conversation || 
                       message.message.extendedTextMessage?.text;
         
+        console.log('Ultra minimal handler received message:', content);
+        
         if (!content || !content.startsWith('!')) return;
+        
+        console.log('Processing command:', content);
         
         // Extract command
         const command = content.slice(1).trim().split(' ')[0].toLowerCase();
         
+        console.log('Extracted command:', command, 'Available commands:', Array.from(commands.keys()));
+        
         // Run command if it exists
         if (commands.has(command)) {
+            console.log('Executing command:', command);
             await commands.get(command)(sock, message);
+        } else {
+            console.log('Command not found:', command);
         }
     } catch (err) {
         console.error('Error in ultra minimal handler:', err);

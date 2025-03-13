@@ -176,6 +176,16 @@ async function connectToWhatsApp() {
                                     if (!message || !message.key) continue;
                                     if (message.key.fromMe) continue;
                                     
+                                    // Debug incoming messages
+                                    console.log(`Received message:`, JSON.stringify({
+                                        jid: message.key.remoteJid,
+                                        fromMe: message.key.fromMe,
+                                        id: message.key.id,
+                                        content: message.message?.conversation || 
+                                               message.message?.extendedTextMessage?.text || 
+                                               'Media or other content'
+                                    }, null, 2));
+                                    
                                     // Process with maximum error protection
                                     setTimeout(() => {
                                         try {
