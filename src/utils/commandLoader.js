@@ -22,6 +22,9 @@ class CommandLoader {
         this.reloadCooldown = 1000;
         this.fs = fs;
         this.fsPromises = fsPromises;
+
+        // Track command registration sources
+        this.commandSources = new Map();
     }
 
     async initializeDirectories() {
@@ -118,6 +121,7 @@ class CommandLoader {
             }
 
             this.commands.clear();
+            this.commandSources.clear();
             await this.loadCommandConfigs();
 
             const commandsPath = path.join(__dirname, '../commands');
@@ -129,6 +133,7 @@ class CommandLoader {
             }
 
             const loadedHandlers = {};
+            const duplicateCommands = new Set();
 
             for (const file of files) {
                 if (!file.endsWith('.js') || file === 'index.js') continue;
@@ -141,10 +146,32 @@ class CommandLoader {
                     const commands = moduleData.commands;
                     const moduleCategory = moduleData.category || category;
 
+                    // Track handlers per category
+                    if (!loadedHandlers[moduleCategory]) {
+                        loadedHandlers[moduleCategory] = {
+                            total: 0,
+                            loaded: 0,
+                            duplicates: 0,
+                            failed: 0
+                        };
+                    }
 
                     for (const [name, handler] of Object.entries(commands)) {
                         try {
                             if (typeof handler !== 'function') {
+                                loadedHandlers[moduleCategory].failed++;
+                                logger.warn(`Skipping non-function handler for ${name} in ${file}`);
+                                continue;
+                            }
+
+                            loadedHandlers[moduleCategory].total++;
+
+                            // Check for duplicates
+                            if (this.commands.has(name)) {
+                                const existingSource = this.commandSources.get(name);
+                                duplicateCommands.add(name);
+                                loadedHandlers[moduleCategory].duplicates++;
+                                logger.warn(`Duplicate command "${name}" found in ${file}, already registered from ${existingSource}`);
                                 continue;
                             }
 
@@ -163,6 +190,9 @@ class CommandLoader {
                                 category: moduleCategory
                             });
 
+                            // Track command source
+                            this.commandSources.set(name, file);
+
                             if (!this.commandCache.has(name)) {
                                 this.commandCache.set(name, {
                                     lastUsed: Date.now(),
@@ -172,8 +202,9 @@ class CommandLoader {
                                 });
                             }
 
-                            loadedHandlers[moduleCategory] = (loadedHandlers[moduleCategory] || 0) + 1;
+                            loadedHandlers[moduleCategory].loaded++;
                         } catch (err) {
+                            loadedHandlers[moduleCategory].failed++;
                             logger.error(`Failed to register handler for ${name} in ${file}:`, err);
                         }
                     }
@@ -183,11 +214,19 @@ class CommandLoader {
                 }
             }
 
-            logger.info('\nCommand loading summary:');
-            for (const [category, count] of Object.entries(loadedHandlers)) {
-                logger.info(`${category}: ${count} commands`);
+            // Print detailed loading statistics
+            logger.info('\nCommand loading statistics:');
+            for (const [category, stats] of Object.entries(loadedHandlers)) {
+                logger.info(`\n${category}:`);
+                logger.info(`  Total handlers: ${stats.total}`);
+                logger.info(`  Successfully loaded: ${stats.loaded}`);
+                logger.info(`  Duplicates skipped: ${stats.duplicates}`);
+                logger.info(`  Failed to load: ${stats.failed}`);
             }
-            logger.info('Total commands:', this.commands.size);
+
+            if (duplicateCommands.size > 0) {
+                logger.warn('\nDuplicate commands found:', Array.from(duplicateCommands));
+            }
 
             this.initialized = true;
             this.lastReload = Date.now();
@@ -247,10 +286,23 @@ class CommandLoader {
             const missingFields = requiredFields.filter(field => !config[field]);
 
             if (missingFields.length > 0) {
+                logger.error(`Invalid command configuration for ${name}: Missing fields: ${missingFields.join(', ')}`);
                 throw new CommandError(
                     `Invalid command configuration: Missing fields: ${missingFields.join(', ')}`,
                     name
                 );
+            }
+
+            // Additional validation for handler field
+            if (config.handler && typeof config.handler !== 'string') {
+                logger.error(`Invalid handler format for command ${name}: handler must be a string`);
+                throw new CommandError('Invalid handler format', name);
+            }
+
+            // Validate permissions array
+            if (config.permissions && (!Array.isArray(config.permissions) || config.permissions.length === 0)) {
+                logger.error(`Invalid permissions format for command ${name}: must be a non-empty array`);
+                throw new CommandError('Invalid permissions format', name);
             }
 
             return {
@@ -261,6 +313,7 @@ class CommandLoader {
             };
         } catch (err) {
             logger.error(`Error validating config for command ${name}:`, err);
+            logger.error('Config object:', JSON.stringify(config, null, 2));
             throw err;
         }
     }
@@ -271,10 +324,10 @@ class CommandLoader {
             // Skip initialization check if already initialized
             if (this.initialized) {
                 const command = this.commands.get(name);
-                
+
                 // Fast enabled check - return null immediately if not usable
                 if (!command || !command.config.enabled) return null;
-                
+
                 // Optional cache update - separated to reduce critical path latency
                 if (this.commandCache.has(name)) {
                     setTimeout(() => {
@@ -290,10 +343,10 @@ class CommandLoader {
                         }
                     }, 0);
                 }
-                
+
                 return command;
             }
-            
+
             // Slower path for first-time initialization
             await this.loadCommandHandlers();
             const command = this.commands.get(name);
@@ -310,12 +363,12 @@ class CommandLoader {
         if (!requiredPermissions?.length || requiredPermissions.includes('user')) {
             return true;
         }
-        
+
         // Owner check - only needed for admin commands
         if (requiredPermissions.includes('owner')) {
             return sender === process.env.OWNER_NUMBER;
         }
-        
+
         return false;
     }
 
