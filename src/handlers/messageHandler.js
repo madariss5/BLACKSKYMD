@@ -25,7 +25,7 @@ async function init() {
     try {
         logger.info('Starting message handler initialization...');
 
-        // Load command handler with detailed logging
+        // Load command handler
         try {
             logger.info('Loading command handler module...');
             const commandHandler = require('./commandHandler');
@@ -50,7 +50,7 @@ async function init() {
             return false;
         }
 
-        // Create temp directories with error handling
+        // Create temp directories
         try {
             const tempDir = path.join(__dirname, '../../temp');
             await fs.mkdir(tempDir, { recursive: true });
@@ -58,15 +58,6 @@ async function init() {
         } catch (err) {
             logger.warn('Failed to create temp directory:', err);
             // Non-critical error, continue initialization
-        }
-
-        // Verify configuration
-        if (!config || !config.bot) {
-            logger.warn('Bot configuration not found, using defaults:', {
-                configExists: !!config,
-                botConfigExists: !!config?.bot,
-                defaultPrefix: '!'
-            });
         }
 
         logger.info('Message handler initialization completed successfully');
@@ -136,39 +127,6 @@ async function showTypingIndicator(sock, jid) {
 }
 
 /**
- * Extract message content
- */
-function extractMessageContent(message) {
-    // Log message structure for debugging
-    logger.debug('Extracting content from message:', {
-        hasMessage: !!message.message,
-        messageTypes: message.message ? Object.keys(message.message) : [],
-        hasRemoteJid: !!message.key?.remoteJid
-    });
-
-    // Direct text message
-    if (message.message?.conversation) {
-        return message.message.conversation;
-    }
-
-    // Extended text message
-    if (message.message?.extendedTextMessage?.text) {
-        return message.message.extendedTextMessage.text;
-    }
-
-    // Media message with caption
-    if (message.message?.imageMessage?.caption) {
-        return message.message.imageMessage.caption;
-    }
-
-    if (message.message?.videoMessage?.caption) {
-        return message.message.videoMessage.caption;
-    }
-
-    return null;
-}
-
-/**
  * Handle incoming messages
  */
 async function messageHandler(sock, message) {
@@ -176,7 +134,11 @@ async function messageHandler(sock, message) {
         // Log incoming message for debugging
         logger.debug('Received message:', {
             type: message.message ? Object.keys(message.message)[0] : null,
-            from: message.key.remoteJid
+            from: message.key.remoteJid,
+            messageContent: message.message?.conversation || 
+                          message.message?.extendedTextMessage?.text ||
+                          message.message?.imageMessage?.caption ||
+                          message.message?.videoMessage?.caption
         });
 
         // Basic validation
@@ -187,8 +149,12 @@ async function messageHandler(sock, message) {
         const sender = message.key.remoteJid;
         const isGroup = sender.endsWith('@g.us');
 
-        // Extract message content
-        const messageContent = extractMessageContent(message);
+        // Extract text content
+        const messageContent = message.message?.conversation ||
+                             message.message?.extendedTextMessage?.text ||
+                             message.message?.imageMessage?.caption ||
+                             message.message?.videoMessage?.caption;
+
         if (!messageContent) {
             return;
         }
@@ -228,20 +194,9 @@ async function messageHandler(sock, message) {
                     throw new Error('Command processor not initialized');
                 }
 
-                // Log command processing
-                logger.info('Processing command:', {
-                    command: commandText,
-                    sender: sender,
-                    isGroup: isGroup
-                });
-
                 // Process command
                 await commandProcessor(sock, message, commandText, { isGroup });
-
-                logger.info('Command processed successfully:', {
-                    command: command,
-                    sender: sender
-                });
+                logger.info(`Command ${command} processed successfully for ${sender}`);
             } catch (err) {
                 logger.error('Command execution failed:', {
                     error: err.message,
