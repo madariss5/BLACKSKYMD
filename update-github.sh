@@ -22,7 +22,8 @@ echo -e "${YELLOW}Adding files to git...${NC}"
 
 # Main files
 git add connected-bot.js qr-web-display.js improved-qr.js bot-handler.js
-git add src/translation/en.json src/translation/de.json
+git add heroku-deploy.js Procfile app.json HEROKU-DEPLOY.md
+git add src/translations/en.json src/translations/de.json
 git add README.md CHANGELOG.md .gitignore .env.example
 
 # Config files
