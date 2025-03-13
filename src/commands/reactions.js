@@ -74,7 +74,27 @@ const ANIME_GIF_API = {
 
 // Helper function to validate mentions
 function validateMention(mention) {
-    return mention && typeof mention === 'string' && mention.includes('@');
+    if (!mention || typeof mention !== 'string') return false;
+    
+    // Check for common WhatsApp mention formats
+    if (mention.includes('@s.whatsapp.net') || 
+        mention.includes('@g.us') || 
+        /^\d+@/.test(mention)) {
+        return true;
+    }
+    
+    // If it's just a number, assume it's a phone number and add WhatsApp format
+    if (/^\d+$/.test(mention)) {
+        return true; // It's a valid phone number
+    }
+    
+    // If it includes @ but doesn't match the patterns above, it might be an invalid mention
+    if (mention.includes('@')) {
+        return false;
+    }
+    
+    // Default case: try to handle it as a potential mention
+    return true;
 }
 
 // Helper function to fetch anime GIFs with retries
@@ -87,7 +107,10 @@ async function fetchAnimeGif(type, retries = 3) {
         }
 
         logger.info(`Fetching gif for type: ${type} from endpoint: ${endpoint}`);
-
+        
+        // Fall back to default image if API call fails
+        const fallbackGifUrl = 'https://i.imgur.com/hew1cmf.gif'; // Generic anime reaction gif
+        
         let lastError;
         for (let i = 0; i < retries; i++) {
             try {
@@ -104,16 +127,22 @@ async function fetchAnimeGif(type, retries = 3) {
             }
         }
 
-        throw lastError;
+        logger.warn(`All ${retries} retries failed for ${type} GIF, using fallback`);
+        return fallbackGifUrl;
     } catch (error) {
         logger.error(`Error fetching ${type} GIF after ${retries} retries:`, error.message);
-        return null;
+        return fallbackGifUrl; // Return fallback URL instead of null
     }
 }
 
 // Helper function to send reaction message
 async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
     try {
+        // Always use fallback if gifUrl is null
+        if (!gifUrl) {
+            gifUrl = 'https://i.imgur.com/hew1cmf.gif';
+        }
+        
         // Get the chat context (either group or private chat)
         const chatJid = sender.includes('@g.us') ? sender : (sender.split('@')[0] + '@s.whatsapp.net');
         const isGroup = chatJid.includes('@g.us');
@@ -123,7 +152,20 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
             ? 'You' // In group chat, it's "You" from the bot's perspective
             : sender.split('@')[0];
 
-        const targetName = target ? target.split('@')[0] : null;
+        // Process target if provided
+        let targetJid = target;
+        let targetName = null;
+        
+        if (target) {
+            // If it's just a number, format it as a WhatsApp JID
+            if (/^\d+$/.test(target)) {
+                targetJid = `${target}@s.whatsapp.net`;
+                targetName = target;
+            } else {
+                // Extract the name part from the JID
+                targetName = target.split('@')[0];
+            }
+        }
 
         let message;
         if (target) {
@@ -141,7 +183,7 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
         logger.debug(`Sending reaction message: ${message} to ${chatJid}`);
 
         // Prepare mentions array only if we're in a group chat
-        const mentions = (isGroup && target) ? [target] : undefined;
+        const mentions = (isGroup && target) ? [targetJid] : undefined;
 
         if (gifUrl) {
             await sock.sendMessage(chatJid, {

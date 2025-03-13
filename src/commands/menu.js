@@ -168,9 +168,12 @@ const menuCommands = {
                 return;
             }
 
+            // Import language manager for translations
+            const { languageManager } = require('../utils/language');
+
             // Show category summary
-            let menuText = createHeader(config.bot.name, totalCommands, "Active");
-            menuText += "\n┏━━━❮ *📂 CATEGORIES* ❯━━━┓\n";
+            let menuText = createHeader(config.bot.name, totalCommands, languageManager.getText('system.uptime', null));
+            menuText += `\n┏━━━❮ *📂 ${languageManager.getText('menu.categories', null)}* ❯━━━┓\n`;
 
             for (const [cat, commands] of Object.entries(allCommands)) {
                 const emoji = categoryEmojis[cat] || categoryEmojis.default;
@@ -179,13 +182,13 @@ const menuCommands = {
             }
 
             menuText += "┗━━━━━━━━━━━━━━━━━━━━┛\n\n";
-            menuText += `Use \`${prefix}menu [category]\` to view commands in a specific category`;
+            menuText += languageManager.getText('menu.category_info', null, prefix);
 
             await sock.sendMessage(sender, { text: menuText });
         } catch (err) {
             logger.error('Menu command error:', err);
             await sock.sendMessage(message.key.remoteJid, { 
-                text: '❌ Error generating menu. Please try again.' 
+                text: '❌ ' + languageManager.getText('menu.error_generating', null)
             });
         }
     },
@@ -234,25 +237,136 @@ const menuCommands = {
         }
     },
 
+    async menu1(sock, message, args) {
+        try {
+            const sender = message.key.remoteJid;
+            const prefix = config.bot.prefix;
+            const { allCommands, totalCommands } = await loadAllCommands();
+            
+            // Import language manager for translations
+            const { languageManager } = require('../utils/language');
+            
+            // Get user's preferred language
+            const userLang = config.bot.language || 'en';
+            
+            // Get bot information
+            const botName = config.bot.name || "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻";
+            const owner = config.owner?.name || "Admin";
+            
+            // Create Flash-MD style header with emojis - German if user speaks German
+            let menuText = `╭─「 *${botName}* 」─⊲\n`;
+            menuText += `│ *🤖 ${languageManager.getText('menu.commands_count', userLang, totalCommands)}*\n`;
+            menuText += `│ *📅 ${languageManager.getText('basic.date', userLang)}:* ${new Date().toLocaleDateString()}\n`;
+            menuText += `│ *👤 ${languageManager.getText('basic.owner', userLang)}:* ${owner}\n`;
+            menuText += `│ *🔑 ${languageManager.getText('menu.prefix_info', userLang, prefix)}*\n`;
+            menuText += `╰────────────────⊲\n\n`;
+            
+            // Generate modern Flash-MD style menu with all commands
+            menuText += `┏━━『 *${languageManager.getText('menu.command_list', userLang)}* 』━━\n`;
+            
+            // Order categories in a specific way for better user experience - Translated category names
+            const orderedCategories = [
+                { id: 'basic', name: languageManager.getText('menu.basic_category', userLang, 'Basic') },
+                { id: 'utility', name: languageManager.getText('menu.utility_category', userLang, 'Utilities') },
+                { id: 'group', name: languageManager.getText('menu.group_category', userLang, 'Group Management') },
+                { id: 'media', name: languageManager.getText('menu.media_category', userLang, 'Media Tools') },
+                { id: 'fun', name: languageManager.getText('menu.fun_category', userLang, 'Fun & Games') },
+                { id: 'reactions', name: languageManager.getText('menu.reactions_category', userLang, 'Reactions') },
+                { id: 'user', name: languageManager.getText('menu.user_category', userLang, 'User Profile') },
+                { id: 'educational', name: languageManager.getText('menu.education_category', userLang, 'Educational') },
+                { id: 'nsfw', name: languageManager.getText('menu.nsfw_category', userLang, 'NSFW') },
+                { id: 'owner', name: languageManager.getText('menu.owner_category', userLang, 'Owner Commands') }
+            ];
+            
+            // Add quick commands section
+            menuText += `┃ ⚡ *${languageManager.getText('menu.quick_commands', userLang)}*\n`;
+            const quickCommands = ['help', 'menu', 'ping', 'profile', 'sticker'];
+            
+            for (const cmd of quickCommands) {
+                menuText += `┃ ➣ ${prefix}${cmd}\n`;
+            }
+            
+            menuText += `┃\n`; // Add space between sections
+            
+            // Get filtered and ordered categories
+            for (const category of orderedCategories) {
+                const commands = allCommands[category.id];
+                if (!commands || commands.length === 0) continue;
+                
+                const emoji = categoryEmojis[category.id] || categoryEmojis.default;
+                
+                menuText += `┃ ✦ ${emoji} *${category.name}*\n`;
+                
+                // Format commands vertically, showing only the first 5 commands for each category
+                const sortedCommands = [...commands].sort();
+                const displayCommands = sortedCommands.slice(0, 5);
+                
+                // Display each command on its own line (Flash-MD style)
+                for (const cmd of displayCommands) {
+                    menuText += `┃ ➣ ${prefix}${cmd}\n`;
+                }
+                
+                // Show command count and how to see more
+                if (sortedCommands.length > 5) {
+                    menuText += `┃ ✧ ${languageManager.getText('menu.see_commands', userLang, prefix)}\n`;
+                }
+                
+                menuText += `┃\n`; // Add space between categories
+            }
+            
+            // Add footer with tips
+            menuText += `┗━━━━━━━━━━━━━━━\n\n`;
+            menuText += `${languageManager.getText('menu.menu_footer', userLang, prefix)}\n`;
+            
+            // Send menu with image if possible
+            try {
+                // Use bot's icon or a generic image
+                const imageUrl = 'https://i.ibb.co/Wn0nczF/BLACKSKY-icon.png'; // Default image
+                
+                await sock.sendMessage(sender, { 
+                    image: { url: imageUrl },
+                    caption: menuText
+                });
+            } catch (imgErr) {
+                // Fallback to text-only if image fails
+                logger.warn('Failed to send menu with image, sending text-only', imgErr);
+                await sock.sendMessage(sender, { text: menuText });
+            }
+            
+        } catch (err) {
+            logger.error('Menu1 command error:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: `❌ ${languageManager.getText('menu.error_generating', null)}` 
+            });
+        }
+    },
+    
     async help(sock, message, args) {
         try {
             const sender = message.key.remoteJid;
             const prefix = config.bot.prefix;
             const commandName = args[0]?.toLowerCase();
+            
+            // Import language manager for translations
+            const { languageManager } = require('../utils/language');
+            
+            // Get user's preferred language
+            const userLang = config.bot.language || 'en';
 
             if (!commandName) {
                 // No specific command requested, show general help with modern styling
-                const helpText = `┏━━━❮ *📚 COMMAND HELP* ❯━━━┓
+                const helpText = `┏━━━❮ *📚 ${languageManager.getText('menu.command_help', userLang)}* ❯━━━┓
 ┃
-┃ ${symbols.arrow} Get command details:
+┃ ${symbols.arrow} ${languageManager.getText('menu.command_info', userLang)}:
 ┃   \`${prefix}help [command]\`
 ┃
-┃ ${symbols.arrow} Browse commands:
-┃   \`${prefix}menu\` - All categories
-┃   \`${prefix}list\` - All categories
-┃   \`${prefix}list [category]\` - Specific category
+┃ ${symbols.arrow} ${languageManager.getText('menu.available_commands', userLang)}:
+┃   \`${prefix}menu\` - ${languageManager.getText('menu.categories', userLang)}
+┃   \`${prefix}menu1\` - ${languageManager.getText('menu.bot_menu', userLang)}
+┃   \`${prefix}list\` - ${languageManager.getText('menu.categories', userLang)}
+┃   \`${prefix}list [category]\` - ${languageManager.getText('menu.category', userLang)}
 ┃
-┃ ${symbols.star} *Examples:*
+┃ ${symbols.star} *${languageManager.getText('menu.help_examples', userLang)}:*
 ┃   \`${prefix}help sticker\`
 ┃   \`${prefix}list media\`
 ┃
@@ -289,7 +403,7 @@ const menuCommands = {
                 const emoji = categoryEmojis[foundIn] || categoryEmojis.default;
 
                 // Get command configuration
-                let configInfo = "No additional information available.";
+                let configInfo = languageManager.getText('menu.no_info_available', userLang, "No additional information available.");
                 try {
                     const configPath = path.join(__dirname, '../config/commands', `${foundIn}.json`);
                     const configData = await fs.readFile(configPath, 'utf8');
@@ -302,16 +416,25 @@ const menuCommands = {
                 } catch (err) {
                     // Config file might not exist, that's ok
                 }
+                
+                // Get properly translated category name
+                let categoryDisplayName = categoryNames[foundIn] || foundIn;
+                // Try to get a translated category name
+                const categoryKey = `menu.${foundIn}_category`;
+                const translatedCategory = languageManager.getText(categoryKey, userLang, null);
+                if (translatedCategory && translatedCategory !== categoryKey) {
+                    categoryDisplayName = translatedCategory;
+                }
 
-                const helpText = `┏━━━❮ *${emoji} COMMAND INFO* ❯━━━┓
+                const helpText = `┏━━━❮ *${emoji} ${languageManager.getText('menu.command_info', userLang)}* ❯━━━┓
 ┃
-┃ *${symbols.star} Command:* \`${prefix}${commandName}\`
-┃ *${symbols.bullet} Category:* ${categoryNames[foundIn] || foundIn}
+┃ *${symbols.star} ${languageManager.getText('commands.help.command_info', userLang, commandName)}* \`${prefix}${commandName}\`
+┃ *${symbols.bullet} ${languageManager.getText('menu.category', userLang)}:* ${categoryDisplayName}
 ┃
-┃ *${symbols.arrow} Description:* 
+┃ *${symbols.arrow} ${languageManager.getText('menu.description', userLang)}:* 
 ┃   ${configInfo}
 ┃
-┃ *${symbols.bullet} Usage:* 
+┃ *${symbols.bullet} ${languageManager.getText('menu.usage', userLang)}:* 
 ┃   \`${prefix}${commandName}\`
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
@@ -319,14 +442,14 @@ const menuCommands = {
                 await sock.sendMessage(sender, { text: helpText });
             } else {
                 await sock.sendMessage(sender, { 
-                    text: `❌ Command "${commandName}" not found. Use \`${prefix}menu\` to see available commands.` 
+                    text: languageManager.getText('menu.command_not_found', userLang, commandName, prefix)
                 });
             }
 
         } catch (err) {
             logger.error('Help command error:', err);
             await sock.sendMessage(message.key.remoteJid, { 
-                text: '❌ Error providing help. Please try again.' 
+                text: `❌ ${languageManager.getText('basic.help.error', config.bot.language || 'en')}` 
             });
         }
     }

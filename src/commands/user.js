@@ -137,13 +137,33 @@ async function getUserProfile(sock, userId, sendError = true) {
  * @returns {boolean} Whether achievement was added (false if already had)
  */
 function addAchievement(profile, achievementId) {
+    // Define achievements list if not available globally
+    const achievementsList = [
+        { id: 'first_message', name: 'First Message' },
+        { id: 'daily_streak', name: 'Weekly Streak' },
+        { id: 'monthly_dedication', name: 'Monthly Dedication' },
+        { id: 'level_10', name: 'Level 10 Reached' },
+        { id: 'level_50', name: 'Level 50 Reached' },
+        { id: 'level_100', name: 'Level 100 Reached' },
+        { id: 'rich', name: 'Wealthy' },
+        { id: 'social', name: 'Social Butterfly' },
+        { id: 'helpful', name: 'Helpful Member' },
+        { id: 'collector', name: 'Collector' }
+    ];
+    
+    // Check if achievement exists
     const achievement = achievementsList.find(a => a.id === achievementId);
     if (!achievement) return false;
     
+    // Initialize achievements array if it doesn't exist
+    profile.achievements = profile.achievements || [];
+    
+    // Check if user already has this achievement
     if (profile.achievements.includes(achievement.name)) {
         return false;
     }
     
+    // Add achievement
     profile.achievements.push(achievement.name);
     return true;
 }
@@ -1083,10 +1103,8 @@ ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty
 };
 
 // Export the commands object directly to ensure it's accessible
-const commands = userCommands;
-
 module.exports = {
-    commands,
+    commands: userCommands,
     category: 'user',
     async init() {
         try {

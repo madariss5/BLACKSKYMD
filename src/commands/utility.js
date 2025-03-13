@@ -713,8 +713,11 @@ const utilityCommands = {
             // If no arguments, show available languages
             if (!args.length) {
                 const availableLangs = languageManager.getAvailableLanguages();
-                const currentLang = userDatabase.getUserProfile(sender) ? 
-                    userDatabase.getUserProfile(sender).language || 'en' : 'en';
+                const userProfile = userDatabase.getUserProfile(sender);
+                const currentLang = userProfile ? userProfile.language || 'en' : 'en';
+                
+                console.log(`Current user ${sender} profile:`, userProfile);
+                console.log(`Current language for user ${sender}: ${currentLang}`);
                 
                 await sock.sendMessage(sender, { 
                     text: `🌐 *Language Settings*\n\n` +
@@ -727,10 +730,12 @@ const utilityCommands = {
             
             // Get the requested language
             const lang = args[0].toLowerCase();
+            console.log(`User ${sender} requested language change to: ${lang}`);
             
             // Check if language is supported
             if (!languageManager.isLanguageSupported(lang)) {
                 const availableLangs = languageManager.getAvailableLanguages().join(', ');
+                console.log(`Language ${lang} is not supported. Available: ${availableLangs}`);
                 await sock.sendMessage(sender, { 
                     text: `❌ Language '${lang}' is not supported.\nAvailable languages: ${availableLangs}` 
                 });
@@ -739,19 +744,46 @@ const utilityCommands = {
             
             // Update user's preferred language in the database
             let profile = userDatabase.getUserProfile(sender);
+            console.log(`Current profile before update:`, profile);
+            
             if (!profile) {
                 profile = { id: sender, language: lang };
+                console.log(`Creating new profile for user ${sender} with language ${lang}`);
             } else {
                 profile.language = lang;
+                console.log(`Updating existing profile for user ${sender} with language ${lang}`);
             }
-            userDatabase.updateUserProfile(sender, profile);
             
-            // Use the appropriate translation to respond
-            const response = languageManager.getText('system.language_changed', lang);
-            await sock.sendMessage(sender, { text: `✅ ${response}` });
-            logger.info(`User ${sender} changed language to: ${lang}`);
+            userDatabase.updateUserProfile(sender, profile);
+            console.log(`Profile after update:`, userDatabase.getUserProfile(sender));
+            
+            // Get the translated response from the language manager
+            // This will automatically use the selected language
+            const translatedMessage = languageManager.getText('system.language_changed', lang);
+            
+            // Add checkmark emoji and use translated message
+            let responseText = `✅ ${translatedMessage}`;
+            
+            // Log translation retrieval information
+            console.log(`Retrieved translation for 'system.language_changed' in language ${lang}: "${translatedMessage}"`);
+            
+            // If the translation failed (returned the key itself), use hardcoded fallback
+            if (translatedMessage === 'system.language_changed') {
+                console.warn(`Translation not found for key 'system.language_changed' in language ${lang}`);
+                if (lang === 'de') {
+                    responseText = "✅ Sprache wurde zu Deutsch geändert";
+                } else if (lang === 'en') {
+                    responseText = "✅ Language has been changed to English";
+                } else {
+                    responseText = `✅ Language changed to ${lang}`;
+                }
+                console.log(`Using fallback message: "${responseText}"`);
+            }
+            
+            await sock.sendMessage(sender, { text: responseText });
+            console.log(`User ${sender} changed language to: ${lang}`);
         } catch (err) {
-            logger.error('Language command error:', err);
+            console.error('Language command error:', err);
             await sock.sendMessage(sender, { text: '❌ Error changing language. Please try again.' });
         }
     }

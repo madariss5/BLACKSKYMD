@@ -11,6 +11,30 @@ const reactionCommands = require('../commands/reactions');
 const helpMessageCache = new Map();
 const HELP_MESSAGE_COOLDOWN = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Determines the user's preferred language
+ * @param {string} sender - The sender's JID
+ * @returns {string} The language code (e.g., 'en', 'de')
+ */
+function getUserLanguage(sender) {
+    try {
+        // Check if user has a profile with language preference
+        const userProfile = userDatabase.getUserProfile(sender);
+        
+        if (userProfile && userProfile.language) {
+            console.log(`User ${sender} has language preference: ${userProfile.language}`);
+            return userProfile.language;
+        }
+        
+        // Fallback to bot default language
+        console.log(`User ${sender} has no language preference, using default: ${config.bot.language || 'en'}`);
+        return config.bot.language || 'en';
+    } catch (err) {
+        console.error(`Error determining language for user ${sender}:`, err);
+        return 'en'; // Default fallback
+    }
+}
+
 // Handle message processing
 async function messageHandler(sock, message) {
     try {
@@ -132,8 +156,8 @@ async function handleLevelUp(sock, sender, levelUpData, userData) {
             }
         }
         
-        // Get user's preferred language or default to English
-        const userLang = userData && userData.language ? userData.language : 'en';
+        // Get user's preferred language using the dedicated function
+        const userLang = getUserLanguage(sender);
         
         // Try to get level up message from translations
         let levelUpTitle = languageManager.getText('leveling.level_up_title', userLang);

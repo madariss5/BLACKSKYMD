@@ -13,6 +13,9 @@ const sharp = require('sharp');
 const ffmpeg = require('fluent-ffmpeg');
 const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
 
+// Define temp directory
+const TEMP_DIR = path.join(__dirname, '../../temp/nsfw');
+
 // Helper function to dynamically import file-type (ESM module)
 async function getFileTypeFromBuffer(buffer) {
     try {
@@ -61,18 +64,8 @@ function detectFileTypeFromMagicNumbers(buffer) {
     return null;
 }
 
-// Create temp directory for processing media
-const TEMP_DIR = path.join(process.cwd(), 'temp', 'nsfw');
-const API_ENDPOINTS = {
-    ANIME: 'https://api.waifu.pics',
-    HMTAI: 'https://hmtai.hatsunia.cfd/v2',
-    NEKOS: 'https://nekos.life/api/v2',
-    ANIME_PICS: 'https://anime-api.hisoka17.repl.co',
-    ANIME_IMAGES: 'https://anime-api.xyz/api/v2',
-    // Fallback APIs in case main ones don't work
-    WAIFU_IM: 'https://api.waifu.im',
-    WAIFU_PICS: 'https://waifu.pics/api'
-};
+// Import the centralized NSFW image fetching utility
+const { fetchNsfwImage, SUPPORTED_CATEGORIES } = require('../utils/fetchNsfwImage');
 
 // Stored user verifications (in memory)
 const verifiedUsers = new Map();
@@ -460,16 +453,19 @@ NSFW Statistics:
     // NSFW image commands
     async waifu(sock, sender) {
         try {
+            // Import language manager for translations
+            const { languageManager } = require('../utils/language');
+            
             if (!await isNsfwEnabledForGroup(sender)) {
                 await sock.sendMessage(sender, {
-                    text: '❌ NSFW commands are disabled for this group'
+                    text: '❌ ' + languageManager.getText('media.nsfw.disabled', null)
                 });
                 return;
             }
             
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
-                    text: '⚠️ You need to verify your age first. Use !verify <your_age>'
+                    text: '⚠️ ' + languageManager.getText('media.nsfw.age_verification', null)
                 });
                 return;
             }
@@ -477,49 +473,25 @@ NSFW Statistics:
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
-                    text: `⏳ Please wait ${remaining} seconds before using this command again.`
+                    text: `⏳ ${languageManager.getText('media.nsfw.cooldown', null, remaining)}`
                 });
                 return;
             }
             
-            await sock.sendMessage(sender, { text: 'Fetching waifu image...' });
+            await sock.sendMessage(sender, { text: languageManager.getText('media.nsfw.fetching', null) });
             
-            // Primary API URL
-            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/waifu`;
+            // Use the centralized fetchNsfwImage utility
+            const waifuUrl = await fetchNsfwImage('waifu');
             
-            // Fallback URLs if the primary fails
-            const fallbacks = [
-                `${API_ENDPOINTS.WAIFU_PICS}/nsfw/waifu`,
-                `${API_ENDPOINTS.WAIFU_IM}/search/?included_tags=waifu&is_nsfw=true`
-            ];
-            
-            // Try primary first, then fallbacks
-            const response = await fetchApi(primaryUrl, fallbacks);
-            
-            // Handle different API response formats
-            let imageUrl = null;
-            if (response) {
-                if (response.url) {
-                    // HMTAI format
-                    imageUrl = response.url;
-                } else if (response.images && response.images.length > 0) {
-                    // WAIFU_IM format
-                    imageUrl = response.images[0].url;
-                } else if (response.url) {
-                    // WAIFU_PICS format
-                    imageUrl = response.url;
-                }
-            }
-            
-            if (!imageUrl) {
+            if (!waifuUrl) {
                 await sock.sendMessage(sender, { 
-                    text: 'Failed to fetch image. All API endpoints are down. Please try again later.' 
+                    text: languageManager.getText('media.error', null) 
                 });
                 return;
             }
             
             await sock.sendMessage(sender, {
-                image: { url: imageUrl },
+                image: { url: waifuUrl },
                 caption: '🎭 NSFW Waifu'
             });
             
@@ -532,16 +504,19 @@ NSFW Statistics:
     
     async neko(sock, sender) {
         try {
+            // Import language manager for translations
+            const { languageManager } = require('../utils/language');
+            
             if (!await isNsfwEnabledForGroup(sender)) {
                 await sock.sendMessage(sender, {
-                    text: '❌ NSFW commands are disabled for this group'
+                    text: '❌ ' + languageManager.getText('media.nsfw.disabled', null)
                 });
                 return;
             }
             
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
-                    text: '⚠️ You need to verify your age first. Use !verify <your_age>'
+                    text: '⚠️ ' + languageManager.getText('media.nsfw.age_verification', null)
                 });
                 return;
             }
@@ -549,21 +524,25 @@ NSFW Statistics:
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
-                    text: `⏳ Please wait ${remaining} seconds before using this command again.`
+                    text: `⏳ ${languageManager.getText('media.nsfw.cooldown', null, remaining)}`
                 });
                 return;
             }
             
-            await sock.sendMessage(sender, { text: 'Fetching neko image...' });
+            await sock.sendMessage(sender, { text: languageManager.getText('media.nsfw.fetching', null) });
             
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/neko`);
-            if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
+            // Use the centralized fetchNsfwImage utility
+            const nekoUrl = await fetchNsfwImage('neko');
+            
+            if (!nekoUrl) {
+                await sock.sendMessage(sender, { 
+                    text: languageManager.getText('media.error', null) 
+                });
                 return;
             }
             
             await sock.sendMessage(sender, {
-                image: { url: response.url },
+                image: { url: nekoUrl },
                 caption: '🐱 NSFW Neko'
             });
             
@@ -752,16 +731,19 @@ NSFW Statistics:
     
     async blowjob(sock, sender) {
         try {
+            // Import language manager for translations
+            const { languageManager } = require('../utils/language');
+            
             if (!await isNsfwEnabledForGroup(sender)) {
                 await sock.sendMessage(sender, {
-                    text: '❌ NSFW commands are disabled for this group'
+                    text: '❌ ' + languageManager.getText('media.nsfw.disabled', null)
                 });
                 return;
             }
             
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
-                    text: '⚠️ You need to verify your age first. Use !verify <your_age>'
+                    text: '⚠️ ' + languageManager.getText('media.nsfw.age_verification', null)
                 });
                 return;
             }
@@ -769,21 +751,25 @@ NSFW Statistics:
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
-                    text: `⏳ Please wait ${remaining} seconds before using this command again.`
+                    text: `⏳ ${languageManager.getText('media.nsfw.cooldown', null, remaining)}`
                 });
                 return;
             }
             
-            await sock.sendMessage(sender, { text: 'Fetching image...' });
+            await sock.sendMessage(sender, { text: languageManager.getText('media.nsfw.fetching', null) });
             
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/blowjob`);
-            if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
+            // Use the centralized fetchNsfwImage utility
+            const blowjobUrl = await fetchNsfwImage('blowjob');
+            
+            if (!blowjobUrl) {
+                await sock.sendMessage(sender, { 
+                    text: languageManager.getText('media.error', null) 
+                });
                 return;
             }
             
             await sock.sendMessage(sender, {
-                image: { url: response.url },
+                image: { url: blowjobUrl },
                 caption: '🔞 Blowjob'
             });
             

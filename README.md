@@ -150,6 +150,8 @@ Optional API keys for enhanced features:
 - `NEWS_API_KEY`: For news commands
 - `SPOTIFY_CLIENT_ID` & `SPOTIFY_CLIENT_SECRET`: For music-related functions
 
+See [API Keys Documentation](docs/API_KEYS.md) for a complete list of supported APIs and setup instructions.
+
 ## Available Commands
 
 The bot includes various command categories:

@@ -1,9 +1,35 @@
 const { commandLoader } = require('../utils/commandLoader');
 const logger = require('../utils/logger');
 const config = require('../config/config');
+const userDatabase = require('../utils/userDatabase');
+const { languageManager } = require('../utils/language');
 
 // Cooldown handling
 const cooldowns = new Map();
+
+/**
+ * Determines the user's preferred language
+ * @param {string} sender - The sender's JID
+ * @returns {string} The language code (e.g., 'en', 'de')
+ */
+function getUserLanguage(sender) {
+    try {
+        // Check if user has a profile with language preference
+        const userProfile = userDatabase.getUserProfile(sender);
+        
+        if (userProfile && userProfile.language) {
+            logger.debug(`User ${sender} has language preference: ${userProfile.language}`);
+            return userProfile.language;
+        }
+        
+        // Fallback to bot default language
+        logger.debug(`User ${sender} has no language preference, using default: ${config.bot.language || 'en'}`);
+        return config.bot.language || 'en';
+    } catch (err) {
+        logger.error(`Error determining language for user ${sender}:`, err);
+        return 'en'; // Default fallback
+    }
+}
 
 // Helper function to normalize phone numbers for comparison
 function normalizePhoneNumber(number) {
@@ -151,4 +177,4 @@ async function processCommand(sock, message, commandText) {
     }
 }
 
-module.exports = { processCommand };
+module.exports = { processCommand, getUserLanguage };

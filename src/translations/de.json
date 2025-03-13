@@ -8,7 +8,134 @@
     "cooldown": "Bitte warten Sie %.1f Sekunden, bevor Sie %s erneut verwenden.",
     "error": "Fehler beim Verarbeiten des Befehls. Bitte versuchen Sie es später erneut.",
     "language_changed": "Sprache wurde zu Deutsch geändert",
-    "welcome_message": "Benutze %shelp um verfügbare Befehle anzuzeigen."
+    "welcome_message": "Benutze %shelp um verfügbare Befehle anzuzeigen.",
+    "uptime": "Laufzeit",
+    "maintenance_mode": "Wartungsmodus ist aktiviert. Bitte versuchen Sie es später erneut.",
+    "prefix_text": "Präfix",
+    "processing": "Verarbeite...",
+    "commands_loaded": "%d Befehle geladen"
+  },
+  "basic": {
+    "help": {
+      "description": "Zeigt Hilfe zu Befehlen an",
+      "usage": ".help [Befehl]",
+      "not_found": "Befehl %s nicht gefunden",
+      "error": "Fehler beim Anzeigen der Hilfe"
+    },
+    "ping": {
+      "description": "Überprüft die Latenz des Bots",
+      "usage": ".ping",
+      "response": "🏓 Pong! Latenz: %dms",
+      "error": "Fehler beim Überprüfen der Latenz"
+    },
+    "info": {
+      "description": "Zeigt Informationen über den Bot",
+      "usage": ".info",
+      "version": "Version",
+      "uptime": "Laufzeit",
+      "memory": "Speichernutzung",
+      "commands": "Befehle",
+      "users": "Benutzer",
+      "groups": "Gruppen",
+      "error": "Fehler beim Anzeigen der Informationen"
+    },
+    "status": {
+      "description": "Zeigt den aktuellen Status des Bots",
+      "usage": ".status",
+      "active": "Bot ist aktiv seit: %s",
+      "memory": "Speichernutzung: %s",
+      "cpu": "CPU-Auslastung: %s",
+      "commands": "Ausgeführte Befehle: %s",
+      "error": "Fehler beim Anzeigen des Status"
+    },
+    "about": {
+      "description": "Zeigt Informationen über den Bot",
+      "usage": ".about",
+      "title": "🤖 Über den Bot",
+      "description_text": "Ein fortschrittlicher WhatsApp-Bot mit vielen Funktionen",
+      "version": "Version: %s",
+      "creator": "Ersteller: %s",
+      "error": "Fehler beim Anzeigen der Informationen"
+    },
+    "botinfo": {
+      "description": "Zeigt detaillierte Informationen über den Bot",
+      "usage": ".botinfo",
+      "title": "🤖 Bot-Informationen",
+      "version": "Version",
+      "uptime": "Laufzeit",
+      "platform": "Plattform",
+      "nodejs": "Node.js Version",
+      "memory": "Speichernutzung",
+      "cpu": "CPU-Auslastung",
+      "commands": "Befehle geladen",
+      "error": "Fehler beim Anzeigen der Bot-Informationen"
+    },
+    "dashboard": {
+      "description": "Zeigt das Bot-Dashboard an",
+      "usage": ".dashboard",
+      "title": "📊 Bot-Dashboard",
+      "stats": "Statistiken",
+      "commands_executed": "Ausgeführte Befehle",
+      "active_users": "Aktive Benutzer",
+      "groups": "Gruppen",
+      "uptime": "Laufzeit",
+      "status": "Status",
+      "error": "Fehler beim Anzeigen des Dashboards"
+    },
+    "speed": {
+      "description": "Testet die Geschwindigkeit des Bots",
+      "usage": ".speed",
+      "testing": "Teste Geschwindigkeit...",
+      "result": "Geschwindigkeit: %s ms",
+      "error": "Fehler beim Testen der Geschwindigkeit"
+    },
+    "system": {
+      "description": "Zeigt Systeminformationen an",
+      "usage": ".system",
+      "title": "💻 Systeminformationen",
+      "os": "Betriebssystem",
+      "cpu": "CPU",
+      "memory": "Arbeitsspeicher",
+      "nodejs": "Node.js Version",
+      "uptime": "System-Laufzeit",
+      "error": "Fehler beim Anzeigen der Systeminformationen"
+    },
+    "owner": {
+      "description": "Zeigt Informationen über den Bot-Besitzer",
+      "usage": ".owner",
+      "title": "👑 Bot-Besitzer",
+      "name": "Name",
+      "contact": "Kontakt",
+      "error": "Fehler beim Anzeigen der Besitzerinformationen"
+    },
+    "runtime": {
+      "description": "Zeigt die Laufzeit des Bots",
+      "usage": ".runtime",
+      "response": "Bot läuft seit: %s",
+      "error": "Fehler beim Anzeigen der Laufzeit"
+    },
+    "support": {
+      "description": "Zeigt Support-Informationen an",
+      "usage": ".support",
+      "title": "🆘 Support",
+      "group": "Support-Gruppe",
+      "contact": "Kontakt",
+      "website": "Website",
+      "error": "Fehler beim Anzeigen der Support-Informationen"
+    },
+    "credits": {
+      "description": "Zeigt die Credits des Bots an",
+      "usage": ".credits",
+      "title": "🏆 Credits",
+      "creator": "Ersteller",
+      "contributors": "Mitwirkende",
+      "libraries": "Verwendete Bibliotheken",
+      "error": "Fehler beim Anzeigen der Credits"
+    },
+    "commands": "Befehle",
+    "status": "Status",
+    "online": "Online",
+    "date": "Datum"
   },
   "leveling": {
     "level_up_title": "Level aufgestiegen!",
@@ -96,7 +223,553 @@
     "no_media": "Bitte senden Sie eine Mediendatei",
     "processing": "Verarbeite Medien...",
     "success": "Erfolgreich verarbeitet!",
-    "error": "Fehler bei der Medienverarbeitung"
+    "error": "Fehler bei der Medienverarbeitung",
+    "sticker": {
+      "description": "Erstellt einen Sticker aus einem Bild oder Video",
+      "usage": ".sticker",
+      "success": "Sticker wurde erstellt!",
+      "error": "Fehler bei der Stickererstellung"
+    },
+    "toimg": {
+      "description": "Konvertiert einen Sticker zurück in ein Bild",
+      "usage": ".toimg",
+      "success": "Sticker wurde in ein Bild konvertiert!",
+      "error": "Fehler bei der Konvertierung des Stickers"
+    },
+    "play": {
+      "description": "Spielt Audio ab",
+      "usage": ".play [Suchbegriff]",
+      "searching": "Suche nach: %s",
+      "not_found": "Kein Audio gefunden",
+      "error": "Fehler beim Abspielen des Audios"
+    },
+    "ytmp3": {
+      "description": "Lädt Audio von YouTube herunter",
+      "usage": ".ytmp3 [YouTube-URL oder Suchbegriff]",
+      "searching": "Suche auf YouTube...",
+      "downloading": "Lade Audio herunter...",
+      "success": "Audio erfolgreich heruntergeladen!",
+      "error": "Fehler beim Herunterladen des Audios"
+    },
+    "ytmp4": {
+      "description": "Lädt Video von YouTube herunter",
+      "usage": ".ytmp4 [YouTube-URL oder Suchbegriff]",
+      "searching": "Suche auf YouTube...",
+      "downloading": "Lade Video herunter...",
+      "success": "Video erfolgreich heruntergeladen!",
+      "error": "Fehler beim Herunterladen des Videos"
+    },
+    "enhance": {
+      "description": "Verbessert die Qualität eines Bildes",
+      "usage": ".enhance",
+      "success": "Bild wurde verbessert!",
+      "error": "Fehler bei der Bildverbesserung"
+    },
+    "sharpen": {
+      "description": "Schärft ein Bild",
+      "usage": ".sharpen [Intensität]",
+      "success": "Bild wurde geschärft!",
+      "error": "Fehler beim Schärfen des Bildes"
+    },
+    "reverse": {
+      "description": "Kehrt ein Audio oder Video um",
+      "usage": ".reverse",
+      "success": "Medien wurden umgekehrt!",
+      "error": "Fehler beim Umkehren der Medien"
+    },
+    "ttp": {
+      "description": "Erstellt ein Textbild",
+      "usage": ".ttp [Text]",
+      "success": "Textbild wurde erstellt!",
+      "error": "Fehler beim Erstellen des Textbildes"
+    },
+    "attp": {
+      "description": "Erstellt ein animiertes Textbild",
+      "usage": ".attp [Text]",
+      "success": "Animiertes Textbild wurde erstellt!",
+      "error": "Fehler beim Erstellen des animierten Textbildes"
+    },
+    "emojimix": {
+      "description": "Mischt zwei Emojis zu einem Sticker",
+      "usage": ".emojimix [Emoji1] [Emoji2]",
+      "success": "Emojis wurden gemischt!",
+      "error": "Fehler beim Mischen der Emojis"
+    },
+    "tovideo": {
+      "description": "Konvertiert eine Datei in ein Video",
+      "usage": ".tovideo",
+      "success": "Datei wurde in ein Video konvertiert!",
+      "error": "Fehler bei der Konvertierung in ein Video"
+    },
+    "trim": {
+      "description": "Schneidet ein Audio oder Video",
+      "usage": ".trim [Startzeit] [Endzeit]",
+      "success": "Medien wurden geschnitten!",
+      "error": "Fehler beim Schneiden der Medien"
+    },
+    "speed": {
+      "description": "Ändert die Geschwindigkeit eines Audio oder Videos",
+      "usage": ".speed [Faktor]",
+      "success": "Geschwindigkeit wurde geändert!",
+      "error": "Fehler beim Ändern der Geschwindigkeit"
+    },
+    "brightness": {
+      "description": "Ändert die Helligkeit eines Bildes",
+      "usage": ".brightness [Wert]",
+      "success": "Helligkeit wurde geändert!",
+      "error": "Fehler beim Ändern der Helligkeit"
+    },
+    "contrast": {
+      "description": "Ändert den Kontrast eines Bildes",
+      "usage": ".contrast [Wert]",
+      "success": "Kontrast wurde geändert!",
+      "error": "Fehler beim Ändern des Kontrastes"
+    },
+    "blur": {
+      "description": "Fügt Unschärfe zu einem Bild hinzu",
+      "usage": ".blur [Intensität]",
+      "success": "Unschärfe wurde hinzugefügt!",
+      "error": "Fehler beim Hinzufügen der Unschärfe"
+    },
+    "rotate": {
+      "description": "Rotiert ein Bild",
+      "usage": ".rotate [Grad]",
+      "success": "Bild wurde rotiert!",
+      "error": "Fehler beim Rotieren des Bildes"
+    },
+    "flip": {
+      "description": "Spiegelt ein Bild",
+      "usage": ".flip [horizontal/vertical]",
+      "success": "Bild wurde gespiegelt!",
+      "error": "Fehler beim Spiegeln des Bildes"
+    },
+    "grayscale": {
+      "description": "Konvertiert ein Bild in Graustufen",
+      "usage": ".grayscale",
+      "success": "Bild wurde in Graustufen konvertiert!",
+      "error": "Fehler bei der Konvertierung in Graustufen"
+    },
+    "negate": {
+      "description": "Invertiert die Farben eines Bildes",
+      "usage": ".negate",
+      "success": "Farben wurden invertiert!",
+      "error": "Fehler beim Invertieren der Farben"
+    },
+    "tint": {
+      "description": "Färbt ein Bild mit einer bestimmten Farbe",
+      "usage": ".tint [Farbcode]",
+      "success": "Bild wurde eingefärbt!",
+      "error": "Fehler beim Einfärben des Bildes"
+    }
+  },
+  "nsfw": {
+    "age_verification": "Bitte verifizieren Sie Ihr Alter mit !verify <Ihr_Alter>",
+    "disabled": "NSFW-Befehle sind für diese Gruppe deaktiviert",
+    "cooldown": "Bitte warten Sie %s Sekunden, bevor Sie diesen Befehl erneut verwenden",
+    "fetching": "Hole NSFW-Inhalt...",
+    "adults_only": "Diese Inhalte sind nur für Erwachsene (18+)",
+    "not_verified": "Sie sind nicht verifiziert. Benutzen Sie !verify [Ihr_Alter] zur Altersverifikation.",
+    "verify": {
+      "description": "Verifiziert Ihr Alter für NSFW-Inhalte",
+      "usage": "!verify [Alter]",
+      "success": "Sie wurden erfolgreich verifiziert!",
+      "underage": "Sie müssen mindestens 18 Jahre alt sein, um auf NSFW-Inhalte zuzugreifen",
+      "error": "Fehler bei der Verifizierung"
+    },
+    "toggleNSFW": {
+      "description": "Aktiviert oder deaktiviert NSFW-Inhalte für eine Gruppe",
+      "usage": "!toggleNSFW [on/off]",
+      "admin_only": "Nur Administratoren können NSFW-Inhalte aktivieren/deaktivieren",
+      "enabled": "NSFW-Inhalte wurden für diese Gruppe aktiviert",
+      "disabled": "NSFW-Inhalte wurden für diese Gruppe deaktiviert",
+      "error": "Fehler beim Ändern der NSFW-Einstellungen"
+    },
+    "isNSFW": {
+      "description": "Zeigt den NSFW-Status für die aktuelle Gruppe",
+      "usage": "!isNSFW",
+      "status_enabled": "NSFW-Inhalte sind für diese Gruppe aktiviert",
+      "status_disabled": "NSFW-Inhalte sind für diese Gruppe deaktiviert",
+      "error": "Fehler beim Abrufen des NSFW-Status"
+    },
+    "nsfwHelp": {
+      "description": "Zeigt Hilfe zu NSFW-Befehlen",
+      "usage": "!nsfwHelp",
+      "title": "NSFW-Befehle Hilfe",
+      "verification": "Verifizierung: !verify [Alter]",
+      "available": "Verfügbare Kategorien:",
+      "note": "Hinweis: Alle Befehle unterliegen einem Cooldown",
+      "error": "Fehler beim Anzeigen der NSFW-Hilfe"
+    },
+    "waifu": {
+      "description": "Sendet ein NSFW-Waifu-Bild",
+      "error": "Fehler beim Laden des Waifu-Bildes"
+    },
+    "neko": {
+      "description": "Sendet ein NSFW-Neko-Bild",
+      "error": "Fehler beim Laden des Neko-Bildes"
+    },
+    "hentai": {
+      "description": "Sendet ein Hentai-Bild",
+      "error": "Fehler beim Laden des Hentai-Bildes"
+    },
+    "boobs": {
+      "description": "Sendet ein NSFW-Bild mit Fokus auf Brüste",
+      "error": "Fehler beim Laden des Bildes"
+    },
+    "ass": {
+      "description": "Sendet ein NSFW-Bild mit Fokus auf Gesäß",
+      "error": "Fehler beim Laden des Bildes"
+    }
+  },
+  "menu": {
+    "categories": "KATEGORIEN",
+    "command_list": "BEFEHLSLISTE",
+    "category_info": "Benutze `%smenu [kategorie]` um Befehle in einer bestimmten Kategorie anzuzeigen",
+    "command_help_info": "Benutze `%shelp [befehl]` für detaillierte Informationen",
+    "command_info": "Kommando-Info",
+    "category": "Kategorie",
+    "description": "Beschreibung",
+    "usage": "Verwendung",
+    "command_not_found": "Befehl \"%s\" nicht gefunden. Benutze `%smenu` um verfügbare Befehle anzuzeigen.",
+    "command_help": "BEFEHLSHILFE",
+    "help_examples": "Beispiele",
+    "available_commands": "Verfügbare Befehle",
+    "total_commands": "Gesamt: %s Befehle",
+    "see_commands": "Benutze `%slist [kategorie]` um Befehle in einer Kategorie anzuzeigen",
+    "error_generating": "Fehler beim Generieren des Menüs. Bitte versuchen Sie es erneut.",
+    "bot_menu": "BOT-MENÜ",
+    "welcome": "Willkommen im Menü",
+    "select_category": "Wähle eine Kategorie",
+    "main_menu": "HAUPTMENÜ",
+    "quick_commands": "SCHNELLBEFEHLE",
+    "popular_commands": "BELIEBTE BEFEHLE",
+    "commands_count": "Befehle: %s",
+    "support_group": "Support-Gruppe",
+    "prefix_info": "Präfix: %s",
+    "back_to_menu": "Zurück zum Menü",
+    "menu_footer": "Tipp: Benutze %shelp für weitere Details",
+    "basic_category": "Grundbefehle",
+    "media_category": "Medienbefehle",
+    "group_category": "Gruppenbefehle",
+    "fun_category": "Spaß & Spiele",
+    "sticker_category": "Stickerbefehle",
+    "owner_category": "Besitzerbefehle",
+    "utility_category": "Dienstprogramme",
+    "education_category": "Bildungsbefehle",
+    "user_category": "Benutzerprofil",
+    "nsfw_category": "NSFW-Befehle",
+    "reactions_category": "Reaktionsbefehle"
+  },
+  "fun": {
+    "games_disabled": "Spiele sind in dieser Gruppe deaktiviert. Bitten Sie einen Administrator, sie mit *.feature games on* zu aktivieren",
+    "quote": {
+      "description": "Zeigt ein zufälliges Zitat an",
+      "error": "Fehler beim Abrufen eines Zitats"
+    },
+    "joke": {
+      "description": "Erzählt einen zufälligen Witz",
+      "error": "Fehler beim Abrufen eines Witzes"
+    },
+    "meme": {
+      "description": "Sendet ein zufälliges Meme",
+      "error": "Fehler beim Abrufen eines Memes"
+    },
+    "tictactoe": {
+      "description": "Startet ein Tic-Tac-Toe-Spiel",
+      "usage": "!tictactoe @Gegner",
+      "error": "Fehler beim Starten des Spiels"
+    },
+    "hangman": {
+      "description": "Startet ein Galgenmännchen-Spiel",
+      "usage": "!hangman [start/guess] [Buchstabe]",
+      "error": "Fehler beim Spielen von Galgenmännchen"
+    },
+    "wordle": {
+      "description": "Startet ein Wordle-Spiel",
+      "usage": "!wordle [start/guess] [Wort]",
+      "error": "Fehler beim Spielen von Wordle"
+    },
+    "quiz": {
+      "description": "Startet ein Quiz",
+      "error": "Fehler beim Starten des Quiz"
+    },
+    "8ball": {
+      "description": "Beantwortet eine Ja/Nein-Frage",
+      "usage": "!8ball [Frage]",
+      "error": "Fehler beim Befragen der magischen Kugel"
+    }
+  },
+  "reactions": {
+    "mention_required": "Wen möchtest du @erwähnen?",
+    "no_self_action": "Du kannst diese Aktion nicht an dir selbst ausführen!",
+    "gif_error": "Fehler beim Laden des Animations-GIF",
+    "hug": {
+      "description": "Umarme jemanden",
+      "usage": "!hug @Person",
+      "message": "%s hat %s umarmt 🤗"
+    },
+    "pat": {
+      "description": "Streichle jemanden",
+      "usage": "!pat @Person",
+      "message": "%s hat %s gestreichelt ✋"
+    },
+    "kiss": {
+      "description": "Küsse jemanden",
+      "usage": "!kiss @Person",
+      "message": "%s hat %s geküsst 💋"
+    },
+    "cuddle": {
+      "description": "Kuschle mit jemandem",
+      "usage": "!cuddle @Person",
+      "message": "%s hat mit %s gekuschelt 🥰"
+    },
+    "poke": {
+      "description": "Stupse jemanden an",
+      "usage": "!poke @Person",
+      "message": "%s hat %s angestupst 👉"
+    },
+    "slap": {
+      "description": "Gib jemandem eine Ohrfeige",
+      "usage": "!slap @Person",
+      "message": "%s hat %s eine Ohrfeige gegeben 👋"
+    },
+    "boop": {
+      "description": "Boope jemanden auf der Nase",
+      "usage": "!boop @Person",
+      "message": "%s hat %s auf der Nase geboopt 👃"
+    },
+    "tickle": {
+      "description": "Kitzle jemanden",
+      "usage": "!tickle @Person",
+      "message": "%s hat %s gekitzelt 🪶"
+    },
+    "blush": {
+      "description": "Erröte vor Verlegenheit",
+      "message": "%s ist errötet 😳"
+    },
+    "cry": {
+      "description": "Zeige, dass du weinst",
+      "message": "%s weint 😢"
+    },
+    "dance": {
+      "description": "Tanze fröhlich",
+      "message": "%s tanzt 💃"
+    },
+    "laugh": {
+      "description": "Lache herzhaft",
+      "message": "%s lacht 😂"
+    },
+    "smile": {
+      "description": "Lächle freundlich",
+      "message": "%s lächelt 😊"
+    },
+    "wave": {
+      "description": "Winke jemandem zu",
+      "usage": "!wave [@Person]",
+      "message": "%s winkt %s zu 👋"
+    },
+    "wink": {
+      "description": "Zwinkere jemandem zu",
+      "usage": "!wink [@Person]",
+      "message": "%s zwinkert %s zu 😉"
+    }
+  },
+  "user": {
+    "not_registered": "Du bist nicht registriert. Benutze !register um ein Profil zu erstellen.",
+    "register": {
+      "description": "Erstelle ein Benutzerprofil",
+      "usage": "!register [Name]",
+      "already_registered": "Du bist bereits registriert!",
+      "success": "Profil erfolgreich erstellt!",
+      "error": "Fehler bei der Registrierung"
+    },
+    "profile": {
+      "description": "Zeigt dein Profil oder das eines anderen Benutzers",
+      "usage": "!profile [@Person]",
+      "not_found": "Profil nicht gefunden",
+      "error": "Fehler beim Laden des Profils"
+    },
+    "setbio": {
+      "description": "Ändere deine Biografie",
+      "usage": "!setbio [Text]",
+      "success": "Biografie aktualisiert!",
+      "error": "Fehler beim Aktualisieren der Biografie"
+    },
+    "settitle": {
+      "description": "Setze deinen Titel",
+      "usage": "!settitle [Titel]",
+      "success": "Titel aktualisiert!",
+      "error": "Fehler beim Aktualisieren des Titels"
+    },
+    "settheme": {
+      "description": "Ändere das Theme deines Profils",
+      "usage": "!settheme [Theme]",
+      "success": "Theme aktualisiert!",
+      "error": "Fehler beim Aktualisieren des Themes"
+    },
+    "setprofilepic": {
+      "description": "Ändere dein Profilbild",
+      "usage": "!setprofilepic (mit Bild)",
+      "success": "Profilbild aktualisiert!",
+      "error": "Fehler beim Aktualisieren des Profilbilds"
+    },
+    "level": {
+      "description": "Zeigt deine Level-Informationen",
+      "usage": "!level [@Person]",
+      "progress": "Fortschritt zum nächsten Level:",
+      "error": "Fehler beim Laden der Level-Informationen"
+    },
+    "daily": {
+      "description": "Erhalte deine tägliche Belohnung",
+      "usage": "!daily",
+      "success": "Du hast %s Münzen erhalten!",
+      "already_claimed": "Du hast deine tägliche Belohnung bereits abgeholt. Versuche es in %s wieder.",
+      "error": "Fehler beim Abholen der täglichen Belohnung"
+    },
+    "leaderboard": {
+      "description": "Zeigt die Bestenliste",
+      "usage": "!leaderboard [xp|coins|level]",
+      "title": "🏆 Bestenliste - %s",
+      "empty": "Keine Benutzer in der Bestenliste",
+      "error": "Fehler beim Laden der Bestenliste"
+    },
+    "achievements": {
+      "description": "Zeigt deine Errungenschaften",
+      "usage": "!achievements [@Person]",
+      "title": "🏅 Errungenschaften",
+      "none": "Noch keine Errungenschaften freigeschaltet",
+      "error": "Fehler beim Laden der Errungenschaften"
+    },
+    "inventory": {
+      "description": "Zeigt dein Inventar",
+      "usage": "!inventory [@Person]",
+      "title": "🎒 Inventar",
+      "empty": "Dein Inventar ist leer",
+      "error": "Fehler beim Laden des Inventars"
+    },
+    "transfer": {
+      "description": "Überweise Münzen an einen anderen Benutzer",
+      "usage": "!transfer @Person [Betrag]",
+      "insufficient": "Du hast nicht genug Münzen!",
+      "success": "Du hast %s Münzen an %s überwiesen!",
+      "error": "Fehler bei der Überweisung"
+    }
+  },
+  "user_extended": {
+    "cooldown": "Du musst noch %s warten, bevor du das wieder tun kannst",
+    "afk": {
+      "description": "Setzt deinen Status auf abwesend",
+      "usage": "!afk [Grund]",
+      "set": "Du bist jetzt AFK: %s",
+      "returned": "Willkommen zurück! Du warst %s lang AFK",
+      "error": "Fehler beim Setzen des AFK-Status"
+    },
+    "unafk": {
+      "description": "Hebt deinen AFK-Status auf",
+      "usage": "!unafk",
+      "error": "Fehler beim Aufheben des AFK-Status"
+    },
+    "work": {
+      "description": "Arbeite, um Münzen zu verdienen",
+      "usage": "!work",
+      "no_job": "Du hast keinen Job. Benutze !getjob um einen zu bekommen",
+      "earned": "Du hast %s Münzen verdient!",
+      "error": "Fehler bei der Arbeit"
+    },
+    "getjob": {
+      "description": "Bekomme einen Job",
+      "usage": "!getjob [Jobtyp]",
+      "already_have": "Du hast bereits einen Job als %s",
+      "available": "Verfügbare Jobs: %s",
+      "got_job": "Du arbeitest jetzt als %s! Benutze !work um zu arbeiten",
+      "error": "Fehler beim Erhalten eines Jobs"
+    },
+    "resign": {
+      "description": "Kündige deinen aktuellen Job",
+      "usage": "!resign",
+      "no_job": "Du hast keinen Job zum Kündigen",
+      "resigned": "Du hast deinen Job als %s gekündigt",
+      "error": "Fehler beim Kündigen"
+    },
+    "crime": {
+      "description": "Begehe ein Verbrechen für Münzen (riskant)",
+      "usage": "!crime",
+      "success": "Verbrechen erfolgreich! Du hast %s Münzen verdient",
+      "failed": "Du wurdest geschnappt und musst %s Münzen Strafe zahlen",
+      "error": "Fehler beim Verbrechen"
+    },
+    "rep": {
+      "description": "Gib jemandem einen Reputationspunkt",
+      "usage": "!rep @Person",
+      "given": "Du hast %s einen Reputationspunkt gegeben!",
+      "cooldown": "Du kannst erst in %s wieder einen Reputationspunkt vergeben",
+      "error": "Fehler beim Vergeben des Reputationspunkts"
+    },
+    "fish": {
+      "description": "Gehe angeln, um Fische zu fangen",
+      "usage": "!fish",
+      "caught": "Du hast einen %s gefangen! (+%s Münzen)",
+      "nothing": "Du hast nichts gefangen...",
+      "error": "Fehler beim Fischen"
+    },
+    "mine": {
+      "description": "Gehe in die Mine, um Ressourcen zu sammeln",
+      "usage": "!mine",
+      "found": "Du hast %s gefunden! (+%s Münzen)",
+      "nothing": "Du hast nichts gefunden...",
+      "error": "Fehler beim Minen"
+    },
+    "sell": {
+      "description": "Verkaufe Gegenstände aus deinem Inventar",
+      "usage": "!sell [Gegenstand] [Menge]",
+      "sold": "Du hast %s x%s für %s Münzen verkauft",
+      "not_enough": "Du hast nicht genug %s zum Verkaufen",
+      "error": "Fehler beim Verkaufen"
+    },
+    "craft": {
+      "description": "Stelle Gegenstände her",
+      "usage": "!craft [Gegenstand]",
+      "crafted": "Du hast erfolgreich %s hergestellt!",
+      "missing": "Dir fehlen folgende Materialien: %s",
+      "error": "Fehler beim Herstellen"
+    },
+    "hourly": {
+      "description": "Erhalte deine stündliche Belohnung",
+      "usage": "!hourly",
+      "claimed": "Du hast %s Münzen erhalten!",
+      "already_claimed": "Du hast deine stündliche Belohnung bereits abgeholt. Versuche es in %s wieder.",
+      "error": "Fehler beim Abholen der stündlichen Belohnung"
+    },
+    "weekly": {
+      "description": "Erhalte deine wöchentliche Belohnung",
+      "usage": "!weekly",
+      "claimed": "Du hast %s Münzen erhalten!",
+      "already_claimed": "Du hast deine wöchentliche Belohnung bereits abgeholt. Versuche es in %s wieder.",
+      "error": "Fehler beim Abholen der wöchentlichen Belohnung"
+    },
+    "adventure": {
+      "description": "Begib dich auf ein Abenteuer",
+      "usage": "!adventure",
+      "started": "Du begibst dich auf ein Abenteuer nach %s...",
+      "found": "Du hast %s gefunden! (+%s Münzen)",
+      "nothing": "Du hast nichts gefunden...",
+      "error": "Fehler beim Abenteuer"
+    },
+    "hunt": {
+      "description": "Gehe auf die Jagd",
+      "usage": "!hunt",
+      "caught": "Du hast ein %s gejagt! (+%s Münzen)",
+      "nothing": "Du hast nichts gejagt...",
+      "error": "Fehler bei der Jagd"
+    },
+    "farm": {
+      "description": "Bewirtschafte deine Farm",
+      "usage": "!farm [pflanzen|ernten|status]",
+      "planted": "Du hast %s gepflanzt",
+      "harvested": "Du hast %s geerntet! (+%s Münzen)",
+      "status": "Deine Farm: %s",
+      "error": "Fehler bei der Farmarbeit"
+    }
   },
   "group": {
     "admin_required": "Sie müssen Administrator sein, um diesen Befehl zu verwenden",
@@ -116,6 +789,297 @@
       "usage": ".add [Nummer]",
       "success": "Benutzer wurde zur Gruppe hinzugefügt",
       "error": "Fehler beim Hinzufügen des Benutzers"
+    },
+    "promote": {
+      "description": "Befördert einen Benutzer zum Admin",
+      "usage": ".promote @benutzer",
+      "success": "Benutzer wurde zum Administrator befördert",
+      "error": "Fehler bei der Beförderung des Benutzers"
+    },
+    "demote": {
+      "description": "Entfernt einen Benutzer als Admin",
+      "usage": ".demote @benutzer",
+      "success": "Benutzer ist kein Administrator mehr",
+      "error": "Fehler bei der Herabstufung des Benutzers"
+    },
+    "mute": {
+      "description": "Stellt die Gruppe für eine bestimmte Zeit stumm",
+      "usage": ".mute [Dauer]",
+      "success": "Gruppe wurde für %s stummgeschaltet",
+      "error": "Fehler beim Stummschalten der Gruppe"
+    },
+    "unmute": {
+      "description": "Hebt die Stummschaltung der Gruppe auf",
+      "usage": ".unmute",
+      "success": "Stummschaltung der Gruppe wurde aufgehoben",
+      "error": "Fehler beim Aufheben der Stummschaltung"
+    },
+    "antispam": {
+      "description": "Aktiviert oder deaktiviert Anti-Spam für die Gruppe",
+      "usage": ".antispam [on/off]",
+      "enabled": "Anti-Spam wurde aktiviert",
+      "disabled": "Anti-Spam wurde deaktiviert",
+      "error": "Fehler beim Ändern der Anti-Spam-Einstellung"
+    },
+    "antilink": {
+      "description": "Aktiviert oder deaktiviert Anti-Link für die Gruppe",
+      "usage": ".antilink [on/off]",
+      "enabled": "Anti-Link wurde aktiviert",
+      "disabled": "Anti-Link wurde deaktiviert",
+      "error": "Fehler beim Ändern der Anti-Link-Einstellung"
+    },
+    "antitoxic": {
+      "description": "Aktiviert oder deaktiviert Anti-Toxic für die Gruppe",
+      "usage": ".antitoxic [on/off]",
+      "enabled": "Anti-Toxic wurde aktiviert",
+      "disabled": "Anti-Toxic wurde deaktiviert",
+      "error": "Fehler beim Ändern der Anti-Toxic-Einstellung"
+    },
+    "antiraid": {
+      "description": "Aktiviert oder deaktiviert Anti-Raid für die Gruppe",
+      "usage": ".antiraid [on/off]",
+      "enabled": "Anti-Raid wurde aktiviert",
+      "disabled": "Anti-Raid wurde deaktiviert",
+      "error": "Fehler beim Ändern der Anti-Raid-Einstellung"
+    },
+    "warn": {
+      "description": "Verwarnt einen Benutzer",
+      "usage": ".warn @benutzer [Grund]",
+      "success": "%s wurde verwarnt (Verwarnungen: %s/%s)",
+      "max_reached": "%s hat die maximale Anzahl an Verwarnungen erreicht und wurde entfernt",
+      "error": "Fehler beim Verwarnen des Benutzers"
+    },
+    "removewarn": {
+      "description": "Entfernt Verwarnungen eines Benutzers",
+      "usage": ".removewarn @benutzer [Anzahl]",
+      "success": "Verwarnung(en) von %s wurden entfernt (Verwarnungen: %s/%s)",
+      "error": "Fehler beim Entfernen der Verwarnung"
+    },
+    "warnings": {
+      "description": "Zeigt die Verwarnungen eines Benutzers an",
+      "usage": ".warnings @benutzer",
+      "none": "%s hat keine Verwarnungen",
+      "list": "%s hat %s/%s Verwarnungen",
+      "error": "Fehler beim Abrufen der Verwarnungen"
+    },
+    "setname": {
+      "description": "Ändert den Gruppennamen",
+      "usage": ".setname [Name]",
+      "success": "Gruppenname wurde zu '%s' geändert",
+      "error": "Fehler beim Ändern des Gruppennamens"
+    },
+    "setdesc": {
+      "description": "Ändert die Gruppenbeschreibung",
+      "usage": ".setdesc [Beschreibung]",
+      "success": "Gruppenbeschreibung wurde geändert",
+      "error": "Fehler beim Ändern der Gruppenbeschreibung"
+    },
+    "setppic": {
+      "description": "Ändert das Gruppenbild",
+      "usage": ".setppic (mit Bild)",
+      "success": "Gruppenbild wurde geändert",
+      "error": "Fehler beim Ändern des Gruppenbilds"
+    },
+    "feature": {
+      "description": "Aktiviert oder deaktiviert Funktionen für die Gruppe",
+      "usage": ".feature [Funktion] [on/off]",
+      "invalid": "Ungültige Funktion. Verfügbare Funktionen: %s",
+      "enabled": "%s wurde für diese Gruppe aktiviert",
+      "disabled": "%s wurde für diese Gruppe deaktiviert",
+      "error": "Fehler beim Ändern der Funktionseinstellung"
+    },
+    "link": {
+      "description": "Zeigt den Gruppenlink an",
+      "usage": ".link",
+      "success": "Gruppenlink: %s",
+      "error": "Fehler beim Abrufen des Gruppenlinks"
+    },
+    "revoke": {
+      "description": "Setzt den Gruppenlink zurück",
+      "usage": ".revoke",
+      "success": "Gruppenlink wurde zurückgesetzt",
+      "error": "Fehler beim Zurücksetzen des Gruppenlinks"
+    },
+    "tagall": {
+      "description": "Markiert alle Gruppenmitglieder",
+      "usage": ".tagall [Nachricht]",
+      "success": "Alle Mitglieder wurden markiert",
+      "error": "Fehler beim Markieren der Mitglieder"
+    },
+    "poll": {
+      "description": "Erstellt eine Umfrage",
+      "usage": ".poll [Frage] | [Option1] | [Option2] | ...",
+      "success": "Umfrage wurde erstellt",
+      "error": "Fehler beim Erstellen der Umfrage"
+    }
+  },
+  "owner": {
+    "owner_only": "Nur der Bot-Besitzer kann diesen Befehl verwenden",
+    "restart": {
+      "description": "Startet den Bot neu",
+      "usage": "!restart",
+      "restarting": "Bot wird neu gestartet...",
+      "error": "Fehler beim Neustart des Bots"
+    },
+    "shutdown": {
+      "description": "Fährt den Bot herunter",
+      "usage": "!shutdown",
+      "shutting_down": "Bot wird heruntergefahren...",
+      "error": "Fehler beim Herunterfahren des Bots"
+    },
+    "update": {
+      "description": "Aktualisiert den Bot auf die neueste Version",
+      "usage": "!update",
+      "checking": "Prüfe auf Updates...",
+      "no_updates": "Bot ist bereits auf dem neuesten Stand",
+      "updating": "Aktualisiere auf Version %s...",
+      "updated": "Bot wurde erfolgreich aktualisiert!",
+      "error": "Fehler bei der Aktualisierung"
+    },
+    "maintenance": {
+      "description": "Aktiviert oder deaktiviert den Wartungsmodus",
+      "usage": "!maintenance [on/off]",
+      "enabled": "Wartungsmodus aktiviert",
+      "disabled": "Wartungsmodus deaktiviert",
+      "error": "Fehler beim Ändern des Wartungsmodus"
+    },
+    "setname": {
+      "description": "Ändert den Namen des Bots",
+      "usage": "!setname [Name]",
+      "success": "Bot-Name wurde zu '%s' geändert",
+      "error": "Fehler beim Ändern des Bot-Namens"
+    },
+    "setbio": {
+      "description": "Ändert die Biografie des Bots",
+      "usage": "!setbio [Text]",
+      "success": "Bot-Biografie wurde geändert",
+      "error": "Fehler beim Ändern der Bot-Biografie"
+    },
+    "setprefix": {
+      "description": "Ändert das Befehlspräfix des Bots",
+      "usage": "!setprefix [Präfix]",
+      "success": "Präfix wurde zu '%s' geändert",
+      "error": "Fehler beim Ändern des Präfixes"
+    },
+    "setlanguage": {
+      "description": "Ändert die Standardsprache des Bots",
+      "usage": "!setlanguage [Sprachcode]",
+      "success": "Standardsprache wurde zu '%s' geändert",
+      "invalid_language": "Ungültiger Sprachcode. Verfügbare Sprachen: %s",
+      "error": "Fehler beim Ändern der Standardsprache"
+    },
+    "setppic": {
+      "description": "Ändert das Profilbild des Bots",
+      "usage": "!setppic (mit Bild)",
+      "success": "Bot-Profilbild wurde geändert",
+      "error": "Fehler beim Ändern des Bot-Profilbilds"
+    },
+    "ban": {
+      "description": "Sperrt einen Benutzer vom Bot",
+      "usage": "!ban @Person [Grund]",
+      "success": "%s wurde vom Bot gesperrt",
+      "error": "Fehler beim Sperren des Benutzers"
+    },
+    "unban": {
+      "description": "Hebt die Sperre eines Benutzers auf",
+      "usage": "!unban @Person",
+      "success": "Sperre für %s wurde aufgehoben",
+      "not_banned": "%s ist nicht gesperrt",
+      "error": "Fehler beim Aufheben der Sperre"
+    },
+    "banlist": {
+      "description": "Zeigt die Liste der gesperrten Benutzer",
+      "usage": "!banlist",
+      "empty": "Keine Benutzer gesperrt",
+      "error": "Fehler beim Abrufen der Sperrliste"
+    },
+    "broadcast": {
+      "description": "Sendet eine Nachricht an alle Chats",
+      "usage": "!broadcast [Nachricht]",
+      "sending": "Sende Broadcast an %s Chats...",
+      "sent": "Broadcast erfolgreich gesendet",
+      "error": "Fehler beim Senden des Broadcasts"
+    }
+  },
+  "utility": {
+    "weather": {
+      "description": "Zeigt Wetterinformationen für einen Ort",
+      "usage": "!weather [Ort]",
+      "current": "Aktuelles Wetter in %s",
+      "temperature": "Temperatur",
+      "feels_like": "Gefühlt wie",
+      "humidity": "Luftfeuchtigkeit",
+      "wind": "Wind",
+      "sunrise": "Sonnenaufgang",
+      "sunset": "Sonnenuntergang",
+      "forecast": "Vorhersage",
+      "error": "Fehler beim Abrufen der Wetterinformationen"
+    },
+    "translate": {
+      "description": "Übersetzt Text in eine andere Sprache",
+      "usage": "!translate [Zielsprache] [Text]",
+      "translated": "Übersetzt nach %s",
+      "error": "Fehler bei der Übersetzung"
+    },
+    "calculate": {
+      "description": "Berechnet mathematische Ausdrücke",
+      "usage": "!calculate [Ausdruck]",
+      "result": "Ergebnis",
+      "error": "Fehler bei der Berechnung"
+    },
+    "dictionary": {
+      "description": "Schlägt ein Wort im Wörterbuch nach",
+      "usage": "!dictionary [Wort]",
+      "definition": "Definition",
+      "synonyms": "Synonyme",
+      "error": "Fehler beim Nachschlagen des Wortes"
+    },
+    "currency": {
+      "description": "Konvertiert Währungen",
+      "usage": "!currency [Betrag] [Von-Währung] [Zu-Währung]",
+      "result": "%s %s entspricht %s %s",
+      "error": "Fehler bei der Währungsumrechnung"
+    },
+    "time": {
+      "description": "Zeigt die aktuelle Zeit in verschiedenen Zeitzonen",
+      "usage": "!time [Zeitzone/Ort]",
+      "current": "Aktuelle Zeit in %s",
+      "error": "Fehler beim Abrufen der Zeitinformation"
+    },
+    "qrgen": {
+      "description": "Generiert einen QR-Code aus einem Text oder Link",
+      "usage": "!qrgen [Text/URL]",
+      "generated": "QR-Code generiert",
+      "error": "Fehler bei der QR-Code-Generierung"
+    },
+    "shortlink": {
+      "description": "Kürzt lange URLs",
+      "usage": "!shortlink [URL]",
+      "shortened": "Gekürzte URL",
+      "error": "Fehler beim Kürzen der URL"
+    },
+    "wiki": {
+      "description": "Sucht Informationen auf Wikipedia",
+      "usage": "!wiki [Suchbegriff]",
+      "not_found": "Keine Informationen gefunden",
+      "error": "Fehler bei der Wikipedia-Suche"
+    },
+    "lyrics": {
+      "description": "Sucht nach Songtexten",
+      "usage": "!lyrics [Künstler] - [Songtitel]",
+      "not_found": "Songtext nicht gefunden",
+      "error": "Fehler beim Suchen des Songtexts"
+    },
+    "movie": {
+      "description": "Zeigt Informationen zu Filmen",
+      "usage": "!movie [Filmtitel]",
+      "not_found": "Film nicht gefunden",
+      "directed_by": "Regie",
+      "starring": "Besetzung",
+      "genre": "Genre",
+      "released": "Veröffentlicht",
+      "rating": "Bewertung",
+      "error": "Fehler beim Suchen des Films"
     }
   },
   "educational": {

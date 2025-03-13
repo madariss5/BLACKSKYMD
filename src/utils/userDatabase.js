@@ -35,6 +35,7 @@ function initializeUserProfile(userId, initialData = {}) {
             level: 1,
             coins: 0,
             bio: '',
+            language: initialData.language || 'en', // Default language is English
             registeredAt: new Date().toISOString(),
             lastDaily: null,
             inventory: [],
@@ -43,10 +44,13 @@ function initializeUserProfile(userId, initialData = {}) {
             warnings: 0
         };
         
-        userProfiles.set(userId, {
+        const profileData = {
             ...defaultProfile,
             ...initialData
-        });
+        };
+        
+        console.log(`Initializing user profile for ${userId}:`, profileData);
+        userProfiles.set(userId, profileData);
     }
     
     return userProfiles.get(userId);
@@ -71,10 +75,20 @@ function updateUserProfile(userId, data) {
     const profile = getUserProfile(userId);
     
     if (!profile) {
+        console.log(`Creating new profile for user ${userId} with data:`, data);
         return initializeUserProfile(userId, data);
     }
     
+    console.log(`Updating profile for user ${userId}:`, data);
     Object.assign(profile, data);
+    
+    // Ensure important fields exist
+    if (!profile.language) {
+        profile.language = 'en';
+        console.log(`Added missing language field to user ${userId}`);
+    }
+    
+    console.log(`Updated profile for ${userId}:`, profile);
     return profile;
 }
 
