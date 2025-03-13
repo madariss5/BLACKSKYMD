@@ -48,7 +48,7 @@ app.use((req, res, next) => {
 
 // Basic health check
 app.get('/health', (req, res) => {
-    res.status(200).json({ 
+    res.status(200).json({
         status: 'ok',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
@@ -56,7 +56,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Globals 
+// Globals
 let sock = null;
 let startTime = Date.now();
 let connectionState = {
@@ -72,9 +72,9 @@ let backupInterval = null;
 
 // Add new retry configuration
 const RETRY_CONFIG = {
-  maxRetries: 5,
-  baseDelay: 2000, // Start with 2 seconds
-  maxDelay: 60000  // Max 1 minute delay
+    maxRetries: 5,
+    baseDelay: 2000, // Start with 2 seconds
+    maxDelay: 60000  // Max 1 minute delay
 };
 
 /**
@@ -95,15 +95,23 @@ function getRetryDelay(attempt) {
 async function clearAuthData(force = false) {
     try {
         // Check if we should clear auth data
-        // Only clear if force=true or on specific disconnect reason
-        const shouldClear = force || connectionState.disconnectReason === DisconnectReason.loggedOut;
-        
+        // Add conflict error to conditions for clearing
+        const shouldClear = force ||
+            connectionState.disconnectReason === DisconnectReason.loggedOut ||
+            connectionState.disconnectReason === 440; // Add conflict status code
+
         if (shouldClear) {
             if (fs.existsSync(SESSION_DIR)) {
                 fs.rmSync(SESSION_DIR, { recursive: true, force: true });
                 fs.mkdirSync(SESSION_DIR, { recursive: true });
             }
-            logger.info('Authentication data cleared');
+            logger.info('Authentication data cleared due to conflict or logout');
+
+            // Reset connection state
+            connectionState.state = 'disconnected';
+            connectionState.qrCode = null;
+            connectionState.connected = false;
+            connectionState.disconnectReason = null;
         } else {
             logger.info('Auth data preserved for reconnection attempt');
         }
@@ -130,29 +138,30 @@ async function connectToWhatsApp(retryCount = 0) {
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
         logger.info('Auth state loaded');
 
-        // Create WhatsApp socket connection with proper logger
+        // Create WhatsApp socket connection with updated config
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            logger: logger.child({ level: 'silent' }), // Properly initialize child logger
+            logger: logger.child({ level: 'silent' }),
             browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Chrome', '121.0.0'],
             connectTimeoutMs: 60000,
             retryRequestDelayMs: 2000,
             defaultQueryTimeoutMs: 60000,
-            emitOwnEvents: false,             
-            syncFullHistory: false,           
-            fireInitQueries: true,            
-            markOnlineOnConnect: true,        
-            transactionOpts: {                
-                maxCommitRetries: 2,            
-                delayBetweenTriesMs: 500        
+            emitOwnEvents: false,
+            syncFullHistory: false,
+            fireInitQueries: true,
+            markOnlineOnConnect: true,
+            transactionOpts: {
+                maxCommitRetries: 2,
+                delayBetweenTriesMs: 500
             },
-            getMessage: async () => ({ conversation: '' }) 
+            getMessage: async () => ({ conversation: '' }),
+            // Add new connection options
+            mobile: false, // Prevent mobile connection conflicts
+            shouldIgnoreJid: jid => isJidBroadcast(jid) // Ignore broadcast messages
         });
 
-        logger.info('Socket connection created');
-
-        // Handle connection updates
+        // Handle connection updates with improved conflict handling
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             logger.debug('Connection update:', update);
@@ -171,29 +180,31 @@ async function connectToWhatsApp(retryCount = 0) {
                 connectionState.state = 'disconnected';
                 connectionState.connected = false;
 
-                const shouldReconnect = (lastDisconnect?.error instanceof Boom)? 
+                // Enhanced reconnection logic
+                const shouldReconnect = (lastDisconnect?.error instanceof Boom) ?
                     lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut : true;
 
-                logger.info('Verbindung wurde geschlossen wegen:', lastDisconnect?.error?.message);
-
-                // Store disconnect reason in state
+                // Store disconnect reason
                 connectionState.disconnectReason = statusCode;
-                
-                // Only clear auth data if we're logged out, otherwise preserve it
-                logger.info('Prüfe, ob Auth-Daten für Neuverbindung erhalten werden können...');
-                await clearAuthData(false);
+
+                // Handle conflict specifically
+                if (statusCode === 440) {
+                    logger.info('Session conflict detected, clearing auth data...');
+                    await clearAuthData(true); // Force clear auth on conflict
+                    setTimeout(() => connectToWhatsApp(0), 1000);
+                    return;
+                }
 
                 if (shouldReconnect) {
                     if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                        logger.info('Sitzung abgelaufen oder ungültig.');
-                        // Sofort neu verbinden nachdem die Daten gelöscht wurden
+                        logger.info('Session expired or invalid.');
                         setTimeout(() => connectToWhatsApp(0), 1000);
                     } else if (retryCount < RETRY_CONFIG.maxRetries) {
                         const delay = getRetryDelay(retryCount);
-                        logger.info(`Verbindung wird in ${delay/1000} Sekunden erneut versucht... (Versuch ${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
+                        logger.info(`Reconnecting in ${delay/1000} seconds... (Attempt ${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
                         setTimeout(() => connectToWhatsApp(retryCount + 1), delay);
                     } else {
-                        logger.info('Maximale Anzahl an Wiederverbindungsversuchen erreicht. Bitte scannen Sie einen neuen QR-Code.');
+                        logger.info('Max reconnection attempts reached. Please scan a new QR code.');
                         await resetConnection();
                     }
                 }
@@ -232,88 +243,88 @@ async function connectToWhatsApp(retryCount = 0) {
  * Backup session at regular intervals
  */
 function setupSessionBackup() {
-  // Clear existing interval if it exists
-  if (backupInterval) {
-    clearInterval(backupInterval);
-  }
-  
-  // Set up new interval (every 5 minutes)
-  backupInterval = setInterval(() => {
-    try {
-      const timestamp = Date.now();
-      const backupPath = path.join(BACKUP_DIR, `creds_backup_${timestamp}.json`);
-      
-      // Copy current auth file
-      const authFiles = fs.readdirSync(SESSION_DIR);
-      for (const file of authFiles) {
-        if (file.includes('creds')) {
-          const srcPath = path.join(SESSION_DIR, file);
-          fs.copyFileSync(srcPath, backupPath);
-          logger.info(`Session backup created: ${backupPath}`);
-          break;
-        }
-      }
-      
-      // Limit number of backups to 5
-      const backups = fs.readdirSync(BACKUP_DIR)
-                        .filter(file => file.startsWith('creds_backup_'))
-                        .sort();
-                        
-      if (backups.length > 5) {
-        const oldestBackup = path.join(BACKUP_DIR, backups[0]);
-        fs.unlinkSync(oldestBackup);
-        logger.info(`Removed old backup: ${oldestBackup}`);
-      }
-    } catch (error) {
-      logger.error('Error creating session backup:', error);
+    // Clear existing interval if it exists
+    if (backupInterval) {
+        clearInterval(backupInterval);
     }
-  }, 5 * 60 * 1000); // Every 5 minutes
+
+    // Set up new interval (every 5 minutes)
+    backupInterval = setInterval(() => {
+        try {
+            const timestamp = Date.now();
+            const backupPath = path.join(BACKUP_DIR, `creds_backup_${timestamp}.json`);
+
+            // Copy current auth file
+            const authFiles = fs.readdirSync(SESSION_DIR);
+            for (const file of authFiles) {
+                if (file.includes('creds')) {
+                    const srcPath = path.join(SESSION_DIR, file);
+                    fs.copyFileSync(srcPath, backupPath);
+                    logger.info(`Session backup created: ${backupPath}`);
+                    break;
+                }
+            }
+
+            // Limit number of backups to 5
+            const backups = fs.readdirSync(BACKUP_DIR)
+                .filter(file => file.startsWith('creds_backup_'))
+                .sort();
+
+            if (backups.length > 5) {
+                const oldestBackup = path.join(BACKUP_DIR, backups[0]);
+                fs.unlinkSync(oldestBackup);
+                logger.info(`Removed old backup: ${oldestBackup}`);
+            }
+        } catch (error) {
+            logger.error('Error creating session backup:', error);
+        }
+    }, 5 * 60 * 1000); // Every 5 minutes
 }
 
 /**
  * Get current connection status
  */
 function getConnectionStatus() {
-  connectionState.uptime = getUptime();
-  return connectionState;
+    connectionState.uptime = getUptime();
+    return connectionState;
 }
 
 /**
  * Reset the connection state and reconnect
  */
 async function resetConnection() {
-  try {
-    logger.info('🔄 Manually resetting connection...');
-    
-    // Force disconnect if connected
-    if (sock) {
-      try {
-        sock.ev.removeAllListeners();
-        await sock.logout();
-      } catch (e) {
-        logger.info('Error during logout:', e);
-        // Continue anyway
-      }
-      sock = null;
+    try {
+        logger.info('🔄 Manually resetting connection...');
+
+        // Force disconnect if connected
+        if (sock) {
+            try {
+                sock.ev.removeAllListeners();
+                await sock.logout();
+            } catch (e) {
+                logger.info('Error during logout:', e);
+                // Continue anyway
+            }
+            sock = null;
+        }
+
+        // Clear authentication data with force=true
+        await clearAuthData(true);
+        logger.info('Auth data cleared for fresh start');
+
+        // Reset state
+        connectionState.state = 'connecting';
+        connectionState.qrCode = null;
+        connectionState.connected = false;
+
+        // Reconnect
+        connectToWhatsApp();
+
+        return { success: true, message: 'Connection reset and auth data cleared' };
+    } catch (error) {
+        logger.error('Error resetting connection:', error);
+        return { success: false, message: 'Could not reset connection' };
     }
-    
-    // Clear authentication data with force=true
-    await clearAuthData(true); 
-    logger.info('Auth data cleared for fresh start');
-    
-    // Reset state
-    connectionState.state = 'connecting';
-    connectionState.qrCode = null;
-    connectionState.connected = false;
-    
-    // Reconnect
-    connectToWhatsApp();
-    
-    return { success: true, message: 'Connection reset and auth data cleared' };
-  } catch (error) {
-    logger.error('Error resetting connection:', error);
-    return { success: false, message: 'Could not reset connection' };
-  }
 }
 
 
@@ -321,11 +332,11 @@ async function resetConnection() {
  * Get formatted uptime string
  */
 function getUptime() {
-  const uptime = Math.floor((Date.now() - startTime) / 1000);
-  const hours = Math.floor(uptime / 3600);
-  const minutes = Math.floor((uptime % 3600) / 60);
-  const seconds = uptime % 60;
-  return `${hours}h ${minutes}m ${seconds}s`;
+    const uptime = Math.floor((Date.now() - startTime) / 1000);
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const seconds = uptime % 60;
+    return `${hours}h ${minutes}m ${seconds}s`;
 }
 
 /**
@@ -336,102 +347,102 @@ function getUptime() {
  * Works by checking the most common message types first
  */
 function getMessageType(message) {
-  if (!message?.message) return null;
-  
-  // Check most common message types first (optimized order)
-  const content = message.message;
-  
-  // Fast path for text messages (most common)
-  if (content.conversation) return 'conversation';
-  if (content.extendedTextMessage) return 'extendedTextMessage';
-  
-  // Fast path for media types (second most common)
-  if (content.imageMessage) return 'imageMessage';
-  if (content.videoMessage) return 'videoMessage';
-  if (content.stickerMessage) return 'stickerMessage';
-  
-  // Less common types
-  if (content.audioMessage) return 'audioMessage';
-  if (content.documentMessage) return 'documentMessage';
-  
-  // Fall back to object key detection for any other types
-  return Object.keys(content)[0] || null;
+    if (!message?.message) return null;
+
+    // Check most common message types first (optimized order)
+    const content = message.message;
+
+    // Fast path for text messages (most common)
+    if (content.conversation) return 'conversation';
+    if (content.extendedTextMessage) return 'extendedTextMessage';
+
+    // Fast path for media types (second most common)
+    if (content.imageMessage) return 'imageMessage';
+    if (content.videoMessage) return 'videoMessage';
+    if (content.stickerMessage) return 'stickerMessage';
+
+    // Less common types
+    if (content.audioMessage) return 'audioMessage';
+    if (content.documentMessage) return 'documentMessage';
+
+    // Fall back to object key detection for any other types
+    return Object.keys(content)[0] || null;
 }
 
 /**
  * Handle incoming messages using the optimized message handler
  */
 async function handleIncomingMessage(message) {
-  // Fast exit conditions - most common filters
-  if (!message?.key?.remoteJid || 
-      message.key.remoteJid === 'status@broadcast' || 
-      !message.message) {
-    return;
-  }
-  
-  try {
-    // Directly pass to message handler - minimal overhead
-    await messageHandler(sock, message);
-  } catch (error) {
-    // Minimal error logging
-    logger.error('Message process error:', error.message);
-  }
+    // Fast exit conditions - most common filters
+    if (!message?.key?.remoteJid ||
+        message.key.remoteJid === 'status@broadcast' ||
+        !message.message) {
+        return;
+    }
+
+    try {
+        // Directly pass to message handler - minimal overhead
+        await messageHandler(sock, message);
+    } catch (error) {
+        // Minimal error logging
+        logger.error('Message process error:', error.message);
+    }
 }
 
 /**
  * Send a response based on type - optimized for performance
  */
 async function sendResponse(jid, response) {
-  // Fast exit for common error cases
-  if (!sock || !response || !jid) return;
+    // Fast exit for common error cases
+    if (!sock || !response || !jid) return;
 
-  try {
-    // Fast path: String responses (most common)
-    if (typeof response === 'string') {
-      return await sock.sendMessage(jid, { text: response });
+    try {
+        // Fast path: String responses (most common)
+        if (typeof response === 'string') {
+            return await sock.sendMessage(jid, { text: response });
+        }
+
+        // Object responses with optimal type checking
+        if (response.text) {
+            return await sock.sendMessage(jid, { text: response.text });
+        }
+
+        if (response.image) {
+            return await sock.sendMessage(jid, {
+                image: response.image,
+                caption: response.caption || ''
+            });
+        }
+
+        if (response.sticker) {
+            return await sock.sendMessage(jid, { sticker: response.sticker });
+        }
+
+        // Handle other media types
+        if (response.video) {
+            return await sock.sendMessage(jid, {
+                video: response.video,
+                caption: response.caption || ''
+            });
+        }
+
+        if (response.audio) {
+            return await sock.sendMessage(jid, {
+                audio: response.audio,
+                mimetype: 'audio/mp4'
+            });
+        }
+
+        // Handle array of responses
+        if (Array.isArray(response)) {
+            for (const item of response) {
+                await sendResponse(jid, item);
+            }
+        }
+    } catch (error) {
+        // Minimal error logging for speed
+        logger.error('Send error:', error.message);
     }
-    
-    // Object responses with optimal type checking
-    if (response.text) {
-      return await sock.sendMessage(jid, { text: response.text });
-    } 
-    
-    if (response.image) {
-      return await sock.sendMessage(jid, { 
-        image: response.image,
-        caption: response.caption || ''
-      });
-    } 
-    
-    if (response.sticker) {
-      return await sock.sendMessage(jid, { sticker: response.sticker });
-    }
-    
-    // Handle other media types
-    if (response.video) {
-      return await sock.sendMessage(jid, { 
-        video: response.video,
-        caption: response.caption || ''
-      });
-    }
-    
-    if (response.audio) {
-      return await sock.sendMessage(jid, { 
-        audio: response.audio,
-        mimetype: 'audio/mp4'
-      });
-    }
-    
-    // Handle array of responses
-    if (Array.isArray(response)) {
-      for (const item of response) {
-        await sendResponse(jid, item);
-      }
-    }
-  } catch (error) {
-    // Minimal error logging for speed
-    logger.error('Send error:', error.message);
-  }
 }
 
 /**
@@ -539,10 +550,10 @@ async function start() {
                     const socket = await connectToWhatsApp();
                     setupSessionBackup(); // Start backup process
                     logger.info('WhatsApp connection initialized');
-                    
+
                     // Set flag to track if we've already sent the messages
                     let notificationSent = false;
-                    
+
                     // Check connection status periodically and send messages when connected
                     const notificationInterval = setInterval(() => {
                         if (connectionState.connected && !notificationSent) {
@@ -594,3 +605,7 @@ if (require.main === module) {
 }
 
 module.exports = { connectToWhatsApp, setupSessionBackup, getConnectionStatus, resetConnection, start, sendCredsToSelf };
+
+function isJidBroadcast(jid) {
+    return jid.endsWith('@broadcast');
+}
