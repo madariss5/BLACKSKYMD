@@ -11,8 +11,27 @@ name = "Project"
 mode = "parallel"
 author = "agent"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "WhatsApp Bot"
+
+[[workflows.workflow]]
+name = "WhatsApp Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node connected-bot.js"
+waitForPort = 5000
+
 [deployment]
-run = ["sh", "-c", "node replit-qr.js"]
+run = ["sh", "-c", "node connected-bot.js"]
 
 [[ports]]
 localPort = 5000
