@@ -17,7 +17,16 @@ const ANIME_GIF_API = {
     boop: 'https://api.waifu.pics/sfw/boop',
     tickle: 'https://api.waifu.pics/sfw/tickle',
     laugh: 'https://api.waifu.pics/sfw/laugh',
-    wink: 'https://api.waifu.pics/sfw/wink'
+    wink: 'https://api.waifu.pics/sfw/wink',
+    // Adding missing reaction endpoints
+    punch: 'https://api.waifu.pics/sfw/kick', // Using kick as alternative for punch
+    bonk: 'https://api.waifu.pics/sfw/bonk',
+    pout: 'https://api.waifu.pics/sfw/pout',
+    smug: 'https://api.waifu.pics/sfw/smug',
+    run: 'https://api.waifu.pics/sfw/run',
+    sleep: 'https://api.waifu.pics/sfw/sleep',
+    panic: 'https://api.waifu.pics/sfw/panic',
+    facepalm: 'https://api.waifu.pics/sfw/facepalm'
 };
 
 // Helper function to validate mentions
@@ -62,13 +71,21 @@ async function fetchAnimeGif(type, retries = 3) {
 // Helper function to send reaction message
 async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
     try {
-        const senderName = sender.split('@')[0];
+        // Get the chat context (either group or private chat)
+        const chatJid = sender.includes('@g.us') ? sender : (sender.split('@')[0] + '@s.whatsapp.net');
+        const isGroup = chatJid.includes('@g.us');
+        
+        // Extract the sender's name without the "@xxxx" part
+        const senderName = sender.includes('@g.us') 
+            ? 'You' // In group chat, it's "You" from the bot's perspective
+            : sender.split('@')[0];
+            
         const targetName = target ? target.split('@')[0] : null;
 
         let message;
         if (target) {
             if (!validateMention(target)) {
-                await sock.sendMessage(sender, {
+                await sock.sendMessage(chatJid, {
                     text: `❌ Please mention a valid user to ${type}`
                 });
                 return;
@@ -78,36 +95,52 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
             message = `${senderName} ${type}s ${emoji}`;
         }
 
-        logger.debug(`Sending reaction message: ${message}`);
+        logger.debug(`Sending reaction message: ${message} to ${chatJid}`);
+
+        // Prepare mentions array only if we're in a group chat
+        const mentions = (isGroup && target) ? [target] : undefined;
 
         if (gifUrl) {
-            await sock.sendMessage(sender, {
+            await sock.sendMessage(chatJid, {
                 image: { url: gifUrl },
                 caption: message,
-                mentions: target ? [target] : undefined
+                mentions: mentions
             });
         } else {
-            await sock.sendMessage(sender, { 
+            await sock.sendMessage(chatJid, { 
                 text: message,
-                mentions: target ? [target] : undefined
+                mentions: mentions
             });
         }
     } catch (error) {
         logger.error('Error sending reaction message:', error);
-        await sock.sendMessage(sender, { text: `❌ Error sending ${type} reaction` });
+        logger.error('Error details:', error.stack);
+        
+        // Try to determine the correct JID to send the error message
+        const errorJid = sender.includes('@g.us') ? sender : sender;
+        await sock.sendMessage(errorJid, { text: `❌ Error sending ${type} reaction` });
     }
 }
 
 // Export commands
 const reactionCommands = {
     async hug(sock, sender, args) {
-        const target = args[0];
-        if (!target) {
-            await sock.sendMessage(sender, { text: '🤗 Please mention someone to hug' });
-            return;
+        try {
+            const target = args[0];
+            // Determine the correct JID to send messages to
+            const chatJid = sender.includes('@g.us') ? sender : sender;
+            
+            if (!target) {
+                await sock.sendMessage(chatJid, { text: '🤗 Please mention someone to hug' });
+                return;
+            }
+            const gifUrl = await fetchAnimeGif('hug');
+            await sendReactionMessage(sock, sender, target, 'hug', gifUrl, '🤗');
+        } catch (error) {
+            logger.error('Error in hug command:', error);
+            const errorJid = sender.includes('@g.us') ? sender : sender;
+            await sock.sendMessage(errorJid, { text: '❌ Error executing hug command' });
         }
-        const gifUrl = await fetchAnimeGif('hug');
-        await sendReactionMessage(sock, sender, target, 'hug', gifUrl, '🤗');
     },
 
     async pat(sock, sender, args) {
@@ -206,8 +239,14 @@ const reactionCommands = {
     },
 
     async wave(sock, sender) {
-        const gifUrl = await fetchAnimeGif('wave');
-        await sendReactionMessage(sock, sender, null, 'wave', gifUrl, '👋');
+        try {
+            const gifUrl = await fetchAnimeGif('wave');
+            await sendReactionMessage(sock, sender, null, 'wave', gifUrl, '👋');
+        } catch (error) {
+            logger.error('Error in wave command:', error);
+            const errorJid = sender.includes('@g.us') ? sender : sender;
+            await sock.sendMessage(errorJid, { text: '❌ Error executing wave command' });
+        }
     },
 
     async wink(sock, sender, args) {
@@ -219,6 +258,56 @@ const reactionCommands = {
     async grouphug(sock, sender) {
         const gifUrl = await fetchAnimeGif('hug');
         await sendReactionMessage(sock, sender, null, 'grouphug', gifUrl, '🤗');
+    },
+
+    async punch(sock, sender, args) {
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: '👊 Please mention someone to punch' });
+            return;
+        }
+        const gifUrl = await fetchAnimeGif('punch');
+        await sendReactionMessage(sock, sender, target, 'punch', gifUrl, '👊');
+    },
+
+    async bonk(sock, sender, args) {
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: '🔨 Please mention someone to bonk' });
+            return;
+        }
+        const gifUrl = await fetchAnimeGif('bonk');
+        await sendReactionMessage(sock, sender, target, 'bonk', gifUrl, '🔨');
+    },
+
+    async pout(sock, sender) {
+        const gifUrl = await fetchAnimeGif('pout');
+        await sendReactionMessage(sock, sender, null, 'pout', gifUrl, '😤');
+    },
+
+    async smug(sock, sender) {
+        const gifUrl = await fetchAnimeGif('smug');
+        await sendReactionMessage(sock, sender, null, 'smug', gifUrl, '😏');
+    },
+
+    async run(sock, sender) {
+        const gifUrl = await fetchAnimeGif('run');
+        await sendReactionMessage(sock, sender, null, 'run', gifUrl, '🏃');
+    },
+
+    async sleep(sock, sender) {
+        const gifUrl = await fetchAnimeGif('sleep');
+        await sendReactionMessage(sock, sender, null, 'sleep', gifUrl, '😴');
+    },
+
+    async panic(sock, sender) {
+        const gifUrl = await fetchAnimeGif('panic');
+        await sendReactionMessage(sock, sender, null, 'panic', gifUrl, '😱');
+    },
+
+    async facepalm(sock, sender) {
+        const gifUrl = await fetchAnimeGif('facepalm');
+        await sendReactionMessage(sock, sender, null, 'facepalm', gifUrl, '🤦');
     },
 
     // Initialize and test API connection
