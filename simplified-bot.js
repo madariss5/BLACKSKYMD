@@ -157,6 +157,28 @@ async function connectToWhatsApp() {
                         await handler.init();
                         console.log('Ultra minimal message handler initialized');
                         messageHandlerInitialized = true;
+                        
+                        // Send a self-test message after a short delay
+                        setTimeout(async () => {
+                            try {
+                                const selfJid = sock.user.id;
+                                console.log(`Attempting to send test message to self: ${selfJid}`);
+                                
+                                // Check available commands
+                                const commandList = Array.from(handler.commands.keys());
+                                const commandCountMsg = `Available commands: ${commandList.length}`;
+                                console.log(commandCountMsg);
+                                console.log('Command list:', commandList.join(', '));
+                                
+                                // Send self-test message with command info
+                                await sock.sendMessage(selfJid, { 
+                                    text: `🧪 Bot Self-Test: The bot is online with ${commandList.length} commands loaded.\n\nAvailable commands: ${commandList.slice(0, 10).join(', ')}${commandList.length > 10 ? '...' : ''}` 
+                                });
+                                console.log('Self-test message sent successfully');
+                            } catch (testErr) {
+                                console.error('Failed to send self-test message:', testErr);
+                            }
+                        }, 5000);
                     }
                     
                     // Extra safety: wrap the event handler setup
