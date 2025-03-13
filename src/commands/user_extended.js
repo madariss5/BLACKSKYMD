@@ -850,13 +850,14 @@ module.exports = {
         });
     },
     
-    async sell(sock, sender, args) {
+    async sell(sock, message, args) {
+        const sender = message.key.remoteJid;
         const profile = await getUserProfile(sock, sender);
         if (!profile) return;
         
         if (args.length < 2) {
             await sock.sendMessage(sender, {
-                text: '*⚠️ Usage:* .sell [type] [name|all]\n\nTypes: fish, mineral'
+                text: '*⚠️ Usage:* !sell [type] [name|all]\n\nTypes: fish, mineral'
             });
             return;
         }
@@ -948,7 +949,8 @@ module.exports = {
         });
     },
     
-    async inventory(sock, sender, args) {
+    async inventory(sock, message, args) {
+        const sender = message.key.remoteJid;
         const profile = await getUserProfile(sock, sender);
         if (!profile) return;
         
@@ -1040,7 +1042,8 @@ module.exports = {
     },
     
     // 4. Crafting System
-    async craft(sock, sender, args) {
+    async craft(sock, message, args) {
+        const sender = message.key.remoteJid;
         const profile = await getUserProfile(sock, sender);
         if (!profile) return;
         

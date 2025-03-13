@@ -210,8 +210,10 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
 // Export commands
 const reactionCommands = {
     // Base command implementations
-    async hug(sock, sender, args) {
+    async hug(sock, message, args) {
         try {
+            // Extract sender from message object
+            const sender = message.key.remoteJid;
             const target = args[0];
             const chatJid = sender.includes('@g.us') ? sender : sender;
 
@@ -221,10 +223,12 @@ const reactionCommands = {
             }
             const gifUrl = await fetchAnimeGif('hug');
             await sendReactionMessage(sock, sender, target, 'hug', gifUrl, '🤗');
+            return true;
         } catch (error) {
             logger.error('Error in hug command:', error);
-            const errorJid = sender.includes('@g.us') ? sender : sender;
+            const errorJid = message.key.remoteJid;
             await sock.sendMessage(errorJid, { text: '❌ Error executing hug command' });
+            throw error;
         }
     },
     async pat(sock, sender, args) {
