@@ -57,11 +57,19 @@ async function init() {
                 moduleType: typeof commandHandler,
                 hasProcessCommand: typeof commandHandler.processCommand === 'function',
                 hasCommands: typeof commandHandler.commands === 'object',
-                commandCount: commandHandler.commands?.size || 0
+                commandCount: commandHandler.commands?.size || 0,
+                isInitialized: typeof commandHandler.isInitialized === 'function' ? commandHandler.isInitialized() : false
             });
 
             if (!commandHandler || typeof commandHandler.processCommand !== 'function') {
                 throw new Error('Invalid command handler structure');
+            }
+
+            // If commands are not loaded yet, try to load them
+            if (commandHandler.commands?.size === 0 && typeof commandHandler.loadCommands === 'function') {
+                logger.info('Commands not loaded yet, loading commands...');
+                await commandHandler.loadCommands();
+                logger.info('Command loading completed, command count:', commandHandler.commands?.size || 0);
             }
 
             commandProcessor = commandHandler.processCommand;

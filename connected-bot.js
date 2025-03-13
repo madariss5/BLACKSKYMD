@@ -620,6 +620,19 @@ async function start() {
                         logger.info('Initializing WhatsApp connection...');
                         const socket = await connectToWhatsApp();
                         setupSessionBackup(); // Start backup process
+                        
+                        // Initialize command modules with the socket
+                        try {
+                            const commandIndex = require('./src/commands/index');
+                            if (commandIndex && typeof commandIndex.initializeModules === 'function') {
+                                logger.info('Initializing command modules with socket...');
+                                await commandIndex.initializeModules(socket);
+                                logger.info('Command modules initialized with socket');
+                            }
+                        } catch (err) {
+                            logger.error('Error initializing command modules with socket:', err);
+                        }
+                        
                         logger.info('WhatsApp connection initialized');
                     } catch (error) {
                         logger.error('Failed to initialize WhatsApp:', error);

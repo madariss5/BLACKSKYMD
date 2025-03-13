@@ -20,24 +20,81 @@ async function loadCommands() {
             logger.info(`Found ${commandCount} commands in commands/index.js`);
             
             // Register each command from the index
-            Object.entries(allCommands).forEach(([name, func]) => {
+            for (const [name, func] of Object.entries(allCommands)) {
                 if (typeof func === 'function' && name !== 'init') {
-                    commands.set(name, {
-                        execute: async (sock, message, args, options = {}) => {
-                            try {
-                                return await func(sock, message, args, options);
-                            } catch (err) {
-                                logger.error(`Error executing command ${name}:`, err);
-                                throw err;
-                            }
-                        },
-                        cooldown: 5,
-                        groupOnly: false
-                    });
+                    try {
+                        commands.set(name, {
+                            execute: async (sock, message, args, options = {}) => {
+                                try {
+                                    return await func(sock, message, args, options);
+                                } catch (err) {
+                                    logger.error(`Error executing command ${name}:`, err);
+                                    throw err;
+                                }
+                            },
+                            cooldown: 5,
+                            groupOnly: false
+                        });
+                    } catch (err) {
+                        logger.error(`Error registering command ${name}:`, err);
+                    }
                 }
-            });
+            }
             
             logger.info(`Registered ${commands.size} commands from modules`);
+        }
+        
+        // Also load individual command files directly for more reliability
+        try {
+            // Define command modules to load
+            const commandModules = [
+                { name: 'basic', module: require('../commands/basic') },
+                { name: 'fun', module: require('../commands/fun') },
+                { name: 'group', module: require('../commands/group') },
+                { name: 'media', module: require('../commands/media') },
+                { name: 'menu', module: require('../commands/menu') },
+                { name: 'nsfw', module: require('../commands/nsfw') },
+                { name: 'owner', module: require('../commands/owner') },
+                { name: 'reactions', module: require('../commands/reactions') },
+                { name: 'user', module: require('../commands/user') },
+                { name: 'utility', module: require('../commands/utility') }
+            ];
+            
+            for (const { name, module } of commandModules) {
+                if (module && typeof module === 'object') {
+                    // Try to get commands from module
+                    const moduleCommands = module.commands || module;
+                    
+                    if (moduleCommands && typeof moduleCommands === 'object') {
+                        // Register each command
+                        for (const [cmdName, cmdFunc] of Object.entries(moduleCommands)) {
+                            if (typeof cmdFunc === 'function' && cmdName !== 'init') {
+                                try {
+                                    commands.set(cmdName, {
+                                        execute: async (sock, message, args, options = {}) => {
+                                            try {
+                                                return await cmdFunc(sock, message, args, options);
+                                            } catch (err) {
+                                                logger.error(`Error executing command ${cmdName} from ${name}:`, err);
+                                                throw err;
+                                            }
+                                        },
+                                        cooldown: 5,
+                                        groupOnly: name === 'group', // Group commands are group-only
+                                        category: name
+                                    });
+                                } catch (err) {
+                                    logger.error(`Error registering command ${cmdName} from ${name}:`, err);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            logger.info(`After direct loading: ${commands.size} total commands registered`);
+        } catch (err) {
+            logger.error('Error loading individual command modules:', err);
         }
         
         // Add basic commands if they don't exist yet
@@ -168,22 +225,42 @@ async function processCommand(sock, message, commandText, options = {}) {
 
         // Split command and args
         const [commandName, ...args] = commandText.trim().split(' ');
+        const cmdName = commandName.toLowerCase();
 
         logger.info('Processing command:', {
-            command: commandName,
+            command: cmdName,
             args: args,
             sender: sender,
             options: options
         });
 
-        // Get command handler
-        const command = commands.get(commandName.toLowerCase());
+        // Try to get command handler from our Map
+        const command = commands.get(cmdName);
 
         if (!command) {
-            await sock.sendMessage(sender, {
-                text: `❌ Unknown command: ${commandName}\nUse !help to see available commands.`
-            });
-            return;
+            // If not found in our Map, try to load from modules directly
+            try {
+                // Load command modules index
+                const commandModules = require('../commands/index');
+                
+                if (commandModules && commandModules.commands && typeof commandModules.commands[cmdName] === 'function') {
+                    logger.info(`Executing command ${cmdName} directly from modules`);
+                    await commandModules.commands[cmdName](sock, message, args, options);
+                    logger.info(`Command ${cmdName} executed successfully from modules`);
+                    return;
+                } else {
+                    await sock.sendMessage(sender, {
+                        text: `❌ Unknown command: ${cmdName}\nUse !help to see available commands.`
+                    });
+                    return;
+                }
+            } catch (moduleErr) {
+                logger.error(`Error trying to execute command ${cmdName} from modules:`, moduleErr);
+                await sock.sendMessage(sender, {
+                    text: `❌ Unknown command: ${cmdName}\nUse !help to see available commands.`
+                });
+                return;
+            }
         }
 
         // Check group-only commands
@@ -196,7 +273,7 @@ async function processCommand(sock, message, commandText, options = {}) {
 
         // Execute command
         await command.execute(sock, message, args, options);
-        logger.info(`Command ${commandName} executed successfully`);
+        logger.info(`Command ${cmdName} executed successfully`);
 
     } catch (err) {
         logger.error('Command processing error:', {
@@ -205,12 +282,29 @@ async function processCommand(sock, message, commandText, options = {}) {
             sender: sender,
             stack: err.stack
         });
-        throw err;
+        
+        try {
+            await sock.sendMessage(sender, {
+                text: '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
+            });
+        } catch (sendErr) {
+            logger.error('Error sending error message:', sendErr);
+        }
     }
+}
+
+/**
+ * Check if command handler is properly loaded
+ * This is used by the message handler to verify command handler status
+ */
+function isInitialized() {
+    return commands.size > 0;
 }
 
 // Export module
 module.exports = {
     processCommand,
-    commands
+    commands,
+    isInitialized,
+    loadCommands // Export for testing or manual reloading
 };
