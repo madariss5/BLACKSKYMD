@@ -3,16 +3,18 @@
     "4915561048015@s.whatsapp.net": {
       "name": "User",
       "age": 0,
-      "xp": 210,
-      "level": 2,
-      "coins": 60,
+      "xp": 310,
+      "level": 3,
+      "coins": 270,
       "bio": "",
       "registeredAt": "2025-03-12T22:40:11.381Z",
-      "lastDaily": null,
+      "lastDaily": "2025-03-13T17:17:30.103Z",
       "inventory": [],
       "achievements": [],
       "customTitle": "",
-      "warnings": 0
+      "warnings": 0,
+      "dailyStreak": 1,
+      "language": "en"
     }
   },
   "games": {},
