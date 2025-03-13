@@ -10,17 +10,19 @@ const http = require('http');
 const app = express();
 const server = http.createServer(app);
 
+// Connection state management
 let sock = null;
 let retryCount = 0;
 const MAX_RETRIES = 5;
-const INITIAL_RETRY_INTERVAL = 10000; // 10 seconds
-const MAX_RETRY_INTERVAL = 300000; // 5 minutes
+const INITIAL_RETRY_INTERVAL = 10000;
+const MAX_RETRY_INTERVAL = 300000;
 let currentRetryInterval = INITIAL_RETRY_INTERVAL;
 let qrPort = 5006;
 let isConnecting = false;
 let connectionLock = false;
 let sessionInvalidated = false;
 let reconnectTimer = null;
+let latestQR = null;
 
 // Set up Express server for QR code display
 app.get('/', (req, res) => {
@@ -65,21 +67,28 @@ app.get('/', (req, res) => {
 
 async function cleanupSession() {
     try {
-        logger.info('Cleaning up session files...');
+        logger.info('Starting complete session cleanup...');
+
+        // Files to clean
         const filesToClean = [
             'auth_info_multi.json',
             'auth_info_baileys.json',
             'auth_info.json',
-            'auth_info_qr.json'
+            'auth_info_qr.json',
+            'session.json',
+            'creds.json'
         ];
 
+        // Directories to clean
         const authDirs = [
             'auth_info',
             'auth_info_baileys',
-            'auth_info_multi'
+            'auth_info_multi',
+            'session',
+            '.session'
         ].map(dir => path.join(process.cwd(), dir));
 
-        // Clean up files
+        // Clean files
         for (const file of filesToClean) {
             try {
                 if (fs.existsSync(file)) {
@@ -91,7 +100,7 @@ async function cleanupSession() {
             }
         }
 
-        // Clean up directories
+        // Clean directories
         for (const dir of authDirs) {
             try {
                 if (fs.existsSync(dir)) {
@@ -104,7 +113,7 @@ async function cleanupSession() {
         }
 
         sessionInvalidated = true;
-        logger.info('Session cleanup completed');
+        logger.info('Session cleanup completed successfully');
     } catch (err) {
         logger.error('Error during session cleanup:', err);
         throw err;
@@ -156,6 +165,9 @@ async function startConnection() {
             });
         }
 
+        // Clear any existing session before starting
+        await cleanupSession();
+
         const authDir = await ensureAuthDir();
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
@@ -163,12 +175,12 @@ async function startConnection() {
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: false,
-            browser: ['WhatsApp Bot', 'Firefox', '2.0.0'],
             logger: pino({ level: 'silent' }),
+            browser: ['BLACKSKY-MD', 'Chrome', '121.0.0'],
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 30000,
-            emitOwnEvents: true,
+            emitOwnEvents: false,
             retryRequestDelayMs: 5000,
             fireInitQueries: true,
             downloadHistory: false,
@@ -177,13 +189,9 @@ async function startConnection() {
             patchMessageBeforeSending: false,
             markOnlineOnConnect: false,
             version: [2, 2323, 4],
-            browser: ['BLACKSKY-MD', 'Chrome', '121.0.0'],
             transactionOpts: { 
                 maxCommitRetries: 10, 
                 delayBetweenTriesMs: 5000 
-            },
-            getMessage: async () => {
-                return { conversation: 'hello' };
             }
         });
 
@@ -215,20 +223,20 @@ async function startConnection() {
                     statusCode === DisconnectReason.connectionReplaced ||
                     statusCode === DisconnectReason.connectionClosed ||
                     statusCode === DisconnectReason.connectionLost ||
-                    statusCode === DisconnectReason.timedOut) {
+                    statusCode === DisconnectReason.timedOut ||
+                    statusCode === 440) {
 
                     logger.info('Critical connection error detected');
                     await cleanupSession();
 
-                    if (statusCode === DisconnectReason.loggedOut ||
-                        statusCode === DisconnectReason.connectionReplaced) {
-                        process.exit(1);
-                        return;
-                    }
+                    // Force restart on critical errors
+                    logger.info('Restarting process after critical error...');
+                    process.exit(1);
+                    return;
                 }
 
                 if (retryCount >= MAX_RETRIES) {
-                    logger.error('Max retries reached, restarting...');
+                    logger.error('Max retries reached, clearing session and restarting...');
                     await cleanupSession();
                     process.exit(1);
                     return;
