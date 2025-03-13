@@ -60,6 +60,26 @@ commands.set('status', async (sock, message) => {
     }
 });
 
+// Add about command
+commands.set('about', async (sock, message) => {
+    try {
+        if (!message.key?.remoteJid) return;
+        const sender = message.key.remoteJid;
+        
+        const aboutText = `*🤖 BLACKSKY-MD Bot*\n\n` +
+                         `A reliable WhatsApp bot with multi-level fallback system.\n\n` +
+                         `*Version:* 1.0.0 (Ultra Minimal)\n` +
+                         `*Framework:* @whiskeysockets/baileys\n` +
+                         `*Created by:* Team BLACKSKY\n\n` +
+                         `_Currently running in ultra-minimal mode to ensure stability._\n\n` +
+                         `Type *!help* for available commands.`;
+        
+        await sock.sendMessage(sender, { text: aboutText });
+    } catch (err) {
+        console.error('Error in about command:', err);
+    }
+});
+
 /**
  * Process messages
  */
