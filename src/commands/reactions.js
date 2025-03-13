@@ -3,7 +3,7 @@ const axios = require('axios');
 
 // API endpoints (using waifu.pics and additional sources)
 const ANIME_GIF_API = {
-    // Existing endpoints
+    // Existing endpoints remain unchanged
     hug: 'https://api.waifu.pics/sfw/hug',
     pat: 'https://api.waifu.pics/sfw/pat',
     kiss: 'https://api.waifu.pics/sfw/kiss',
@@ -27,8 +27,7 @@ const ANIME_GIF_API = {
     sleep: 'https://api.waifu.pics/sfw/sleep',
     panic: 'https://api.waifu.pics/sfw/panic',
     facepalm: 'https://api.waifu.pics/sfw/facepalm',
-    highfive: 'https://api.waifu.pics/sfw/highfive',
-    hold: 'https://api.waifu.pics/sfw/handhold', // Using handhold for hold
+    highfive: 'https://api.waifu.pics/sfw/highfive', // Using handhold for hold
     handhold: 'https://api.waifu.pics/sfw/handhold',
     nom: 'https://api.waifu.pics/sfw/bite', // Using bite for nom
     bite: 'https://api.waifu.pics/sfw/bite',
@@ -603,42 +602,79 @@ const reactionCommands = {
     },
     // Alternative commands
     async hifive(sock, sender, args) {
-        // Use the highfive handler since it's the same action
-        await reactionCommands.highfive(sock, sender, args);
+        return await reactionCommands.highfive(sock, sender, args);
     },
+
+    async grouphug(sock, sender) {
+        return await reactionCommands.hug(sock, sender, ['@everyone']);
+    },
+
+    async peck(sock, sender, args) {
+        return await reactionCommands.kiss(sock, sender, args);
+    },
+
+    async greet(sock, sender, args) {
+        return await reactionCommands.wave(sock, sender, args);
+    },
+
+    async bye(sock, sender) {
+        return await reactionCommands.wave(sock, sender, null);
+    },
+
+    async sad(sock, sender) {
+        return await reactionCommands.cry(sock, sender);
+    },
+
+    async nom(sock, sender, args) {
+        return await reactionCommands.bite(sock, sender, args);
+    },
+
     async init() {
         try {
             logger.info('Initializing reactions command handler...');
 
-            // Log the state of the command handler
-            const commandNames = Object.keys(reactionCommands).filter(key => key !== 'init');
+            // Get all command names excluding special functions
+            const commandNames = Object.keys(reactionCommands).filter(key =>
+                key !== 'init' && typeof reactionCommands[key] === 'function'
+            );
+
+            // Get all API endpoints
             const endpointNames = Object.keys(ANIME_GIF_API);
 
             logger.info(`Available reaction commands: ${commandNames.length}`);
             logger.info(`Available API endpoints: ${endpointNames.length}`);
 
-            // Check for mismatches between commands and endpoints
-            const missingEndpoints = commandNames.filter(cmd => !ANIME_GIF_API[cmd]);
-            const unusedEndpoints = endpointNames.filter(endpoint =>
-                !commandNames.some(cmd => cmd === endpoint ||
-                    (cmd === 'hifive' && endpoint === 'highfive'))
-            );
+            // Validate all commands have corresponding endpoints
+            const missingEndpoints = commandNames.filter(cmd => {
+                // Handle special cases for alternative commands
+                if (cmd === 'hifive') return !ANIME_GIF_API['highfive'];
+                if (cmd === 'grouphug') return !ANIME_GIF_API['hug'];
+                if (cmd === 'peck') return !ANIME_GIF_API['kiss'];
+                if (cmd === 'greet' || cmd === 'bye') return !ANIME_GIF_API['wave'];
+                if (cmd === 'sad') return !ANIME_GIF_API['cry'];
+                if (cmd === 'nom') return !ANIME_GIF_API['bite'];
+                return !ANIME_GIF_API[cmd];
+            });
 
             if (missingEndpoints.length > 0) {
                 logger.warn(`Commands missing API endpoints: ${missingEndpoints.join(', ')}`);
             }
 
-            if (unusedEndpoints.length > 0) {
-                logger.warn(`Unused API endpoints: ${unusedEndpoints.join(', ')}`);
-            }
-
-            // Test each endpoint for at least one command
+            // Test endpoints with retries
             logger.info('Testing API endpoints...');
             const testedEndpoints = new Set();
             const results = await Promise.allSettled(
                 commandNames.map(async cmd => {
                     try {
-                        const endpoint = ANIME_GIF_API[cmd];
+                        // Get the correct endpoint for the command
+                        let endpoint = ANIME_GIF_API[cmd];
+                        if (cmd === 'hifive') endpoint = ANIME_GIF_API['highfive'];
+                        if (cmd === 'grouphug') endpoint = ANIME_GIF_API['hug'];
+                        if (cmd === 'peck') endpoint = ANIME_GIF_API['kiss'];
+                        if (cmd === 'greet' || cmd === 'bye') endpoint = ANIME_GIF_API['wave'];
+                        if (cmd === 'sad') endpoint = ANIME_GIF_API['cry'];
+                        if (cmd === 'nom') endpoint = ANIME_GIF_API['bite'];
+
                         if (!endpoint || testedEndpoints.has(endpoint)) {
                             return { command: cmd, skipped: true };
                         }
@@ -669,7 +705,7 @@ const reactionCommands = {
                     });
             }
 
-            // Return success if we have working endpoints
+            // Count working endpoints
             const workingEndpoints = results
                 .filter(r => r.status === 'fulfilled' && r.value.success)
                 .length;
