@@ -2,73 +2,95 @@ const logger = require('../utils/logger');
 const { processCommand } = require('./commandHandler');
 const config = require('../config/config');
 
-/**
- * Main message handler for WhatsApp messages
- */
+// Initialize message handler
+async function init() {
+    try {
+        logger.info('Starting message handler initialization...');
+
+        // Debug: Log all dependencies
+        logger.info('Dependency check:', {
+            processCommandType: typeof processCommand,
+            processCommandFunction: typeof processCommand === 'function',
+            configPresent: !!config,
+            configType: typeof config,
+            botConfigPresent: !!config?.bot,
+            prefix: config?.bot?.prefix || '!'
+        });
+
+        // Basic validation
+        if (typeof processCommand !== 'function') {
+            logger.error('Command processor not properly initialized:', {
+                type: typeof processCommand,
+                value: processCommand
+            });
+            return false;
+        }
+
+        if (!config || typeof config !== 'object') {
+            logger.error('Configuration not properly loaded:', {
+                type: typeof config,
+                exists: !!config
+            });
+            return false;
+        }
+
+        logger.info('Message handler initialization completed successfully');
+        return true;
+    } catch (err) {
+        logger.error('Message handler initialization failed:', err);
+        logger.error('Stack trace:', err.stack);
+        return false;
+    }
+}
+
 async function messageHandler(sock, message) {
     try {
-        // FAST PATH: Skip protocol messages immediately
-        if (message.message?.protocolMessage) {
+        // Skip if no message content
+        if (!message?.message) {
             return;
         }
 
-        // Extract message content with optimized path for common types
-        let messageContent;
-
-        // Fast path for most common message types (ordered by frequency)
-        if (message.message?.conversation) {
-            messageContent = message.message.conversation;
-        } else if (message.message?.extendedTextMessage?.text) {
-            messageContent = message.message.extendedTextMessage.text;
-        } else if (message.message?.imageMessage?.caption) {
-            messageContent = message.message.imageMessage.caption;
-        } else if (message.message?.videoMessage?.caption) {
-            messageContent = message.message.videoMessage.caption;
-        } else {
-            // For other message types that don't contain text
-            messageContent = null;
-        }
+        // Get message content
+        const messageContent = message.message?.conversation ||
+                             message.message?.extendedTextMessage?.text ||
+                             message.message?.imageMessage?.caption ||
+                             message.message?.videoMessage?.caption;
 
         // Get sender information
         const sender = message.key.remoteJid;
         if (!sender) {
-            logger.warn('Message without remoteJid, skipping');
             return;
         }
 
-        const prefix = config.bot.prefix || '!';
+        // Skip empty messages
+        if (!messageContent) {
+            return;
+        }
 
-        // FAST PATH: Skip empty messages immediately
-        if (!messageContent) return;
+        // Get prefix from config
+        const prefix = config?.bot?.prefix || '!';
 
-        logger.debug(`Received message from ${sender}: ${messageContent}`);
-
-        // Command processing
+        // Process commands
         if (messageContent.startsWith(prefix)) {
             const commandText = messageContent.slice(prefix.length).trim();
             if (commandText) {
-                logger.info(`Processing command: ${commandText} from ${sender}`);
+                logger.info(`Processing command from ${sender}: ${commandText}`);
                 try {
                     await processCommand(sock, message, commandText);
                 } catch (err) {
                     logger.error('Command execution failed:', err);
                     await sock.sendMessage(sender, { 
-                        text: '*❌ Command failed.* Please try again.\n\nUse !help to see available commands.' 
+                        text: '❌ Command failed. Please try again.\n\nUse !help to see available commands.' 
                     });
                 }
             }
-            return;
         }
-
     } catch (err) {
-        logger.error('Error in message handler:', {
-            name: err.name,
-            message: err.message,
-            stack: err.stack,
-            sender: message?.key?.remoteJid,
-            messageContent: messageContent
-        });
+        logger.error('Error in message handler:', err);
     }
 }
 
-module.exports = { messageHandler };
+module.exports = { 
+    messageHandler,
+    init 
+};
