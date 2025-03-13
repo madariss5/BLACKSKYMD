@@ -67,20 +67,35 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Root endpoint for web interface
+app.get('/', (req, res) => {
+    res.send(`
+        <html>
+            <head>
+                <title>WhatsApp Bot Status</title>
+            </head>
+            <body>
+                <h1>WhatsApp Bot Status</h1>
+                <p>Status: Active</p>
+                <p>Port: ${PORT}</p>
+                <p>Commands Loaded: ${commandHandler.commands.size}</p>
+            </body>
+        </html>
+    `);
+});
+
 // Connection state storage
 let connectionState = {
     state: 'disconnected',
     qrCode: null,
-    uptime: 0,
     connected: false,
-    disconnectReason: null
+    lastError: null,
+    reconnectCount: 0
 };
-
-let isConnecting = false;
 
 // Retry configuration
 const RETRY_CONFIG = {
-    maxRetries: 3,
+    maxRetries: 5,
     baseDelay: 5000,
     maxDelay: 30000
 };
@@ -107,7 +122,6 @@ function isJidBroadcast(jid) {
  */
 async function connectToWhatsApp(retryCount = 0) {
     try {
-        isConnecting = true;
         connectionState.state = 'connecting';
         logger.info('🟢 Starting WhatsApp authentication...');
 
@@ -123,58 +137,65 @@ async function connectToWhatsApp(retryCount = 0) {
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            logger: pino({ level: 'debug' }),
+            logger: pino({ level: 'silent' }), // Reduce noise in logs
             browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Chrome', '121.0.0'],
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             markOnlineOnConnect: true,
+            keepAliveIntervalMs: 30000,
             shouldIgnoreJid: jid => isJidBroadcast(jid)
         });
 
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            logger.info('Connection update received:', update);
+            logger.info('Connection update:', update);
 
             if (qr) {
                 connectionState.state = 'qr_ready';
                 connectionState.qrCode = qr;
+                logger.info('New QR code generated');
+            }
+
+            if (connection === 'connecting') {
+                connectionState.state = 'connecting';
+                logger.info('Connecting to WhatsApp...');
             }
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
+                                     retryCount < RETRY_CONFIG.maxRetries;
+
                 connectionState.state = 'disconnected';
                 connectionState.connected = false;
-                connectionState.disconnectReason = statusCode;
-                isConnecting = false;
+                connectionState.lastError = lastDisconnect?.error;
 
-                if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                    setTimeout(() => connectToWhatsApp(0), 5000);
-                } else if (retryCount < RETRY_CONFIG.maxRetries) {
+                logger.info('Connection closed:', { statusCode, shouldReconnect, retryCount });
+
+                if (shouldReconnect) {
                     const delay = getRetryDelay(retryCount);
+                    logger.info(`Reconnecting in ${delay}ms... (Attempt ${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
                     setTimeout(() => connectToWhatsApp(retryCount + 1), delay);
                 } else {
-                    logger.info('Max retries reached, manual restart needed');
+                    logger.error('Connection closed permanently:', lastDisconnect?.error);
                 }
-            } else if (connection === 'open') {
+            }
+
+            if (connection === 'open') {
                 logger.info('🟢 WhatsApp connection established!');
                 connectionState.state = 'connected';
                 connectionState.connected = true;
-                isConnecting = false;
+                connectionState.reconnectCount = 0;
 
-                // Initialize message handling
+                // Initialize message handlers
                 logger.info('Initializing message handlers...');
                 try {
                     // Initialize message handler
-                    logger.info('Starting message handler initialization...');
                     const initialized = await initMessageHandler();
-                    logger.info('Message handler initialization result:', initialized);
-
                     if (!initialized) {
-                        logger.error('Message handler initialization failed - check dependencies');
-                        return;
+                        throw new Error('Message handler initialization failed');
                     }
-
                     logger.info('Message handler initialized successfully');
 
                     // Set up message event handlers
@@ -182,16 +203,18 @@ async function connectToWhatsApp(retryCount = 0) {
                     sock.ev.on('messages.upsert', async ({ messages, type }) => {
                         if (type === 'notify') {
                             for (const message of messages) {
-                                if (message.key.fromMe) {
-                                    logger.debug('Skipping own message');
-                                    continue;
-                                }
+                                if (message.key.fromMe) continue;
 
                                 try {
-                                    logger.debug('Processing incoming message:', {
+                                    logger.debug('Processing message:', {
                                         type: message.message ? Object.keys(message.message)[0] : null,
-                                        from: message.key.remoteJid
+                                        from: message.key.remoteJid,
+                                        content: message.message?.conversation || 
+                                                message.message?.extendedTextMessage?.text ||
+                                                message.message?.imageMessage?.caption ||
+                                                message.message?.videoMessage?.caption
                                     });
+
                                     await messageHandler(sock, message);
                                 } catch (err) {
                                     logger.error('Message handling error:', err);
@@ -200,9 +223,10 @@ async function connectToWhatsApp(retryCount = 0) {
                         }
                     });
                     logger.info('Message event handler registered successfully');
-                } catch (error) {
-                    logger.error('Failed to initialize message handlers:', error);
-                    logger.error('Stack trace:', error.stack);
+
+                } catch (err) {
+                    logger.error('Failed to initialize message handlers:', err);
+                    logger.error('Stack trace:', err.stack);
                 }
             }
         });
@@ -214,7 +238,6 @@ async function connectToWhatsApp(retryCount = 0) {
     } catch (error) {
         logger.error('Error in WhatsApp connection:', error);
         logger.error('Stack trace:', error.stack);
-        isConnecting = false;
         throw error;
     }
 }
