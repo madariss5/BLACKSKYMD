@@ -103,26 +103,43 @@ function validateMention(mention) {
 // Helper function to fetch anime GIFs with retries
 async function fetchAnimeGif(type, retries = 3) {
     try {
+        // Type-specific fallback GIFs for common reactions (these are stable URLs)
+        const fallbacks = {
+            'hug': 'https://c.tenor.com/FzEfrj9RKqEAAAAd/anime-hug.gif',
+            'pat': 'https://c.tenor.com/Dbj9bAT9S-YAAAAC/anime-pat.gif',
+            'kiss': 'https://c.tenor.com/Fu-vx6npJicAAAAC/anime-kiss.gif',
+            'slap': 'https://c.tenor.com/PeJyQRCSHHkAAAAC/saki-saki-mukai-naoya.gif',
+            'cuddle': 'https://c.tenor.com/ItpTQW2UKPYAAAAC/cuddle-anime.gif',
+            'panic': 'https://c.tenor.com/KOMV7S7Zf28AAAAC/anime-panic.gif',
+            'yeet': 'https://c.tenor.com/1FYdZLkHY9wAAAAC/anime-throw.gif',
+            'sad': 'https://c.tenor.com/6q-ickMeKnYAAAAC/crying-anime.gif',
+            'happy': 'https://c.tenor.com/QxIL-aeHRmMAAAAC/happy-anime.gif'
+        };
+        
+        // Generic fallback for all other types
+        const genericFallback = 'https://i.imgur.com/hew1cmf.gif';
+        
+        // Get type-specific fallback or use generic
+        const fallbackGifUrl = fallbacks[type] || genericFallback;
+        
         const endpoint = ANIME_GIF_API[type];
         if (!endpoint) {
             logger.error(`Invalid reaction type: ${type}`);
-            return null;
+            return fallbackGifUrl;
         }
 
         logger.info(`Fetching gif for type: ${type} from endpoint: ${endpoint}`);
-        
-        // Fall back to default image if API call fails
-        const fallbackGifUrl = 'https://i.imgur.com/hew1cmf.gif'; // Generic anime reaction gif
         
         let lastError;
         for (let i = 0; i < retries; i++) {
             try {
                 const response = await axios.get(endpoint);
-                logger.debug('API Response:', {
-                    status: response.status,
-                    data: response.data
-                });
-                return response.data.url;
+                if (response.status === 200 && response.data && response.data.url) {
+                    logger.debug(`Successfully fetched ${type} GIF from API`);
+                    return response.data.url;
+                } else {
+                    throw new Error(`Invalid response format for ${type}`);
+                }
             } catch (error) {
                 lastError = error;
                 logger.warn(`Retry ${i + 1}/${retries} failed for ${type} GIF:`, error.message);
@@ -134,7 +151,8 @@ async function fetchAnimeGif(type, retries = 3) {
         return fallbackGifUrl;
     } catch (error) {
         logger.error(`Error fetching ${type} GIF after ${retries} retries:`, error.message);
-        return fallbackGifUrl; // Return fallback URL instead of null
+        // Return type-specific fallback if available, otherwise generic
+        return fallbacks[type] || genericFallback;
     }
 }
 
@@ -328,33 +346,45 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('boop');
         await sendReactionMessage(sock, sender, target, 'boop', gifUrl, '👉');
     },
-    async blush(sock, sender) {
+    async blush(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('blush');
         await sendReactionMessage(sock, sender, null, 'blush', gifUrl, '😊');
     },
-    async cry(sock, sender) {
+    async cry(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('cry');
         await sendReactionMessage(sock, sender, null, 'cry', gifUrl, '😢');
     },
-    async dance(sock, sender) {
+    async dance(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('dance');
         await sendReactionMessage(sock, sender, null, 'dance', gifUrl, '💃');
     },
-    async laugh(sock, sender) {
+    async laugh(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('laugh');
         await sendReactionMessage(sock, sender, null, 'laugh', gifUrl, '😂');
     },
-    async smile(sock, sender) {
+    async smile(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('smile');
         await sendReactionMessage(sock, sender, null, 'smile', gifUrl, '😊');
     },
-    async wave(sock, sender) {
+    async wave(sock, message) {
         try {
+            // Extract sender from message object
+            const sender = message.key.remoteJid;
             const gifUrl = await fetchAnimeGif('wave');
             await sendReactionMessage(sock, sender, null, 'wave', gifUrl, '👋');
         } catch (error) {
             logger.error('Error in wave command:', error);
-            const errorJid = sender.includes('@g.us') ? sender : sender;
+            const errorJid = message.key.remoteJid;
             await sock.sendMessage(errorJid, { text: '❌ Error executing wave command' });
         }
     },
@@ -403,7 +433,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('sleep');
         await sendReactionMessage(sock, sender, null, 'sleep', gifUrl, '😴');
     },
-    async panic(sock, sender) {
+    async panic(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('panic');
         await sendReactionMessage(sock, sender, null, 'panic', gifUrl, '😱');
     },
@@ -475,7 +507,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('kill');
         await sendReactionMessage(sock, sender, target, 'kill', gifUrl, '💀');
     },
-    async yeet(sock, sender, args) {
+    async yeet(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🚀 Please mention someone to yeet' });
@@ -521,23 +555,33 @@ const reactionCommands = {
         await sendReactionMessage(sock, sender, target, 'bully', gifUrl, '😈');
     },
     // Solo reactions (no target needed)
-    async happy(sock, sender) {
+    async happy(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('happy');
         await sendReactionMessage(sock, sender, null, 'happy', gifUrl, '😊');
     },
-    async sad(sock, sender) {
+    async sad(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('sad');
         await sendReactionMessage(sock, sender, null, 'sad', gifUrl, '😢');
     },
-    async angry(sock, sender) {
+    async angry(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('angry');
         await sendReactionMessage(sock, sender, null, 'angry', gifUrl, '😠');
     },
-    async confused(sock, sender) {
+    async confused(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('confused');
         await sendReactionMessage(sock, sender, null, 'confused', gifUrl, '😕');
     },
-    async think(sock, sender) {
+    async think(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('think');
         await sendReactionMessage(sock, sender, null, 'think', gifUrl, '🤔');
     },
