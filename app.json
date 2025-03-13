@@ -4,6 +4,19 @@
   "repository": "https://github.com/madariss5/BLACKSKY",
   "logo": "https://raw.githubusercontent.com/madariss5/BLACKSKY/main/generated-icon.png",
   "keywords": ["whatsapp", "bot", "multi-device", "baileys", "md-bot", "blacksky"],
+  "success_url": "/",
+  "stack": "heroku-20",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    },
+    {
+      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
+    },
+    {
+      "url": "https://github.com/clhuang/heroku-buildpack-webp-binaries.git"
+    }
+  ],
   "env": {
     "SESSION_STRING": {
       "description": "WhatsApp session credentials (Base64 encoded). You can leave this blank and add it via the web interface after deployment.",
@@ -68,17 +81,5 @@
       "value": "true",
       "required": false
     }
-  },
-  "buildpacks": [
-    {
-      "url": "heroku/nodejs"
-    },
-    {
-      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
-    },
-    {
-      "url": "https://github.com/clhuang/heroku-buildpack-webp-binaries.git"
-    }
-  ],
-  "stack": "heroku-20"
+  }
 }
