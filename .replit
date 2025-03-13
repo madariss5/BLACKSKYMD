@@ -19,6 +19,10 @@ args = "Check Commands"
 task = "workflow.run"
 args = "Unified WhatsApp Bot"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "WhatsApp Bot"
+
 [[workflows.workflow]]
 name = "Check Commands"
 author = "agent"
@@ -47,6 +51,21 @@ task = "packager.installForAll"
 task = "shell.exec"
 args = "node connected-bot.js"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "WhatsApp Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node bot-handler.js"
+waitForPort = 5001
 
 [deployment]
 run = ["sh", "-c", "node replit-qr.js"]
