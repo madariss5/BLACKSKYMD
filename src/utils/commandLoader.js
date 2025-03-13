@@ -158,20 +158,28 @@ class CommandLoader {
 
                     for (const [name, handler] of Object.entries(commands)) {
                         try {
+                            loadedHandlers[moduleCategory].total++;
+
+                            // Add detailed logging for non-function handlers
                             if (typeof handler !== 'function') {
                                 loadedHandlers[moduleCategory].failed++;
-                                logger.warn(`Skipping non-function handler for ${name} in ${file}`);
+                                logger.warn(`Skipping non-function handler for ${name} in ${file}. Type: ${typeof handler}`);
+                                logger.debug(`Handler content:`, handler);
                                 continue;
                             }
 
-                            loadedHandlers[moduleCategory].total++;
-
-                            // Check for duplicates
+                            // Log duplicate command details
                             if (this.commands.has(name)) {
                                 const existingSource = this.commandSources.get(name);
                                 duplicateCommands.add(name);
                                 loadedHandlers[moduleCategory].duplicates++;
                                 logger.warn(`Duplicate command "${name}" found in ${file}, already registered from ${existingSource}`);
+                                logger.debug(`Duplicate command details:`, {
+                                    name,
+                                    currentFile: file,
+                                    existingSource,
+                                    handlerType: typeof handler
+                                });
                                 continue;
                             }
 
@@ -193,6 +201,9 @@ class CommandLoader {
                             // Track command source
                             this.commandSources.set(name, file);
 
+                            // Log successful command registration
+                            logger.debug(`Successfully registered command: ${name} from ${file}`);
+
                             if (!this.commandCache.has(name)) {
                                 this.commandCache.set(name, {
                                     lastUsed: Date.now(),
@@ -206,6 +217,12 @@ class CommandLoader {
                         } catch (err) {
                             loadedHandlers[moduleCategory].failed++;
                             logger.error(`Failed to register handler for ${name} in ${file}:`, err);
+                            logger.debug('Handler registration error details:', {
+                                name,
+                                file,
+                                error: err.message,
+                                stack: err.stack
+                            });
                         }
                     }
                 } catch (err) {

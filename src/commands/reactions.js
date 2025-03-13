@@ -18,7 +18,6 @@ const ANIME_GIF_API = {
     tickle: 'https://api.waifu.pics/sfw/tickle',
     laugh: 'https://api.waifu.pics/sfw/laugh',
     wink: 'https://api.waifu.pics/sfw/wink',
-    // Adding missing reaction endpoints
     punch: 'https://api.waifu.pics/sfw/kick', // Using kick as alternative for punch
     bonk: 'https://api.waifu.pics/sfw/bonk',
     pout: 'https://api.waifu.pics/sfw/pout',
@@ -40,7 +39,7 @@ const ANIME_GIF_API = {
     feed: 'https://api.waifu.pics/sfw/feed',
     bully: 'https://api.waifu.pics/sfw/bully',
     happy: 'https://api.waifu.pics/sfw/happy',
-    sad: 'https://api.waifu.pics/sfw/cry', // Reusing cry for sad
+    sad: 'https://api.waifu.pics/sfw/cry', // Using cry for sad
     angry: 'https://api.waifu.pics/sfw/angry',
     confused: 'https://api.waifu.pics/sfw/confused',
     think: 'https://api.waifu.pics/sfw/think',
@@ -67,7 +66,9 @@ const ANIME_GIF_API = {
     nuzzle: 'https://api.waifu.pics/sfw/nuzzle',
     growl: 'https://api.waifu.pics/sfw/growl',
     disgusted: 'https://api.waifu.pics/sfw/disgust',
-    scared: 'https://api.waifu.pics/sfw/scared'
+    scared: 'https://api.waifu.pics/sfw/scared',
+    // Alternative commands using existing endpoints
+    hifive: 'https://api.waifu.pics/sfw/highfive' // Alternative for highfive
 };
 
 // Helper function to validate mentions
@@ -165,10 +166,10 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
 
 // Export commands
 const reactionCommands = {
+    // Base command implementations
     async hug(sock, sender, args) {
         try {
             const target = args[0];
-            // Determine the correct JID to send messages to
             const chatJid = sender.includes('@g.us') ? sender : sender;
 
             if (!target) {
@@ -183,7 +184,6 @@ const reactionCommands = {
             await sock.sendMessage(errorJid, { text: '❌ Error executing hug command' });
         }
     },
-
     async pat(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -193,7 +193,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('pat');
         await sendReactionMessage(sock, sender, target, 'pat', gifUrl, '👋');
     },
-
     async kiss(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -203,7 +202,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('kiss');
         await sendReactionMessage(sock, sender, target, 'kiss', gifUrl, '💋');
     },
-
     async cuddle(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -213,7 +211,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('cuddle');
         await sendReactionMessage(sock, sender, target, 'cuddle', gifUrl, '🤗');
     },
-
     async poke(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -223,7 +220,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('poke');
         await sendReactionMessage(sock, sender, target, 'poke', gifUrl, '👉');
     },
-
     async slap(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -233,7 +229,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('slap');
         await sendReactionMessage(sock, sender, target, 'slap', gifUrl, '👋');
     },
-
     async tickle(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -243,7 +238,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('tickle');
         await sendReactionMessage(sock, sender, target, 'tickle', gifUrl, '🤗');
     },
-
     async boop(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -253,32 +247,26 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('boop');
         await sendReactionMessage(sock, sender, target, 'boop', gifUrl, '👉');
     },
-
     async blush(sock, sender) {
         const gifUrl = await fetchAnimeGif('blush');
         await sendReactionMessage(sock, sender, null, 'blush', gifUrl, '😊');
     },
-
     async cry(sock, sender) {
         const gifUrl = await fetchAnimeGif('cry');
         await sendReactionMessage(sock, sender, null, 'cry', gifUrl, '😢');
     },
-
     async dance(sock, sender) {
         const gifUrl = await fetchAnimeGif('dance');
         await sendReactionMessage(sock, sender, null, 'dance', gifUrl, '💃');
     },
-
     async laugh(sock, sender) {
         const gifUrl = await fetchAnimeGif('laugh');
         await sendReactionMessage(sock, sender, null, 'laugh', gifUrl, '😂');
     },
-
     async smile(sock, sender) {
         const gifUrl = await fetchAnimeGif('smile');
         await sendReactionMessage(sock, sender, null, 'smile', gifUrl, '😊');
     },
-
     async wave(sock, sender) {
         try {
             const gifUrl = await fetchAnimeGif('wave');
@@ -289,18 +277,15 @@ const reactionCommands = {
             await sock.sendMessage(errorJid, { text: '❌ Error executing wave command' });
         }
     },
-
     async wink(sock, sender, args) {
         const target = args[0];
         const gifUrl = await fetchAnimeGif('wink');
         await sendReactionMessage(sock, sender, target, 'wink', gifUrl, '😉');
     },
-
     async grouphug(sock, sender) {
         const gifUrl = await fetchAnimeGif('hug');
         await sendReactionMessage(sock, sender, null, 'grouphug', gifUrl, '🤗');
     },
-
     async punch(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -310,7 +295,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('punch');
         await sendReactionMessage(sock, sender, target, 'punch', gifUrl, '👊');
     },
-
     async bonk(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -320,37 +304,30 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('bonk');
         await sendReactionMessage(sock, sender, target, 'bonk', gifUrl, '🔨');
     },
-
     async pout(sock, sender) {
         const gifUrl = await fetchAnimeGif('pout');
         await sendReactionMessage(sock, sender, null, 'pout', gifUrl, '😤');
     },
-
     async smug(sock, sender) {
         const gifUrl = await fetchAnimeGif('smug');
         await sendReactionMessage(sock, sender, null, 'smug', gifUrl, '😏');
     },
-
     async run(sock, sender) {
         const gifUrl = await fetchAnimeGif('run');
         await sendReactionMessage(sock, sender, null, 'run', gifUrl, '🏃');
     },
-
     async sleep(sock, sender) {
         const gifUrl = await fetchAnimeGif('sleep');
         await sendReactionMessage(sock, sender, null, 'sleep', gifUrl, '😴');
     },
-
     async panic(sock, sender) {
         const gifUrl = await fetchAnimeGif('panic');
         await sendReactionMessage(sock, sender, null, 'panic', gifUrl, '😱');
     },
-
     async facepalm(sock, sender) {
         const gifUrl = await fetchAnimeGif('facepalm');
         await sendReactionMessage(sock, sender, null, 'facepalm', gifUrl, '🤦');
     },
-
     // New commands implementation
     async highfive(sock, sender, args) {
         const target = args[0];
@@ -361,7 +338,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('highfive');
         await sendReactionMessage(sock, sender, target, 'highfive', gifUrl, '✋');
     },
-
     async hold(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -371,7 +347,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('hold');
         await sendReactionMessage(sock, sender, target, 'hold', gifUrl, '🤝');
     },
-
     async handhold(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -381,7 +356,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('handhold');
         await sendReactionMessage(sock, sender, target, 'handhold', gifUrl, '🤝');
     },
-
     async nom(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -391,7 +365,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('nom');
         await sendReactionMessage(sock, sender, target, 'nom', gifUrl, '😋');
     },
-
     async bite(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -401,7 +374,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('bite');
         await sendReactionMessage(sock, sender, target, 'bite', gifUrl, '😬');
     },
-
     async glomp(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -411,7 +383,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('glomp');
         await sendReactionMessage(sock, sender, target, 'glomp', gifUrl, '💫');
     },
-
     async kill(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -421,7 +392,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('kill');
         await sendReactionMessage(sock, sender, target, 'kill', gifUrl, '💀');
     },
-
     async yeet(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -431,7 +401,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('yeet');
         await sendReactionMessage(sock, sender, target, 'yeet', gifUrl, '🚀');
     },
-
     async stare(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -441,7 +410,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('stare');
         await sendReactionMessage(sock, sender, target, 'stare', gifUrl, '👀');
     },
-
     async lick(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -451,7 +419,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('lick');
         await sendReactionMessage(sock, sender, target, 'lick', gifUrl, '👅');
     },
-
     async feed(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -461,7 +428,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('feed');
         await sendReactionMessage(sock, sender, target, 'feed', gifUrl, '🍽️');
     },
-
     async bully(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -471,33 +437,27 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('bully');
         await sendReactionMessage(sock, sender, target, 'bully', gifUrl, '😈');
     },
-
     // Solo reactions (no target needed)
     async happy(sock, sender) {
         const gifUrl = await fetchAnimeGif('happy');
         await sendReactionMessage(sock, sender, null, 'happy', gifUrl, '😊');
     },
-
     async sad(sock, sender) {
         const gifUrl = await fetchAnimeGif('sad');
         await sendReactionMessage(sock, sender, null, 'sad', gifUrl, '😢');
     },
-
     async angry(sock, sender) {
         const gifUrl = await fetchAnimeGif('angry');
         await sendReactionMessage(sock, sender, null, 'angry', gifUrl, '😠');
     },
-
     async confused(sock, sender) {
         const gifUrl = await fetchAnimeGif('confused');
         await sendReactionMessage(sock, sender, null, 'confused', gifUrl, '😕');
     },
-
     async think(sock, sender) {
         const gifUrl = await fetchAnimeGif('think');
         await sendReactionMessage(sock, sender, null, 'think', gifUrl, '🤔');
     },
-
     async peck(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -507,7 +467,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('peck');
         await sendReactionMessage(sock, sender, target, 'peck', gifUrl, '😘');
     },
-
     async greet(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -517,7 +476,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('greet');
         await sendReactionMessage(sock, sender, target, 'greet', gifUrl, '👋');
     },
-
     async salute(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -527,27 +485,22 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('salute');
         await sendReactionMessage(sock, sender, target, 'salute', gifUrl, '🫡');
     },
-
     async shocked(sock, sender) {
         const gifUrl = await fetchAnimeGif('shocked');
         await sendReactionMessage(sock, sender, null, 'shocked', gifUrl, '😱');
     },
-
     async shrug(sock, sender) {
         const gifUrl = await fetchAnimeGif('shrug');
         await sendReactionMessage(sock, sender, null, 'shrug', gifUrl, '🤷');
     },
-
     async nod(sock, sender) {
         const gifUrl = await fetchAnimeGif('nod');
         await sendReactionMessage(sock, sender, null, 'nod', gifUrl, '😌');
     },
-
     async shake(sock, sender) {
         const gifUrl = await fetchAnimeGif('shake');
         await sendReactionMessage(sock, sender, null, 'shake', gifUrl, '😤');
     },
-
     async kick(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -557,7 +510,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('kick');
         await sendReactionMessage(sock, sender, target, 'kick', gifUrl, '🦵');
     },
-
     async throw(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -567,7 +519,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('throw');
         await sendReactionMessage(sock, sender, target, 'throw', gifUrl, '🎯');
     },
-
     async shoot(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -577,52 +528,42 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('shoot');
         await sendReactionMessage(sock, sender, target, 'shoot', gifUrl, '🔫');
     },
-
     async thumbsup(sock, sender) {
         const gifUrl = await fetchAnimeGif('thumbsup');
         await sendReactionMessage(sock, sender, null, 'thumbsup', gifUrl, '👍');
     },
-
     async thumbsdown(sock, sender) {
         const gifUrl = await fetchAnimeGif('thumbsdown');
         await sendReactionMessage(sock, sender, null, 'thumbsdown', gifUrl, '👎');
     },
-
     async excited(sock, sender) {
         const gifUrl = await fetchAnimeGif('excited');
         await sendReactionMessage(sock, sender, null, 'excited', gifUrl, '🤩');
     },
-
     async lewd(sock, sender) {
         const gifUrl = await fetchAnimeGif('lewd');
         await sendReactionMessage(sock, sender, null, 'lewd', gifUrl, '😳');
     },
-
     async bored(sock, sender) {
         const gifUrl = await fetchAnimeGif('bored');
         await sendReactionMessage(sock, sender, null, 'bored', gifUrl, '😑');
     },
-
     async nervous(sock, sender) {
         const gifUrl = await fetchAnimeGif('nervous');
         await sendReactionMessage(sock, sender, null, 'nervous', gifUrl, '😰');
     },
-
     async celebrate(sock, sender) {
         const gifUrl = await fetchAnimeGif('celebrate');
         await sendReactionMessage(sock, sender, null, 'celebrate', gifUrl, '🎉');
     },
-
     async dizzy(sock, sender) {
         const gifUrl = await fetchAnimeGif('dizzy');
         await sendReactionMessage(sock, sender, null, 'dizzy', gifUrl, '💫');
     },
-
     async bye(sock, sender) {
         const gifUrl = await fetchAnimeGif('bye');
         await sendReactionMessage(sock, sender, null, 'bye', gifUrl, '👋');
     },
-
     async smack(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -632,7 +573,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('smack');
         await sendReactionMessage(sock, sender, target, 'smack', gifUrl, '💥');
     },
-
     async nuzzle(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -642,7 +582,6 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('nuzzle');
         await sendReactionMessage(sock, sender, target, 'nuzzle', gifUrl, '🥰');
     },
-
     async growl(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -652,17 +591,19 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('growl');
         await sendReactionMessage(sock, sender, target, 'growl', gifUrl, '😾');
     },
-
     async disgusted(sock, sender) {
         const gifUrl = await fetchAnimeGif('disgusted');
         await sendReactionMessage(sock, sender, null, 'disgusted', gifUrl, '🤢');
     },
-
     async scared(sock, sender) {
         const gifUrl = await fetchAnimeGif('scared');
         await sendReactionMessage(sock, sender, null, 'scared', gifUrl, '😱');
     },
-
+    // Alternative commands
+    async hifive(sock, sender, args) {
+        // Use the highfive handler since it's the same action
+        await reactionCommands.highfive(sock, sender, args);
+    },
     async init() {
         try {
             logger.info('Initializing reactions command handler...');
