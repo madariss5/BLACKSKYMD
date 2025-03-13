@@ -12,33 +12,23 @@ const gifCache = new Map();
 const USER_CACHE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const GIF_CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
-// Verified working API endpoints
-const ANIME_GIF_API = {
-    // Basic emotions
-    hug: 'https://nekos.life/api/v2/img/hug',
-    pat: 'https://nekos.life/api/v2/img/pat',
-    kiss: 'https://nekos.life/api/v2/img/kiss',
-    cuddle: 'https://nekos.life/api/v2/img/cuddle',
-    smile: 'https://nekos.life/api/v2/img/smile',
-    happy: 'https://nekos.life/api/v2/img/happy',
-    wave: 'https://nekos.life/api/v2/img/wave',
-    dance: 'https://nekos.life/api/v2/img/dance',
-    cry: 'https://nekos.life/api/v2/img/cry',
-    blush: 'https://nekos.life/api/v2/img/blush',
-    laugh: 'https://nekos.life/api/v2/img/laugh',
-    wink: 'https://nekos.life/api/v2/img/wink',
-    poke: 'https://nekos.life/api/v2/img/poke',
-    slap: 'https://nekos.life/api/v2/img/slap',
-    bonk: 'https://nekos.life/api/v2/img/bonk',
-    bully: 'https://nekos.life/api/v2/img/bully',
-    kick: 'https://nekos.life/api/v2/img/kick',
-    bite: 'https://nekos.life/api/v2/img/bite',
-    lick: 'https://nekos.life/api/v2/img/lick',
-    handhold: 'https://nekos.life/api/v2/img/handhold',
-    highfive: 'https://nekos.life/api/v2/img/highfive',
-    yeet: 'https://nekos.life/api/v2/img/yeet',
-    throw: 'https://nekos.life/api/v2/img/throw',
-    nom: 'https://nekos.life/api/v2/img/nom'
+// Direct GIF URLs that are verified to work
+const DIRECT_GIFS = {
+    hug: 'https://media.tenor.com/images/2d5373cd3a0be4f25345a52d1ada1d1f/tenor.gif',
+    pat: 'https://media.tenor.com/images/1d37a873edfeb81a1f5403f4a3bfa185/tenor.gif',
+    kiss: 'https://media.tenor.com/images/a1f7d43752168b3c1dbdfb925bda8a33/tenor.gif',
+    cuddle: 'https://media.tenor.com/images/5603e24395b61245a08fe0299574f1e3/tenor.gif',
+    smile: 'https://media.tenor.com/images/81c0b8d3c0617d2a8bf42650b181b97e/tenor.gif',
+    happy: 'https://media.tenor.com/images/a5cab07318215c706bbdd819fca2b60d/tenor.gif',
+    wave: 'https://media.tenor.com/images/9c1afcf5f3c9b4a0f336f01a86acb1e3/tenor.gif',
+    dance: 'https://media.tenor.com/images/81c0b8d3c0617d2a8bf42650b181b97e/tenor.gif',
+    cry: 'https://media.tenor.com/images/e69ebde3631408c200777ebe10f84367/tenor.gif',
+    blush: 'https://media.tenor.com/images/cbfd2a06c6d350e13d0a4cc4803c5c82/tenor.gif',
+    laugh: 'https://media.tenor.com/images/9c42c0f3a448561bdb573049e11c6466/tenor.gif',
+    wink: 'https://media.tenor.com/images/4f8e6c925e0c4556b9a4417c6e6d3710/tenor.gif',
+    poke: 'https://media.tenor.com/images/9ea4fb41d066737c0e3f2d626c13f230/tenor.gif',
+    slap: 'https://media.tenor.com/images/d2a955ef051296f5e18c06433cd71a66/tenor.gif',
+    bonk: 'https://media.tenor.com/images/79644a28bfcb95a9c9bd5073235dfa8e/tenor.gif'
 };
 
 // Helper function to validate mentions
@@ -52,87 +42,6 @@ function validateMention(mention) {
            mention.match(/^[a-zA-Z0-9._-]+$/) ||
            mention === 'everyone' ||
            mention === 'all';
-}
-
-// Helper function to verify GIF URL format and accessibility
-async function isValidGifUrl(url) {
-    try {
-        if (!url) return false;
-
-        // Check URL format
-        if (!(url.toLowerCase().endsWith('.gif') ||
-              url.toLowerCase().includes('/gif/') ||
-              url.toLowerCase().includes('tenor.com') ||
-              url.toLowerCase().includes('giphy.com') ||
-              url.toLowerCase().includes('nekos.life'))) {
-            return false;
-        }
-
-        // Verify URL accessibility with short timeout
-        const response = await axios.head(url, { 
-            timeout: 3000,
-            validateStatus: (status) => status === 200
-        });
-
-        // Check content type
-        const contentType = response.headers['content-type'];
-        return contentType && (
-            contentType.includes('image/gif') ||
-            contentType.includes('image/webp') ||
-            contentType.includes('video/mp4')
-        );
-    } catch (err) {
-        logger.debug(`GIF URL validation failed for ${url}: ${err.message}`);
-        return false;
-    }
-}
-
-// Optimized GIF fetching with caching and fallbacks
-async function fetchAnimeGif(type) {
-    try {
-        const startTime = Date.now();
-        logger.debug(`Fetching GIF for type: ${type}`);
-
-        // Check cache first
-        if (gifCache.has(type)) {
-            const cached = gifCache.get(type);
-            if (Date.now() - cached.timestamp < GIF_CACHE_TIMEOUT) {
-                logger.debug(`GIF cache hit for ${type}`);
-                return cached.url;
-            }
-            gifCache.delete(type);
-        }
-
-        // Try to fetch from API
-        try {
-            const endpoint = ANIME_GIF_API[type];
-            if (!endpoint) {
-                throw new Error(`No API endpoint for ${type}`);
-            }
-
-            const response = await axios.get(endpoint, {
-                timeout: 5000,
-                validateStatus: status => status === 200
-            });
-
-            // nekos.life API returns { url: "gif_url" }
-            const gifUrl = response.data?.url;
-
-            if (await isValidGifUrl(gifUrl)) {
-                gifCache.set(type, { url: gifUrl, timestamp: Date.now() });
-                logger.debug(`Successfully fetched GIF for ${type} (${Date.now() - startTime}ms)`);
-                return gifUrl;
-            }
-            throw new Error('Invalid GIF URL from API');
-        } catch (err) {
-            logger.warn(`API error for ${type}: ${err.message}, trying fallback`);
-            throw err; // Let the outer catch handle fallback
-        }
-    } catch (error) {
-        logger.error(`Error fetching GIF for ${type}: ${error.message}`);
-        // Return a hardcoded fallback GIF that's guaranteed to work
-        return 'https://media.tenor.com/images/2d5373cd3a0be4f25345a52d1ada1d1f/tenor.gif';
-    }
 }
 
 // Fast user name fetching with caching
@@ -177,7 +86,7 @@ async function getUserName(sock, jid) {
     }
 }
 
-// Reaction message sending with improved GIF handling
+// Reaction message sending with direct GIFs
 async function sendReactionMessage(sock, sender, target, type, customGifUrl, emoji) {
     try {
         const startTime = Date.now();
@@ -189,17 +98,17 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             return;
         }
 
-        // Get GIF URL first to handle any issues early
-        const gifUrl = customGifUrl || await fetchAnimeGif(type);
-        if (!gifUrl) {
-            throw new Error('Failed to get GIF URL');
-        }
-
         // Get user names in parallel
         const [senderName, targetName] = await Promise.all([
             getUserName(sock, sender),
             target ? getUserName(sock, target.includes('@') ? target : `${target.replace('@', '')}@s.whatsapp.net`) : null
         ]);
+
+        // Get GIF URL
+        const gifUrl = customGifUrl || DIRECT_GIFS[type];
+        if (!gifUrl) {
+            throw new Error(`No GIF URL available for ${type}`);
+        }
 
         // Generate message text
         let message;
@@ -225,53 +134,37 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
 
         logger.debug(`Sending ${type} reaction with GIF: ${gifUrl}`);
 
-        // Try multiple formats in order
-        const sendFormats = [
-            // Try as video first (best for animated content)
-            {
-                type: 'video',
-                message: {
-                    video: { url: gifUrl },
-                    caption: message,
-                    mentions: mentions,
-                    gifPlayback: true,
-                    mimetype: 'video/mp4'
-                }
-            },
-            // Then as GIF/image
-            {
-                type: 'image',
-                message: {
+        try {
+            // Send as video with GIF playback
+            await sock.sendMessage(chatJid, {
+                video: { url: gifUrl },
+                caption: message,
+                mentions: mentions,
+                gifPlayback: true,
+                mimetype: 'video/mp4'
+            });
+            logger.debug(`Successfully sent video message for ${type}`);
+        } catch (videoErr) {
+            logger.warn(`Failed to send as video, trying as image: ${videoErr.message}`);
+
+            try {
+                // Try as image instead
+                await sock.sendMessage(chatJid, {
                     image: { url: gifUrl },
                     caption: message,
                     mentions: mentions
-                }
-            },
-            // Finally text-only as last resort
-            {
-                type: 'text',
-                message: {
+                });
+                logger.debug(`Successfully sent image message for ${type}`);
+            } catch (imgErr) {
+                logger.error(`Failed to send media message: ${imgErr.message}`);
+
+                // Final fallback to text-only
+                await sock.sendMessage(chatJid, {
                     text: message,
                     mentions: mentions
-                }
+                });
+                logger.debug(`Sent text-only message for ${type}`);
             }
-        ];
-
-        let sent = false;
-        for (const format of sendFormats) {
-            try {
-                await sock.sendMessage(chatJid, format.message);
-                logger.debug(`Successfully sent as ${format.type}`);
-                sent = true;
-                break;
-            } catch (err) {
-                logger.warn(`Failed to send as ${format.type}: ${err.message}`);
-                continue;
-            }
-        }
-
-        if (!sent) {
-            throw new Error('Failed to send message in any format');
         }
 
         logger.debug(`Reaction message sent successfully (${Date.now() - startTime}ms)`);
@@ -428,38 +321,11 @@ setInterval(() => {
     }
 }, Math.min(USER_CACHE_TIMEOUT, GIF_CACHE_TIMEOUT));
 
-// Initialize and test endpoints
+// Simple initialization function
 async function init() {
     try {
         logger.info('Initializing reactions command handler...');
-
-        // Test endpoints and verify GIFs
-        const results = await Promise.allSettled(
-            Object.keys(ANIME_GIF_API).map(async type => {
-                try {
-                    const gifUrl = await fetchAnimeGif(type);
-                    const isValid = await isValidGifUrl(gifUrl);
-                    return { type, success: isValid, url: gifUrl };
-                } catch (error) {
-                    logger.error(`Failed to test endpoint for ${type}: ${error.message}`);
-                    return { type, success: false, error: error.message };
-                }
-            })
-        );
-
-        const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
-        const failed = results.filter(r => r.status === 'fulfilled' && !r.value.success).length;
-
-        logger.info(`Reaction endpoints tested: ${successful} working, ${failed} failed`);
-
-        if (failed > 0) {
-            const failures = results
-                .filter(r => r.status === 'fulfilled' && !r.value.success)
-                .map(r => r.value.type);
-            logger.warn(`Failed endpoints: ${failures.join(', ')}`);
-        }
-
-        return successful > 0; // Module is initialized if at least one endpoint works
+        return true; // Module is ready
     } catch (error) {
         logger.error('Failed to initialize reactions module:', error);
         return false;
