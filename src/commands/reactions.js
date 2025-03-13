@@ -3,6 +3,7 @@ const axios = require('axios');
 
 // API endpoints (using waifu.pics and additional sources)
 const ANIME_GIF_API = {
+    // Existing endpoints
     hug: 'https://api.waifu.pics/sfw/hug',
     pat: 'https://api.waifu.pics/sfw/pat',
     kiss: 'https://api.waifu.pics/sfw/kiss',
@@ -68,7 +69,8 @@ const ANIME_GIF_API = {
     disgusted: 'https://api.waifu.pics/sfw/disgust',
     scared: 'https://api.waifu.pics/sfw/scared',
     // Alternative commands using existing endpoints
-    hifive: 'https://api.waifu.pics/sfw/highfive' // Alternative for highfive
+    hifive: 'https://api.waifu.pics/sfw/highfive', // Alternative for highfive
+    grouphug: 'https://api.waifu.pics/sfw/hug' // Using hug for grouphug
 };
 
 // Helper function to validate mentions
@@ -608,15 +610,40 @@ const reactionCommands = {
         try {
             logger.info('Initializing reactions command handler...');
 
-            // Log available commands
-            const availableCommands = Object.keys(ANIME_GIF_API);
-            logger.info(`Available reaction commands: ${availableCommands.join(', ')}`);
+            // Log the state of the command handler
+            const commandNames = Object.keys(reactionCommands).filter(key => key !== 'init');
+            const endpointNames = Object.keys(ANIME_GIF_API);
 
-            // Test each API endpoint
+            logger.info(`Available reaction commands: ${commandNames.length}`);
+            logger.info(`Available API endpoints: ${endpointNames.length}`);
+
+            // Check for mismatches between commands and endpoints
+            const missingEndpoints = commandNames.filter(cmd => !ANIME_GIF_API[cmd]);
+            const unusedEndpoints = endpointNames.filter(endpoint =>
+                !commandNames.some(cmd => cmd === endpoint ||
+                    (cmd === 'hifive' && endpoint === 'highfive'))
+            );
+
+            if (missingEndpoints.length > 0) {
+                logger.warn(`Commands missing API endpoints: ${missingEndpoints.join(', ')}`);
+            }
+
+            if (unusedEndpoints.length > 0) {
+                logger.warn(`Unused API endpoints: ${unusedEndpoints.join(', ')}`);
+            }
+
+            // Test each endpoint for at least one command
             logger.info('Testing API endpoints...');
+            const testedEndpoints = new Set();
             const results = await Promise.allSettled(
-                availableCommands.map(async cmd => {
+                commandNames.map(async cmd => {
                     try {
+                        const endpoint = ANIME_GIF_API[cmd];
+                        if (!endpoint || testedEndpoints.has(endpoint)) {
+                            return { command: cmd, skipped: true };
+                        }
+                        testedEndpoints.add(endpoint);
+
                         const url = await fetchAnimeGif(cmd, 1);
                         return { command: cmd, success: !!url };
                     } catch (error) {
@@ -627,7 +654,7 @@ const reactionCommands = {
             );
 
             const failed = results
-                .filter(r => r.status === 'fulfilled' && !r.value.success)
+                .filter(r => r.status === 'fulfilled' && !r.value.skipped && !r.value.success)
                 .map(r => r.value.command);
 
             if (failed.length > 0) {
@@ -642,27 +669,13 @@ const reactionCommands = {
                     });
             }
 
-            // Double-check command configurations
-            const configuredCommands = new Set(Object.keys(this));
-            const apiCommands = new Set(Object.keys(ANIME_GIF_API));
+            // Return success if we have working endpoints
+            const workingEndpoints = results
+                .filter(r => r.status === 'fulfilled' && r.value.success)
+                .length;
 
-            // Find mismatches between API endpoints and command handlers
-            const missingHandlers = [...apiCommands].filter(cmd => !configuredCommands.has(cmd));
-            const missingEndpoints = [...configuredCommands].filter(cmd =>
-                cmd !== 'init' && !apiCommands.has(cmd)
-            );
-
-            if (missingHandlers.length > 0) {
-                logger.warn('API endpoints without handlers:', missingHandlers);
-            }
-            if (missingEndpoints.length > 0) {
-                logger.warn('Command handlers without API endpoints:', missingEndpoints);
-            }
-
-            logger.info('Successfully tested API endpoints');
-
-            // Return true even if some endpoints fail, as long as basic functionality works
-            return availableCommands.length > 0;
+            logger.info(`Successfully tested ${workingEndpoints} API endpoints`);
+            return workingEndpoints > 0;
         } catch (error) {
             logger.error('Failed to initialize reactions commands:', error);
             logger.error('Stack trace:', error.stack);
