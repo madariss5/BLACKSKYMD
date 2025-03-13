@@ -2,57 +2,49 @@
   "category": "fun",
   "commands": [
     {
-      "name": "chess",
-      "description": "Play chess against the bot",
-      "usage": ".chess <start|move> [from] [to]",
-      "example": ".chess start",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
       "name": "tictactoe",
       "description": "Play Tic-tac-toe against the bot",
-      "usage": ".tictactoe <start|move> [1-9]",
-      "example": ".tictactoe start",
+      "usage": ".tictactoe [position]",
+      "example": ".tictactoe 5",
       "cooldown": 3,
       "permissions": ["user"]
     },
     {
       "name": "hangman",
       "description": "Play Hangman word guessing game",
-      "usage": ".hangman <start|guess> [letter]",
-      "example": ".hangman start",
+      "usage": ".hangman [letter]",
+      "example": ".hangman a",
       "cooldown": 3,
       "permissions": ["user"]
     },
     {
       "name": "wordle",
       "description": "Play Wordle word guessing game",
-      "usage": ".wordle <start|guess> [word]",
+      "usage": ".wordle [word|hint]",
       "example": ".wordle start",
       "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "quiz",
-      "description": "Test your knowledge in specific subjects",
-      "usage": ".quiz [subject]",
-      "example": ".quiz math",
+      "description": "Play an educational quiz game",
+      "usage": ".quiz [category]",
+      "example": ".quiz coding",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "trivia",
-      "description": "Play trivia quiz game",
+      "description": "Play trivia in various categories",
       "usage": ".trivia [category]",
-      "example": ".trivia general",
+      "example": ".trivia tech",
       "cooldown": 10,
       "permissions": ["user"]
     },
     {
       "name": "rps",
       "description": "Play Rock Paper Scissors against the bot",
-      "usage": ".rps <rock|paper|scissors>",
+      "usage": ".rps [choice]",
       "example": ".rps rock",
       "cooldown": 3,
       "permissions": ["user"]
@@ -60,8 +52,7 @@
     {
       "name": "slot",
       "description": "Play the slot machine game",
-      "usage": ".slot [bet]",
-      "example": ".slot 10",
+      "usage": ".slot",
       "cooldown": 5,
       "permissions": ["user"]
     },
@@ -74,33 +65,24 @@
       "permissions": ["user"]
     },
     {
-      "name": "flip",
-      "description": "Flip a coin",
-      "usage": ".flip",
-      "cooldown": 3,
-      "permissions": ["user"]
-    },
-    {
-      "name": "choose",
-      "description": "Choose between multiple options",
-      "usage": ".choose [option1] | [option2] | [option3]",
-      "example": ".choose pizza | burger | salad",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "mock",
-      "description": "Convert text to alternating case",
-      "usage": ".mock [text]",
-      "example": ".mock Hello World",
-      "cooldown": 3,
-      "permissions": ["user"]
-    },
-    {
       "name": "riddle",
       "description": "Get a random riddle",
       "usage": ".riddle",
       "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "reveal",
+      "description": "Reveal the answer to the current riddle",
+      "usage": ".reveal",
+      "cooldown": 5,
+      "permissions": ["user"]
+    },
+    {
+      "name": "fortune",
+      "description": "Get your fortune told",
+      "usage": ".fortune",
+      "cooldown": 10,
       "permissions": ["user"]
     },
     {
@@ -112,30 +94,16 @@
       "permissions": ["user"]
     },
     {
-      "name": "fortune",
-      "description": "Get your fortune told",
-      "usage": ".fortune",
-      "cooldown": 10,
+      "name": "fact",
+      "description": "Get a random fun fact",
+      "usage": ".fact",
+      "cooldown": 5,
       "permissions": ["user"]
     },
     {
       "name": "quote",
-      "description": "Get a random inspirational quote",
+      "description": "Get an inspirational quote",
       "usage": ".quote",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "joke",
-      "description": "Get a random joke",
-      "usage": ".joke",
-      "cooldown": 5,
-      "permissions": ["user"]
-    },
-    {
-      "name": "fact",
-      "description": "Get a random fun fact",
-      "usage": ".fact",
       "cooldown": 5,
       "permissions": ["user"]
     }

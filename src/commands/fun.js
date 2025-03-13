@@ -29,76 +29,80 @@ async function areGamesEnabled(sock, remoteJid) {
     return true;
 }
 
-// Game state initialization
+// Game state initialization - improved with timeouts and better state tracking
 function initializeGameState() {
-    global.games = global.games || new Map();
-    global.hangmanGames = global.hangmanGames || new Map();
-    global.wordleGames = global.wordleGames || new Map();
-    global.chessGames = global.chessGames || new Map();
-    global.quizGames = global.quizGames || new Map();
-    global.triviaGames = global.triviaGames || new Map();
-    global.akinator = global.akinator || new Map();
-    global.truthOrDare = global.truthOrDare || { truth: new Set(), dare: new Set() };
-    global.uno = global.uno || new Map();
-    global.riddles = global.riddles || new Map();
-    global.wordScramble = global.wordScramble || new Map();
-    
-    // Initialize state for new games
-    global.codeGames = global.codeGames || new Map();
-    global.numberGames = global.numberGames || new Map();
-    global.hangmanVsGames = global.hangmanVsGames || new Map();
-    global.connectFourGames = global.connectFourGames || new Map();
-    global.wordChainGames = global.wordChainGames || new Map();
-    global.personalityQuizzes = global.personalityQuizzes || new Map();
-    global.movieHangmanGames = global.movieHangmanGames || new Map();
-    global.movieQuizzes = global.movieQuizzes || new Map();
-    global.numberSequenceGames = global.numberSequenceGames || new Map();
-    global.dicePokerGames = global.dicePokerGames || new Map();
-    global.rpsTournaments = global.rpsTournaments || new Map();
+    if (!global.games) {
+        global.games = {
+            tictactoe: new Map(),
+            hangman: new Map(),
+            wordle: new Map(),
+            quiz: new Map(),
+            trivia: new Map()
+        };
+    }
+
+    // Clean up expired games every hour
+    if (!global.gameCleanupInterval) {
+        global.gameCleanupInterval = setInterval(() => {
+            const now = Date.now();
+            const TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+            for (const [gameType, gameMap] of Object.entries(global.games)) {
+                for (const [id, game] of gameMap.entries()) {
+                    if (now - game.lastActivity > TIMEOUT) {
+                        gameMap.delete(id);
+                        logger.info(`Cleaned up inactive ${gameType} game for ${id}`);
+                    }
+                }
+            }
+        }, 60 * 60 * 1000); // Run every hour
+    }
 }
 
-// Board rendering functions
+// Board rendering with improved aesthetics 
 function renderBoard(board) {
-    const cells = board.map((cell, i) => cell === ' ' ? (i + 1).toString() : cell);
-    return `${cells[0]} │ ${cells[1]} │ ${cells[2]}\n──┼───┼──\n${cells[3]} │ ${cells[4]} │ ${cells[5]}\n──┼───┼──\n${cells[6]} │ ${cells[7]} │ ${cells[8]}`;
+    const cells = board.map((cell, i) => cell === ' ' ? `[${i + 1}]` : ` ${cell} `);
+    return `${cells[0]}│${cells[1]}│${cells[2]}\n───┼───┼───\n${cells[3]}│${cells[4]}│${cells[5]}\n───┼───┼───\n${cells[6]}│${cells[7]}│${cells[8]}`;
 }
 
+// Enhanced win checking
 function checkWinner(board) {
-    const winPatterns = [
+    const patterns = [
         [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
         [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
         [0, 4, 8], [2, 4, 6]             // Diagonals
     ];
 
-    for (const pattern of winPatterns) {
-        const [a, b, c] = pattern;
+    for (const [a, b, c] of patterns) {
         if (board[a] !== ' ' && board[a] === board[b] && board[b] === board[c]) {
-            return board[a];
+            return { winner: board[a], line: [a, b, c] };
         }
     }
-    return null;
+
+    return board.includes(' ') ? null : { winner: 'draw' };
 }
 
+// Improved bot move calculation
 function getBotMove(board) {
     // First try to win
-    const move = findWinningMove(board, 'O');
-    if (move !== -1) return move;
+    const winMove = findWinningMove(board, 'O');
+    if (winMove !== -1) return winMove;
 
-    // Then block player's winning move
+    // Then block player
     const blockMove = findWinningMove(board, 'X');
     if (blockMove !== -1) return blockMove;
 
-    // Take center if available
+    // Take center
     if (board[4] === ' ') return 4;
 
-    // Take any available corner
+    // Take corners
     const corners = [0, 2, 6, 8];
     const availableCorners = corners.filter(i => board[i] === ' ');
     if (availableCorners.length > 0) {
         return availableCorners[Math.floor(Math.random() * availableCorners.length)];
     }
 
-    // Take any available side
+    // Take sides
     const sides = [1, 3, 5, 7];
     const availableSides = sides.filter(i => board[i] === ' ');
     if (availableSides.length > 0) {
@@ -108,25 +112,26 @@ function getBotMove(board) {
     return -1;
 }
 
+// Enhanced winning move detection
 function findWinningMove(board, player) {
-    const winPatterns = [
+    const patterns = [
         [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
         [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
         [0, 4, 8], [2, 4, 6]             // Diagonals
     ];
 
-    for (const pattern of winPatterns) {
-        const [a, b, c] = pattern;
-        // Check if we can win in this pattern
+    for (const [a, b, c] of patterns) {
+        // Check each position in the pattern
         if (board[a] === player && board[b] === player && board[c] === ' ') return c;
-        if (board[a] === player && board[b] === ' ' && board[c] === player) return b;
-        if (board[a] === ' ' && board[b] === player && board[c] === player) return a;
+        if (board[a] === player && board[c] === player && board[b] === ' ') return b;
+        if (board[b] === player && board[c] === player && board[a] === ' ') return a;
     }
     return -1;
 }
 
+// Improved Hangman display
 function getHangmanDisplay(game) {
-    const hangmanStages = [
+    const stages = [
         '\n      +---+\n      |   |\n          |\n          |\n          |\n          |\n    =========',
         '\n      +---+\n      |   |\n      O   |\n          |\n          |\n          |\n    =========',
         '\n      +---+\n      |   |\n      O   |\n      |   |\n          |\n          |\n    =========',
@@ -136,32 +141,44 @@ function getHangmanDisplay(game) {
         '\n      +---+\n      |   |\n      O   |\n     /|\\  |\n     / \\  |\n          |\n    ========='
     ];
 
-    const displayWord = game.word.split('').map(letter => 
-        game.guessedLetters.includes(letter) ? letter : '_'
-    ).join(' ');
+    const displayWord = game.word
+        .split('')
+        .map(letter => game.guessedLetters.includes(letter.toLowerCase()) ? letter : '_')
+        .join(' ');
 
-    const wrongGuesses = game.guessedLetters.filter(letter => !game.word.includes(letter));
-    const hangmanIndex = Math.min(wrongGuesses.length, hangmanStages.length - 1);
+    const wrongGuesses = game.guessedLetters
+        .filter(letter => !game.word.toLowerCase().includes(letter));
+    
+    const unusedLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        .split('')
+        .filter(letter => !game.guessedLetters.includes(letter.toLowerCase()))
+        .join(' ');
 
-    return `${hangmanStages[hangmanIndex]}\n\nWord: ${displayWord}\nGuessed: ${game.guessedLetters.join(', ') || 'None'}\nWrong guesses: ${wrongGuesses.length}/${game.maxWrongGuesses}`;
+    return `${stages[Math.min(wrongGuesses.length, stages.length - 1)]}\n
+📝 Word: ${displayWord}
+❌ Wrong guesses (${wrongGuesses.length}/${game.maxWrongGuesses}): ${wrongGuesses.join(' ') || 'None'}
+✨ Available letters: ${unusedLetters}`;
 }
 
+// Enhanced Wordle feedback
 function handleWordleGuess(word, guess) {
     const feedback = [];
-    const wordLetters = word.split('');
-    const guessLetters = guess.split('');
+    const wordLetters = word.toLowerCase().split('');
+    const guessLetters = guess.toLowerCase().split('');
     
     // First pass: Mark exact matches
     for (let i = 0; i < 5; i++) {
         if (guessLetters[i] === wordLetters[i]) {
             feedback[i] = '🟩'; // Green
             wordLetters[i] = null; // Mark as used
+            guessLetters[i] = null;
         }
     }
     
     // Second pass: Mark partial matches
     for (let i = 0; i < 5; i++) {
         if (feedback[i]) continue; // Skip if already matched
+        if (!guessLetters[i]) continue; // Skip if marked in first pass
         
         const letterIndex = wordLetters.indexOf(guessLetters[i]);
         if (letterIndex !== -1) {
@@ -177,7 +194,7 @@ function handleWordleGuess(word, guess) {
 
 // Command exports
 const funCommands = {
-    // Fun Text Commands
+    // Fun Text Commands with improved error handling and feedback
     async quote(sock, sender) {
         try {
             const quotes = [
@@ -185,13 +202,22 @@ const funCommands = {
                 "Two things are infinite: the universe and human stupidity; and I'm not sure about the universe. - Albert Einstein",
                 "Be the change that you wish to see in the world. - Mahatma Gandhi",
                 "Life is what happens when you're busy making other plans. - John Lennon",
-                "The only way to do great work is to love what you do. - Steve Jobs"
+                "The only way to do great work is to love what you do. - Steve Jobs",
+                "Stay hungry, stay foolish. - Steve Jobs",
+                "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
+                "Success is not final, failure is not fatal: it is the courage to continue that counts. - Winston Churchill",
+                "The only impossible journey is the one you never begin. - Tony Robbins",
+                "Life is either a daring adventure or nothing at all. - Helen Keller"
             ];
             const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-            await sock.sendMessage(sender, { text: `📜 Quote of the moment:\n\n${randomQuote}` });
+            await sock.sendMessage(sender, { 
+                text: `📜 *Quote of the Moment*\n\n_${randomQuote}_\n\n💭 Need inspiration? Use *!quote* again.` 
+            });
         } catch (err) {
             logger.error('Quote error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching the quote.' });
+            await sock.sendMessage(sender, { 
+                text: '❌ Oops! Something went wrong fetching your quote.\nPlease try again in a moment.' 
+            });
         }
     },
 
@@ -233,21 +259,31 @@ const funCommands = {
             const sender = message.key.remoteJid;
             if (!(await areGamesEnabled(sock, sender))) return;
             
-            if (!global.games) global.games = new Map();
+            if (!global.games.tictactoe) global.games.tictactoe = new Map();
             const gameId = sender;
-            let game = global.games.get(gameId);
+            let game = global.games.tictactoe.get(gameId);
             
             // Create new game if no active game
             if (!game) {
                 game = {
                     board: [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
                     currentPlayer: 'X',
-                    moves: 0
+                    moves: 0,
+                    lastActivity: Date.now()
                 };
-                global.games.set(gameId, game);
+                global.games.tictactoe.set(gameId, game);
                 
                 await sock.sendMessage(sender, {
-                    text: `🎮 Let's play Tic-Tac-Toe!\nYou are X, I am O.\n\n${renderBoard(game.board)}\n\nSelect your move (1-9):`
+                    text: `🎮 *Tic-Tac-Toe*\nYou are X, Bot is O\n\n${renderBoard(game.board)}\n\nSelect position (1-9):`
+                });
+                return;
+            }
+            
+            // Check for game timeout
+            if (Date.now() - game.lastActivity > 5 * 60 * 1000) {
+                global.games.tictactoe.delete(gameId);
+                await sock.sendMessage(sender, {
+                    text: '⏰ Game expired. Start a new game with !tictactoe'
                 });
                 return;
             }
@@ -255,36 +291,41 @@ const funCommands = {
             // Process player move
             const move = parseInt(args[0]);
             if (isNaN(move) || move < 1 || move > 9) {
-                await sock.sendMessage(sender, { text: '❌ Please choose a number between 1 and 9.' });
+                await sock.sendMessage(sender, {
+                    text: '❌ Please choose a number between 1 and 9'
+                });
                 return;
             }
             
             const index = move - 1;
             if (game.board[index] !== ' ') {
-                await sock.sendMessage(sender, { text: '❌ That position is already taken! Choose another.' });
+                await sock.sendMessage(sender, {
+                    text: '❌ That position is already taken! Choose another'
+                });
                 return;
             }
             
             // Apply player move
             game.board[index] = 'X';
             game.moves++;
+            game.lastActivity = Date.now();
             
             // Check for win or draw
-            let winner = checkWinner(game.board);
-            if (winner || game.moves === 9) {
-                let result = '';
-                if (winner === 'X') {
-                    result = '🎉 You win! Congratulations!';
-                } else if (winner === 'O') {
-                    result = '😢 I win! Better luck next time.';
+            let result = checkWinner(game.board);
+            if (result || game.moves === 9) {
+                let message = '';
+                if (result?.winner === 'X') {
+                    message = '🎉 You win! Congratulations!';
+                } else if (result?.winner === 'O') {
+                    message = '😢 Bot wins! Better luck next time.';
                 } else {
-                    result = '🤝 It\'s a draw!';
+                    message = '🤝 It\'s a draw!';
                 }
                 
                 await sock.sendMessage(sender, {
-                    text: `${renderBoard(game.board)}\n\n${result}\n\nType *!tictactoe* to play again.`
+                    text: `${renderBoard(game.board)}\n\n${message}\n\nType *!tictactoe* to play again`
                 });
-                global.games.delete(gameId);
+                global.games.tictactoe.delete(gameId);
                 return;
             }
             
@@ -295,64 +336,78 @@ const funCommands = {
                 game.moves++;
                 
                 // Check for win or draw after bot move
-                winner = checkWinner(game.board);
-                if (winner || game.moves === 9) {
-                    let result = '';
-                    if (winner === 'X') {
-                        result = '🎉 You win! Congratulations!';
-                    } else if (winner === 'O') {
-                        result = '😢 I win! Better luck next time.';
+                result = checkWinner(game.board);
+                if (result || game.moves === 9) {
+                    let message = '';
+                    if (result?.winner === 'X') {
+                        message = '🎉 You win! Congratulations!';
+                    } else if (result?.winner === 'O') {
+                        message = '😢 Bot wins! Better luck next time.';
                     } else {
-                        result = '🤝 It\'s a draw!';
+                        message = '🤝 It\'s a draw!';
                     }
                     
                     await sock.sendMessage(sender, {
-                        text: `${renderBoard(game.board)}\n\n${result}\n\nType *!tictactoe* to play again.`
+                        text: `${renderBoard(game.board)}\n\n${message}\n\nType *!tictactoe* to play again`
                     });
-                    global.games.delete(gameId);
+                    global.games.tictactoe.delete(gameId);
                     return;
                 }
             }
             
-            global.games.set(gameId, game);
+            global.games.tictactoe.set(gameId, game);
             await sock.sendMessage(sender, {
-                text: `${renderBoard(game.board)}\n\nYour move (1-9):`
+                text: `${renderBoard(game.board)}\n\nYour turn! Choose position (1-9):`
             });
         } catch (err) {
             logger.error('Tic-tac-toe error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
-            global.games.delete(sender);
+            await sock.sendMessage(sender, {
+                text: '❌ An error occurred during the game'
+            });
+            global.games.tictactoe.delete(sender);
         }
     },
 
-    async hangman(sock, sender, args) {
+    async hangman(sock, message, args) {
         try {
+            const sender = message.key.remoteJid;
             if (!(await areGamesEnabled(sock, sender))) return;
             
-            if (!global.hangmanGames) global.hangmanGames = new Map();
+            if (!global.games.hangman) global.games.hangman = new Map();
             
             const gameId = sender;
-            let game = global.hangmanGames.get(gameId);
+            let game = global.games.hangman.get(gameId);
             
             if (!game) {
-                // Start a new game
+                // Start a new game with filtered word list
                 const words = [
-                    'APPLE', 'BANANA', 'COMPUTER', 'DIAMOND', 'ELEPHANT', 
-                    'FOOTBALL', 'GUITAR', 'HAMBURGER', 'ISLAND', 'JACKET'
+                    'PYTHON', 'JAVASCRIPT', 'PROGRAMMING', 'COMPUTER', 'DATABASE',
+                    'NETWORK', 'ALGORITHM', 'INTERNET', 'SOFTWARE', 'DEVELOPER',
+                    'CODING', 'WEBSITE', 'SECURITY', 'MOBILE', 'CLOUD'
                 ];
                 const randomWord = words[Math.floor(Math.random() * words.length)];
                 
                 game = {
                     word: randomWord,
                     guessedLetters: [],
-                    maxWrongGuesses: 6
+                    maxWrongGuesses: 6,
+                    lastActivity: Date.now()
                 };
                 
-                global.hangmanGames.set(gameId, game);
+                global.games.hangman.set(gameId, game);
                 
                 const hangmanDisplay = getHangmanDisplay(game);
                 await sock.sendMessage(sender, {
-                    text: `🎮 Hangman Game\n${hangmanDisplay}\n\nGuess a letter using *!hangman [letter]*`
+                    text: `🎮 *Hangman Game*\n${hangmanDisplay}\n\nGuess a letter using *!hangman [letter]*`
+                });
+                return;
+            }
+            
+            // Check for game timeout
+            if (Date.now() - game.lastActivity > 5 * 60 * 1000) {
+                global.games.hangman.delete(gameId);
+                await sock.sendMessage(sender, {
+                    text: '⏰ Game expired. Start a new game with !hangman'
                 });
                 return;
             }
@@ -360,17 +415,22 @@ const funCommands = {
             // Process a guess
             const guess = args[0]?.toUpperCase();
             if (!guess || guess.length !== 1 || !guess.match(/[A-Z]/)) {
-                await sock.sendMessage(sender, { text: '❌ Please guess a single letter (A-Z).' });
+                await sock.sendMessage(sender, {
+                    text: '❌ Please guess a single letter (A-Z)'
+                });
                 return;
             }
             
             if (game.guessedLetters.includes(guess)) {
-                await sock.sendMessage(sender, { text: '❌ You already guessed that letter!' });
+                await sock.sendMessage(sender, {
+                    text: '❌ You already guessed that letter!'
+                });
                 return;
             }
             
             game.guessedLetters.push(guess);
-            global.hangmanGames.set(gameId, game);
+            game.lastActivity = Date.now();
+            global.games.hangman.set(gameId, game);
             
             const wrongGuesses = game.guessedLetters.filter(letter => !game.word.includes(letter));
             const isWon = game.word.split('').every(letter => game.guessedLetters.includes(letter));
@@ -380,14 +440,14 @@ const funCommands = {
             
             if (isWon) {
                 await sock.sendMessage(sender, {
-                    text: `${hangmanDisplay}\n\n🎉 You win! The word was: ${game.word}\n\nType *!hangman* to play again.`
+                    text: `${hangmanDisplay}\n\n🎉 You won! The word was: ${game.word}\n\nType *!hangman* to play again`
                 });
-                global.hangmanGames.delete(gameId);
+                global.games.hangman.delete(gameId);
             } else if (isLost) {
                 await sock.sendMessage(sender, {
-                    text: `${hangmanDisplay}\n\n💀 Game Over! The word was: ${game.word}\n\nType *!hangman* to play again.`
+                    text: `${hangmanDisplay}\n\n💀 Game Over! The word was: ${game.word}\n\nType *!hangman* to try again`
                 });
-                global.hangmanGames.delete(gameId);
+                global.games.hangman.delete(gameId);
             } else {
                 await sock.sendMessage(sender, {
                     text: `${hangmanDisplay}\n\nGuess another letter using *!hangman [letter]*`
@@ -395,35 +455,63 @@ const funCommands = {
             }
         } catch (err) {
             logger.error('Hangman error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
-            global.hangmanGames.delete(sender);
+            await sock.sendMessage(sender, {
+                text: '❌ An error occurred during the game'
+            });
+            global.games.hangman.delete(sender);
         }
     },
 
-    async wordle(sock, sender, args) {
+    async wordle(sock, message, args) {
         try {
+            const sender = message.key.remoteJid;
             if (!(await areGamesEnabled(sock, sender))) return;
             
-            if (!global.wordleGames) global.wordleGames = new Map();
+            if (!global.games.wordle) global.games.wordle = new Map();
             
             const gameId = sender;
-            let game = global.wordleGames.get(gameId);
+            let game = global.games.wordle.get(gameId);
             
             if (!game) {
-                // Start a new game
-                const words = ['APPLE', 'BANANA', 'CHART', 'DANCE', 'EAGLE', 'FLAME', 'GLOBE', 'HOUSE', 'IMAGE', 'JUICE'];
+                // Curated 5-letter word list
+                const words = [
+                    'SPEAK', 'DREAM', 'LEARN', 'BUILD', 'TEACH',
+                    'THINK', 'SOLVE', 'WRITE', 'SHARE', 'STUDY',
+                    'FOCUS', 'SKILL', 'LOGIC', 'BRAIN', 'SMART'
+                ];
                 const randomWord = words[Math.floor(Math.random() * words.length)];
                 
                 game = {
                     word: randomWord,
                     guesses: [],
-                    maxAttempts: 6
+                    maxAttempts: 6,
+                    lastActivity: Date.now(),
+                    hint: false
                 };
                 
-                global.wordleGames.set(gameId, game);
+                global.games.wordle.set(gameId, game);
                 
                 await sock.sendMessage(sender, {
-                    text: `🎮 Wordle Game\n\nI'm thinking of a 5-letter word. You have 6 tries to guess it!\n\n🟩 - Correct letter, correct position\n🟨 - Correct letter, wrong position\n⬜ - Letter not in the word\n\nMake your first guess with *!wordle [word]*`
+                    text: `🎮 *Wordle Game*\n\nI'm thinking of a 5-letter word. You have 6 tries to guess it!\n\n🟩 - Correct letter, correct position\n🟨 - Correct letter, wrong position\n⬜ - Letter not in word\n\nMake your first guess with *!wordle [word]*\n\nNeed a hint? Use *!wordle hint*`
+                });
+                return;
+            }
+            
+            // Check for game timeout
+            if (Date.now() - game.lastActivity > 10 * 60 * 1000) {
+                global.games.wordle.delete(gameId);
+                await sock.sendMessage(sender, {
+                    text: '⏰ Game expired. Start a new game with !wordle'
+                });
+                return;
+            }
+
+            // Handle hint request
+            if (args[0]?.toLowerCase() === 'hint' && !game.hint) {
+                game.hint = true;
+                const firstLetter = game.word[0];
+                await sock.sendMessage(sender, {
+                    text: `💡 Hint: The word starts with '${firstLetter}'`
                 });
                 return;
             }
@@ -431,29 +519,42 @@ const funCommands = {
             // Process a guess
             const guess = args[0]?.toUpperCase();
             if (!guess || guess.length !== 5 || !guess.match(/^[A-Z]{5}$/)) {
-                await sock.sendMessage(sender, { text: '❌ Please provide a valid 5-letter word' });
+                await sock.sendMessage(sender, {
+                    text: '❌ Please provide a valid 5-letter word'
+                });
                 return;
             }
+            
+            game.lastActivity = Date.now();
             
             try {
                 const feedback = handleWordleGuess(game.word, guess);
                 game.guesses.push({ word: guess, feedback: feedback });
-                global.wordleGames.set(gameId, game);
+                global.games.wordle.set(gameId, game);
                 
                 const display = game.guesses.map(g => `${g.word} ${g.feedback}`).join('\n');
                 const isWon = guess === game.word;
                 const isLost = game.guesses.length >= game.maxAttempts;
                 
                 if (isWon) {
+                    const attempts = game.guesses.length;
+                    let rating = '';
+                    if (attempts === 1) rating = '🌟 Genius!';
+                    else if (attempts === 2) rating = '🎯 Magnificent!';
+                    else if (attempts === 3) rating = '✨ Impressive!';
+                    else if (attempts === 4) rating = '👏 Great!';
+                    else if (attempts === 5) rating = '😊 Good!';
+                    else rating = '😌 Phew!';
+
                     await sock.sendMessage(sender, {
-                        text: `${display}\n\n🎉 Congratulations! You found the word!`
+                        text: `${display}\n\n🎉 ${rating}\nYou found the word in ${attempts} ${attempts === 1 ? 'try' : 'tries'}!\n\nPlay again with *!wordle*`
                     });
-                    global.wordleGames.delete(gameId);
+                    global.games.wordle.delete(gameId);
                 } else if (isLost) {
                     await sock.sendMessage(sender, {
-                        text: `${display}\n\n💀 Game Over! The word was: ${game.word}`
+                        text: `${display}\n\n💀 Game Over!\nThe word was: ${game.word}\n\nTry again with *!wordle*`
                     });
-                    global.wordleGames.delete(gameId);
+                    global.games.wordle.delete(gameId);
                 } else {
                     await sock.sendMessage(sender, {
                         text: `${display}\n\n${game.maxAttempts - game.guesses.length} attempts remaining`
@@ -461,18 +562,181 @@ const funCommands = {
                 }
             } catch (err) {
                 logger.error('Error processing Wordle guess:', err);
-                await sock.sendMessage(sender, { text: '❌ An error occurred while processing your guess.' });
-                global.wordleGames.delete(gameId);
+                await sock.sendMessage(sender, {
+                    text: '❌ Error processing your guess'
+                });
+                global.games.wordle.delete(gameId);
             }
         } catch (err) {
             logger.error('Wordle error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
-            global.wordleGames.delete(gameId);
+            await sock.sendMessage(sender, {
+                text: '❌ An error occurred during the game'
+            });
+            global.games.wordle.delete(sender);
         }
     },
 
-    async rps(sock, sender, args) {
+    async quiz(sock, message, args) {
         try {
+            const sender = message.key.remoteJid;
+            if (!(await areGamesEnabled(sock, sender))) return;
+            
+            if (!global.games.quiz) global.games.quiz = new Map();
+            const gameId = sender;
+            let game = global.games.quiz.get(gameId);
+
+            const categories = {
+                general: [
+                    {
+                        question: "Which programming language is known as the 'language of the web'?",
+                        options: ["Python", "JavaScript", "Java", "C++"],
+                        correct: 1,
+                        explanation: "JavaScript is essential for web development and runs in all modern browsers."
+                    },
+                    {
+                        question: "What does CPU stand for?",
+                        options: ["Central Process Unit", "Central Programming Unit", "Central Processing Unit", "Computer Processing Unit"],
+                        correct: 2,
+                        explanation: "CPU (Central Processing Unit) is the brain of a computer."
+                    }
+                ],
+                coding: [
+                    {
+                        question: "What is the result of 2 + '2' in JavaScript?",
+                        options: ["4", "22", "TypeError", "NaN"],
+                        correct: 1,
+                        explanation: "In JavaScript, when + is used with a string, it performs concatenation."
+                    },
+                    {
+                        question: "Which data structure follows LIFO?",
+                        options: ["Queue", "Stack", "Array", "Tree"],
+                        correct: 1,
+                        explanation: "Stack follows Last In, First Out (LIFO) principle."
+                    }
+                ]
+            };
+
+            if (!args[0]) {
+                await sock.sendMessage(sender, {
+                    text: `📚 *Quiz Game*\n\nAvailable categories:\n${Object.keys(categories).map(c => `• ${c}`).join('\n')}\n\nStart with *!quiz [category]*`
+                });
+                return;
+            }
+
+            const category = args[0].toLowerCase();
+            if (!categories[category]) {
+                await sock.sendMessage(sender, {
+                    text: '❌ Invalid category. Available categories: ' + Object.keys(categories).join(', ')
+                });
+                return;
+            }
+
+            if (!game) {
+                game = {
+                    category,
+                    questions: [...categories[category]], // Create copy to shuffle
+                    currentQuestion: 0,
+                    score: 0,
+                    maxQuestions: categories[category].length,
+                    lastActivity: Date.now(),
+                    attempts: 0
+                };
+
+                // Shuffle questions
+                for (let i = game.questions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [game.questions[i], game.questions[j]] = [game.questions[j], game.questions[i]];
+                }
+
+                global.games.quiz.set(gameId, game);
+
+                // Display first question
+                const question = game.questions[0];
+                const optionsText = question.options
+                    .map((opt, i) => `${i + 1}. ${opt}`)
+                    .join('\n');
+
+                await sock.sendMessage(sender, {
+                    text: `🎯 *Quiz - ${category.toUpperCase()}*\n\nQuestion 1/${game.maxQuestions}:\n${question.question}\n\n${optionsText}\n\nRespond with *!answer [number]*`
+                });
+                return;
+            }
+
+            // Check for game timeout
+            if (Date.now() - game.lastActivity > 5 * 60 * 1000) {
+                global.games.quiz.delete(gameId);
+                await sock.sendMessage(sender, {
+                    text: '⏰ Quiz expired. Start a new quiz with !quiz'
+                });
+                return;
+            }
+
+            // Handle answer
+            if (args[0].toLowerCase() === 'answer') {
+                const answer = parseInt(args[1]);
+                if (isNaN(answer) || answer < 1 || answer > 4) {
+                    await sock.sendMessage(sender, {
+                        text: '❌ Please provide a valid answer number (1-4)'
+                    });
+                    return;
+                }
+
+                const currentQ = game.questions[game.currentQuestion];
+                const isCorrect = (answer - 1) === currentQ.correct;
+                
+                if (isCorrect) {
+                    game.score++;
+                    await sock.sendMessage(sender, {
+                        text: `✅ Correct!\n\n${currentQ.explanation}`
+                    });
+                } else {
+                    await sock.sendMessage(sender, {
+                        text: `❌ Wrong! The correct answer was: ${currentQ.options[currentQ.correct]}\n\n${currentQ.explanation}`
+                    });
+                }
+
+                game.currentQuestion++;
+                game.lastActivity = Date.now();
+
+                if (game.currentQuestion >= game.maxQuestions) {
+                    // Quiz complete
+                    const percentage = (game.score / game.maxQuestions) * 100;
+                    let grade = '';
+                    if (percentage === 100) grade = '🌟 Perfect!';
+                    else if (percentage >= 80) grade = '🎉 Excellent!';
+                    else if (percentage >= 60) grade = '👏 Good job!';
+                    else if (percentage >= 40) grade = '😊 Nice try!';
+                    else grade = '📚 Keep learning!';
+
+                    await sock.sendMessage(sender, {
+                        text: `🎮 Quiz Complete!\n\nFinal Score: ${game.score}/${game.maxQuestions}\n${grade}\n\nPlay again with *!quiz*`
+                    });
+                    global.games.quiz.delete(gameId);
+                } else {
+                    // Next question
+                    const nextQ = game.questions[game.currentQuestion];
+                    const optionsText = nextQ.options
+                        .map((opt, i) => `${i + 1}. ${opt}`)
+                        .join('\n');
+
+                    await sock.sendMessage(sender, {
+                        text: `🎯 Question ${game.currentQuestion + 1}/${game.maxQuestions}:\n${nextQ.question}\n\n${optionsText}\n\nRespond with *!answer [number]*`
+                    });
+                    global.games.quiz.set(gameId, game);
+                }
+            }
+        } catch (err) {
+            logger.error('Quiz error:', err);
+            await sock.sendMessage(sender, {
+                text: '❌ An error occurred during the quiz'
+            });
+            global.games.quiz.delete(sender);
+        }
+    },
+
+    async rps(sock, message, args) {
+        try {
+            const sender = message.key.remoteJid;
             if (!(await areGamesEnabled(sock, sender))) return;
             
             const choices = ['rock', 'paper', 'scissors'];
@@ -480,72 +744,223 @@ const funCommands = {
             
             if (!choices.includes(userChoice)) {
                 await sock.sendMessage(sender, { 
-                    text: '❌ Please choose either *rock*, *paper*, or *scissors*.' 
+                    text: '⚔️ *Rock Paper Scissors*\n\nChoose your weapon:\n• rock 🪨\n• paper 📄\n• scissors ✂️' 
                 });
                 return;
             }
             
             const botChoice = choices[Math.floor(Math.random() * choices.length)];
+            const emojis = {
+                rock: '🪨',
+                paper: '📄',
+                scissors: '✂️'
+            };
+
             let result = '';
-            
             if (userChoice === botChoice) {
-                result = "It's a tie!";
+                result = "It's a tie! 🤝";
             } else if (
                 (userChoice === 'rock' && botChoice === 'scissors') ||
                 (userChoice === 'paper' && botChoice === 'rock') ||
                 (userChoice === 'scissors' && botChoice === 'paper')
             ) {
-                result = 'You win!';
+                result = 'You win! 🎉';
             } else {
-                result = 'I win!';
+                result = 'Bot wins! 🤖';
             }
             
-            await sock.sendMessage(sender, { 
-                text: `You chose *${userChoice}*\nI chose *${botChoice}*\n\n*${result}*` 
-            });
+            const response = `*⚔️ Rock Paper Scissors*\n\nYou chose: ${userChoice} ${emojis[userChoice]}\nBot chose: ${botChoice} ${emojis[botChoice]}\n\n${result}\n\nPlay again with !rps [choice]`;
+            await sock.sendMessage(sender, { text: response });
         } catch (err) {
             logger.error('RPS error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: '❌ An error occurred during the game. Please try again.' 
+            });
         }
     },
 
-    async trivia(sock, sender, args) {
+    async roll(sock, message, args) {
         try {
-            if (!global.triviaGames) global.triviaGames = new Map();
+            const sender = message.key.remoteJid;
+            const sides = parseInt(args[0]) || 6;
+
+            if (sides < 2 || sides > 100) {
+                await sock.sendMessage(sender, {
+                    text: '🎲 Please specify a number of sides between 2 and 100\nExample: !roll 20'
+                });
+                return;
+            }
+
+            const result = Math.floor(Math.random() * sides) + 1;
+            await sock.sendMessage(sender, {
+                text: `🎲 *Dice Roll (d${sides})*\n\nYou rolled: ${result}\n\nRoll again with !roll [sides]`
+            });
+        } catch (err) {
+            logger.error('Dice roll error:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error rolling dice. Please try again.'
+            });
+        }
+    },
+
+    async riddle(sock, message) {
+        try {
+            const sender = message.key.remoteJid;
+            const riddles = [
+                {
+                    question: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?",
+                    answer: "An echo"
+                },
+                {
+                    question: "What has keys, but no locks; space, but no room; and you can enter, but not go in?",
+                    answer: "A keyboard"
+                },
+                {
+                    question: "The more you take, the more you leave behind. What am I?",
+                    answer: "Footsteps"
+                },
+                {
+                    question: "What has cities, but no houses; forests, but no trees; and rivers, but no water?",
+                    answer: "A map"
+                },
+                {
+                    question: "What is always in front of you but can't be seen?",
+                    answer: "The future"
+                }
+            ];
+
+            // Store current riddle for reveal
+            if (!global.riddles) global.riddles = new Map();
+            
+            const currentRiddle = riddles[Math.floor(Math.random() * riddles.length)];
+            global.riddles.set(sender, {
+                riddle: currentRiddle,
+                timestamp: Date.now()
+            });
+
+            await sock.sendMessage(sender, {
+                text: `🤔 *Riddle*\n\n${currentRiddle.question}\n\nUse *!reveal* to see the answer`
+            });
+        } catch (err) {
+            logger.error('Riddle error:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error generating riddle. Please try again.'
+            });
+        }
+    },
+
+    async reveal(sock, message) {
+        try {
+            const sender = message.key.remoteJid;
+            
+            if (!global.riddles || !global.riddles.has(sender)) {
+                await sock.sendMessage(sender, {
+                    text: '❌ No active riddle. Use !riddle to get a new riddle'
+                });
+                return;
+            }
+
+            const riddle = global.riddles.get(sender);
+            
+            // Check for timeout (5 minutes)
+            if (Date.now() - riddle.timestamp > 5 * 60 * 1000) {
+                global.riddles.delete(sender);
+                await sock.sendMessage(sender, {
+                    text: '⏰ Riddle expired. Use !riddle to get a new one'
+                });
+                return;
+            }
+
+            await sock.sendMessage(sender, {
+                text: `🎯 *Answer:* ${riddle.riddle.answer}\n\nGet another riddle with !riddle`
+            });
+            global.riddles.delete(sender);
+        } catch (err) {
+            logger.error('Reveal error:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error revealing answer. Please try again.'
+            });
+        }
+    },
+
+    async fact(sock, message) {
+        try {
+            const sender = message.key.remoteJid;
+            const facts = [
+                "A day on Venus is longer than its year. 🌟",
+                "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old! 🍯",
+                "The first oranges weren't orange! The original oranges from Southeast Asia were actually green. 🍊",
+                "A cloud can weigh more than a million pounds. ☁️",
+                "Octopuses have three hearts. 🐙",
+                "The Great Wall of China isn't visible from space. 🌍", 
+                "Bananas are berries, but strawberries aren't! 🍌",
+                "A bolt of lightning is six times hotter than the sun's surface. ⚡",
+                "The average person spends 6 months of their lifetime waiting for red lights to turn green. 🚦",
+                "Dogs' sense of smell is 40 times greater than humans. 🐕"
+            ];
+
+            const randomFact = facts[Math.floor(Math.random() * facts.length)];
+            await sock.sendMessage(sender, {
+                text: `📚 *Fun Fact*\n\n${randomFact}\n\nGet another fact with !fact`
+            });
+        } catch (err) {
+            logger.error('Fact error:', err);
+            await sock.sendMessage(message.key.remoteJid, {
+                text: '❌ Error generating fact. Please try again.'
+            });
+        }
+    },
+
+    async trivia(sock, message, args) {
+        try {
+            const sender = message.key.remoteJid;
+            if (!(await areGamesEnabled(sock, sender))) return;
+
+            if (!global.games.trivia) global.games.trivia = new Map();
 
             const gameId = sender;
-            let game = global.triviaGames.get(gameId);
+            let game = global.games.trivia.get(gameId);
 
             const categories = {
-                general: [
+                tech: [
                     {
-                        question: "What is the capital of France?",
-                        options: ["London", "Berlin", "Paris", "Madrid"],
-                        correct: 2
+                        question: "Which company created JavaScript?",
+                        options: ["Microsoft", "Netscape", "Oracle", "Google"],
+                        correct: 1
                     },
                     {
-                        question: "Which planet is known as the Red Planet?",
-                        options: ["Venus", "Mars", "Jupiter", "Saturn"],
-                        correct: 1
+                        question: "What does CPU stand for?",
+                        options: ["Central Processing Unit", "Computer Personal Unit", "Central Program Utility", "Computer Program Unit"],
+                        correct: 0
+                    },
+                    {
+                        question: "What does HTML stand for?",
+                        options: ["Hyper Text Markup Language", "High Tech Modern Language", "Hyper Transfer Markup Logic", "Home Tool Markup Language"],
+                        correct: 0
                     }
                 ],
-                science: [
+                coding: [
                     {
-                        question: "What is the chemical symbol for gold?",
-                        options: ["Ag", "Fe", "Au", "Cu"],
-                        correct: 2
+                        question: "Which of these is not a programming language?",
+                        options: ["Java", "Python", "Cobra", "Photoshop"],
+                        correct: 3
                     },
                     {
-                        question: "What is the hardest natural substance on Earth?",
-                        options: ["Gold", "Iron", "Diamond", "Platinum"],
-                        correct: 2
+                        question: "What is the most basic data structure?",
+                        options: ["Tree", "Array", "Queue", "Stack"],
+                        correct: 1
+                    },
+                    {
+                        question: "Which symbol is used for single-line comments in JavaScript?",
+                        options: ["#", "//", "/*", "--"],
+                        correct: 1
                     }
                 ]
             };
 
             if (!args[0]) {
                 await sock.sendMessage(sender, {
-                    text: `📚 Available categories: ${Object.keys(categories).join(', ')}\nUse: !trivia [category] to start`
+                    text: `📚 *Trivia Categories*\n\n${Object.keys(categories).join(', ')}\n\nUse: *!trivia [category]* to start`
                 });
                 return;
             }
@@ -565,7 +980,8 @@ const funCommands = {
                     questions: [...categories[category]], // Create copy to shuffle
                     currentQuestion: 0,
                     score: 0,
-                    maxQuestions: categories[category].length
+                    maxQuestions: categories[category].length,
+                    lastActivity: Date.now()
                 };
 
                 // Shuffle questions
@@ -574,7 +990,7 @@ const funCommands = {
                     [game.questions[i], game.questions[j]] = [game.questions[j], game.questions[i]];
                 }
 
-                global.triviaGames.set(gameId, game);
+                global.games.trivia.set(gameId, game);
 
                 // Display first question
                 const question = game.questions[0];
@@ -583,7 +999,16 @@ const funCommands = {
                     .join('\n');
 
                 await sock.sendMessage(sender, {
-                    text: `🎯 Trivia Game - ${category.toUpperCase()}\n\nQuestion 1/${game.maxQuestions}:\n${question.question}\n\n${optionsText}\n\nRespond with !answer [number]`
+                    text: `🎯 *Trivia Game - ${category.toUpperCase()}*\n\nQuestion 1/${game.maxQuestions}:\n${question.question}\n\n${optionsText}\n\nRespond with *!trivia answer [number]*`
+                });
+                return;
+            }
+
+            // Check for game timeout
+            if (Date.now() - game.lastActivity > 5 * 60 * 1000) {
+                global.games.trivia.delete(gameId);
+                await sock.sendMessage(sender, {
+                    text: '⏰ Game expired. Start a new game with !trivia'
                 });
                 return;
             }
@@ -602,15 +1027,22 @@ const funCommands = {
                 const isCorrect = (answer - 1) === currentQ.correct;
                 if (isCorrect) game.score++;
 
-                const feedbackText = isCorrect ? '✅ Correct!' : `❌ Wrong! The correct answer was: ${currentQ.options[currentQ.correct]}`;
+                const feedbackText = isCorrect ? 
+                    '✅ *Correct!*' : 
+                    `❌ *Wrong!* The correct answer was: ${currentQ.options[currentQ.correct]}`;
                 game.currentQuestion++;
+                game.lastActivity = Date.now();
 
                 if (game.currentQuestion >= game.maxQuestions) {
                     // Game over
+                    const scoreText = game.score === game.maxQuestions ? 
+                        '🏆 Perfect Score!' : 
+                        `Final Score: ${game.score}/${game.maxQuestions}`;
+
                     await sock.sendMessage(sender, {
-                        text: `${feedbackText}\n\n🎮 Game Over!\nFinal Score: ${game.score}/${game.maxQuestions}`
+                        text: `${feedbackText}\n\n🎮 Game Over!\n${scoreText}\n\nType *!trivia* to play again`
                     });
-                    global.triviaGames.delete(gameId);
+                    global.games.trivia.delete(gameId);
                 } else {
                     // Next question
                     const nextQ = game.questions[game.currentQuestion];
@@ -619,15 +1051,127 @@ const funCommands = {
                         .join('\n');
 
                     await sock.sendMessage(sender, {
-                        text: `${feedbackText}\n\nQuestion ${game.currentQuestion + 1}/${game.maxQuestions}:\n${nextQ.question}\n\n${optionsText}\n\nRespond with !answer [number]`
+                        text: `${feedbackText}\n\n*Question ${game.currentQuestion + 1}/${game.maxQuestions}:*\n${nextQ.question}\n\n${optionsText}\n\nRespond with *!trivia answer [number]*`
                     });
-                    global.triviaGames.set(gameId, game);
+                    global.games.trivia.set(gameId, game);
                 }
             }
         } catch (err) {
             logger.error('Trivia error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
-            global.triviaGames.delete(gameId);
+            await sock.sendMessage(sender, {
+                text: '❌ An error occurred during the game'
+            });
+            global.games.trivia.delete(gameId);
+        }
+    },
+
+    async slot(sock, message, args) {
+        try {
+            const sender = message.key.remoteJid;
+            if (!(await areGamesEnabled(sock, sender))) return;
+
+            const symbols = ['🍒', '🍊', '🍇', '💎', '7️⃣', '🎰'];
+            const lines = 3;
+            const reels = 3;
+
+            // Generate random slot results
+            const board = Array(lines).fill().map(() => 
+                Array(reels).fill().map(() => symbols[Math.floor(Math.random() * symbols.length)])
+            );
+
+            // Format board display
+            const boardDisplay = board.map(line => line.join(' | ')).join('\n');
+            
+            // Check for wins
+            const winningLines = board.filter(line => 
+                line.every(symbol => symbol === line[0])
+            ).length;
+
+            let message = `🎰 *Slot Machine*\n\n${boardDisplay}\n\n`;
+            
+            if (winningLines > 0) {
+                message += `🎉 Congratulations! You got ${winningLines} winning line${winningLines > 1 ? 's' : ''}!`;
+            } else {
+                message += '😢 No winning lines. Try again!';
+            }
+
+            await sock.sendMessage(sender, { text: message });
+        } catch (err) {
+            logger.error('Slot error:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: '❌ Error running slot machine. Please try again.' 
+            });
+        }
+    },
+
+    async fortune(sock, message) {
+        try {
+            const sender = message.key.remoteJid;
+            const fortunes = [
+                "A beautiful, smart, and loving person will be coming into your life. 🌟",
+                "Your creativity will bring you great success. 🎨",
+                "A thrilling opportunity lies ahead. Be ready to seize it! 🎯",
+                "A friendly encounter will lead to a lasting relationship. 🤝",
+                "Your hard work is about to pay off. Keep pushing forward! 💪",
+                "A pleasant surprise is waiting for you. 🎁",
+                "Your positive attitude will guide you to success. ✨",
+                "An unexpected journey will bring great joy. 🌈",
+                "Your talents will be recognized and rewarded. 🏆",
+                "New friendships will brighten your path. 🌟"
+            ];
+
+            const randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+            await sock.sendMessage(sender, { 
+                text: `🔮 *Your Fortune*\n\n${randomFortune}\n\nGet another fortune with !fortune` 
+            });
+        } catch (err) {
+            logger.error('Fortune error:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: '❌ Error reading your fortune. Please try again.' 
+            });
+        }
+    },
+
+    async horoscope(sock, message, args) {
+        try {
+            const sender = message.key.remoteJid;
+            const signs = [
+                'aries', 'taurus', 'gemini', 'cancer', 
+                'leo', 'virgo', 'libra', 'scorpio', 
+                'sagittarius', 'capricorn', 'aquarius', 'pisces'
+            ];
+
+            const sign = args[0]?.toLowerCase();
+            if (!sign || !signs.includes(sign)) {
+                const signList = signs.map(s => `• ${s.charAt(0).toUpperCase() + s.slice(1)}`).join('\n');
+                await sock.sendMessage(sender, { 
+                    text: `⭐ *Daily Horoscope*\n\nPlease specify your zodiac sign:\n${signList}\n\nUsage: !horoscope [sign]` 
+                });
+                return;
+            }
+
+            const horoscopes = {
+                aries: "Your energy is high today. Take on new challenges! 🔥",
+                taurus: "Focus on practical matters and financial planning. 💰",
+                gemini: "Communication flows easily. Share your ideas! 💭",
+                cancer: "Trust your intuition in emotional matters. 🌙",
+                leo: "Your creative energy shines bright today. ☀️",
+                virgo: "Pay attention to details but don't overthink. ✨",
+                libra: "Balance is key in all your endeavors today. ⚖️",
+                scorpio: "Your determination leads to breakthroughs. 🦂",
+                sagittarius: "Adventure calls! Explore new horizons. 🎯",
+                capricorn: "Your hard work brings recognition. 🏔️",
+                aquarius: "Innovation and originality are highlighted. ⚡",
+                pisces: "Trust your creative instincts today. 🌊"
+            };
+
+            const response = `🌟 *${sign.toUpperCase()} Horoscope*\n\n${horoscopes[sign]}\n\nCheck again tomorrow!`;
+            await sock.sendMessage(sender, { text: response });
+        } catch (err) {
+            logger.error('Horoscope error:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: '❌ Error reading your horoscope. Please try again.' 
+            });
         }
     },
 

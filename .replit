@@ -19,6 +19,10 @@ args = "Replit QR Server"
 task = "workflow.run"
 args = "WhatsApp Bot"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Check Commands"
+
 [[workflows.workflow]]
 name = "Replit QR Server"
 author = "agent"
@@ -48,6 +52,20 @@ task = "packager.installForAll"
 task = "shell.exec"
 args = "node bot-handler.js"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Check Commands"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node check-commands.js"
 
 [deployment]
 run = ["sh", "-c", "node compatible-qr.js"]
