@@ -9,10 +9,20 @@
       "description": "WhatsApp session credentials (Base64 encoded). You can leave this blank and add it via the web interface after deployment.",
       "required": false
     },
+    "SESSION_ID": {
+      "description": "Unique session ID for multi-device support (deprecated - SESSION_STRING is preferred)",
+      "required": false,
+      "value": ""
+    },
     "PREFIX": {
       "description": "Command prefix (e.g., '.')",
       "value": ".",
       "required": true
+    },
+    "BOT_PREFIX": {
+      "description": "Alternative command prefix (default: .) - Use PREFIX instead",
+      "required": false,
+      "value": "."
     },
     "OWNER_NUMBER": {
       "description": "Your WhatsApp number with country code (example: 491234567890)",
@@ -67,6 +77,7 @@
       "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
     }
   ],
+  "stack": "heroku-22",
   "formation": {
     "web": {
       "quantity": 1,
