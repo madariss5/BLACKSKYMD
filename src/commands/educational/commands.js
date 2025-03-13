@@ -1899,4 +1899,42 @@ Available periods:
     }
 };
 
-module.exports = { commands };
+// Add init function for proper module initialization
+commands.init = async function() {
+    try {
+        logger.info('🔄 Initializing Educational Commands...');
+        
+        // Initialize required directories
+        await ensureDirectory('data/educational');
+        await ensureDirectory('data/educational/flashcards');
+        await ensureDirectory('data/educational/mindmaps');
+        await ensureDirectory('data/educational/quiz_scores');
+        await ensureDirectory('data/educational/study_materials');
+        await ensureDirectory('data/educational/language_exercises');
+        await ensureDirectory('data/educational/math_solutions');
+        await ensureDirectory('data/educational/study_plans');
+        
+        logger.info('✅ Educational Commands initialized successfully');
+        return true;
+    } catch (err) {
+        logger.error('❌ Failed to initialize Educational Commands:', err);
+        logger.error('Stack trace:', err.stack);
+        return false;
+    }
+};
+
+// Ensure directory exists
+async function ensureDirectory(dirPath) {
+    try {
+        const fullPath = path.join(process.cwd(), dirPath);
+        if (!fs.existsSync(fullPath)) {
+            await fsPromises.mkdir(fullPath, { recursive: true });
+            logger.info(`✓ Created directory: ${dirPath}`);
+        }
+    } catch (err) {
+        logger.error(`Failed to create directory ${dirPath}:`, err);
+        throw err;
+    }
+}
+
+module.exports = commands;
