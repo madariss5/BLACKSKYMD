@@ -102,30 +102,35 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Connection state storage
+// Configure retry settings
+const RETRY_CONFIG = {
+    maxRetries: 5,
+    baseDelay: 10000, // 10 seconds
+    maxDelay: 60000,  // 1 minute
+    connectionTimeout: 30000 // 30 seconds
+};
+
+// Connection state tracking
 let connectionState = {
     state: 'disconnected',
     qrCode: null,
     connected: false,
     lastError: null,
-    reconnectCount: 0
-};
-
-// Retry configuration
-const RETRY_CONFIG = {
-    maxRetries: 5,
-    baseDelay: 5000,
-    maxDelay: 30000
+    reconnectCount: 0,
+    reconnectTimer: null,
+    isReconnecting: false
 };
 
 /**
  * Calculate exponential backoff delay
  */
 function getRetryDelay(attempt) {
-    return Math.min(
+    const delay = Math.min(
         RETRY_CONFIG.maxDelay,
         RETRY_CONFIG.baseDelay * Math.pow(2, attempt)
-    ) + (Math.random() * 1000);
+    );
+    // Add some randomness to prevent thundering herd
+    return delay + (Math.random() * 1000);
 }
 
 /**
@@ -177,27 +182,68 @@ async function setupMessageEventHandler(sock, handlerFunction) {
     }
 }
 
+/**
+ * Safe reconnection handler
+ */
+async function handleReconnection(retryCount = 0) {
+    // Prevent multiple reconnection attempts
+    if (connectionState.isReconnecting) {
+        logger.warn('Reconnection already in progress, skipping...');
+        return;
+    }
+
+    try {
+        connectionState.isReconnecting = true;
+        connectionState.state = 'connecting';
+        logger.info(`Attempting reconnection (attempt ${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
+
+        // Clear any existing timer
+        if (connectionState.reconnectTimer) {
+            clearTimeout(connectionState.reconnectTimer);
+            connectionState.reconnectTimer = null;
+        }
+
+        // Initialize WhatsApp connection
+        const sock = await connectToWhatsApp(retryCount);
+
+        if (!sock) {
+            throw new Error('Failed to create socket connection');
+        }
+
+        return sock;
+    } catch (error) {
+        logger.error('Reconnection attempt failed:', error);
+
+        // Schedule next retry if within limits
+        if (retryCount < RETRY_CONFIG.maxRetries) {
+            const delay = getRetryDelay(retryCount);
+            logger.info(`Scheduling next reconnection attempt in ${delay/1000} seconds...`);
+
+            connectionState.reconnectTimer = setTimeout(() => {
+                handleReconnection(retryCount + 1);
+            }, delay);
+        } else {
+            logger.error('Maximum reconnection attempts reached');
+            connectionState.state = 'failed';
+        }
+    } finally {
+        connectionState.isReconnecting = false;
+    }
+}
+
 // Initialize WhatsApp connection with retry logic
 async function connectToWhatsApp(retryCount = 0) {
     try {
-        connectionState.state = 'connecting';
-        logger.info('🟢 Starting WhatsApp authentication...');
-
-        // Ensure session directory exists
-        if (!fs.existsSync(SESSION_DIR)) {
-            fs.mkdirSync(SESSION_DIR, { recursive: true });
-        }
-
         // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
-        // Create WhatsApp socket connection
+        // Create WhatsApp socket connection with optimized settings
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
             logger: pino({ level: 'silent' }),
             browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Chrome', '121.0.0'],
-            connectTimeoutMs: 30000,
+            connectTimeoutMs: RETRY_CONFIG.connectionTimeout,
             defaultQueryTimeoutMs: 20000,
             markOnlineOnConnect: true,
             keepAliveIntervalMs: 15000,
@@ -210,7 +256,6 @@ async function connectToWhatsApp(retryCount = 0) {
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            logger.info('Connection update:', update);
 
             if (qr) {
                 connectionState.state = 'qr_ready';
@@ -226,18 +271,15 @@ async function connectToWhatsApp(retryCount = 0) {
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
-                                         retryCount < RETRY_CONFIG.maxRetries;
+                                     retryCount < RETRY_CONFIG.maxRetries &&
+                                     !connectionState.isReconnecting;
 
                 connectionState.state = 'disconnected';
                 connectionState.connected = false;
                 connectionState.lastError = lastDisconnect?.error;
 
-                logger.info('Connection closed:', { statusCode, shouldReconnect, retryCount });
-
                 if (shouldReconnect) {
-                    const delay = getRetryDelay(retryCount);
-                    logger.info(`Reconnecting in ${delay}ms... (Attempt ${retryCount + 1}/${RETRY_CONFIG.maxRetries})`);
-                    setTimeout(() => connectToWhatsApp(retryCount + 1), delay);
+                    handleReconnection(retryCount);
                 } else {
                     logger.error('Connection closed permanently:', lastDisconnect?.error);
                 }
@@ -248,9 +290,10 @@ async function connectToWhatsApp(retryCount = 0) {
                 connectionState.state = 'connected';
                 connectionState.connected = true;
                 connectionState.reconnectCount = 0;
+                connectionState.lastError = null;
 
                 try {
-                    // Load and initialize the simple handler
+                    // Initialize handlers
                     logger.info('Loading message handler...');
                     const { messageHandler: simpleHandler, init } = require('./src/handlers/simpleMessageHandler');
 
@@ -275,7 +318,7 @@ async function connectToWhatsApp(retryCount = 0) {
                     const emergencyHandler = async (sock, message) => {
                         try {
                             const content = message.message?.conversation ||
-                                            message.message?.extendedTextMessage?.text;
+                                         message.message?.extendedTextMessage?.text;
 
                             if (content?.startsWith('!') && message.key?.remoteJid) {
                                 const sender = message.key.remoteJid;
