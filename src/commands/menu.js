@@ -334,7 +334,7 @@ const menuCommands = {
 
 module.exports = {
     commands: menuCommands,
-    category: 'basic',
+    category: 'menu',
     async init() {
         try {
             logger.info('Initializing menu system...');
