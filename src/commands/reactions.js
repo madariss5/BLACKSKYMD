@@ -231,7 +231,9 @@ const reactionCommands = {
             throw error;
         }
     },
-    async pat(sock, sender, args) {
+    async pat(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👋 Please mention someone to pat' });
@@ -240,7 +242,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('pat');
         await sendReactionMessage(sock, sender, target, 'pat', gifUrl, '👋');
     },
-    async kiss(sock, sender, args) {
+    async kiss(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '💋 Please mention someone to kiss' });
@@ -249,7 +253,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('kiss');
         await sendReactionMessage(sock, sender, target, 'kiss', gifUrl, '💋');
     },
-    async cuddle(sock, sender, args) {
+    async cuddle(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🤗 Please mention someone to cuddle' });
@@ -329,7 +335,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('wink');
         await sendReactionMessage(sock, sender, target, 'wink', gifUrl, '😉');
     },
-    async grouphug(sock, sender) {
+    async grouphug(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('hug');
         await sendReactionMessage(sock, sender, null, 'grouphug', gifUrl, '🤗');
     },
@@ -647,32 +655,73 @@ const reactionCommands = {
         await sendReactionMessage(sock, sender, null, 'scared', gifUrl, '😱');
     },
     // Alternative commands
-    async hifive(sock, sender, args) {
-        return await reactionCommands.highfive(sock, sender, args);
+    async hifive(sock, message, args) {
+        // This is a wrapper for the highfive command
+        const sender = message.key.remoteJid;
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: '✋ Please mention someone to high five' });
+            return;
+        }
+        const gifUrl = await fetchAnimeGif('highfive');
+        await sendReactionMessage(sock, sender, target, 'highfive', gifUrl, '✋');
     },
 
-    async grouphug(sock, sender) {
-        return await reactionCommands.hug(sock, sender, ['@everyone']);
+    async grouphug(sock, message) {
+        // Already implemented above independently
+        const sender = message.key.remoteJid;
+        const gifUrl = await fetchAnimeGif('hug');
+        await sendReactionMessage(sock, sender, null, 'grouphug', gifUrl, '🤗');
     },
 
-    async peck(sock, sender, args) {
-        return await reactionCommands.kiss(sock, sender, args);
+    async peck(sock, message, args) {
+        // This is a wrapper for the kiss command
+        const sender = message.key.remoteJid;
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: '😘 Please mention someone to peck' });
+            return;
+        }
+        const gifUrl = await fetchAnimeGif('kiss');
+        await sendReactionMessage(sock, sender, target, 'peck', gifUrl, '😘');
     },
 
-    async greet(sock, sender, args) {
-        return await reactionCommands.wave(sock, sender, args);
+    async greet(sock, message, args) {
+        // This is a wrapper for the wave command
+        const sender = message.key.remoteJid;
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: '👋 Please mention someone to greet' });
+            return;
+        }
+        const gifUrl = await fetchAnimeGif('wave');
+        await sendReactionMessage(sock, sender, target, 'greet', gifUrl, '👋');
     },
 
-    async bye(sock, sender) {
-        return await reactionCommands.wave(sock, sender, null);
+    async bye(sock, message) {
+        // This is a wrapper for the wave command with no target
+        const sender = message.key.remoteJid;
+        const gifUrl = await fetchAnimeGif('wave');
+        await sendReactionMessage(sock, sender, null, 'bye', gifUrl, '👋');
     },
 
-    async sad(sock, sender) {
-        return await reactionCommands.cry(sock, sender);
+    async sad(sock, message) {
+        // This is a wrapper for the cry command
+        const sender = message.key.remoteJid;
+        const gifUrl = await fetchAnimeGif('cry');
+        await sendReactionMessage(sock, sender, null, 'sad', gifUrl, '😢');
     },
 
-    async nom(sock, sender, args) {
-        return await reactionCommands.bite(sock, sender, args);
+    async nom(sock, message, args) {
+        // This is a wrapper for the bite command
+        const sender = message.key.remoteJid;
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: '😋 Please mention someone to nom' });
+            return;
+        }
+        const gifUrl = await fetchAnimeGif('bite');
+        await sendReactionMessage(sock, sender, target, 'nom', gifUrl, '😋');
     },
 
     async init() {
