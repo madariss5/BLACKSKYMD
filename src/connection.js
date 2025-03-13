@@ -210,6 +210,20 @@ async function startConnection() {
                 clearReconnectTimer();
                 await saveCreds();
 
+                // Initialize message handling after successful connection
+                sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                    if (type === 'notify') {
+                        for (const message of messages) {
+                            try {
+                                await messageHandler(sock, message);
+                                logger.info('Message handled successfully');
+                            } catch (err) {
+                                logger.error('Error handling message:', err);
+                            }
+                        }
+                    }
+                });
+
                 isConnecting = false;
                 connectionLock = false;
             }
@@ -269,6 +283,38 @@ async function startConnection() {
         });
 
         sock.ev.on('creds.update', saveCreds);
+
+        // Add message receipt acknowledgment
+        sock.ev.on('messages.update', async (messages) => {
+            for (const message of messages) {
+                if (message.key && message.key.remoteJid) {
+                    try {
+                        await sock.readMessages([message.key]);
+                        logger.debug('Message marked as read');
+                    } catch (err) {
+                        logger.error('Error marking message as read:', err);
+                    }
+                }
+            }
+        });
+
+        // Handle chat updates
+        sock.ev.on('chats.update', async (chats) => {
+            for (const chat of chats) {
+                if (chat.unreadCount > 0) {
+                    try {
+                        await sock.readMessages([{
+                            remoteJid: chat.id,
+                            id: chat.conversationTimestamp.toString()
+                        }]);
+                        logger.debug('Chat marked as read');
+                    } catch (err) {
+                        logger.error('Error marking chat as read:', err);
+                    }
+                }
+            }
+        });
+
 
         return sock;
     } catch (err) {
