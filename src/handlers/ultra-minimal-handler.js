@@ -206,26 +206,59 @@ async function messageHandler(sock, message) {
  * Initialize all command modules
  */
 async function init() {
-    console.log('Ultra minimal handler initializing...');
+    console.log('⚙️ Ultra minimal handler initializing...');
     
     try {
         // Try to initialize command modules
         if (require('../commands/index').initializeModules) {
-            console.log('Initializing all command modules...');
+            console.log('📚 Initializing all command modules...');
             try {
                 // We don't have the sock object at this point, so we pass null
                 // The actual commands will get the sock object when they're called
                 await require('../commands/index').initializeModules(null);
-                console.log('Command modules initialized successfully');
+                console.log('✅ Command modules initialized successfully');
+                
+                // Log command categories
+                const categories = {};
+                for (const commandName of commands.keys()) {
+                    // Group commands by their first 3 letters to get an idea of categories
+                    const prefix = commandName.slice(0, 3);
+                    categories[prefix] = (categories[prefix] || 0) + 1;
+                }
+                
+                console.log('📊 Command categories distribution:');
+                Object.entries(categories)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10)
+                    .forEach(([prefix, count]) => {
+                        console.log(`   - ${prefix}*: ${count} commands`);
+                    });
+                
+                // Log some sample commands from each category for verification
+                const sampleCommands = {};
+                for (const commandName of commands.keys()) {
+                    const prefix = commandName.slice(0, 3);
+                    if (!sampleCommands[prefix]) {
+                        sampleCommands[prefix] = [];
+                    }
+                    if (sampleCommands[prefix].length < 3) {
+                        sampleCommands[prefix].push(commandName);
+                    }
+                }
+                
+                console.log('🔍 Sample commands by category:');
+                Object.entries(sampleCommands).forEach(([prefix, cmdList]) => {
+                    console.log(`   - ${prefix}*: ${cmdList.join(', ')}`);
+                });
             } catch (initErr) {
-                console.error('Error initializing command modules:', initErr);
+                console.error('❌ Error initializing command modules:', initErr);
             }
         }
     } catch (err) {
-        console.warn('Could not initialize command modules (this is fine for backup handler):', err.message);
+        console.warn('⚠️ Could not initialize command modules (this is fine for backup handler):', err.message);
     }
     
-    console.log(`Ultra minimal handler initialized with ${commands.size} commands`);
+    console.log(`🚀 Ultra minimal handler initialized with ${commands.size} commands`);
     return true;
 }
 
