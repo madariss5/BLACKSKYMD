@@ -6,9 +6,7 @@ const config = {
         name: process.env.OWNER_NAME || 'Bot Owner',  
         // Convert owner number to proper format with WhatsApp suffix
         number: process.env.OWNER_NUMBER ? 
-            (process.env.OWNER_NUMBER.includes('@') ? 
-                process.env.OWNER_NUMBER : 
-                `${process.env.OWNER_NUMBER}@s.whatsapp.net`) : 
+            `${process.env.OWNER_NUMBER.replace(/[^0-9]/g, '')}@s.whatsapp.net` : 
             '12345678900@s.whatsapp.net', // Default number, will be overridden by env var
         email: process.env.OWNER_EMAIL || '',
     },
@@ -59,9 +57,12 @@ const config = {
         if (!process.env.SESSION_ID) missingVars.push('SESSION_ID');
 
         // Additional validation for owner number format
-        if (process.env.OWNER_NUMBER && !process.env.OWNER_NUMBER.match(/^\d+(@s\.whatsapp\.net)?$/)) {
-            missingVars.push('OWNER_NUMBER (invalid format)');
-            console.error('Invalid OWNER_NUMBER format. Please use only digits, optionally followed by @s.whatsapp.net');
+        if (process.env.OWNER_NUMBER) {
+            const cleanNumber = process.env.OWNER_NUMBER.replace(/[^0-9]/g, '');
+            if (!cleanNumber.match(/^\d+$/)) {
+                missingVars.push('OWNER_NUMBER (invalid format)');
+                console.error('Invalid OWNER_NUMBER format. Please provide only numbers including country code (e.g., 12345678900)');
+            }
         }
 
         return {
