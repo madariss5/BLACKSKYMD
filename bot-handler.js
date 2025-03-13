@@ -25,15 +25,23 @@ let messageHandler;
 let commandHandler;
 
 try {
-    const { messageHandler: handler, init: initMessageHandler } = require('./src/handlers/messageHandler');
-    const { commands, processCommand } = require('./src/handlers/commandHandler');
-    messageHandler = handler;
-    commandHandler = { commands, processCommand };
+    logger.info('Loading message and command handlers...');
 
-    logger.info('Handlers loaded successfully:', {
-        messageHandlerLoaded: !!messageHandler,
-        commandsLoaded: commands.size
-    });
+    // Load command handler first
+    commandHandler = require('./src/handlers/commandHandler');
+    if (!commandHandler || !commandHandler.processCommand) {
+        throw new Error('Command handler failed to load properly');
+    }
+    logger.info('Command handler loaded successfully');
+
+    // Then load message handler
+    const { messageHandler: handler, init: initMessageHandler } = require('./src/handlers/messageHandler');
+    messageHandler = handler;
+    if (!messageHandler) {
+        throw new Error('Message handler failed to load properly');
+    }
+    logger.info('Message handler loaded successfully');
+
 } catch (err) {
     logger.error('Failed to load handlers:', err);
     process.exit(1);
@@ -41,9 +49,8 @@ try {
 
 // Configure options based on environment variables
 const AUTH_DIR = process.env.AUTH_DIR || 'auth_info_qr';
-const BOT_MODE = process.env.BOT_MODE || 'BOT_HANDLER';
 const SESSION_DIR = path.join(__dirname, AUTH_DIR);
-const PORT = parseInt(process.env.BOT_PORT || '5001', 10);
+const PORT = parseInt(process.env.PORT || '5000', 10);
 
 // Initialize express app
 const app = express();
@@ -62,8 +69,6 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         port: PORT,
-        mode: BOT_MODE,
-        auth_dir: AUTH_DIR,
         commandsLoaded: commandHandler.commands.size
     });
 });
@@ -79,7 +84,7 @@ let connectionState = {
 
 let isConnecting = false;
 
-// Add retry configuration
+// Retry configuration
 const RETRY_CONFIG = {
     maxRetries: 3,
     baseDelay: 5000,
@@ -90,11 +95,10 @@ const RETRY_CONFIG = {
  * Calculate exponential backoff delay
  */
 function getRetryDelay(attempt) {
-    const delay = Math.min(
+    return Math.min(
         RETRY_CONFIG.maxDelay,
         RETRY_CONFIG.baseDelay * Math.pow(2, attempt)
-    );
-    return delay + (Math.random() * 1000);
+    ) + (Math.random() * 1000);
 }
 
 /**
@@ -125,10 +129,10 @@ async function connectToWhatsApp(retryCount = 0) {
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            logger: pino({ level: 'silent' }),
+            logger: pino({ level: 'debug' }),
             browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Chrome', '121.0.0'],
-            connectTimeoutMs: 30000,
-            defaultQueryTimeoutMs: 30000,
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000,
             markOnlineOnConnect: true,
             shouldIgnoreJid: jid => isJidBroadcast(jid)
         });
@@ -136,6 +140,7 @@ async function connectToWhatsApp(retryCount = 0) {
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
+            logger.info('Connection update received:', update);
 
             if (qr) {
                 connectionState.state = 'qr_ready';
@@ -149,13 +154,11 @@ async function connectToWhatsApp(retryCount = 0) {
                 connectionState.disconnectReason = statusCode;
                 isConnecting = false;
 
-                // Handle session conflict
-                if (statusCode === 440) {
-                    setTimeout(() => connectToWhatsApp(0), 5000);
-                    return;
-                }
+                logger.warn('Connection closed:', {
+                    statusCode,
+                    reason: lastDisconnect?.error?.message
+                });
 
-                // Handle other disconnections
                 if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
                     setTimeout(() => connectToWhatsApp(0), 5000);
                 } else if (retryCount < RETRY_CONFIG.maxRetries) {
@@ -174,11 +177,15 @@ async function connectToWhatsApp(retryCount = 0) {
                 logger.info('Initializing message handlers...');
                 try {
                     // Initialize message handler
+                    logger.info('Starting message handler initialization...');
                     const initialized = await initMessageHandler();
+                    logger.info('Message handler initialization result:', initialized);
+
                     if (!initialized) {
                         logger.error('Message handler initialization failed - check dependencies');
                         return;
                     }
+
                     logger.info('Message handler initialized successfully');
 
                     // Set up message event handlers
@@ -186,20 +193,19 @@ async function connectToWhatsApp(retryCount = 0) {
                     sock.ev.on('messages.upsert', async ({ messages, type }) => {
                         if (type === 'notify') {
                             for (const message of messages) {
-                                // Skip own messages to prevent loops
                                 if (message.key.fromMe) {
+                                    logger.debug('Skipping own message');
                                     continue;
                                 }
 
                                 try {
+                                    logger.debug('Processing incoming message:', {
+                                        type: message.message ? Object.keys(message.message)[0] : null,
+                                        from: message.key.remoteJid
+                                    });
                                     await messageHandler(sock, message);
                                 } catch (err) {
-                                    logger.error('Message handling error:', {
-                                        error: err.message,
-                                        stack: err.stack,
-                                        messageId: message.key?.id,
-                                        remoteJid: message.key?.remoteJid
-                                    });
+                                    logger.error('Message handling error:', err);
                                 }
                             }
                         }
@@ -207,6 +213,7 @@ async function connectToWhatsApp(retryCount = 0) {
                     logger.info('Message event handler registered successfully');
                 } catch (error) {
                     logger.error('Failed to initialize message handlers:', error);
+                    logger.error('Stack trace:', error.stack);
                 }
             }
         });
@@ -217,6 +224,7 @@ async function connectToWhatsApp(retryCount = 0) {
         return sock;
     } catch (error) {
         logger.error('Error in WhatsApp connection:', error);
+        logger.error('Stack trace:', error.stack);
         isConnecting = false;
         throw error;
     }

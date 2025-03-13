@@ -2,49 +2,61 @@
 const commands = new Map();
 const logger = require('../utils/logger');
 
-// Initialize basic commands with error handling
-try {
-    // Register ping command
-    commands.set('ping', {
-        execute: async (sock, message, args) => {
-            try {
-                const sender = message.key.remoteJid;
-                logger.info(`Executing ping command for ${sender}`);
-                await sock.sendMessage(sender, {
-                    text: '🏓 Pong! Bot is active and responding.'
-                });
-                logger.info(`Ping command completed for ${sender}`);
-            } catch (err) {
-                logger.error('Error executing ping command:', err);
-                throw err;
+/**
+ * Register basic commands
+ */
+function registerBasicCommands() {
+    try {
+        // Register ping command
+        commands.set('ping', {
+            execute: async (sock, message, args) => {
+                try {
+                    const sender = message.key.remoteJid;
+                    logger.info(`Executing ping command for ${sender}`);
+                    await sock.sendMessage(sender, {
+                        text: '🏓 Pong! Bot is active and responding.'
+                    });
+                    logger.info(`Ping command completed for ${sender}`);
+                } catch (err) {
+                    logger.error('Error executing ping command:', err);
+                    throw err;
+                }
             }
-        }
-    });
+        });
 
-    // Register help command
-    commands.set('help', {
-        execute: async (sock, message, args) => {
-            try {
-                const sender = message.key.remoteJid;
-                logger.info(`Executing help command for ${sender}`);
-                const commandList = Array.from(commands.keys())
-                    .map(cmd => `!${cmd}`)
-                    .join('\n');
-                await sock.sendMessage(sender, {
-                    text: `*Available Commands:*\n\n${commandList}`
-                });
-                logger.info(`Help command completed for ${sender}`);
-            } catch (err) {
-                logger.error('Error executing help command:', err);
-                throw err;
+        // Register help command
+        commands.set('help', {
+            execute: async (sock, message, args) => {
+                try {
+                    const sender = message.key.remoteJid;
+                    logger.info(`Executing help command for ${sender}`);
+                    const commandList = Array.from(commands.keys())
+                        .map(cmd => `!${cmd}`)
+                        .join('\n');
+                    await sock.sendMessage(sender, {
+                        text: `*Available Commands:*\n\n${commandList}`
+                    });
+                    logger.info(`Help command completed for ${sender}`);
+                } catch (err) {
+                    logger.error('Error executing help command:', err);
+                    throw err;
+                }
             }
-        }
-    });
+        });
 
-    logger.info(`Successfully registered ${commands.size} basic commands`);
-} catch (err) {
-    logger.error('Error initializing commands:', err);
-    throw err;
+        logger.info('Basic commands registered successfully:', {
+            registeredCommands: Array.from(commands.keys())
+        });
+        return true;
+    } catch (err) {
+        logger.error('Error registering basic commands:', err);
+        return false;
+    }
+}
+
+// Register basic commands immediately
+if (!registerBasicCommands()) {
+    throw new Error('Failed to register basic commands');
 }
 
 /**
@@ -103,7 +115,6 @@ function processCommand(sock, message, commandText) {
 // Make processCommand available for testing
 processCommand.commands = commands;
 
-// Export functions
 module.exports = {
     processCommand,
     commands

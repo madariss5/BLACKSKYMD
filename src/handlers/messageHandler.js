@@ -1,40 +1,34 @@
 const logger = require('../utils/logger');
-const { processCommand } = require('./commandHandler');
 const config = require('../config/config');
+const { processCommand } = require('./commandHandler');
 
 // Initialize message handler
 async function init() {
     try {
         logger.info('Starting message handler initialization...');
 
-        // Debug: Log all dependencies
-        logger.info('Dependency check:', {
-            processCommandType: typeof processCommand,
-            processCommandFunction: typeof processCommand === 'function',
-            configPresent: !!config,
-            configType: typeof config,
-            botConfigPresent: !!config?.bot,
+        // Debug logging for dependencies
+        logger.info('Command handler check:', {
+            hasProcessCommand: typeof processCommand === 'function',
+            hasCommands: !!processCommand.commands,
+            commandCount: processCommand.commands?.size,
             prefix: config?.bot?.prefix || '!'
         });
 
-        // Basic validation
+        // Verify minimum requirements
         if (typeof processCommand !== 'function') {
-            logger.error('Command processor not properly initialized:', {
+            logger.error('Command processor validation failed:', {
                 type: typeof processCommand,
                 value: processCommand
             });
             return false;
         }
 
-        if (!config || typeof config !== 'object') {
-            logger.error('Configuration not properly loaded:', {
-                type: typeof config,
-                exists: !!config
-            });
-            return false;
+        if (!config?.bot?.prefix) {
+            logger.warn('Bot prefix not found in config, using default: !');
         }
 
-        logger.info('Message handler initialization completed successfully');
+        logger.info('Message handler initialization completed');
         return true;
     } catch (err) {
         logger.error('Message handler initialization failed:', err);
@@ -74,13 +68,17 @@ async function messageHandler(sock, message) {
         if (messageContent.startsWith(prefix)) {
             const commandText = messageContent.slice(prefix.length).trim();
             if (commandText) {
-                logger.info(`Processing command from ${sender}: ${commandText}`);
+                logger.info('Processing command:', {
+                    text: commandText,
+                    sender: sender
+                });
+
                 try {
                     await processCommand(sock, message, commandText);
                 } catch (err) {
                     logger.error('Command execution failed:', err);
-                    await sock.sendMessage(sender, { 
-                        text: '❌ Command failed. Please try again.\n\nUse !help to see available commands.' 
+                    await sock.sendMessage(sender, {
+                        text: '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
                     });
                 }
             }
