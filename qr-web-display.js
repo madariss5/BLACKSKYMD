@@ -175,11 +175,122 @@ let connectionState = {
     qrCode: null
 };
 
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const INITIAL_RETRY_INTERVAL = 2000; // Start with 2 seconds
+
+// Function to clear auth state
+async function clearAuthState() {
+    try {
+        if (fs.existsSync(AUTH_DIR)) {
+            fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+            fs.mkdirSync(AUTH_DIR, { recursive: true });
+            logger.info('Auth state cleared successfully');
+        }
+    } catch (error) {
+        logger.error('Error clearing auth state:', error);
+    }
+}
+
+// Calculate exponential backoff delay
+function getRetryDelay() {
+    return Math.min(INITIAL_RETRY_INTERVAL * Math.pow(2, reconnectAttempts), 30000); // Max 30 seconds
+}
+
+async function startWhatsAppConnection(clearAuth = false) {
+    try {
+        if (clearAuth) {
+            await clearAuthState();
+            reconnectAttempts = 0;
+        }
+
+        connectionState.state = 'initializing';
+        connectionState.message = 'Initializing connection...';
+
+        // Initialize auth state
+        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+
+        // Create WhatsApp socket connection
+        sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: true,
+            browser: ['BLACKSKY-MD', 'Chrome', '121.0.0'],
+            version: [2, 3000, 1019707846],
+            syncFullHistory: false,
+            connectTimeoutMs: 60000,
+            logger: pino({ level: 'silent' }),
+            markOnlineOnConnect: false,
+            defaultQueryTimeoutMs: 60000,
+            keepAliveIntervalMs: 30000,
+            retryRequestDelayMs: 3000
+        });
+
+        // Handle connection updates
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                lastQR = qr;
+                connectionState.state = 'qr_ready';
+                connectionState.message = 'QR Code bereit zum Scannen';
+                logger.info('New QR code generated');
+                reconnectAttempts = 0; // Reset reconnect attempts when new QR is generated
+            }
+
+            if (connection === 'open') {
+                connectionState.state = 'connected';
+                connectionState.message = 'Verbindung hergestellt! Du kannst diese Seite jetzt schließen.';
+                logger.info('✅ CONNECTED SUCCESSFULLY!');
+                reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+            }
+
+            if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
+                                      statusCode !== DisconnectReason.multideviceMismatch &&
+                                      reconnectAttempts < MAX_RECONNECT_ATTEMPTS;
+
+                connectionState.state = 'disconnected';
+                connectionState.message = `Verbindung getrennt (${statusCode}). ${shouldReconnect ? 'Versuche erneut...' : 'Bitte Seite neu laden.'}`;
+
+                logger.info(`Connection closed with status: ${lastDisconnect?.error?.message}`);
+
+                if (shouldReconnect) {
+                    reconnectAttempts++;
+                    const delay = getRetryDelay();
+                    logger.info(`Reconnecting in ${delay/1000} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                    setTimeout(() => startWhatsAppConnection(statusCode === DisconnectReason.connectionReplaced), delay);
+                } else {
+                    connectionState.state = 'error';
+                    connectionState.message = 'Verbindung fehlgeschlagen. Bitte Seite neu laden.';
+                    logger.info('Cannot reconnect - max attempts reached or logged out');
+                    await clearAuthState(); // Clear auth state on permanent disconnection
+                }
+            }
+        });
+
+        // Handle credentials update
+        sock.ev.on('creds.update', saveCreds);
+
+    } catch (err) {
+        logger.error('Error in WhatsApp connection:', err);
+        connectionState.state = 'error';
+        connectionState.message = 'Verbindungsfehler. Bitte Seite neu laden.';
+
+        // Retry with exponential backoff if not max attempts
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts++;
+            const delay = getRetryDelay();
+            logger.info(`Retrying connection in ${delay/1000} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+            setTimeout(() => startWhatsAppConnection(true), delay);
+        }
+    }
+}
+
 // API endpoints
 app.get('/qrcode.png', async (req, res) => {
     if (lastQR) {
         try {
-            // Convert QR data to PNG buffer
             const qrImage = await qrcode.toBuffer(lastQR);
             res.type('png');
             res.send(qrImage);
@@ -188,7 +299,6 @@ app.get('/qrcode.png', async (req, res) => {
             res.status(500).send('Error generating QR code');
         }
     } else {
-        // If no QR code is available yet, send a placeholder or error image
         res.status(503).send('QR code not yet available');
     }
 });
@@ -197,83 +307,36 @@ app.get('/status', (req, res) => {
     res.json(connectionState);
 });
 
-async function startWhatsAppConnection() {
-    try {
-        connectionState.state = 'initializing';
-        connectionState.message = 'Initializing connection...';
-
-        // Initialize auth state
-        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-        
-        // Create WhatsApp socket connection
-        sock = makeWASocket({
-            auth: state,
-            printQRInTerminal: true,
-            browser: ['BLACKSKY-MD', 'Chrome', '121.0.0'],
-            version: [2, 3000, 1019707846], // Use the latest version
-            syncFullHistory: false,
-            connectTimeoutMs: 60000,
-            logger: pino({ level: 'silent' }),
-            emitOwnEvents: false,
-            defaultQueryTimeoutMs: 60000,
-            phoneNumber: process.env.BOT_NUMBER
-        });
-        
-        // Handle connection updates
-        sock.ev.on('connection.update', (update) => {
-            const { connection, lastDisconnect, qr } = update;
-            
-            if (qr) {
-                lastQR = qr; // Save QR code for web display
-                connectionState.state = 'qr_ready';
-                connectionState.message = 'QR Code bereit zum Scannen';
-                logger.info('New QR code generated');
-            }
-            
-            if (connection === 'open') {
-                connectionState.state = 'connected';
-                connectionState.message = 'Verbindung hergestellt! Du kannst diese Seite jetzt schließen.';
-                logger.info('✅ CONNECTED SUCCESSFULLY!');
-                logger.info('Your BLACKSKY-MD bot is now authenticated.');
-                logger.info('Bot is now ready to use!');
-            }
-            
-            if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                connectionState.state = 'disconnected';
-                connectionState.message = `Verbindung getrennt (${statusCode}). Versuche erneut...`;
-                
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                
-                logger.info(`Connection closed with status: ${lastDisconnect?.error?.message}`);
-                
-                if (shouldReconnect) {
-                    logger.info('Reconnecting in 5 seconds...');
-                    setTimeout(startWhatsAppConnection, 5000);
-                } else {
-                    connectionState.state = 'error';
-                    connectionState.message = 'Ausgeloggt. Bitte lade die Seite neu.';
-                    logger.info('Cannot reconnect - logged out');
-                }
-            }
-        });
-        
-        // Handle credentials update
-        sock.ev.on('creds.update', saveCreds);
-        
-    } catch (err) {
-        logger.error('Error in WhatsApp connection:', err);
-        connectionState.state = 'error';
-        connectionState.message = 'Verbindungsfehler. Bitte lade die Seite neu.';
-        
-        // Retry after delay
-        setTimeout(startWhatsAppConnection, 10000);
-    }
-}
-
 // Start the server
 app.listen(PORT, '0.0.0.0', () => {
     logger.info(`QR code server started on port ${PORT}`);
     logger.info(`Open the web app to see the QR code`);
-    startWhatsAppConnection();
+    startWhatsAppConnection(true); // Start with fresh auth state
+});
+
+// Handle process termination
+process.on('SIGINT', async () => {
+    logger.info('Shutting down...');
+    if (sock) {
+        try {
+            await sock.logout();
+            await clearAuthState();
+        } catch (err) {
+            logger.error('Error during shutdown:', err);
+        }
+    }
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    logger.info('Shutting down...');
+    if (sock) {
+        try {
+            await sock.logout();
+            await clearAuthState();
+        } catch (err) {
+            logger.error('Error during shutdown:', err);
+        }
+    }
+    process.exit(0);
 });
