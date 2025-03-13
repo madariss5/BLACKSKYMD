@@ -1,7 +1,7 @@
 const logger = require('../utils/logger');
 const axios = require('axios');
 
-// API endpoint (using waifu.pics)
+// API endpoints (using waifu.pics and additional sources)
 const ANIME_GIF_API = {
     hug: 'https://api.waifu.pics/sfw/hug',
     pat: 'https://api.waifu.pics/sfw/pat',
@@ -13,11 +13,20 @@ const ANIME_GIF_API = {
     cry: 'https://api.waifu.pics/sfw/cry',
     dance: 'https://api.waifu.pics/sfw/dance',
     smile: 'https://api.waifu.pics/sfw/smile',
-    wave: 'https://api.waifu.pics/sfw/wave'
+    wave: 'https://api.waifu.pics/sfw/wave',
+    boop: 'https://api.waifu.pics/sfw/boop',
+    tickle: 'https://api.waifu.pics/sfw/tickle',
+    laugh: 'https://api.waifu.pics/sfw/laugh',
+    wink: 'https://api.waifu.pics/sfw/wink'
 };
 
-// Helper function to fetch anime GIFs
-async function fetchAnimeGif(type) {
+// Helper function to validate mentions
+function validateMention(mention) {
+    return mention && typeof mention === 'string' && mention.includes('@');
+}
+
+// Helper function to fetch anime GIFs with retries
+async function fetchAnimeGif(type, retries = 3) {
     try {
         const endpoint = ANIME_GIF_API[type];
         if (!endpoint) {
@@ -26,17 +35,26 @@ async function fetchAnimeGif(type) {
         }
 
         logger.info(`Fetching gif for type: ${type} from endpoint: ${endpoint}`);
-        const response = await axios.get(endpoint);
 
-        logger.debug('API Response:', {
-            status: response.status,
-            data: response.data,
-            headers: response.headers
-        });
+        let lastError;
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await axios.get(endpoint);
+                logger.debug('API Response:', {
+                    status: response.status,
+                    data: response.data
+                });
+                return response.data.url;
+            } catch (error) {
+                lastError = error;
+                logger.warn(`Retry ${i + 1}/${retries} failed for ${type} GIF:`, error.message);
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s between retries
+            }
+        }
 
-        return response.data.url;
+        throw lastError;
     } catch (error) {
-        logger.error(`Error fetching ${type} GIF:`, error.message);
+        logger.error(`Error fetching ${type} GIF after ${retries} retries:`, error.message);
         return null;
     }
 }
@@ -45,28 +63,43 @@ async function fetchAnimeGif(type) {
 async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
     try {
         const senderName = sender.split('@')[0];
-        const message = target ? 
-            `${senderName} ${type}s ${target} ${emoji}` :
-            `${senderName} ${type}s ${emoji}`;
+        const targetName = target ? target.split('@')[0] : null;
+
+        let message;
+        if (target) {
+            if (!validateMention(target)) {
+                await sock.sendMessage(sender, {
+                    text: `❌ Please mention a valid user to ${type}`
+                });
+                return;
+            }
+            message = `${senderName} ${type}s ${targetName} ${emoji}`;
+        } else {
+            message = `${senderName} ${type}s ${emoji}`;
+        }
 
         logger.debug(`Sending reaction message: ${message}`);
 
         if (gifUrl) {
             await sock.sendMessage(sender, {
                 image: { url: gifUrl },
-                caption: message
+                caption: message,
+                mentions: target ? [target] : undefined
             });
         } else {
-            await sock.sendMessage(sender, { text: message });
+            await sock.sendMessage(sender, { 
+                text: message,
+                mentions: target ? [target] : undefined
+            });
         }
     } catch (error) {
         logger.error('Error sending reaction message:', error);
-        await sock.sendMessage(sender, { text: `Error sending ${type} reaction.` });
+        await sock.sendMessage(sender, { text: `❌ Error sending ${type} reaction` });
     }
 }
 
-// Export commands directly
-module.exports = {
+// Export commands
+const reactionCommands = {
     async hug(sock, sender, args) {
         const target = args[0];
         if (!target) {
@@ -127,6 +160,26 @@ module.exports = {
         await sendReactionMessage(sock, sender, target, 'slap', gifUrl, '👋');
     },
 
+    async tickle(sock, sender, args) {
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: '🤗 Please mention someone to tickle' });
+            return;
+        }
+        const gifUrl = await fetchAnimeGif('tickle');
+        await sendReactionMessage(sock, sender, target, 'tickle', gifUrl, '🤗');
+    },
+
+    async boop(sock, sender, args) {
+        const target = args[0];
+        if (!target) {
+            await sock.sendMessage(sender, { text: '👉 Please mention someone to boop' });
+            return;
+        }
+        const gifUrl = await fetchAnimeGif('boop');
+        await sendReactionMessage(sock, sender, target, 'boop', gifUrl, '👉');
+    },
+
     async blush(sock, sender) {
         const gifUrl = await fetchAnimeGif('blush');
         await sendReactionMessage(sock, sender, null, 'blush', gifUrl, '😊');
@@ -142,12 +195,33 @@ module.exports = {
         await sendReactionMessage(sock, sender, null, 'dance', gifUrl, '💃');
     },
 
+    async laugh(sock, sender) {
+        const gifUrl = await fetchAnimeGif('laugh');
+        await sendReactionMessage(sock, sender, null, 'laugh', gifUrl, '😂');
+    },
+
+    async smile(sock, sender) {
+        const gifUrl = await fetchAnimeGif('smile');
+        await sendReactionMessage(sock, sender, null, 'smile', gifUrl, '😊');
+    },
+
     async wave(sock, sender) {
         const gifUrl = await fetchAnimeGif('wave');
         await sendReactionMessage(sock, sender, null, 'wave', gifUrl, '👋');
     },
 
-    // Helper method to initialize and test API connection
+    async wink(sock, sender, args) {
+        const target = args[0];
+        const gifUrl = await fetchAnimeGif('wink');
+        await sendReactionMessage(sock, sender, target, 'wink', gifUrl, '😉');
+    },
+
+    async grouphug(sock, sender) {
+        const gifUrl = await fetchAnimeGif('hug');
+        await sendReactionMessage(sock, sender, null, 'grouphug', gifUrl, '🤗');
+    },
+
+    // Initialize and test API connection
     async init() {
         try {
             logger.info('Initializing reactions command handler...');
@@ -156,18 +230,34 @@ module.exports = {
             const availableCommands = Object.keys(ANIME_GIF_API);
             logger.info(`Available reaction commands: ${availableCommands.join(', ')}`);
 
-            // Test API connection
-            logger.info('Testing API connection...');
-            const testGif = await fetchAnimeGif('hug');
-            if (testGif) {
-                logger.info('Successfully tested API connection');
-                return true;
+            // Test each API endpoint
+            logger.info('Testing API endpoints...');
+            const results = await Promise.allSettled(
+                availableCommands.map(async cmd => {
+                    const url = await fetchAnimeGif(cmd, 1);
+                    return { command: cmd, success: !!url };
+                })
+            );
+
+            const failed = results
+                .filter(r => r.status === 'fulfilled' && !r.value.success)
+                .map(r => r.value.command);
+
+            if (failed.length > 0) {
+                logger.warn(`Failed to fetch test GIFs for commands: ${failed.join(', ')}`);
+                return false;
             }
-            logger.error('Failed to fetch test GIF');
-            return false;
+
+            logger.info('Successfully tested all API endpoints');
+            return true;
         } catch (error) {
             logger.error('Failed to initialize reactions commands:', error);
             return false;
         }
     }
+};
+
+module.exports = {
+    commands: reactionCommands,
+    category: 'reactions'
 };
