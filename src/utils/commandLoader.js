@@ -27,8 +27,14 @@ class CommandLoader {
     }
 
     async loadCommandsFromDirectory(dir, category = '') {
+        logger.info(`Scanning directory: ${dir} (category: ${category || 'root'})`);
         const entries = await fsPromises.readdir(dir, { withFileTypes: true });
         const loadedHandlers = {};
+
+        // Log all entries found in this directory
+        const directories = entries.filter(e => e.isDirectory()).map(e => e.name);
+        const jsFiles = entries.filter(e => e.isFile() && e.name.endsWith('.js')).map(e => e.name);
+        logger.info(`Found in ${path.basename(dir)}: Directories: [${directories.join(', ')}], JS files: [${jsFiles.join(', ')}]`);
 
         for (const entry of entries) {
             const fullPath = path.join(dir, entry.name);
@@ -36,21 +42,26 @@ class CommandLoader {
             if (entry.isDirectory()) {
                 // Recursively load commands from subdirectories
                 const subCategory = category ? `${category}_${entry.name}` : entry.name;
+                logger.info(`Processing subdirectory: ${entry.name} as category: ${subCategory}`);
                 const subHandlers = await this.loadCommandsFromDirectory(fullPath, subCategory);
                 Object.assign(loadedHandlers, subHandlers);
                 continue;
             }
 
-            if (!entry.name.endsWith('.js') || entry.name === 'index.js') continue;
+            if (!entry.name.endsWith('.js') || entry.name === 'index.js') {
+                logger.info(`Skipping non-command file: ${entry.name}`);
+                continue;
+            }
 
             const currentCategory = category || entry.name.replace('.js', '');
+            logger.info(`Loading commands from file: ${entry.name} (category: ${currentCategory})`);
 
             try {
                 delete require.cache[require.resolve(fullPath)];
                 const module = require(fullPath);
 
                 if (!module || !module.commands || typeof module.commands !== 'object') {
-                    logger.warn(`Invalid module format in ${entry.name}`);
+                    logger.warn(`Invalid module format in ${entry.name}, module keys: ${module ? Object.keys(module).join(', ') : 'null'}`);
                     continue;
                 }
 
@@ -62,13 +73,16 @@ class CommandLoader {
                     };
                 }
 
+                const commandNames = Object.keys(module.commands);
+                logger.info(`Found ${commandNames.length} commands in ${entry.name}: ${commandNames.join(', ')}`);
+
                 for (const [name, handler] of Object.entries(module.commands)) {
                     try {
                         loadedHandlers[currentCategory].total++;
 
                         if (typeof handler !== 'function') {
                             loadedHandlers[currentCategory].failed++;
-                            logger.warn(`Skipping non-function handler for ${name} in ${entry.name}`);
+                            logger.warn(`Skipping non-function handler for ${name} in ${entry.name}, type: ${typeof handler}`);
                             continue;
                         }
 
@@ -100,11 +114,18 @@ class CommandLoader {
                     } catch (err) {
                         loadedHandlers[currentCategory].failed++;
                         logger.error(`Failed to register handler for ${name} in ${entry.name}:`, err);
+                        logger.error(err.stack);
                     }
                 }
             } catch (err) {
                 logger.error(`Error processing module ${entry.name}:`, err);
+                logger.error(err.stack);
             }
+        }
+
+        // Log the summary for this directory
+        for (const [category, stats] of Object.entries(loadedHandlers)) {
+            logger.info(`Directory ${path.basename(dir)} - Category ${category}: Total: ${stats.total}, Loaded: ${stats.loaded}, Failed: ${stats.failed}`);
         }
 
         return loadedHandlers;
@@ -120,6 +141,13 @@ class CommandLoader {
             this.commandSources.clear();
 
             const commandsPath = path.join(__dirname, '../commands');
+            logger.info(`Loading commands from path: ${commandsPath}`);
+            
+            // List all directories in the commands folder
+            const entries = await fsPromises.readdir(commandsPath, { withFileTypes: true });
+            const directories = entries.filter(entry => entry.isDirectory()).map(dir => dir.name);
+            logger.info(`Found command directories: ${directories.join(', ')}`);
+            
             const loadedHandlers = await this.loadCommandsFromDirectory(commandsPath);
 
             // Print loading statistics
@@ -134,10 +162,35 @@ class CommandLoader {
             this.initialized = true;
             this.lastReload = Date.now();
 
-            const totalCommands = Array.from(this.commands.values()).length;
-            logger.info(`\n✅ Total commands loaded: ${totalCommands}`);
+            // Use the new breakdown method to get detailed command stats
+            const breakdown = this.getCommandsBreakdown();
+            
+            logger.info(`\n✅ TOTAL COMMANDS AVAILABLE: ${breakdown.total}`);
+            logger.info(`✅ Enabled commands: ${breakdown.enabled}`);
+            logger.info(`❌ Disabled commands: ${breakdown.disabled}`);
+            
+            // If there are disabled commands, log details about them
+            if (breakdown.disabled > 0) {
+                logger.info('\nDisabled commands by category:');
+                const disabledByCategory = breakdown.disabledCommands.reduce((acc, cmd) => {
+                    acc[cmd.category] = acc[cmd.category] || [];
+                    acc[cmd.category].push(cmd.name);
+                    return acc;
+                }, {});
+                
+                for (const [category, commands] of Object.entries(disabledByCategory)) {
+                    logger.info(`  ${category}: ${commands.length} commands - ${commands.join(', ')}`);
+                }
+            }
+            
+            // Log information about each category
+            const commandsByCategory = this.getCommandStats().commandsByCategory;
+            logger.info('\nEnabled commands by category:');
+            for (const [category, count] of Object.entries(commandsByCategory)) {
+                logger.info(`  ${category}: ${count}`);
+            }
 
-            return totalCommands > 0;
+            return breakdown.total > 0;
         } catch (err) {
             logger.error('Critical error in loadCommandHandlers:', err);
             return false;
@@ -290,10 +343,35 @@ class CommandLoader {
         }
     }
 
-    getAllCommands() {
-        return Array.from(this.commands.values())
-            .filter(cmd => cmd.config.enabled)
-            .sort((a, b) => a.category.localeCompare(b.category));
+    getAllCommands(includeDisabled = false) {
+        const commands = Array.from(this.commands.values());
+        return includeDisabled 
+            ? commands.sort((a, b) => a.category.localeCompare(b.category))
+            : commands
+                .filter(cmd => cmd.config.enabled)
+                .sort((a, b) => a.category.localeCompare(b.category));
+    }
+    
+    // Get a count of total commands including disabled ones
+    getAllCommandsCount() {
+        return this.commands.size;
+    }
+    
+    // Get details about enabled vs disabled commands
+    getCommandsBreakdown() {
+        const all = Array.from(this.commands.values());
+        const enabled = all.filter(cmd => cmd.config.enabled);
+        const disabled = all.filter(cmd => !cmd.config.enabled);
+        
+        return {
+            total: all.length,
+            enabled: enabled.length,
+            disabled: disabled.length,
+            disabledCommands: disabled.map(cmd => ({
+                name: cmd.config.name,
+                category: cmd.category
+            }))
+        };
     }
 
     async reloadCommands() {
