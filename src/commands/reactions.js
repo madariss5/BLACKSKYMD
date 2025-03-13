@@ -388,7 +388,9 @@ const reactionCommands = {
             await sock.sendMessage(errorJid, { text: '❌ Error executing wave command' });
         }
     },
-    async wink(sock, sender, args) {
+    async wink(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         const gifUrl = await fetchAnimeGif('wink');
         await sendReactionMessage(sock, sender, target, 'wink', gifUrl, '😉');
@@ -399,7 +401,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('hug');
         await sendReactionMessage(sock, sender, null, 'grouphug', gifUrl, '🤗');
     },
-    async punch(sock, sender, args) {
+    async punch(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👊 Please mention someone to punch' });
@@ -408,7 +412,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('punch');
         await sendReactionMessage(sock, sender, target, 'punch', gifUrl, '👊');
     },
-    async bonk(sock, sender, args) {
+    async bonk(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🔨 Please mention someone to bonk' });
@@ -417,19 +423,27 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('bonk');
         await sendReactionMessage(sock, sender, target, 'bonk', gifUrl, '🔨');
     },
-    async pout(sock, sender) {
+    async pout(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('pout');
         await sendReactionMessage(sock, sender, null, 'pout', gifUrl, '😤');
     },
-    async smug(sock, sender) {
+    async smug(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('smug');
         await sendReactionMessage(sock, sender, null, 'smug', gifUrl, '😏');
     },
-    async run(sock, sender) {
+    async run(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('run');
         await sendReactionMessage(sock, sender, null, 'run', gifUrl, '🏃');
     },
-    async sleep(sock, sender) {
+    async sleep(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('sleep');
         await sendReactionMessage(sock, sender, null, 'sleep', gifUrl, '😴');
     },
@@ -439,12 +453,16 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('panic');
         await sendReactionMessage(sock, sender, null, 'panic', gifUrl, '😱');
     },
-    async facepalm(sock, sender) {
+    async facepalm(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('facepalm');
         await sendReactionMessage(sock, sender, null, 'facepalm', gifUrl, '🤦');
     },
     // New commands implementation
-    async highfive(sock, sender, args) {
+    async highfive(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '✋ Please mention someone to high five' });
@@ -453,7 +471,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('highfive');
         await sendReactionMessage(sock, sender, target, 'highfive', gifUrl, '✋');
     },
-    async hold(sock, sender, args) {
+    async hold(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🤝 Please mention someone to hold' });
@@ -462,7 +482,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('hold');
         await sendReactionMessage(sock, sender, target, 'hold', gifUrl, '🤝');
     },
-    async handhold(sock, sender, args) {
+    async handhold(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🤝 Please mention someone to hold hands with' });
@@ -471,7 +493,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('handhold');
         await sendReactionMessage(sock, sender, target, 'handhold', gifUrl, '🤝');
     },
-    async nom(sock, sender, args) {
+    async nom(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '😋 Please mention someone to nom' });
@@ -480,7 +504,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('nom');
         await sendReactionMessage(sock, sender, target, 'nom', gifUrl, '😋');
     },
-    async bite(sock, sender, args) {
+    async bite(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '😬 Please mention someone to bite' });
@@ -489,7 +515,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('bite');
         await sendReactionMessage(sock, sender, target, 'bite', gifUrl, '😬');
     },
-    async glomp(sock, sender, args) {
+    async glomp(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '💫 Please mention someone to glomp' });
@@ -498,7 +526,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('glomp');
         await sendReactionMessage(sock, sender, target, 'glomp', gifUrl, '💫');
     },
-    async kill(sock, sender, args) {
+    async kill(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '💀 Please mention someone to kill (jokingly)' });
@@ -518,7 +548,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('yeet');
         await sendReactionMessage(sock, sender, target, 'yeet', gifUrl, '🚀');
     },
-    async stare(sock, sender, args) {
+    async stare(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👀 Please mention someone to stare at' });
@@ -527,7 +559,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('stare');
         await sendReactionMessage(sock, sender, target, 'stare', gifUrl, '👀');
     },
-    async lick(sock, sender, args) {
+    async lick(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👅 Please mention someone to lick' });
@@ -536,7 +570,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('lick');
         await sendReactionMessage(sock, sender, target, 'lick', gifUrl, '👅');
     },
-    async feed(sock, sender, args) {
+    async feed(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🍽️ Please mention someone to feed' });
@@ -545,7 +581,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('feed');
         await sendReactionMessage(sock, sender, target, 'feed', gifUrl, '🍽️');
     },
-    async bully(sock, sender, args) {
+    async bully(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '😈 Please mention someone to bully (playfully)' });
@@ -585,7 +623,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('think');
         await sendReactionMessage(sock, sender, null, 'think', gifUrl, '🤔');
     },
-    async peck(sock, sender, args) {
+    async peck(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '😘 Please mention someone to peck' });
@@ -594,7 +634,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('peck');
         await sendReactionMessage(sock, sender, target, 'peck', gifUrl, '😘');
     },
-    async greet(sock, sender, args) {
+    async greet(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '👋 Please mention someone to greet' });
@@ -603,7 +645,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('greet');
         await sendReactionMessage(sock, sender, target, 'greet', gifUrl, '👋');
     },
-    async salute(sock, sender, args) {
+    async salute(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🫡 Please mention someone to salute' });
@@ -612,23 +656,33 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('salute');
         await sendReactionMessage(sock, sender, target, 'salute', gifUrl, '🫡');
     },
-    async shocked(sock, sender) {
+    async shocked(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('shocked');
         await sendReactionMessage(sock, sender, null, 'shocked', gifUrl, '😱');
     },
-    async shrug(sock, sender) {
+    async shrug(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('shrug');
         await sendReactionMessage(sock, sender, null, 'shrug', gifUrl, '🤷');
     },
-    async nod(sock, sender) {
+    async nod(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('nod');
         await sendReactionMessage(sock, sender, null, 'nod', gifUrl, '😌');
     },
-    async shake(sock, sender) {
+    async shake(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('shake');
         await sendReactionMessage(sock, sender, null, 'shake', gifUrl, '😤');
     },
-    async kick(sock, sender, args) {
+    async kick(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🦵 Please mention someone to kick' });
@@ -637,7 +691,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('kick');
         await sendReactionMessage(sock, sender, target, 'kick', gifUrl, '🦵');
     },
-    async throw(sock, sender, args) {
+    async throw(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🎯 Please mention someone to throw at' });
@@ -646,7 +702,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('throw');
         await sendReactionMessage(sock, sender, target, 'throw', gifUrl, '🎯');
     },
-    async shoot(sock, sender, args) {
+    async shoot(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🔫 Please mention someone to shoot (jokingly)' });
@@ -655,43 +713,63 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('shoot');
         await sendReactionMessage(sock, sender, target, 'shoot', gifUrl, '🔫');
     },
-    async thumbsup(sock, sender) {
+    async thumbsup(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('thumbsup');
         await sendReactionMessage(sock, sender, null, 'thumbsup', gifUrl, '👍');
     },
-    async thumbsdown(sock, sender) {
+    async thumbsdown(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('thumbsdown');
         await sendReactionMessage(sock, sender, null, 'thumbsdown', gifUrl, '👎');
     },
-    async excited(sock, sender) {
+    async excited(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('excited');
         await sendReactionMessage(sock, sender, null, 'excited', gifUrl, '🤩');
     },
-    async lewd(sock, sender) {
+    async lewd(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('lewd');
         await sendReactionMessage(sock, sender, null, 'lewd', gifUrl, '😳');
     },
-    async bored(sock, sender) {
+    async bored(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('bored');
         await sendReactionMessage(sock, sender, null, 'bored', gifUrl, '😑');
     },
-    async nervous(sock, sender) {
+    async nervous(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('nervous');
         await sendReactionMessage(sock, sender, null, 'nervous', gifUrl, '😰');
     },
-    async celebrate(sock, sender) {
+    async celebrate(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('celebrate');
         await sendReactionMessage(sock, sender, null, 'celebrate', gifUrl, '🎉');
     },
-    async dizzy(sock, sender) {
+    async dizzy(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('dizzy');
         await sendReactionMessage(sock, sender, null, 'dizzy', gifUrl, '💫');
     },
-    async bye(sock, sender) {
+    async bye(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('bye');
         await sendReactionMessage(sock, sender, null, 'bye', gifUrl, '👋');
     },
-    async smack(sock, sender, args) {
+    async smack(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '💥 Please mention someone to smack' });
@@ -700,7 +778,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('smack');
         await sendReactionMessage(sock, sender, target, 'smack', gifUrl, '💥');
     },
-    async nuzzle(sock, sender, args) {
+    async nuzzle(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '🥰 Please mention someone to nuzzle' });
@@ -709,7 +789,9 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('nuzzle');
         await sendReactionMessage(sock, sender, target, 'nuzzle', gifUrl, '🥰');
     },
-    async growl(sock, sender, args) {
+    async growl(sock, message, args) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const target = args[0];
         if (!target) {
             await sock.sendMessage(sender, { text: '😾 Please mention someone to growl at' });
@@ -718,11 +800,15 @@ const reactionCommands = {
         const gifUrl = await fetchAnimeGif('growl');
         await sendReactionMessage(sock, sender, target, 'growl', gifUrl, '😾');
     },
-    async disgusted(sock, sender) {
+    async disgusted(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('disgusted');
         await sendReactionMessage(sock, sender, null, 'disgusted', gifUrl, '🤢');
     },
-    async scared(sock, sender) {
+    async scared(sock, message) {
+        // Extract sender from message object
+        const sender = message.key.remoteJid;
         const gifUrl = await fetchAnimeGif('scared');
         await sendReactionMessage(sock, sender, null, 'scared', gifUrl, '😱');
     },
