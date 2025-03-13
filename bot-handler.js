@@ -18,6 +18,9 @@ try {
     process.exit(1);
 }
 
+// Load command handler
+const { getAllCommands } = require('./src/handlers/commandHandler');
+
 // Configure options based on environment variables
 const AUTH_DIR = process.env.AUTH_DIR || 'auth_info_qr';
 const BOT_MODE = process.env.BOT_MODE || 'BOT_HANDLER';
@@ -38,6 +41,13 @@ const logger = pino({
     }
 });
 
+// Verify command handler initialization
+const availableCommands = getAllCommands();
+logger.info('Command handler initialized with commands:', {
+    count: availableCommands.length,
+    commands: availableCommands
+});
+
 // Initialize express app
 const app = express();
 app.use(express.json());
@@ -56,7 +66,8 @@ app.get('/health', (req, res) => {
         uptime: process.uptime(),
         port: PORT,
         mode: BOT_MODE,
-        auth_dir: AUTH_DIR
+        auth_dir: AUTH_DIR,
+        availableCommands
     });
 });
 
@@ -233,10 +244,45 @@ async function connectToWhatsApp(retryCount = 0) {
                 logger.info('Initializing message handlers...');
                 try {
                     // Set up message event handlers
+                    sock.ev.off('messages.upsert'); // Remove any existing handlers
                     sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                        logger.info('Messages event received:', {
+                            type,
+                            messageCount: messages.length,
+                            isNotify: type === 'notify',
+                            messageTypes: messages.map(m => m.message ? Object.keys(m.message) : [])
+                        });
+
                         if (type === 'notify') {
                             for (const message of messages) {
-                                await handleIncomingMessage(sock, message);
+                                // Skip own messages to prevent loops
+                                if (message.key.fromMe) {
+                                    logger.debug('Skipping message from self');
+                                    continue;
+                                }
+
+                                try {
+                                    // Extract message content for debugging
+                                    const content = message.message?.conversation ||
+                                                    message.message?.extendedTextMessage?.text ||
+                                                    message.message?.imageMessage?.caption ||
+                                                    message.message?.videoMessage?.caption;
+
+                                    logger.info('Processing incoming message:', {
+                                        content,
+                                        messageType: message.message ? Object.keys(message.message)[0] : null,
+                                        remoteJid: message.key.remoteJid
+                                    });
+
+                                    await handleIncomingMessage(sock, message);
+                                } catch (err) {
+                                    logger.error('Message handling error:', {
+                                        error: err.message,
+                                        stack: err.stack,
+                                        messageId: message.key?.id,
+                                        remoteJid: message.key?.remoteJid
+                                    });
+                                }
                             }
                         }
                     });
@@ -376,20 +422,34 @@ function setupSessionBackup() {
 
 // Handle messages with proper error handling
 async function handleIncomingMessage(sock, message) {
-    if (!message?.key?.remoteJid || 
-        message.key.remoteJid === 'status@broadcast' || 
-        !message.message) {
-        return;
-    }
-
     try {
+        // Log full message details for debugging
+        logger.info('Processing message:', {
+            messageId: message.key?.id,
+            remoteJid: message.key?.remoteJid,
+            messageType: message.message ? Object.keys(message.message)[0] : null,
+            messageContent: message.message?.conversation ||
+                            message.message?.extendedTextMessage?.text ||
+                            message.message?.imageMessage?.caption ||
+                            message.message?.videoMessage?.caption
+        });
+
+        // Skip invalid messages
+        if (!message?.key?.remoteJid || !message.message) {
+            logger.debug('Skipping invalid message');
+            return;
+        }
+
+        // Process message through handler
         await messageHandler(sock, message);
-    } catch (error) {
-        logger.error('Message process error:', {
-            error: error.message,
-            stack: error.stack,
-            messageId: message.key.id,
-            remoteJid: message.key.remoteJid
+        logger.info('Message processed successfully');
+
+    } catch (err) {
+        logger.error('Error in handleIncomingMessage:', {
+            error: err.message,
+            stack: err.stack,
+            messageId: message.key?.id,
+            remoteJid: message.key?.remoteJid
         });
     }
 }
