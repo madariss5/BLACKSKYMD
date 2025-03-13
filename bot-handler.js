@@ -11,7 +11,8 @@ const pino = require('pino');
 // Import message handlers with error handling
 let messageHandler;
 try {
-    messageHandler = require('./src/handlers/messageHandler').messageHandler;
+    const { messageHandler: handler } = require('./src/handlers/messageHandler');
+    messageHandler = handler;
 } catch (err) {
     console.error('Failed to load message handler:', err);
     process.exit(1);
@@ -122,7 +123,7 @@ function getConnectionStatus() {
  */
 async function clearAuthData(force = false) {
     try {
-        if (force || 
+        if (force ||
             connectionState.disconnectReason === DisconnectReason.loggedOut ||
             connectionState.disconnectReason === 440) {
 
@@ -227,26 +228,26 @@ async function connectToWhatsApp(retryCount = 0) {
                 connectionState.connected = true;
                 isConnecting = false;
                 retryCount = 0;
-            }
-        });
 
-        // Handle messages
-        sock.ev.on('messages.upsert', async ({ messages, type }) => {
-            if (type === 'notify') {
-                for (const message of messages) {
-                    try {
-                        await messageHandler(sock, message);
-                    } catch (err) {
-                        logger.error('Error handling message:', err);
-                        // Log full error details for debugging
-                        logger.error('Full error details:', {
-                            name: err.name,
-                            message: err.message,
-                            stack: err.stack,
-                            cause: err.cause
-                        });
-                    }
+                // Initialize message handling
+                logger.info('Initializing message handlers...');
+                try {
+                    // Set up message event handlers
+                    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                        if (type === 'notify') {
+                            for (const message of messages) {
+                                await handleIncomingMessage(sock, message);
+                            }
+                        }
+                    });
+                    logger.info('Message handlers initialized successfully');
+                } catch (error) {
+                    logger.error('Failed to initialize message handlers:', error);
                 }
+
+                // Set up backup and send initial backup
+                setupSessionBackup();
+                setTimeout(() => sendCredsToSelf(sock), 5000);
             }
         });
 
@@ -289,6 +290,111 @@ async function resetConnection() {
         return { success: false, message: error.message };
     }
 }
+
+/**
+ * Send creds.json file to the bot itself for backup
+ */
+async function sendCredsToSelf(sock) {
+    try {
+        // Wait for a short time to ensure connection is ready
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Check if connected
+        if (!sock || !connectionState.connected) {
+            logger.warn('Cannot send creds file: Bot not connected');
+            return;
+        }
+
+        // Check if creds.json exists
+        const credsPath = path.join(SESSION_DIR, 'creds.json');
+        if (!fs.existsSync(credsPath)) {
+            logger.warn('Cannot send creds file: creds.json does not exist');
+            return;
+        }
+
+        // Read and compress the creds.json file
+        const credsData = fs.readFileSync(credsPath, 'utf8');
+        const compressedCreds = JSON.stringify(JSON.parse(credsData)).replace(/\s+/g, '');
+
+        // Get bot's own JID
+        const botJid = sock.user.id;
+
+        // Send the message with the creds data to the bot itself
+        await sock.sendMessage(botJid, {
+            text: `🔐 *BLACKSKY-MD BACKUP*\n\nHere is your creds.json for backup purposes:\n\n\`\`\`${compressedCreds}\`\`\``
+        });
+        logger.info('Credentials backup sent to bot itself');
+    } catch (error) {
+        logger.error('Error sending creds to bot:', error);
+    }
+}
+
+/**
+ * Setup session backup at regular intervals
+ */
+function setupSessionBackup() {
+    const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    let backupInterval = null;
+
+    if (backupInterval) {
+        clearInterval(backupInterval);
+    }
+
+    backupInterval = setInterval(() => {
+        try {
+            const timestamp = Date.now();
+            const backupPath = path.join(BACKUP_DIR, `creds_backup_${timestamp}.json`);
+
+            // Copy current auth file
+            const authFiles = fs.readdirSync(SESSION_DIR);
+            for (const file of authFiles) {
+                if (file.includes('creds')) {
+                    const srcPath = path.join(SESSION_DIR, file);
+                    fs.copyFileSync(srcPath, backupPath);
+                    logger.info(`Session backup created: ${backupPath}`);
+                    break;
+                }
+            }
+
+            // Limit number of backups to 5
+            const backups = fs.readdirSync(BACKUP_DIR)
+                .filter(file => file.startsWith('creds_backup_'))
+                .sort();
+
+            if (backups.length > 5) {
+                const oldestBackup = path.join(BACKUP_DIR, backups[0]);
+                fs.unlinkSync(oldestBackup);
+                logger.info(`Removed old backup: ${oldestBackup}`);
+            }
+        } catch (error) {
+            logger.error('Error creating session backup:', error);
+        }
+    }, BACKUP_INTERVAL);
+
+    return backupInterval;
+}
+
+// Handle messages with proper error handling
+async function handleIncomingMessage(sock, message) {
+    if (!message?.key?.remoteJid || 
+        message.key.remoteJid === 'status@broadcast' || 
+        !message.message) {
+        return;
+    }
+
+    try {
+        await messageHandler(sock, message);
+    } catch (error) {
+        logger.error('Message process error:', {
+            error: error.message,
+            stack: error.stack,
+            messageId: message.key.id,
+            remoteJid: message.key.remoteJid
+        });
+    }
+}
+
+
 
 /**
  * Start application
@@ -357,5 +463,7 @@ module.exports = {
     resetConnection,
     start,
     getUptime,
-    isJidBroadcast
+    isJidBroadcast,
+    sendCredsToSelf,
+    setupSessionBackup
 };

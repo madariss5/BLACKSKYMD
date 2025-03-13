@@ -4,7 +4,7 @@ const config = require('../config/config');
 const { languageManager } = require('../utils/language');
 const levelingSystem = require('../utils/levelingSystem');
 const userDatabase = require('../utils/userDatabase');
-
+const menuCommands = require('../commands/menu').commands;
 
 /**
  * Main message handler for WhatsApp messages
@@ -42,133 +42,72 @@ async function messageHandler(sock, message) {
             return;
         }
 
-        const prefix = config.bot.prefix || '.';
+        const prefix = config.bot.prefix || '!';
 
         // FAST PATH: Skip empty messages immediately
         if (!messageContent) return;
+
+        logger.debug(`Received message from ${sender}: ${messageContent}`);
 
         // Command processing
         if (messageContent.startsWith(prefix)) {
             const commandText = messageContent.slice(prefix.length).trim();
             if (commandText) {
-                logger.debug(`Processing command: ${commandText}`);
+                logger.info(`Processing command: ${commandText} from ${sender}`);
                 try {
+                    // Split command and arguments
+                    const [cmd, ...args] = commandText.split(' ');
+
+                    // Log command details for debugging
+                    logger.info('Command details:', {
+                        command: cmd,
+                        args: args,
+                        sender: sender,
+                        messageType: message.message ? Object.keys(message.message)[0] : 'unknown'
+                    });
+
+                    // Check for menu commands first
+                    if (menuCommands && menuCommands[cmd]) {
+                        logger.info(`Executing menu command: ${cmd}`);
+                        await menuCommands[cmd](sock, message, args);
+                        return;
+                    }
+
+                    // Process other commands
                     await processCommand(sock, message, commandText);
                 } catch (err) {
-                    logger.error('Command execution failed:', err);
+                    logger.error('Command execution failed:', {
+                        error: err.message,
+                        stack: err.stack,
+                        command: commandText,
+                        sender: sender
+                    });
+
                     await sock.sendMessage(sender, { 
-                        text: '❌ Command failed. Please try again.' 
+                        text: '*❌ Command failed.* Please try again.\n\nUse !help to see available commands.' 
                     });
                 }
             }
             return;
         }
 
-        // Handle normal messages here if needed
+        // For non-command messages, check if we should update user XP
+        if (!sender.endsWith('@g.us')) { // Only for private chats
+            try {
+                await levelingSystem.updateUserXP(sender);
+            } catch (err) {
+                logger.error('Error updating user XP:', err);
+            }
+        }
 
     } catch (err) {
-        logger.error('Error in message handler:', err);
-    }
-}
-
-// Handle level up event
-async function handleLevelUp(sock, sender, levelUpData, userData) {
-    if (!levelUpData) return;
-    
-    try {
-        // Check if user has enabled level up notifications
-        if (!levelingSystem.hasLevelUpNotificationEnabled(sender)) return;
-        
-        // Add achievements for level milestones
-        if (userData) {
-            userData.achievements = userData.achievements || [];
-            
-            // Check for level achievements
-            if (levelUpData.newLevel >= 5) {
-                if (!userData.achievements.includes('Leveling Up')) {
-                    userData.achievements.push('Leveling Up');
-                    userDatabase.updateUserProfile(sender, { achievements: userData.achievements });
-                }
-            }
-            
-            if (levelUpData.newLevel >= 10) {
-                if (!userData.achievements.includes('Pro User')) {
-                    userData.achievements.push('Pro User');
-                    userDatabase.updateUserProfile(sender, { achievements: userData.achievements });
-                }
-            }
-            
-            if (levelUpData.newLevel >= 25) {
-                if (!userData.achievements.includes('Dedicated User')) {
-                    userData.achievements.push('Dedicated User');
-                    userDatabase.updateUserProfile(sender, { achievements: userData.achievements });
-                }
-            }
-        }
-        
-        // Get user's preferred language using the dedicated function
-        const userLang = getUserLanguage(sender);
-        
-        // Try to get level up message from translations
-        let levelUpTitle = languageManager.getText('leveling.level_up_title', userLang);
-        let levelUpCongrats = languageManager.getText('leveling.congrats', userLang);
-        let levelUpReward = languageManager.getText('leveling.coin_reward', userLang);
-        let levelUpTip = languageManager.getText('leveling.xp_tip', userLang);
-        let levelUpCurrent = languageManager.getText('leveling.current_xp', userLang);
-        let levelUpNext = languageManager.getText('leveling.next_level', userLang);
-        
-        // If translations are missing, fall back to keys (which helps identify missing translations)
-        if (levelUpTitle === 'leveling.level_up_title') levelUpTitle = 'Level Up!';
-        if (levelUpCongrats === 'leveling.congrats') levelUpCongrats = 'Congratulations! You\'ve reached level %s!';
-        if (levelUpReward === 'leveling.coin_reward') levelUpReward = '+%s coins added to your balance';
-        if (levelUpTip === 'leveling.xp_tip') levelUpTip = 'Keep chatting to earn more XP';
-        if (levelUpCurrent === 'leveling.current_xp') levelUpCurrent = 'Current XP: %s';
-        if (levelUpNext === 'leveling.next_level') levelUpNext = 'Next level: %s XP needed';
-        
-        // Format the strings with the values
-        levelUpCongrats = levelUpCongrats.replace('%s', levelUpData.newLevel);
-        levelUpReward = levelUpReward.replace('%s', levelUpData.coinReward);
-        levelUpCurrent = levelUpCurrent.replace('%s', levelUpData.totalXp);
-        levelUpNext = levelUpNext.replace('%s', levelUpData.requiredXp);
-        
-        // Create level up message
-        const levelUpMessage = `
-🎉 *${levelUpTitle}*
-
-${levelUpCongrats}
-🏆 ${levelUpReward}
-⭐ ${levelUpTip}
-
-${levelUpCurrent}
-${levelUpNext}
-        `.trim();
-        
-        // Send level up notification
-        await sock.sendMessage(sender, { text: levelUpMessage });
-        
-        // Generate and send level card for every 5 levels
-        if (levelUpData.newLevel % 5 === 0 && userData) {
-            try {
-                const cardPath = await levelingSystem.generateLevelCard(sender, userData);
-                if (cardPath) {
-                    // Try to get the achievement message from translations
-                    let achievementText = languageManager.getText('leveling.achievement_unlocked', userLang);
-                    if (achievementText === 'leveling.achievement_unlocked') {
-                        achievementText = 'Level %s Achievement Unlocked!';
-                    }
-                    achievementText = achievementText.replace('%s', levelUpData.newLevel);
-                    
-                    await sock.sendMessage(sender, {
-                        image: { url: cardPath },
-                        caption: `🏆 ${achievementText}`
-                    });
-                }
-            } catch (err) {
-                logger.error('Error generating level card:', err);
-            }
-        }
-    } catch (error) {
-        logger.error('Error sending level up notification:', error);
+        logger.error('Error in message handler:', {
+            name: err.name,
+            message: err.message,
+            stack: err.stack,
+            sender: message?.key?.remoteJid,
+            messageContent: messageContent
+        });
     }
 }
 
@@ -181,19 +120,19 @@ function getUserLanguage(sender) {
     try {
         // Check if user has a profile with language preference
         const userProfile = userDatabase.getUserProfile(sender);
-        
+
         if (userProfile && userProfile.language) {
-            console.log(`User ${sender} has language preference: ${userProfile.language}`);
+            logger.debug(`User ${sender} has language preference: ${userProfile.language}`);
             return userProfile.language;
         }
-        
+
         // Fallback to bot default language
-        console.log(`User ${sender} has no language preference, using default: ${config.bot.language || 'en'}`);
+        logger.debug(`User ${sender} has no language preference, using default: ${config.bot.language || 'en'}`);
         return config.bot.language || 'en';
     } catch (err) {
-        console.error(`Error determining language for user ${sender}:`, err);
+        logger.error(`Error determining language for user ${sender}:`, err);
         return 'en'; // Default fallback
     }
 }
 
-module.exports = { messageHandler, handleLevelUp };
+module.exports = { messageHandler };
