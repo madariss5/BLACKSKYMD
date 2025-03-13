@@ -7,11 +7,46 @@ const gifCache = new Map();
 const USER_CACHE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const GIF_CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
-// Fallback GIFs for when API fails
+// API endpoints using waifu.pics API
+const ANIME_GIF_API = {
+    hug: 'https://api.waifu.pics/sfw/hug',
+    pat: 'https://api.waifu.pics/sfw/pat',
+    kiss: 'https://api.waifu.pics/sfw/kiss',
+    cuddle: 'https://api.waifu.pics/sfw/cuddle',
+    poke: 'https://api.waifu.pics/sfw/poke',
+    slap: 'https://api.waifu.pics/sfw/slap',
+    tickle: 'https://api.waifu.pics/sfw/tickle',
+    bite: 'https://api.waifu.pics/sfw/bite',
+    dance: 'https://api.waifu.pics/sfw/dance',
+    blush: 'https://api.waifu.pics/sfw/blush',
+    smile: 'https://api.waifu.pics/sfw/smile',
+    wave: 'https://api.waifu.pics/sfw/wave',
+    wink: 'https://api.waifu.pics/sfw/wink',
+    cry: 'https://api.waifu.pics/sfw/cry',
+    laugh: 'https://api.waifu.pics/sfw/laugh',
+    happy: 'https://api.waifu.pics/sfw/happy',
+    angry: 'https://api.waifu.pics/sfw/angry',
+    think: 'https://api.waifu.pics/sfw/think',
+    panic: 'https://api.waifu.pics/sfw/panic',
+    nod: 'https://api.waifu.pics/sfw/nod',
+    shake: 'https://api.waifu.pics/sfw/shake',
+    run: 'https://api.waifu.pics/sfw/run',
+    pout: 'https://api.waifu.pics/sfw/pout',
+    smug: 'https://api.waifu.pics/sfw/smug',
+    bored: 'https://api.waifu.pics/sfw/bored',
+    stare: 'https://api.waifu.pics/sfw/stare',
+    sleep: 'https://api.waifu.pics/sfw/sleep',
+    nervous: 'https://api.waifu.pics/sfw/nervous',
+    confused: 'https://api.waifu.pics/sfw/confused',
+    celebrate: 'https://api.waifu.pics/sfw/celebrate',
+    dizzy: 'https://api.waifu.pics/sfw/dizzy'
+};
+
+// Tenor GIF fallbacks (verified working GIF URLs)
 const fallbacks = {
-    hug: 'https://media.tenor.com/images/a9bb4d55b2a08d3a964ddb39c0e96f3d/tenor.gif',
+    hug: 'https://media.tenor.com/images/2d5373cd3a0be4f25345a52d1ada1d1f/tenor.gif',
     pat: 'https://media.tenor.com/images/1d37a873edfeb81a1f5403f4a3bfa185/tenor.gif',
-    kiss: 'https://media.tenor.com/images/02d9cae34993e48ab5bb27763f46b32e/tenor.gif',
+    kiss: 'https://media.tenor.com/images/a1f7d43752168b3c1dbdfb925bda8a33/tenor.gif',
     slap: 'https://media.tenor.com/images/9ea4fb41d066737c0e3f2d626c13f230/tenor.gif',
     cuddle: 'https://media.tenor.com/images/5603e24395b61245a08fe0299574f1e3/tenor.gif',
     panic: 'https://media.tenor.com/images/9c42c0f3a448561bdb573049e11c6466/tenor.gif',
@@ -30,7 +65,16 @@ const fallbacks = {
     confused: 'https://media.tenor.com/images/f2e7957f59d71bcf8ca3a6fe406a53a5/tenor.gif',
     bully: 'https://media.tenor.com/images/dd8058fa55f2b208350e00f329cdfa9a/tenor.gif',
     stare: 'https://media.tenor.com/images/9e6e8f42500512dd18dc99c1d054b909/tenor.gif',
-    celebrate: 'https://media.tenor.com/images/2b9cba7b488142d61559145bf1d406c3/tenor.gif'
+    celebrate: 'https://media.tenor.com/images/2b9cba7b488142d61559145bf1d406c3/tenor.gif',
+    bye: 'https://media.tenor.com/images/9c1afcf5f3c9b4a0f336f01a86acb1e3/tenor.gif',
+    wave: 'https://media.tenor.com/images/9c1afcf5f3c9b4a0f336f01a86acb1e3/tenor.gif',
+    greet: 'https://media.tenor.com/images/9c1afcf5f3c9b4a0f336f01a86acb1e3/tenor.gif',
+    nuzzle: 'https://media.tenor.com/images/a7e87502e0983d3a94865c6d8d35712a/tenor.gif',
+    throw: 'https://media.tenor.com/images/d88b38c6698c568e7347ef365ae6b348/tenor.gif',
+    smack: 'https://media.tenor.com/images/9ea4fb41d066737c0e3f2d626c13f230/tenor.gif',
+    highfive: 'https://media.tenor.com/images/7b1f06eac73c36721912edcaa21f31ec/tenor.gif',
+    thumbsup: 'https://media.tenor.com/images/26d97e1fbf3669d57039aee0f45e20b3/tenor.gif',
+    thumbsdown: 'https://media.tenor.com/images/0a458cf2a451036ada47f8fff421e0af/tenor.gif'
 };
 
 const genericFallback = 'https://media.tenor.com/images/2b9cba7b488142d61559145bf1d406c3/tenor.gif';
@@ -48,7 +92,18 @@ function validateMention(mention) {
            mention === 'all';
 }
 
-// Optimized GIF fetching with caching and faster timeout
+// Helper function to verify GIF URL format
+function isValidGifUrl(url) {
+    return url && (
+        url.toLowerCase().endsWith('.gif') ||
+        url.toLowerCase().includes('/gif/') ||
+        url.toLowerCase().includes('tenor.com') ||
+        url.toLowerCase().includes('giphy.com') ||
+        url.toLowerCase().includes('waifu.pics')
+    );
+}
+
+// Optimized GIF fetching with caching and fallbacks
 async function fetchAnimeGif(type) {
     try {
         const startTime = Date.now();
@@ -62,38 +117,46 @@ async function fetchAnimeGif(type) {
             gifCache.delete(type);
         }
 
-        // Get fallback URL ready
         const fallbackUrl = fallbacks[type] || genericFallback;
 
-        // Try to get GIF in parallel with very short timeout 
+        // Try primary API
         try {
+            const endpoint = ANIME_GIF_API[type];
+            if (!endpoint) {
+                logger.warn(`No API endpoint for ${type}, using fallback`);
+                gifCache.set(type, { url: fallbackUrl, timestamp: Date.now() });
+                return fallbackUrl;
+            }
+
             const response = await Promise.race([
-                axios.get(`https://api.waifu.pics/sfw/${type}`, { timeout: 1500 }),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Timeout')), 1500)
-                )
+                axios.get(endpoint, {
+                    timeout: 2000,
+                    validateStatus: status => status === 200
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('API Timeout')), 2000))
             ]);
 
-            if (response?.data?.url) {
+            if (response?.data?.url && isValidGifUrl(response.data.url)) {
                 const gifUrl = response.data.url;
                 gifCache.set(type, { url: gifUrl, timestamp: Date.now() });
                 logger.debug(`GIF fetched for ${type} (${Date.now() - startTime}ms)`);
                 return gifUrl;
             }
-        } catch (error) {
-            logger.warn(`Error fetching ${type} GIF (${Date.now() - startTime}ms): ${error.message}`);
+        } catch (err) {
+            logger.warn(`Primary API error for ${type}: ${err.message}`);
         }
 
-        // Use fallback 
+        // Use fallback
         gifCache.set(type, { url: fallbackUrl, timestamp: Date.now() });
         return fallbackUrl;
+
     } catch (error) {
         logger.error(`Error in fetchAnimeGif for ${type}: ${error.message}`);
         return fallbacks[type] || genericFallback;
     }
 }
 
-// Optimized user name fetching with caching
+// Fast user name fetching with caching
 async function getUserName(sock, jid) {
     try {
         const startTime = Date.now();
@@ -168,15 +231,14 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
         ]);
         logger.debug(`Parallel data fetch completed (${Date.now() - startTime}ms)`);
 
+        // Handle validation first
+        if (target && !validateMention(target)) {
+            await sock.sendMessage(chatJid, { text: `❌ Please mention a valid user to ${type}` });
+            return;
+        }
+
         let message;
         if (target) {
-            if (!validateMention(target)) {
-                await sock.sendMessage(chatJid, {
-                    text: `❌ Please mention a valid user to ${type}`
-                });
-                return;
-            }
-
             message = targetName === 'everyone' || targetName === 'all'
                 ? `${senderName} ${type}s everyone ${emoji}`
                 : `${senderName} ${type}s ${targetName} ${emoji}`;
@@ -199,17 +261,36 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
         const mentions = (chatJid.includes('@g.us') && target && target.includes('@')) ? [target] : undefined;
 
         logger.debug(`Sending reaction message (${Date.now() - startTime}ms)`);
+
+        // Ensure GIF URL is valid
+        if (!isValidGifUrl(finalGifUrl)) {
+            logger.warn(`Invalid GIF URL format: ${finalGifUrl}, using fallback`);
+            finalGifUrl = fallbacks[type] || genericFallback;
+        }
+
         await sock.sendMessage(chatJid, {
-            image: { url: finalGifUrl },
+            video: { url: finalGifUrl },
             caption: message,
-            mentions: mentions
+            mentions: mentions,
+            gifPlayback: true,
+            mimetype: 'video/mp4'
         }).catch(async (err) => {
-            logger.error(`Error sending message with image (${Date.now() - startTime}ms):`, err);
-            // Fallback to text-only message
-            await sock.sendMessage(chatJid, {
-                text: message,
-                mentions: mentions
-            });
+            logger.error(`Error sending message with GIF (${Date.now() - startTime}ms):`, err);
+            try {
+                // First fallback: Try sending as image
+                await sock.sendMessage(chatJid, {
+                    image: { url: finalGifUrl },
+                    caption: message,
+                    mentions: mentions
+                });
+            } catch (imgErr) {
+                logger.error('Error sending as image, falling back to text-only:', imgErr);
+                // Second fallback: Text-only message
+                await sock.sendMessage(chatJid, {
+                    text: message,
+                    mentions: mentions
+                });
+            }
         });
         logger.debug(`Reaction message sent successfully (${Date.now() - startTime}ms)`);
     } catch (error) {
@@ -218,7 +299,7 @@ async function sendReactionMessage(sock, sender, target, type, gifUrl, emoji) {
     }
 }
 
-// Export commands
+// Define command handlers
 const reactionCommands = {
     async hug(sock, message, args) {
         const sender = message.key.remoteJid;
@@ -538,7 +619,7 @@ const reactionCommands = {
     },
     async growl(sock, message, args) {
         const sender = message.key.remoteJid;
-        const target = args[0];
+        const target= args[0];
         await sendReactionMessage(sock, sender, target, 'growl', null, '😾');
     },
     async disgusted(sock, message, args) {
@@ -701,5 +782,6 @@ setInterval(() => {
 
 module.exports = {
     commands: reactionCommands,
-    category: 'reactions'
+    category: 'reactions',
+    init
 };
