@@ -13,12 +13,13 @@ const server = http.createServer(app);
 let sock = null;
 let retryCount = 0;
 const MAX_RETRIES = 5;
-const RETRY_INTERVAL = 10000; 
-const RECONNECT_INTERVAL = 5000; 
+const RETRY_INTERVAL = 15000; // Increased to 15 seconds
+const RECONNECT_INTERVAL = 10000; // Increased to 10 seconds
 let latestQR = null;
 let qrPort = 5006;
 let isConnecting = false;
 let connectionLock = false;
+let currentDelay = RETRY_INTERVAL;
 
 // Set up Express server for QR code display
 app.get('/', (req, res) => {
@@ -60,9 +61,9 @@ app.get('/', (req, res) => {
                 </div>
                 <p class="status">Please scan the QR code with WhatsApp to connect</p>
                 <script>
-                    // Auto-refresh the page every 20 seconds if no QR code is present
+                    // Auto-refresh the page every 30 seconds if no QR code is present
                     if (!document.querySelector('#qrcode img')) {
-                        setTimeout(() => location.reload(), 20000);
+                        setTimeout(() => location.reload(), 30000);
                     }
                 </script>
             </body>
@@ -90,11 +91,21 @@ async function clearSession() {
             }
         }
 
-        const authDir = path.join(process.cwd(), 'auth_info');
-        if (fs.existsSync(authDir)) {
-            await fsPromises.rm(authDir, { recursive: true, force: true });
-            logger.info('Cleared auth_info directory');
+        // Clear auth directories
+        const authDirs = [
+            path.join(process.cwd(), 'auth_info'),
+            path.join(process.cwd(), 'auth_info_baileys'),
+            path.join(process.cwd(), 'auth_info_multi')
+        ];
+
+        for (const dir of authDirs) {
+            if (fs.existsSync(dir)) {
+                await fsPromises.rm(dir, { recursive: true, force: true });
+                logger.info(`Cleared auth directory: ${dir}`);
+            }
         }
+
+        logger.info('All session data cleared successfully');
     } catch (err) {
         logger.error('Error in clearSession:', err);
     }
@@ -150,7 +161,7 @@ async function startConnection() {
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 30000,
             emitOwnEvents: true,
-            retryRequestDelayMs: 2000,
+            retryRequestDelayMs: 5000,
             version: [2, 2323, 4],
             markOnlineOnConnect: false,
             syncFullHistory: false,
@@ -161,7 +172,7 @@ async function startConnection() {
             },
             patchMessageBeforeSending: false,
             userDevicesCache: false,
-            transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
+            transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 5000 },
             ws: {
                 connectTimeoutMs: 30000,
                 keepAliveIntervalMs: 25000,
@@ -180,7 +191,8 @@ async function startConnection() {
 
             if (connection === 'open') {
                 retryCount = 0;
-                latestQR = null; 
+                currentDelay = RETRY_INTERVAL;
+                latestQR = null;
                 await saveCreds();
                 logger.restoreLogging();
                 logger.info('Connection established successfully!');
@@ -191,37 +203,49 @@ async function startConnection() {
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
+                logger.info(`Connection closed with status code: ${statusCode}`);
 
-                // Handle critical disconnect reasons
+                // Handle critical disconnect reasons with session clearing
                 if (statusCode === DisconnectReason.loggedOut || 
                     statusCode === DisconnectReason.connectionReplaced ||
                     statusCode === DisconnectReason.connectionClosed ||
+                    statusCode === DisconnectReason.connectionLost ||
                     statusCode === DisconnectReason.timedOut) {
 
-                    logger.info('Critical disconnect, clearing session...');
+                    logger.info('Critical disconnect detected, clearing session...');
                     await clearSession();
-                    process.exit(1); 
-                    return;
+
+                    // Only exit on logout or replacement
+                    if (statusCode === DisconnectReason.loggedOut ||
+                        statusCode === DisconnectReason.connectionReplaced) {
+                        process.exit(1);
+                        return;
+                    }
                 }
 
-                // Implement exponential backoff for reconnection
+                // Implement exponential backoff with maximum delay
                 if (retryCount < MAX_RETRIES) {
                     retryCount++;
-                    const delay = RETRY_INTERVAL * Math.pow(2, retryCount - 1);
+                    currentDelay = Math.min(currentDelay * 2, 300000); // Max 5 minutes
+
+                    logger.info(`Attempting reconnection ${retryCount}/${MAX_RETRIES} in ${currentDelay}ms`);
 
                     setTimeout(async () => {
                         try {
-                            logger.info(`Attempting reconnection ${retryCount}/${MAX_RETRIES}`);
                             isConnecting = false;
                             connectionLock = false;
                             sock = await startConnection();
                         } catch (err) {
                             logger.error('Reconnection attempt failed:', err);
-                            process.exit(1);
+                            if (retryCount >= MAX_RETRIES) {
+                                logger.error('Max retries reached, exiting...');
+                                process.exit(1);
+                            }
                         }
-                    }, delay);
+                    }, currentDelay);
                 } else {
-                    logger.error('Max reconnection attempts reached');
+                    logger.error('Max reconnection attempts reached, clearing session and restarting...');
+                    await clearSession();
                     process.exit(1);
                 }
             }
@@ -233,9 +257,10 @@ async function startConnection() {
     } catch (err) {
         logger.error('Fatal error in startConnection:', err);
 
+        // Implement exponential backoff for initial connection errors
         if (retryCount < MAX_RETRIES) {
             retryCount++;
-            const delay = RETRY_INTERVAL * Math.pow(2, retryCount - 1);
+            currentDelay = Math.min(currentDelay * 2, 300000);
 
             setTimeout(async () => {
                 try {
@@ -243,10 +268,12 @@ async function startConnection() {
                     connectionLock = false;
                     sock = await startConnection();
                 } catch (err) {
-                    logger.error('Retry attempt failed:', err);
-                    process.exit(1);
+                    logger.error('Initial connection retry failed:', err);
+                    if (retryCount >= MAX_RETRIES) {
+                        process.exit(1);
+                    }
                 }
-            }, delay);
+            }, currentDelay);
         } else {
             process.exit(1);
         }
