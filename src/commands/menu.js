@@ -1,6 +1,5 @@
 /**
  * Modern WhatsApp MD Bot Menu System
- * Features elegant design, categorized commands, and dynamic loading
  */
 
 const { languageManager } = require('../utils/language');
@@ -8,98 +7,6 @@ const config = require('../config/config');
 const logger = require('../utils/logger');
 const fs = require('fs').promises;
 const path = require('path');
-const { commandLoader } = require('../utils/commandLoader');
-const moment = require('moment');
-
-/**
- * Loads commands from all directories and builds category structure
- */
-async function loadAllCommands() {
-    const commandsPath = path.join(__dirname);
-    const commandFiles = await fs.readdir(commandsPath);
-    const allCommands = {};
-    let totalCommands = 0;
-    
-    // Process a module to extract commands
-    const processModule = (moduleData, suggestedCategory) => {
-        let commandsObject;
-        let categoryName = suggestedCategory;
-        
-        if (moduleData.commands) {
-            commandsObject = moduleData.commands;
-            if (moduleData.category) {
-                categoryName = moduleData.category;
-            }
-        } else {
-            commandsObject = moduleData;
-        }
-        
-        const commandNames = Object.keys(commandsObject).filter(cmd => 
-            cmd !== 'init' && typeof commandsObject[cmd] === 'function'
-        );
-        
-        if (commandNames.length > 0) {
-            if (allCommands[categoryName]) {
-                allCommands[categoryName] = [...allCommands[categoryName], ...commandNames];
-            } else {
-                allCommands[categoryName] = commandNames;
-            }
-            totalCommands += commandNames.length;
-        }
-        
-        return commandNames.length;
-    };
-    
-    // Load commands from JS files in the commands directory
-    for (const file of commandFiles) {
-        if (file.endsWith('.js') && file !== 'index.js' && file !== 'menu.js') {
-            try {
-                const moduleData = require(`./${file}`);
-                const categoryName = file.replace('.js', '');
-                processModule(moduleData, categoryName);
-            } catch (err) {
-                logger.error(`Error loading commands from ${file}:`, err);
-            }
-        }
-    }
-    
-    // Load commands from subdirectories
-    for (const item of commandFiles) {
-        const itemPath = path.join(commandsPath, item);
-        try {
-            const stats = await fs.stat(itemPath);
-            
-            if (stats.isDirectory()) {
-                // Try index.js first
-                try {
-                    const moduleData = require(`./${item}/index.js`);
-                    processModule(moduleData, item);
-                } catch (indexErr) {
-                    // If index.js fails, try individual files
-                    try {
-                        const subFiles = await fs.readdir(itemPath);
-                        for (const subFile of subFiles) {
-                            if (subFile.endsWith('.js') && subFile !== 'index.js') {
-                                try {
-                                    const subModule = require(`./${item}/${subFile}`);
-                                    processModule(subModule, item);
-                                } catch (subErr) {
-                                    logger.error(`Error loading commands from ${item}/${subFile}:`, subErr);
-                                }
-                            }
-                        }
-                    } catch (readErr) {
-                        logger.error(`Error reading directory ${item}:`, readErr);
-                    }
-                }
-            }
-        } catch (statErr) {
-            logger.error(`Error checking ${item}:`, statErr);
-        }
-    }
-    
-    return { allCommands, totalCommands };
-}
 
 // Emoji mapping for categories
 const categoryEmojis = {
@@ -114,8 +21,6 @@ const categoryEmojis = {
     'user': '👤',
     'utility': '🛠️',
     'group_new': '👥',
-    
-    // Add more as needed
     'default': '📋'
 };
 
@@ -132,42 +37,73 @@ const categoryNames = {
     'user': 'User Profile',
     'utility': 'Utilities',
     'group_new': 'Group Advanced',
-    
-    // Add more as needed
     'default': 'Misc'
 };
 
-// Decorative symbols for elegant menu styling
+// Decorative symbols
 const symbols = {
-    divider: '┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄',
-    dotted: '┄┄┄┄┄┄┄┄┄',
     bullet: '•',
     arrow: '➤',
     star: '✦',
-    check: '✓',
-    dot: '∙',
-    heart: '♡',
-    sparkle: '✧',
-    diamond: '♦',
-    circle: '○',
-    square: '■',
-    flower: '✿',
-    fire: '🔥',
-    line: '━━━━━━━━━━━━━━━━━',
-    doubleLine: '═════════════════',
-    // Box drawing characters
-    box: {
-        corner1: '┌',
-        corner2: '┐',
-        corner3: '└',
-        corner4: '┘',
-        horizontal: '─',
-        vertical: '│'
-    }
+    line: '━━━━━━━━━━━━━━━━━'
 };
 
 /**
- * Creates a beautifully formatted menu header with advanced styling
+ * Load all available commands from command files
+ */
+async function loadAllCommands() {
+    try {
+        const commandsPath = path.join(__dirname);
+        const commandFiles = await fs.readdir(commandsPath);
+        const allCommands = {};
+        let totalCommands = 0;
+
+        // Process a command module to extract commands
+        const processCommandModule = (moduleData, category) => {
+            let commands = moduleData.commands || moduleData;
+            let categoryName = moduleData.category || category;
+
+            if (typeof commands !== 'object') return 0;
+
+            const commandList = Object.keys(commands).filter(cmd => 
+                typeof commands[cmd] === 'function' && cmd !== 'init'
+            );
+
+            if (commandList.length > 0) {
+                if (!allCommands[categoryName]) {
+                    allCommands[categoryName] = [];
+                }
+                allCommands[categoryName].push(...commandList);
+                totalCommands += commandList.length;
+            }
+
+            return commandList.length;
+        };
+
+        // Load commands from JS files
+        for (const file of commandFiles) {
+            if (file.endsWith('.js') && !['index.js', 'menu.js'].includes(file)) {
+                try {
+                    const filePath = path.join(commandsPath, file);
+                    const moduleData = require(filePath);
+                    const category = file.replace('.js', '');
+                    processCommandModule(moduleData, category);
+                } catch (err) {
+                    logger.error(`Error loading commands from ${file}:`, err);
+                }
+            }
+        }
+
+        logger.info(`Loaded ${totalCommands} commands from ${Object.keys(allCommands).length} categories`);
+        return { allCommands, totalCommands };
+    } catch (err) {
+        logger.error('Error loading commands:', err);
+        return { allCommands: {}, totalCommands: 0 };
+    }
+}
+
+/**
+ * Create menu header
  */
 function createHeader(botName, totalCommands, uptime) {
     return `┏━━━❮ *${botName.toUpperCase()}* ❯━━━┓
@@ -175,209 +111,113 @@ function createHeader(botName, totalCommands, uptime) {
 ┃ *📊 Status:* Online ✅
 ┃ *⏰ Uptime:* ${uptime}
 ┃ *🔢 Commands:* ${totalCommands}
-┃ *🌐 Version:* 1.0.0
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛
 
-${symbols.doubleLine}
-`;
+${symbols.line}`;
 }
 
 /**
- * Creates a nicely formatted category section with improved styling
+ * Create category section
  */
-function createCategorySection(categoryName, commands, prefix) {
-    const emoji = categoryEmojis[categoryName] || categoryEmojis.default;
-    const prettyName = categoryNames[categoryName] || categoryNames.default;
-    
+function createCategorySection(category, commands, prefix) {
+    const emoji = categoryEmojis[category] || categoryEmojis.default;
+    const prettyName = categoryNames[category] || categoryNames.default;
+
     let section = `\n┌───「 *${emoji} ${prettyName.toUpperCase()}* 」───┐\n`;
-    
-    // Format commands in a clean 2-column layout when possible
     const sortedCommands = [...commands].sort();
-    const commandsPerLine = 2;
-    
-    for (let i = 0; i < sortedCommands.length; i += commandsPerLine) {
-        const commandsInThisLine = sortedCommands.slice(i, i + commandsPerLine);
-        const formattedCommands = commandsInThisLine.map(cmd => {
-            // Add some styling variation based on command length
-            const icon = cmd.length % 5 === 0 ? symbols.star : 
-                        cmd.length % 4 === 0 ? symbols.diamond : 
-                        cmd.length % 3 === 0 ? symbols.flower : symbols.bullet;
-            return `${icon} \`${prefix}${cmd}\``;
-        });
-        section += formattedCommands.join(' ᅠ ᅠ ') + '\n';
+
+    for (const cmd of sortedCommands) {
+        section += `┃ ${symbols.bullet} \`${prefix}${cmd}\`\n`;
     }
-    
-    section += `└─────────${symbols.dotted}─────────┘\n`;
+
+    section += `└─────────${symbols.line}─────────┘\n`;
     return section;
 }
 
-/**
- * Creates a stylish category summary with modern formatting
- */
-function createCategorySummary(categories) {
-    let summary = `┏━━━❮ *📂 CATEGORIES* ❯━━━┓\n`;
-    
-    Object.keys(categories).forEach(category => {
-        const emoji = categoryEmojis[category] || categoryEmojis.default;
-        const prettyName = categoryNames[category] || categoryNames.default;
-        const count = categories[category].length;
-        
-        // Add a different decorative symbol based on the count
-        const countSymbol = count > 20 ? symbols.fire : 
-                          count > 10 ? symbols.star : 
-                          count > 5 ? symbols.sparkle : 
-                          symbols.circle;
-        
-        summary += `┃ ${emoji} *${prettyName.padEnd(15)}* ${countSymbol} ${count}\n`;
-    });
-    
-    summary += `┗━━━━━━━━━━━━━━━━━━━━┛\n`;
-    return summary;
-}
-
-/**
- * Create stylish footer with usage instructions
- */
-function createFooter(prefix) {
-    return `
-┏━━━❮ *💡 HELP & TIPS* ❯━━━┓
-┃
-┃ ${symbols.arrow} Type \`${prefix}menu [category]\`
-┃   View commands in a category
-┃
-┃ ${symbols.arrow} Type \`${prefix}help [command]\`
-┃   Get detailed command help
-┃
-┃ ${symbols.arrow} Use \`${prefix}\` as your prefix
-┃   For all commands
-┃
-┗━━━━━━━━━━━━━━━━━━━━┛
-
-_${symbols.heart} Powered by @whiskeysockets/baileys_`;
-}
-
-// Define menu commands
+// Menu command handlers
 const menuCommands = {
-    category: 'basic',
-    commands: {
-        /**
-         * Main menu command with category filtering
-         */
-        async menu(sock, message, args) {
-            try {
-                const sender = message.key.remoteJid;
-                const username = message.pushName || 'User';
-                const uptime = process.uptime();
-                const uptimeStr = moment.duration(uptime, 'seconds').humanize();
-                const prefix = config.bot.prefix;
-                
-                // Check if specific category requested
-                const category = args[0]?.toLowerCase();
-                
-                // Load all commands
-                const { allCommands, totalCommands } = await loadAllCommands();
-                
-                if (category && allCommands[category]) {
-                    // Show specific category
-                    const commands = allCommands[category];
-                    
-                    const menuText = `${createHeader(config.bot.name, commands.length, uptimeStr)}` +
-                                     `${createCategorySection(category, commands, prefix)}` +
-                                     `${createFooter(prefix)}`;
-                    
-                    await sock.sendMessage(sender, { text: menuText });
-                    return;
-                }
-                
-                // Show all categories in summary view
-                const header = createHeader(config.bot.name, totalCommands, uptimeStr);
-                const categorySummary = createCategorySummary(allCommands);
-                const footer = createFooter(prefix);
-                
-                const menuText = `${header}${categorySummary}${footer}`;
-                
+    async menu(sock, message, args) {
+        try {
+            const sender = message.key.remoteJid;
+            const prefix = config.bot.prefix;
+            const { allCommands, totalCommands } = await loadAllCommands();
+
+            // Check if specific category requested
+            const category = args[0]?.toLowerCase();
+
+            if (category && allCommands[category]) {
+                const header = createHeader(config.bot.name, allCommands[category].length, "Active");
+                const menuText = header + createCategorySection(category, allCommands[category], prefix);
                 await sock.sendMessage(sender, { text: menuText });
-                
-            } catch (err) {
-                logger.error('Menu command error:', err);
-                await sock.sendMessage(message.key.remoteJid, { 
-                    text: '❌ Error generating menu. Please try again.' 
-                });
+                return;
             }
-        },
-        
-        /**
-         * List all commands in a category or all categories
-         */
-        async list(sock, message, args) {
-            try {
-                const sender = message.key.remoteJid;
-                const prefix = config.bot.prefix;
-                
-                // Check if specific category requested
-                const category = args[0]?.toLowerCase();
-                
-                // Load all commands
-                const { allCommands, totalCommands } = await loadAllCommands();
-                
-                if (category && allCommands[category]) {
-                    // Show specific category
-                    const commands = allCommands[category];
-                    const emoji = categoryEmojis[category] || categoryEmojis.default;
-                    const prettyName = categoryNames[category] || categoryNames.default;
-                    
-                    let listText = `┏━━━❮ *${emoji} ${prettyName.toUpperCase()}* ❯━━━┓\n`;
-                    
-                    commands.sort().forEach(cmd => {
-                        // Add some styling variation based on command length
-                        const icon = cmd.length % 5 === 0 ? symbols.star : 
-                                    cmd.length % 4 === 0 ? symbols.diamond : 
-                                    cmd.length % 3 === 0 ? symbols.flower : symbols.bullet;
-                        listText += `┃ ${icon} \`${prefix}${cmd}\`\n`;
-                    });
-                    
-                    listText += `┗━━━━━━━━━━━━━━━━━━━━┛\n\n_${symbols.sparkle} Total: ${commands.length} commands_`;
-                    
-                    await sock.sendMessage(sender, { text: listText });
-                    return;
-                }
-                
-                // List all categories with modern styling
-                let listText = `┏━━━❮ *📋 CATEGORIES* ❯━━━┓\n`;
-                
-                Object.keys(allCommands).forEach(cat => {
-                    const emoji = categoryEmojis[cat] || categoryEmojis.default;
-                    const prettyName = categoryNames[cat] || categoryNames.default;
-                    const count = allCommands[cat].length;
-                    
-                    // Use different symbols for different command counts
-                    const countSymbol = count > 20 ? symbols.fire : 
-                                      count > 10 ? symbols.star : 
-                                      count > 5 ? symbols.sparkle : 
-                                      symbols.circle;
-                    
-                    listText += `┃ ${emoji} *${prettyName.padEnd(12)}* ${countSymbol} ${count}\n`;
+
+            // Show category summary
+            let menuText = createHeader(config.bot.name, totalCommands, "Active");
+            menuText += "\n┏━━━❮ *📂 CATEGORIES* ❯━━━┓\n";
+
+            for (const [cat, commands] of Object.entries(allCommands)) {
+                const emoji = categoryEmojis[cat] || categoryEmojis.default;
+                const prettyName = categoryNames[cat] || categoryNames.default;
+                menuText += `┃ ${emoji} *${prettyName}* (${commands.length})\n`;
+            }
+
+            menuText += "┗━━━━━━━━━━━━━━━━━━━━┛\n\n";
+            menuText += `Use \`${prefix}menu [category]\` to view commands in a specific category`;
+
+            await sock.sendMessage(sender, { text: menuText });
+        } catch (err) {
+            logger.error('Menu command error:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: '❌ Error generating menu. Please try again.' 
+            });
+        }
+    },
+
+    async list(sock, message, args) {
+        try {
+            const sender = message.key.remoteJid;
+            const prefix = config.bot.prefix;
+            const { allCommands, totalCommands } = await loadAllCommands();
+
+            // Check if specific category requested
+            const category = args[0]?.toLowerCase();
+
+            if (category && allCommands[category]) {
+                const emoji = categoryEmojis[category] || categoryEmojis.default;
+                const prettyName = categoryNames[category] || categoryNames.default;
+                let listText = `*${emoji} ${prettyName} Commands*\n${symbols.line}\n`;
+
+                allCommands[category].sort().forEach(cmd => {
+                    listText += `${symbols.bullet} \`${prefix}${cmd}\`\n`;
                 });
-                
-                listText += `┗━━━━━━━━━━━━━━━━━━━━┛\n\n` +
-                           `${symbols.arrow} _To see commands in a category:_\n` +
-                           `   \`${prefix}list [category]\``;
-                
+
+                listText += `\n_Total: ${allCommands[category].length} commands_`;
                 await sock.sendMessage(sender, { text: listText });
-                
-            } catch (err) {
-                logger.error('List command error:', err);
-                await sock.sendMessage(message.key.remoteJid, { 
-                    text: '❌ Error listing commands. Please try again.' 
-                });
+                return;
             }
-        },
-        
-        /**
-         * Display help for a specific command
-         */
-        async help(sock, message, args) {
+
+            // List all categories
+            let listText = "*📂 Available Categories*\n" + symbols.line + "\n";
+            for (const [cat, commands] of Object.entries(allCommands)) {
+                const emoji = categoryEmojis[cat] || categoryEmojis.default;
+                const prettyName = categoryNames[cat] || categoryNames.default;
+                listText += `${emoji} *${prettyName}* - ${commands.length} commands\n`;
+            }
+
+            listText += `\n_Total: ${totalCommands} commands_\n`;
+            listText += `\nUse \`${prefix}list [category]\` to see commands in a category`;
+
+            await sock.sendMessage(sender, { text: listText });
+        } catch (err) {
+            logger.error('List command error:', err);
+            await sock.sendMessage(message.key.remoteJid, { 
+                text: '❌ Error listing commands. Please try again.' 
+            });
+        }
+    },
+    async help(sock, message, args) {
             try {
                 const sender = message.key.remoteJid;
                 const prefix = config.bot.prefix;
@@ -484,7 +324,6 @@ const menuCommands = {
                 });
             }
         }
-    }
 };
 
 module.exports = {
@@ -492,10 +331,12 @@ module.exports = {
     category: 'basic',
     async init() {
         try {
-            logger.info('Initializing modern menu system...');
+            logger.info('Initializing menu system...');
+            const { totalCommands } = await loadAllCommands();
+            logger.info(`Menu system initialized with ${totalCommands} total commands`);
             return true;
-        } catch (error) {
-            logger.error('Failed to initialize menu system:', error);
+        } catch (err) {
+            logger.error('Failed to initialize menu system:', err);
             return false;
         }
     }
