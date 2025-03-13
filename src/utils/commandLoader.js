@@ -79,6 +79,7 @@ class CommandLoader {
                 for (const [name, handler] of Object.entries(module.commands)) {
                     try {
                         loadedHandlers[currentCategory].total++;
+                        logger.info(`Processing command: ${name} in ${entry.name}`);
 
                         if (typeof handler !== 'function') {
                             loadedHandlers[currentCategory].failed++;
@@ -95,6 +96,11 @@ class CommandLoader {
                             enabled: true
                         };
 
+                        // Check if command name starts with underscore
+                        if (name.startsWith('_')) {
+                            logger.warn(`Command name starts with underscore: ${name} in ${entry.name} - this might cause issues`);
+                        }
+
                         this.commands.set(name, {
                             execute: handler,
                             config,
@@ -103,6 +109,7 @@ class CommandLoader {
 
                         this.commandSources.set(name, fullPath);
                         loadedHandlers[currentCategory].loaded++;
+                        logger.info(`Successfully registered command: ${name} in ${entry.name}`);
 
                         if (!this.commandCache.has(name)) {
                             this.commandCache.set(name, {
@@ -147,6 +154,30 @@ class CommandLoader {
             const entries = await fsPromises.readdir(commandsPath, { withFileTypes: true });
             const directories = entries.filter(entry => entry.isDirectory()).map(dir => dir.name);
             logger.info(`Found command directories: ${directories.join(', ')}`);
+            
+            // Special handling for user_extended.js
+            const userExtendedPath = path.join(commandsPath, 'user_extended.js');
+            if (fs.existsSync(userExtendedPath)) {
+                try {
+                    delete require.cache[require.resolve(userExtendedPath)];
+                    const module = require(userExtendedPath);
+                    if (module && module.commands) {
+                        const commandNames = Object.keys(module.commands);
+                        logger.info(`DEBUG - User_extended commands: ${commandNames.join(', ')}`);
+                        
+                        // Check each command
+                        for (const [name, handler] of Object.entries(module.commands)) {
+                            if (typeof handler !== 'function') {
+                                logger.error(`Invalid handler in user_extended.js for command '${name}': ${typeof handler}`);
+                            }
+                        }
+                    } else {
+                        logger.error(`Invalid module format in user_extended.js: ${Object.keys(module || {}).join(', ')}`);
+                    }
+                } catch (err) {
+                    logger.error(`Error inspecting user_extended.js:`, err);
+                }
+            }
             
             const loadedHandlers = await this.loadCommandsFromDirectory(commandsPath);
 
