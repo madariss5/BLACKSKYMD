@@ -39,24 +39,24 @@ try {
         logger.info('Loading simple message handler...');
         const simpleHandler = require('./src/handlers/simpleMessageHandler');
         messageHandler = simpleHandler.messageHandler;
-        
+
         if (!messageHandler) {
             throw new Error('Simple message handler failed to load properly');
         }
-        
+
         logger.info('Simple message handler loaded successfully with basic commands');
     } catch (simpleHandlerErr) {
         logger.error('Failed to load simple message handler:', simpleHandlerErr);
-        
+
         // Fallback to original handler if simple one fails
         logger.warn('Attempting to load original message handler as fallback...');
         const messageHandlerModule = require('./src/handlers/messageHandler');
         messageHandler = messageHandlerModule.messageHandler;
-        
+
         if (!messageHandler) {
             throw new Error('All message handlers failed to load properly');
         }
-        
+
         logger.info('Original message handler loaded as fallback');
     }
 
@@ -155,13 +155,16 @@ async function connectToWhatsApp(retryCount = 0) {
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            logger: pino({ level: 'silent' }), // Reduce noise in logs
+            logger: pino({ level: 'silent' }), // Reduce logging overhead
             browser: ['𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻', 'Chrome', '121.0.0'],
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 60000,
+            connectTimeoutMs: 30000, // Reduced from 60000
+            defaultQueryTimeoutMs: 20000, // Reduced from 60000
             markOnlineOnConnect: true,
-            keepAliveIntervalMs: 30000,
-            shouldIgnoreJid: jid => isJidBroadcast(jid)
+            keepAliveIntervalMs: 15000, // Reduced from 30000
+            emitOwnEvents: false, // Don't process own messages
+            syncFullHistory: false, // Don't sync history to save time
+            patchMessageBeforeSending: false, // Disable message patching
+            shouldIgnoreJid: jid => isJidBroadcast(jid) // Skip broadcast messages
         });
 
         // Handle connection updates
@@ -182,8 +185,8 @@ async function connectToWhatsApp(retryCount = 0) {
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
-                                     retryCount < RETRY_CONFIG.maxRetries;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
+                                         retryCount < RETRY_CONFIG.maxRetries;
 
                 connectionState.state = 'disconnected';
                 connectionState.connected = false;
@@ -213,17 +216,17 @@ async function connectToWhatsApp(retryCount = 0) {
                     logger.info('Attempting to load minimal message handler...');
                     const minimalHandler = require('./src/handlers/minimalHandler');
                     await minimalHandler.init();
-                    
+
                     // Set the minimal handler as our handler (guaranteed to work)
                     messageHandler = minimalHandler.messageHandler;
                     logger.info(`Using minimal message handler with ${minimalHandler.commands.size} basic commands`);
-                    
+
                     // Now try loading the simple handler if possible
                     try {
                         logger.info('Attempting to load the simple message handler...');
                         const simpleHandler = require('./src/handlers/simpleMessageHandler');
                         const initialized = await simpleHandler.init();
-                        
+
                         if (initialized) {
                             // Use the simple handler instead if it initializes
                             messageHandler = simpleHandler.messageHandler;
@@ -251,7 +254,7 @@ async function connectToWhatsApp(retryCount = 0) {
                                     for (const message of messages) {
                                         // Skip our own messages
                                         if (message.key.fromMe) continue;
-                                        
+
                                         // Call the handler with error catching
                                         try {
                                             await handlerFunction(sock, message);
@@ -261,13 +264,13 @@ async function connectToWhatsApp(retryCount = 0) {
                                     }
                                 }
                             };
-                            
+
                             // This will only run if there is actually a listener
                             if (sock.ev.listenerCount('messages.upsert') > 0) {
                                 // Remove existing handlers if any exist
                                 sock.ev.removeAllListeners('messages.upsert');
                             }
-                            
+
                             // Set up new handler
                             sock.ev.on('messages.upsert', messageProcessor);
                             return true;
@@ -276,7 +279,7 @@ async function connectToWhatsApp(retryCount = 0) {
                             return false;
                         }
                     };
-                    
+
                     // Try to set up the event handler with our message handler
                     if (setupMessageEventHandler(finalMessageHandler)) {
                         logger.info('Message event handler registered successfully');
@@ -288,35 +291,35 @@ async function connectToWhatsApp(retryCount = 0) {
                 } catch (err) {
                     logger.error('Failed to initialize message handlers:', err);
                     logger.error('Stack trace:', err.stack);
-                    
+
                     // Log detailed error information
                     logger.error('Detailed error info:', {
-                        name: err.name, 
+                        name: err.name,
                         message: err.message,
                         code: err.code,
                         type: typeof err,
                         hasStack: !!err.stack
                     });
-                    
+
                     // Continue with basic functionality even if handler initialization fails
                     logger.warn('Continuing with limited functionality due to message handler initialization failure');
-                    
+
                     // Set up a bare-minimum message handler as a last resort
                     const emergencyHandler = async (sock, message) => {
                         try {
                             // Only handle text messages with ! prefix
-                            const content = message.message?.conversation || 
-                                          message.message?.extendedTextMessage?.text;
-                            
+                            const content = message.message?.conversation ||
+                                              message.message?.extendedTextMessage?.text;
+
                             if (content && content.startsWith('!') && message.key?.remoteJid) {
                                 const sender = message.key.remoteJid;
                                 const command = content.slice(1).trim().toLowerCase();
-                                
+
                                 if (command === 'ping') {
                                     await sock.sendMessage(sender, { text: '🏓 Pong! (Emergency Handler)' });
                                 } else if (command === 'help') {
-                                    await sock.sendMessage(sender, { 
-                                        text: '*Emergency Mode Commands:*\n!ping - Check if bot is online\n!help - Show this help' 
+                                    await sock.sendMessage(sender, {
+                                        text: '*Emergency Mode Commands:*\n!ping - Check if bot is online\n!help - Show this help'
                                     });
                                 }
                             }
@@ -324,10 +327,10 @@ async function connectToWhatsApp(retryCount = 0) {
                             console.error('Emergency handler error:', err.message);
                         }
                     };
-                    
+
                     // Use the emergency handler
                     messageHandler = emergencyHandler;
-                    
+
                     // Set up basic event handler using the same setup function
                     if (setupMessageEventHandler(emergencyHandler)) {
                         logger.info('Emergency message handler registered successfully');
@@ -388,10 +391,10 @@ async function start() {
 process.on('uncaughtException', (err) => {
     logger.error('Uncaught Exception - recovering if possible:', err);
     console.error('Uncaught Exception occurred:', err);
-    
+
     // Only exit for severe errors that we can't recover from
-    if (err.code === 'EADDRINUSE' || 
-        err.code === 'EACCES' || 
+    if (err.code === 'EADDRINUSE' ||
+        err.code === 'EACCES' ||
         err.message.includes('Cannot find module')) {
         process.exit(1);
     }
