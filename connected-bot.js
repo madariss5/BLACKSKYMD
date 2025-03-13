@@ -13,7 +13,7 @@ const path = require('path');
 const pino = require('pino');
 
 // Import message handlers
-const { messageHandler } = require('./src/handlers/messageHandler');
+const { messageHandler, init: initMessageHandler } = require('./src/handlers/messageHandler');
 
 // Configure options based on environment variables
 const AUTH_DIR = process.env.AUTH_DIR || 'auth_info_qr';
@@ -614,6 +614,9 @@ async function start() {
                 // Initialize WhatsApp connection after server is ready
                 (async () => {
                     try {
+                        logger.info('Initializing message handler...');
+                        await initMessageHandler();
+                        
                         logger.info('Initializing WhatsApp connection...');
                         const socket = await connectToWhatsApp();
                         setupSessionBackup(); // Start backup process
