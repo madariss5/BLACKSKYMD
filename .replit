@@ -27,7 +27,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node bot-handler.js"
+args = "node simplified-bot.js"
 waitForPort = 5000
 
 [deployment]

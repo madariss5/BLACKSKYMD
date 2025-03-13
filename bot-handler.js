@@ -242,32 +242,47 @@ async function connectToWhatsApp(retryCount = 0) {
                     // Get message handler reference for use in event handler
                     const finalMessageHandler = messageHandler;
 
-                    try {
-                        // Set up message event handlers
-                        sock.ev.off('messages.upsert'); // Remove any existing handlers
-                        sock.ev.on('messages.upsert', async ({ messages, type }) => {
-                            if (type === 'notify') {
-                                for (const message of messages) {
-                                    if (message.key.fromMe) continue;
-
-                                    try {
-                                        // Do minimal extracting of details here
-                                        const msgType = message.message ? Object.keys(message.message)[0] : null;
-                                        const fromJid = message.key.remoteJid;
+                    // Set up event handler function - define what our handler will do
+                    const setupMessageEventHandler = (handlerFunction) => {
+                        try {
+                            // Create a wrapper function to process messages
+                            const messageProcessor = async ({ messages, type }) => {
+                                if (type === 'notify') {
+                                    for (const message of messages) {
+                                        // Skip our own messages
+                                        if (message.key.fromMe) continue;
                                         
-                                        // Call the message handler function
-                                        await finalMessageHandler(sock, message);
-                                    } catch (err) {
-                                        console.error('Message handling error:', err.message);
-                                        logger.error('Message handling error:', err);
+                                        // Call the handler with error catching
+                                        try {
+                                            await handlerFunction(sock, message);
+                                        } catch (err) {
+                                            console.error('Message handling error:', err.message);
+                                        }
                                     }
                                 }
+                            };
+                            
+                            // This will only run if there is actually a listener
+                            if (sock.ev.listenerCount('messages.upsert') > 0) {
+                                // Remove existing handlers if any exist
+                                sock.ev.removeAllListeners('messages.upsert');
                             }
-                        });
+                            
+                            // Set up new handler
+                            sock.ev.on('messages.upsert', messageProcessor);
+                            return true;
+                        } catch (err) {
+                            console.error('Error setting up message event handler:', err);
+                            return false;
+                        }
+                    };
+                    
+                    // Try to set up the event handler with our message handler
+                    if (setupMessageEventHandler(finalMessageHandler)) {
                         logger.info('Message event handler registered successfully');
-                    } catch (evErr) {
-                        logger.error('Failed to set up event handler:', evErr);
-                        throw evErr;
+                    } else {
+                        logger.error('Failed to set up event handler, will try with emergency handler');
+                        throw new Error('Event handler setup failed');
                     }
 
                 } catch (err) {
@@ -313,20 +328,14 @@ async function connectToWhatsApp(retryCount = 0) {
                     // Use the emergency handler
                     messageHandler = emergencyHandler;
                     
-                    // Set up basic event handler
-                    try {
-                        sock.ev.off('messages.upsert'); // Remove any existing handlers
-                        sock.ev.on('messages.upsert', ({ messages, type }) => {
-                            if (type === 'notify') {
-                                for (const message of messages) {
-                                    if (message.key.fromMe) continue;
-                                    emergencyHandler(sock, message).catch(console.error);
-                                }
-                            }
-                        });
-                        logger.info('Emergency message handler registered');
-                    } catch (evErr) {
-                        logger.error('Failed to set up emergency handler:', evErr);
+                    // Set up basic event handler using the same setup function
+                    if (setupMessageEventHandler(emergencyHandler)) {
+                        logger.info('Emergency message handler registered successfully');
+                    } else {
+                        logger.error('CRITICAL: Failed to set up even the emergency handler');
+                        // At this point, no message handlers are working
+                        // Log critical error but continue running the bot
+                        console.error('CRITICAL ERROR: Bot running with no message handlers');
                     }
                 }
             }
@@ -377,13 +386,22 @@ async function start() {
 
 // Handle uncaught errors
 process.on('uncaughtException', (err) => {
-    logger.error('Uncaught Exception:', err);
-    process.exit(1);
+    logger.error('Uncaught Exception - recovering if possible:', err);
+    console.error('Uncaught Exception occurred:', err);
+    
+    // Only exit for severe errors that we can't recover from
+    if (err.code === 'EADDRINUSE' || 
+        err.code === 'EACCES' || 
+        err.message.includes('Cannot find module')) {
+        process.exit(1);
+    }
+    // For other errors, try to continue
 });
 
 process.on('unhandledRejection', (err) => {
-    logger.error('Unhandled Rejection:', err);
-    process.exit(1);
+    logger.error('Unhandled Rejection - bot will continue running:', err);
+    console.error('Unhandled Promise Rejection:', err);
+    // Don't exit process - log and continue
 });
 
 // Start application
