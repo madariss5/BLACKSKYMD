@@ -57,6 +57,8 @@ async function loadCommands() {
                 { name: 'owner', module: require('../commands/owner') },
                 { name: 'reactions', module: require('../commands/reactions') },
                 { name: 'user', module: require('../commands/user') },
+                { name: 'user_extended', module: require('../commands/user_extended') },
+                { name: 'educational', module: require('../commands/educational') },
                 { name: 'utility', module: require('../commands/utility') }
             ];
             
