@@ -207,6 +207,393 @@
       "cooldown": 5,
       "permissions": ["user"],
       "handler": "reactions.facepalm"
+    },
+    {
+      "name": "highfive",
+      "description": "Give a high five to someone",
+      "usage": "!highfive @user",
+      "example": "!highfive @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.highfive"
+    },
+    {
+      "name": "hold",
+      "description": "Hold someone's hand",
+      "usage": "!hold @user",
+      "example": "!hold @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.hold"
+    },
+    {
+      "name": "handhold",
+      "description": "Hold hands with someone",
+      "usage": "!handhold @user",
+      "example": "!handhold @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.handhold"
+    },
+    {
+      "name": "nom",
+      "description": "Pretend to nibble on someone",
+      "usage": "!nom @user",
+      "example": "!nom @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.nom"
+    },
+    {
+      "name": "bite",
+      "description": "Bite someone playfully",
+      "usage": "!bite @user",
+      "example": "!bite @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.bite"
+    },
+    {
+      "name": "glomp",
+      "description": "Jump hug someone enthusiastically",
+      "usage": "!glomp @user",
+      "example": "!glomp @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.glomp"
+    },
+    {
+      "name": "kill",
+      "description": "Pretend to kill someone (joke)",
+      "usage": "!kill @user",
+      "example": "!kill @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.kill"
+    },
+    {
+      "name": "yeet",
+      "description": "Throw someone away",
+      "usage": "!yeet @user",
+      "example": "!yeet @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.yeet"
+    },
+    {
+      "name": "stare",
+      "description": "Stare at someone",
+      "usage": "!stare @user",
+      "example": "!stare @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.stare"
+    },
+    {
+      "name": "lick",
+      "description": "Lick someone playfully",
+      "usage": "!lick @user",
+      "example": "!lick @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.lick"
+    },
+    {
+      "name": "feed",
+      "description": "Feed someone",
+      "usage": "!feed @user",
+      "example": "!feed @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.feed"
+    },
+    {
+      "name": "bully",
+      "description": "Playfully bully someone",
+      "usage": "!bully @user",
+      "example": "!bully @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.bully"
+    },
+    {
+      "name": "happy",
+      "description": "Show that you're happy",
+      "usage": "!happy",
+      "example": "!happy",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.happy"
+    },
+    {
+      "name": "sad",
+      "description": "Show that you're sad",
+      "usage": "!sad",
+      "example": "!sad",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.sad"
+    },
+    {
+      "name": "angry",
+      "description": "Show that you're angry",
+      "usage": "!angry",
+      "example": "!angry",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.angry"
+    },
+    {
+      "name": "confused",
+      "description": "Show that you're confused",
+      "usage": "!confused",
+      "example": "!confused",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.confused"
+    },
+    {
+      "name": "think",
+      "description": "Show that you're thinking",
+      "usage": "!think",
+      "example": "!think",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.think"
+    },
+    {
+      "name": "peck",
+      "description": "Give a quick kiss on the cheek",
+      "usage": "!peck @user",
+      "example": "!peck @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.peck"
+    },
+    {
+      "name": "greet",
+      "description": "Greet someone formally",
+      "usage": "!greet @user",
+      "example": "!greet @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.greet"
+    },
+    {
+      "name": "salute",
+      "description": "Give a military salute",
+      "usage": "!salute @user",
+      "example": "!salute @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.salute"
+    },
+    {
+      "name": "shocked",
+      "description": "Show that you're shocked",
+      "usage": "!shocked",
+      "example": "!shocked",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.shocked"
+    },
+    {
+      "name": "shrug",
+      "description": "Show a shrug gesture",
+      "usage": "!shrug",
+      "example": "!shrug",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.shrug"
+    },
+    {
+      "name": "nod",
+      "description": "Nod in agreement",
+      "usage": "!nod",
+      "example": "!nod",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.nod"
+    },
+    {
+      "name": "shake",
+      "description": "Shake head in disagreement",
+      "usage": "!shake",
+      "example": "!shake",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.shake"
+    },
+    {
+      "name": "kick",
+      "description": "Kick someone (playfully)",
+      "usage": "!kick @user",
+      "example": "!kick @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.kick"
+    },
+    {
+      "name": "throw",
+      "description": "Throw something at someone",
+      "usage": "!throw @user",
+      "example": "!throw @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.throw"
+    },
+    {
+      "name": "shoot",
+      "description": "Pretend to shoot someone (joke)",
+      "usage": "!shoot @user",
+      "example": "!shoot @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.shoot"
+    },
+    {
+      "name": "thumbsup",
+      "description": "Give a thumbs up",
+      "usage": "!thumbsup",
+      "example": "!thumbsup",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.thumbsup"
+    },
+    {
+      "name": "thumbsdown",
+      "description": "Give a thumbs down",
+      "usage": "!thumbsdown",
+      "example": "!thumbsdown",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.thumbsdown"
+    },
+    {
+      "name": "excited",
+      "description": "Show that you're excited",
+      "usage": "!excited",
+      "example": "!excited",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.excited"
+    },
+    {
+      "name": "lewd",
+      "description": "React to something lewd (SFW)",
+      "usage": "!lewd",
+      "example": "!lewd",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.lewd"
+    },
+    {
+      "name": "bored",
+      "description": "Show that you're bored",
+      "usage": "!bored",
+      "example": "!bored",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.bored"
+    },
+    {
+      "name": "nervous",
+      "description": "Show that you're nervous",
+      "usage": "!nervous",
+      "example": "!nervous",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.nervous"
+    },
+    {
+      "name": "celebrate",
+      "description": "Celebrate something",
+      "usage": "!celebrate",
+      "example": "!celebrate",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.celebrate"
+    },
+    {
+      "name": "dizzy",
+      "description": "Show that you're dizzy",
+      "usage": "!dizzy",
+      "example": "!dizzy",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.dizzy"
+    },
+    {
+      "name": "bye",
+      "description": "Say goodbye to the group",
+      "usage": "!bye",
+      "example": "!bye",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.bye"
+    },
+    {
+      "name": "smack",
+      "description": "Smack someone",
+      "usage": "!smack @user",
+      "example": "!smack @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.smack"
+    },
+    {
+      "name": "nuzzle",
+      "description": "Nuzzle against someone",
+      "usage": "!nuzzle @user",
+      "example": "!nuzzle @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.nuzzle"
+    },
+    {
+      "name": "growl",
+      "description": "Growl at someone",
+      "usage": "!growl @user",
+      "example": "!growl @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.growl"
+    },
+    {
+      "name": "hifive",
+      "description": "Alternative command for highfive",
+      "usage": "!hifive @user",
+      "example": "!hifive @user",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.highfive"
+    },
+    {
+      "name": "disgusted",
+      "description": "Show disgust reaction",
+      "usage": "!disgusted",
+      "example": "!disgusted",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.disgusted"
+    },
+    {
+      "name": "scared",
+      "description": "Show that you're scared",
+      "usage": "!scared",
+      "example": "!scared",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.scared"
+    },
+    {
+      "name": "smile",
+      "description": "Show a bright smile",
+      "usage": "!smile",
+      "example": "!smile",
+      "cooldown": 5,
+      "permissions": ["user"],
+      "handler": "reactions.smile"
     }
   ]
 }
