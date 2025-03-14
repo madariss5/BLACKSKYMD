@@ -5,6 +5,7 @@
  */
 
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const logger = require('./logger');
 const Jimp = require('jimp');
@@ -13,6 +14,8 @@ const ffmpeg = require('fluent-ffmpeg');
 const { spawn } = require('child_process');
 const { promisify } = require('util');
 const exec = promisify(require('child_process').exec);
+// Import file-type/browser as FileType for compatibility with both CJS and ESM
+const fileTypeModule = import('file-type');
 
 /**
  * Create temporary directory for processing media
@@ -456,6 +459,210 @@ async function reverseMedia(inputPath, reverseAudio = true) {
   }
 }
 
+/**
+ * Optimize a GIF file for WhatsApp compatibility
+ * @param {string|Buffer} input Path to GIF file or buffer containing GIF
+ * @param {Object} options Configuration options
+ * @param {number} options.maxSize Maximum size in bytes (default: 1.5MB)
+ * @param {number} options.maxWidth Maximum width in pixels (default: 512)
+ * @param {number} options.maxHeight Maximum height in pixels (default: 512)
+ * @param {number} options.quality Quality for WebP conversion (1-100, default: 80)
+ * @param {boolean} options.keepAsGif Whether to keep as GIF format instead of converting to WebP
+ * @returns {Promise<Object>} Result containing buffer, path, and metadata
+ */
+async function optimizeGif(input, options = {}) {
+  const {
+    maxSize = 1.5 * 1024 * 1024, // 1.5MB default
+    maxWidth = 512,
+    maxHeight = 512,
+    quality = 80,
+    keepAsGif = false // NEW: Option to keep as GIF instead of converting to WebP
+  } = options;
+  
+  // Create a temporary directory for processing
+  const tempDir = await ensureTempDir();
+  const tempFilePath = path.join(tempDir, getRandomFileName('gif'));
+  const webpOutputPath = path.join(tempDir, getRandomFileName('webp'));
+  const optimizedGifPath = path.join(tempDir, getRandomFileName('gif'));
+  
+  let buffer;
+  let filePath;
+  let originalSize = 0;
+  
+  try {
+    // Determine input type and get buffer
+    if (typeof input === 'string') {
+      // Input is a file path
+      if (!fsSync.existsSync(input)) {
+        throw new Error(`GIF file not found: ${input}`);
+      }
+      
+      const stats = fsSync.statSync(input);
+      originalSize = stats.size;
+      buffer = fsSync.readFileSync(input);
+      filePath = input;
+    } else if (Buffer.isBuffer(input)) {
+      // Input is a buffer
+      originalSize = input.length;
+      buffer = input;
+      // Write buffer to temporary file for processing
+      fsSync.writeFileSync(tempFilePath, buffer);
+      filePath = tempFilePath;
+    } else {
+      throw new Error('Input must be a file path or buffer');
+    }
+    
+    // Check if already small enough
+    if (originalSize <= maxSize) {
+      logger.info(`GIF already optimized (${(originalSize/1024).toFixed(2)}KB), returning original`);
+      return {
+        buffer,
+        path: filePath,
+        originalSize,
+        optimizedSize: originalSize,
+        sizeReduction: 0,
+        wasOptimized: false,
+        format: 'gif'
+      };
+    }
+    
+    // Verify it's actually a GIF
+    // file-type is an ESM module, need to access it properly
+    let fileTypeResult;
+    try {
+      const FileType = await fileTypeModule;
+      fileTypeResult = await FileType.fileTypeFromBuffer(buffer);
+      if (!fileTypeResult || fileTypeResult.mime !== 'image/gif') {
+        throw new Error(`File is not a GIF: ${fileTypeResult?.mime || 'unknown type'}`);
+      }
+    } catch (typeError) {
+      logger.warn(`Could not verify file type: ${typeError.message}`);
+      // Continue assuming it's a GIF since we were provided with it as such
+    }
+    
+    logger.info(`Optimizing GIF: ${(originalSize/1024).toFixed(2)}KB → target <${(maxSize/1024).toFixed(2)}KB, keepAsGif: ${keepAsGif}`);
+    
+    // If keepAsGif is true, use FFmpeg to optimize while preserving GIF format
+    if (keepAsGif) {
+      // Use FFmpeg to optimize the GIF directly
+      return new Promise((resolve, reject) => {
+        ffmpeg(filePath)
+          .outputOptions([
+            '-vf', `scale=min(${maxWidth}\\,iw):min(${maxHeight}\\,ih)`,
+            '-gifflags', '-transdiff', 
+            '-q:v', '10' // Lower quality for better compression (3-30 range, lower is better)
+          ])
+          .output(optimizedGifPath)
+          .on('end', () => {
+            try {
+              const optimizedBuffer = fsSync.readFileSync(optimizedGifPath);
+              const optimizedSize = optimizedBuffer.length;
+              
+              logger.info(`GIF optimization complete: ${(originalSize/1024).toFixed(2)}KB → ${(optimizedSize/1024).toFixed(2)}KB (${Math.round((1 - optimizedSize/originalSize) * 100)}% reduction)`);
+              
+              resolve({
+                buffer: optimizedBuffer,
+                path: optimizedGifPath,
+                originalSize,
+                optimizedSize,
+                sizeReduction: originalSize - optimizedSize,
+                wasOptimized: true,
+                format: 'gif'
+              });
+            } catch (readError) {
+              reject(new Error(`Failed to read optimized GIF: ${readError.message}`));
+            }
+          })
+          .on('error', (ffmpegError) => {
+            logger.error(`FFmpeg GIF optimization failed: ${ffmpegError.message}`);
+            reject(ffmpegError);
+          })
+          .run();
+      });
+    }
+    
+    // If not keeping as GIF, use WebP conversion for maximum size reduction
+    try {
+      await sharp(buffer, { animated: true })
+        .resize(maxWidth, maxHeight, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .toFormat('webp', { 
+          quality, 
+          effort: 6  // Maximum compression effort
+        })
+        .toFile(webpOutputPath);
+      
+      // Read the optimized file
+      const optimizedBuffer = fsSync.readFileSync(webpOutputPath);
+      const optimizedSize = optimizedBuffer.length;
+      
+      logger.info(`Successfully optimized GIF to WebP: ${(originalSize/1024).toFixed(2)}KB → ${(optimizedSize/1024).toFixed(2)}KB (${Math.round((1 - optimizedSize/originalSize) * 100)}% reduction)`);
+      
+      return {
+        buffer: optimizedBuffer,
+        path: webpOutputPath,
+        originalSize,
+        optimizedSize,
+        sizeReduction: originalSize - optimizedSize,
+        wasOptimized: true,
+        format: 'webp'
+      };
+    } catch (sharpError) {
+      logger.warn(`Sharp WebP optimization failed: ${sharpError.message}, trying FFmpeg fallback`);
+      
+      // Fallback to FFmpeg for more aggressive optimization
+      return new Promise((resolve, reject) => {
+        ffmpeg(filePath)
+          .outputOptions([
+            '-vf', `scale=min(${maxWidth}\\,iw):min(${maxHeight}\\,ih)`,
+            '-gifflags', '-transdiff'
+          ])
+          .output(optimizedGifPath)
+          .on('end', () => {
+            try {
+              const optimizedBuffer = fsSync.readFileSync(optimizedGifPath);
+              const optimizedSize = optimizedBuffer.length;
+              
+              logger.info(`FFmpeg optimization complete: ${(originalSize/1024).toFixed(2)}KB → ${(optimizedSize/1024).toFixed(2)}KB (${Math.round((1 - optimizedSize/originalSize) * 100)}% reduction)`);
+              
+              resolve({
+                buffer: optimizedBuffer,
+                path: optimizedGifPath,
+                originalSize,
+                optimizedSize,
+                sizeReduction: originalSize - optimizedSize,
+                wasOptimized: true,
+                format: 'gif'
+              });
+            } catch (readError) {
+              reject(new Error(`Failed to read optimized GIF: ${readError.message}`));
+            }
+          })
+          .on('error', (ffmpegError) => {
+            logger.error(`FFmpeg optimization failed: ${ffmpegError.message}`);
+            reject(ffmpegError);
+          })
+          .run();
+      });
+    }
+  } catch (error) {
+    logger.error(`GIF optimization failed: ${error.message}`);
+    // Return original if optimization fails
+    return {
+      buffer,
+      path: filePath,
+      originalSize,
+      optimizedSize: originalSize,
+      sizeReduction: 0,
+      wasOptimized: false,
+      format: 'gif',
+      error: error.message
+    };
+  }
+}
+
 module.exports = {
   applyBlur,
   rotateImage,
@@ -469,6 +676,7 @@ module.exports = {
   adjustBrightness,
   adjustContrast,
   reverseMedia,
+  optimizeGif,
   ensureTempDir,
   getRandomFileName,
   fileExists

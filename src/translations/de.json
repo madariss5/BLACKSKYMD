@@ -290,6 +290,40 @@
       "toEveryone": "%s yeeetet alle %s"
     }
   },
+  "commands": {
+    "help": {
+      "command_info": "Befehl: %s",
+      "description": "Zeigt Hilfe für bestimmte Befehle an",
+      "error": "Beim Abrufen der Hilfeinformationen ist ein Fehler aufgetreten"
+    }
+  },
+  "menu": {
+    "basic_category": "Grundlagen",
+    "utility_category": "Hilfsprogramme",
+    "group_category": "Gruppenverwaltung",
+    "media_category": "Medienwerkzeuge",
+    "fun_category": "Spaß & Spiele",
+    "reactions_category": "Reaktionen",
+    "user_category": "Benutzerprofil",
+    "user_extended_category": "Erweitertes Profil",
+    "educational_category": "Bildung",
+    "nsfw_category": "NSFW Inhalte",
+    "example-with-error-handling_category": "Beispiele",
+    "group_new_category": "Erweiterte Gruppe",
+    "owner_category": "Besitzerbefehle",
+    "main_category": "Hauptbefehle",
+    "command_help": "Befehlshilfe",
+    "command_info": "Befehlsinformationen",
+    "available_commands": "Verfügbare Befehle",
+    "categories": "Befehlskategorien anzeigen",
+    "bot_menu": "Bot-Menü anzeigen",
+    "category": "Kategorie",
+    "help_examples": "Beispiele",
+    "description": "Beschreibung",
+    "usage": "Verwendung",
+    "no_info_available": "Keine zusätzlichen Informationen verfügbar",
+    "command_not_found": "Befehl '%s' nicht gefunden. Versuche %shelp für eine Liste der Befehle."
+  },
   "errors": {
     "fetch_failed": "Fehler beim Abrufen von Daten von der API",
     "invalid_arguments": "Ungültige Argumente. Verwendung: %s",

@@ -290,6 +290,40 @@
       "toEveryone": "%s yeets everyone %s"
     }
   },
+  "commands": {
+    "help": {
+      "command_info": "Command: %s",
+      "description": "Shows help for specific commands",
+      "error": "An error occurred while fetching help information"
+    }
+  },
+  "menu": {
+    "basic_category": "Basic",
+    "utility_category": "Utilities",
+    "group_category": "Group Management",
+    "media_category": "Media Tools",
+    "fun_category": "Fun & Games",
+    "reactions_category": "Reactions",
+    "user_category": "User Profile",
+    "user_extended_category": "Extended Profile",
+    "educational_category": "Educational",
+    "nsfw_category": "NSFW Content",
+    "example-with-error-handling_category": "Examples",
+    "group_new_category": "Advanced Group",
+    "owner_category": "Owner Commands",
+    "main_category": "Main",
+    "command_help": "Command Help",
+    "command_info": "Command Information",
+    "available_commands": "Available commands",
+    "categories": "View command categories",
+    "bot_menu": "Show bot menu",
+    "category": "Category",
+    "help_examples": "Examples",
+    "description": "Description",
+    "usage": "Usage",
+    "no_info_available": "No additional information available",
+    "command_not_found": "Command '%s' not found. Try %shelp for a list of commands."
+  },
   "errors": {
     "fetch_failed": "Failed to fetch data from API",
     "invalid_arguments": "Invalid arguments. Usage: %s",

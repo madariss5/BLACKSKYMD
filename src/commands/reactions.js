@@ -233,25 +233,85 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         // Then try to send the GIF if available - using centralized safeSendAnimatedGif utility
         if (hasGif) {
             try {
-                // Use our specialized GIF sending utility with built-in fallbacks
+                // Log GIF information
+                const stats = fs.statSync(gifPath);
+                const fileSize = stats.size / 1024; // KB
+                logger.info(`Preparing to send ${type} reaction GIF (${fileSize.toFixed(2)} KB) from ${gifPath}`);
+                
+                // Use our specialized GIF sending utility with improved animation options
                 await safeSendAnimatedGif(sock, sender, gifPath, '', { 
                     ptt: false,
-                    gifAttribution: type
+                    gifAttribution: type,
+                    keepFormat: true,    // Signal to preserve original format
+                    mediaType: 2,        // 2 = video type
+                    isAnimated: true,    // Signal this is animated content
+                    animated: true,      // Double confirm animation
+                    shouldLoop: true,    // Ensure animation loops
+                    seconds: 8           // Suggested duration for looping
                 });
                 logger.info(`Successfully sent ${type} reaction GIF to ${sender} using safeSendAnimatedGif`);
             } catch (gifError) {
                 logger.error(`Error sending animated GIF: ${gifError.message}`);
                 
-                // If the unified approach failed, try as an animated sticker
+                // Try MP4 conversion as a fallback approach (most compatible)
                 try {
-                    const buffer = fs.readFileSync(gifPath);
-                    await safeSendMessage(sock, sender, {
-                        sticker: buffer,
-                        isAnimated: true,
+                    logger.info(`Attempting direct MP4 conversion for ${type} reaction GIF`);
+                    const fs = require('fs');
+                    const path = require('path');
+                    const ffmpeg = require('fluent-ffmpeg');
+                    
+                    // Create temp directory and paths
+                    const tempDir = path.join(process.cwd(), 'temp');
+                    if (!fs.existsSync(tempDir)) {
+                        fs.mkdirSync(tempDir, { recursive: true });
+                    }
+                    
+                    const mp4Path = path.join(tempDir, `${type}-${Date.now()}.mp4`);
+                    
+                    // Convert to MP4
+                    await new Promise((resolve, reject) => {
+                        ffmpeg(gifPath)
+                            .outputOptions([
+                                '-movflags faststart',
+                                '-pix_fmt yuv420p',
+                                '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
+                            ])
+                            .output(mp4Path)
+                            .on('end', resolve)
+                            .on('error', reject)
+                            .run();
                     });
-                    logger.info(`Successfully sent ${type} reaction as animated sticker to ${sender} (fallback)`);
-                } catch (fallbackError) {
-                    logger.error(`Fallback sticker method also failed: ${fallbackError.message}`);
+                    
+                    // Send as video with gifPlayback
+                    const mp4Buffer = fs.readFileSync(mp4Path);
+                    await sock.sendMessage(sender, {
+                        video: mp4Buffer,
+                        gifPlayback: true,
+                        caption: ''
+                    });
+                    
+                    logger.info(`Successfully sent ${type} reaction as MP4 with gifPlayback to ${sender}`);
+                    
+                    // Clean up
+                    try {
+                        fs.unlinkSync(mp4Path);
+                    } catch (cleanupError) {
+                        logger.warn(`Failed to clean up temp MP4: ${cleanupError.message}`);
+                    }
+                } catch (mp4Error) {
+                    logger.error(`MP4 conversion fallback failed: ${mp4Error.message}`);
+                    
+                    // Last resort: try as regular sticker
+                    try {
+                        const buffer = fs.readFileSync(gifPath);
+                        await safeSendMessage(sock, sender, {
+                            sticker: buffer,
+                            isAnimated: true,
+                        });
+                        logger.info(`Successfully sent ${type} reaction as animated sticker to ${sender} (last resort)`);
+                    } catch (fallbackError) {
+                        logger.error(`All fallback methods failed: ${fallbackError.message}`);
+                    }
                 }
             }
         }
@@ -425,7 +485,13 @@ const reactionCommands = {
             // First try with our unified safeSendAnimatedGif helper
             try {
                 await safeSendAnimatedGif(sock, sender, gifPath, `${gifName} reaction (using safeSendAnimatedGif)`, {
-                    gifAttribution: gifName
+                    gifAttribution: gifName,
+                    keepFormat: true,    // Signal to preserve original format
+                    mediaType: 2,        // 2 = video type
+                    isAnimated: true,    // Signal this is animated content
+                    animated: true,      // Double confirm animation
+                    shouldLoop: true,    // Ensure animation loops
+                    seconds: 8           // Suggested duration for looping
                 });
                 logger.info(`Successfully sent test GIF using safeSendAnimatedGif utility`);
             } catch (unifiedError) {

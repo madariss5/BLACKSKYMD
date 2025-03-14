@@ -47,6 +47,14 @@ const categoryNames = {
 // Import necessary utilities
 const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
+// Symbols for menu formatting
+const symbols = {
+    arrow: "➣",
+    bullet: "•",
+    star: "✦",
+    dot: "·"
+};
+
 // Menu command handlers
 const menuCommands = {
     async menu(sock, message, args) {
@@ -113,11 +121,22 @@ const menuCommands = {
 
             // Send menu with image if possible
             try {
-                const imageUrl = 'https://i.ibb.co/Wn0nczF/BLACKSKY-icon.png';
-                await safeSendMessage(sock, sender, {
-                    image: { url: imageUrl },
-                    caption: menuText
-                });
+                // First try with local image file if available, then fallback to URL
+                const localImagePath = path.join(process.cwd(), 'generated-icon.png');
+                
+                // Check if local image exists
+                try {
+                    await fs.access(localImagePath);
+                    // Local image exists, use it
+                    await safeSendMessage(sock, sender, {
+                        image: { url: localImagePath },
+                        caption: menuText
+                    });
+                } catch (accessErr) {
+                    // Local file doesn't exist, try URL
+                    // The URL method can cause issues, use safeSendImage method instead
+                    await safeSendImage(sock, sender, 'https://i.ibb.co/Wn0nczF/BLACKSKY-icon.png', menuText);
+                }
             } catch (imgErr) {
                 logger.warn('Failed to send menu with image, sending text-only', imgErr);
                 await safeSendText(sock, sender, menuText);
@@ -235,9 +254,9 @@ const menuCommands = {
         
         } catch (err) {
             logger.error('Help command error:', err);
-            await safeSendMessage(sock, message.key.remoteJid, { 
-                text: `❌ ${languageManager.getText('basic.help.error', config.bot.language || 'en')}` 
-            });
+            await safeSendText(sock, message.key.remoteJid, 
+                `❌ ${languageManager.getText('basic.help.error', config.bot.language || 'en')}`
+            );
         }
     }
 };
