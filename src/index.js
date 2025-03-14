@@ -1,6 +1,6 @@
 const express = require('express');
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const { messageHandler } = require('./handlers/messageHandler');
+const handler = require('./handlers/ultra-minimal-handler');
 const { commandLoader } = require('./utils/commandLoader');
 const commandModules = require('./commands/index');
 const logger = require('./utils/logger');
@@ -153,6 +153,10 @@ qrApp.get('/', (req, res) => {
 // Start WhatsApp connection
 async function startConnection() {
     try {
+        // Initialize the handler first
+        await handler.init();
+        logger.info('Command handler initialized');
+
         // Ensure auth directory exists
         await fs.mkdir(AUTH_DIRECTORY, { recursive: true });
 
@@ -209,10 +213,12 @@ async function startConnection() {
         });
 
         sock.ev.on('creds.update', saveCreds);
+
+        // Wire up message handler using our ultra-minimal-handler
         sock.ev.on('messages.upsert', async (m) => {
             if (m.type === 'notify') {
                 try {
-                    await messageHandler(sock, m.messages[0]);
+                    await handler.messageHandler(sock, m.messages[0]);
                 } catch (err) {
                     logger.error('Message handling error:', err);
                 }

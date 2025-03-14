@@ -24,8 +24,8 @@ async function loadCommands() {
                 try {
                     const filePath = file;
                     const moduleData = require(filePath);
-                    const category = path.basename(file, '.js');
 
+                    // Handle both direct commands and categorized commands
                     if (moduleData.commands) {
                         Object.entries(moduleData.commands).forEach(([name, func]) => {
                             if (typeof func === 'function' && name !== 'init') {
@@ -38,16 +38,35 @@ async function loadCommands() {
                                     }
                                 });
                                 loadedCount++;
-                                logger.log(`Loaded command: ${name} from ${category}`);
+                                logger.log(`Loaded command: ${name}`);
                             }
                         });
 
                         // Initialize module if it has init function
                         if (typeof moduleData.init === 'function') {
-                            moduleData.init().catch(err => {
-                                logger.error(`Error initializing module ${category}:`, err);
-                            });
+                            try {
+                                await moduleData.init();
+                                logger.log(`Initialized module: ${path.basename(file, '.js')}`);
+                            } catch (err) {
+                                logger.error(`Error initializing module ${path.basename(file, '.js')}:`, err);
+                            }
                         }
+                    } else if (typeof moduleData === 'object') {
+                        // Direct command exports
+                        Object.entries(moduleData).forEach(([name, func]) => {
+                            if (typeof func === 'function' && name !== 'init') {
+                                commands.set(name, async (sock, message, args) => {
+                                    try {
+                                        return await func(sock, message, args);
+                                    } catch (err) {
+                                        logger.error(`Error executing command ${name}:`, err);
+                                        throw err;
+                                    }
+                                });
+                                loadedCount++;
+                                logger.log(`Loaded direct command: ${name}`);
+                            }
+                        });
                     }
                 } catch (err) {
                     logger.error(`Error loading commands from ${file}:`, err);
@@ -56,6 +75,7 @@ async function loadCommands() {
         }
 
         logger.log(`Successfully loaded ${loadedCount} commands`);
+        logger.log('Available commands:', Array.from(commands.keys()));
     } catch (err) {
         logger.error('Error loading commands:', err);
     }
@@ -135,7 +155,7 @@ async function messageHandler(sock, message) {
         }
 
         // Check for command prefix
-        if (content.startsWith('!') || content.startsWith('.')) {
+        if (content.startsWith('!') || content.startsWith('/') || content.startsWith('.')) {
             const prefix = content.charAt(0);
             const [commandName, ...args] = content.slice(1).trim().split(' ');
             const cmd = commandName.toLowerCase();
