@@ -66,7 +66,7 @@ const playNextInQueue = async (sock, sender) => {
     if (queue && queue.length > 0) {
         const audioBuffer = queue.shift();
         try {
-            await sock.sendMessage(sender, { audio: { url: audioBuffer } });
+            await safeSendMessage(sock, sender, { audio: { url: audioBuffer } });
             if(queue.length > 0) {
                 setTimeout(() => playNextInQueue(sock, sender), 1000);
             } else {
@@ -117,7 +117,7 @@ const mediaCommands = {
             stream.on('data', chunk => chunks.push(chunk));
             stream.on('end', async () => {
                 const buffer = Buffer.concat(chunks);
-                await sock.sendMessage(remoteJid, { 
+                await safeSendMessage(sock, remoteJid, { 
                     audio: { url: buffer },
                     mimetype: 'audio/mp4'
                 });
@@ -163,7 +163,7 @@ const mediaCommands = {
                 .webp()
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 sticker: { url: outputPath }
             });
 
@@ -203,7 +203,7 @@ const mediaCommands = {
                 .png()
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: '✅ Here\'s your image!'
             });
@@ -238,7 +238,7 @@ const mediaCommands = {
             stream.on('data', chunk => chunks.push(chunk));
             stream.on('end', async () => {
                 const buffer = Buffer.concat(chunks);
-                await sock.sendMessage(remoteJid, { 
+                await safeSendMessage(sock, remoteJid, { 
                     audio: { url: buffer },
                     mimetype: 'audio/mp4'
                 });
@@ -272,7 +272,7 @@ const mediaCommands = {
             stream.on('data', chunk => chunks.push(chunk));
             stream.on('end', async () => {
                 const buffer = Buffer.concat(chunks);
-                await sock.sendMessage(remoteJid, { 
+                await safeSendMessage(sock, remoteJid, { 
                     video: { url: buffer }
                 });
             });
@@ -321,7 +321,7 @@ const mediaCommands = {
                     .png()
                     .toFile(outputPath);
 
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     image: { url: outputPath },
                     caption: '✅ Here\'s your enhanced image!'
                 });
@@ -378,7 +378,7 @@ const mediaCommands = {
                     .png()
                     .toFile(outputPath);
 
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     image: { url: outputPath },
                     caption: `✅ Image sharpened with level ${level}!`
                 });
@@ -433,7 +433,7 @@ const mediaCommands = {
                     .on('error', reject);
             });
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 video: { url: outputPath },
                 caption: '✅ Here\'s your reversed video!'
             });
@@ -491,7 +491,7 @@ const mediaCommands = {
                 .webp()
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 sticker: { url: outputPath }
             });
 
@@ -562,7 +562,7 @@ const mediaCommands = {
             }
             await img.save(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 sticker: { url: outputPath }
             });
 
@@ -612,7 +612,7 @@ const mediaCommands = {
                 .webp()
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 sticker: { url: outputPath }
             });
 
@@ -662,7 +662,7 @@ const mediaCommands = {
                     .on('error', reject);
             });
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 video: { url: outputPath }
             });
 
@@ -717,7 +717,7 @@ const mediaCommands = {
                     .run();
             });
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 video: { url: outputPath },
                 caption: '✅ Here\'s your trimmed video!'
             });
@@ -778,7 +778,7 @@ const mediaCommands = {
                     .run();
             });
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 video: { url: outputPath },
                 caption: `✅ Video speed adjusted to ${speed}x`
             });
@@ -821,7 +821,7 @@ const mediaCommands = {
                 })
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: `✅ Image brightness adjusted to ${level}x`
             });
@@ -863,7 +863,7 @@ const mediaCommands = {
                 })
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: `✅ Image contrast adjusted to ${level}x`
             });
@@ -903,7 +903,7 @@ const mediaCommands = {
                 .blur(sigma)
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: `✅ Applied blur effect (sigma: ${sigma})`
             });
@@ -943,7 +943,7 @@ const mediaCommands = {
                 .rotate(angle)
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: `✅ Image rotated by ${angle} degrees`
             });
@@ -984,7 +984,7 @@ const mediaCommands = {
                 .flop(direction=== 'horizontal')
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url:outputPath },
                 caption: `✅ Image flipped ${direction}ly`
             });
@@ -1024,7 +1024,7 @@ const mediaCommands = {
                 .tint({ r, g, b })
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: `✅ Applied color tint (R:${r}, G:${g}, B:${b})`
             });
@@ -1058,7 +1058,7 @@ const mediaCommands = {
                 .negate()
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: '✅ Image colors inverted'
             });
@@ -1098,7 +1098,7 @@ const mediaCommands = {
                 .grayscale()
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: '✅ Image converted to grayscale!'
             });
@@ -1146,7 +1146,7 @@ const mediaCommands = {
                 .rotate(degrees)
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: `✅ Image rotated ${degrees}°!`
             });
@@ -1195,7 +1195,7 @@ const mediaCommands = {
                 .flop(direction === 'horizontal')
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: `✅ Image flipped ${direction}ly!`
             });
@@ -1236,7 +1236,7 @@ const mediaCommands = {
                 .negate()
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: '✅ Image colors inverted!'
             });
@@ -1284,7 +1284,7 @@ const mediaCommands = {
                 .blur(sigma)
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: `✅ Image blurred with sigma ${sigma}!`
             });
@@ -1332,7 +1332,7 @@ const mediaCommands = {
                 .tint({ r, g, b })
                 .toFile(outputPath);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 image: { url: outputPath },
                 caption: `✅ Image tinted with RGB(${r}, ${g}, ${b})!`
             });

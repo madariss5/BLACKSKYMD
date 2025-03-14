@@ -1,7 +1,7 @@
 // Import required modules
 const logger = require('../utils/logger');
 const axios = require('axios');
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+const { safeSendText, safeSendMessage, safeSendImage, safeSendAnimatedGif } = require('../utils/jidHelper');
 
 // Cache for user information
 const userCache = new Map();
@@ -134,7 +134,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
 
         // Validate target if provided
         if (target && !validateMention(target)) {
-            await sock.sendMessage(sender, { text: `❌ Invalid target mention for ${type} command` });
+            await safeSendMessage(sock, sender, { text: `❌ Invalid target mention for ${type} command` });
             return;
         }
 
@@ -216,45 +216,36 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         await safeSendText(sock, sender, decoratedMessage);
         logger.info(`Successfully sent ${type} reaction text to ${sender}`);
         
-        // Then try to send the GIF if available
+        // Then try to send the GIF if available - using centralized safeSendAnimatedGif utility
         if (hasGif) {
             try {
-                // Read the GIF file directly
-                const buffer = fs.readFileSync(gifPath);
+                // Use our specialized GIF sending utility with built-in fallbacks
+                await safeSendAnimatedGif(sock, sender, gifPath, '', { 
+                    ptt: false,
+                    gifAttribution: type
+                });
+                logger.info(`Successfully sent ${type} reaction GIF to ${sender} using safeSendAnimatedGif`);
+            } catch (gifError) {
+                logger.error(`Error sending animated GIF: ${gifError.message}`);
                 
-                // Try to send as video with GIF playback first (most compatible)
+                // If the unified approach failed, try as an animated sticker
                 try {
-                    await sock.sendMessage(sender, {
-                        video: buffer,
-                        caption: message,
-                        gifPlayback: true
-                    });
-                    logger.info(`Successfully sent ${type} reaction as GIF to ${sender}`);
-                    return;
-                } catch (gifError) {
-                    logger.warn(`Could not send as GIF playback video: ${gifError.message}`);
-                }
-                
-                // Try as regular image
-                try {
+                    const buffer = fs.readFileSync(gifPath);
                     await safeSendMessage(sock, sender, {
-                        image: buffer,
-                        caption: message
+                        sticker: buffer,
+                        isAnimated: true,
                     });
-                    logger.info(`Successfully sent ${type} reaction as image to ${sender}`);
-                    return;
-                } catch (imageError) {
-                    logger.warn(`Could not send as image: ${imageError.message}`);
+                    logger.info(`Successfully sent ${type} reaction as animated sticker to ${sender} (fallback)`);
+                } catch (fallbackError) {
+                    logger.error(`Fallback sticker method also failed: ${fallbackError.message}`);
                 }
-            } catch (fileError) {
-                logger.error(`Error reading GIF file: ${fileError.message}`);
             }
         }
     } catch (error) {
         logger.error('Error in reaction command:', error);
         try {
             // Simple error message
-            await sock.sendMessage(sender, { 
+            await safeSendMessage(sock, sender, { 
                 text: `Error processing ${type} command: ${error.message}` 
             });
         } catch (sendErr) {
@@ -383,7 +374,7 @@ const reactionCommands = {
         
         // Check if the file exists
         if (!fs.existsSync(gifPath)) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `❌ GIF not found: ${gifName}.gif\n\nTry !testgif to see available GIFs.`
             });
             return;
@@ -402,43 +393,71 @@ const reactionCommands = {
             }
             
             // Send info message
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*Testing GIF: ${gifName}*\n` +
                       `File size: ${fileSizeKB} KB\n` +
                       `Full path: ${gifPath}\n\n` +
                       `${sourceInfo}`
             });
             
-            // Read the GIF file
-            const buffer = fs.readFileSync(gifPath);
-            
-            // Try to send as video with GIF playback (most compatible)
+            // First try with our unified safeSendAnimatedGif helper
             try {
-                await sock.sendMessage(sender, {
-                    video: buffer,
-                    caption: `${gifName} reaction`,
-                    gifPlayback: true
+                await safeSendAnimatedGif(sock, sender, gifPath, `${gifName} reaction (using safeSendAnimatedGif)`, {
+                    gifAttribution: gifName
                 });
-                return;
-            } catch (gifError) {
-                logger.warn(`Could not send as GIF playback video: ${gifError.message}`);
-            }
-            
-            // Fallback to regular image if video fails
-            try {
-                await sock.sendMessage(sender, {
-                    image: buffer,
-                    caption: `${gifName} reaction`
-                });
-                return;
-            } catch (imageError) {
-                logger.warn(`Could not send as image: ${imageError.message}`);
+                logger.info(`Successfully sent test GIF using safeSendAnimatedGif utility`);
+            } catch (unifiedError) {
+                logger.error(`Error with unified GIF sender: ${unifiedError.message}`);
                 
-                // Final error if both methods fail
-                await safeSendText(sock, sender, `❌ Error sending GIF: Could not send as video or image.`);
+                // If the unified approach failed, try individual methods for diagnostic purposes
+                const buffer = fs.readFileSync(gifPath);
+                
+                // Method 1: Try to send as sticker with animation
+                try {
+                    await safeSendMessage(sock, sender, {
+                        sticker: buffer,
+                        isAnimated: true,
+                    });
+                    logger.info(`Successfully sent test GIF as animated sticker`);
+                } catch (stickerError) {
+                    logger.warn(`Could not send as animated sticker: ${stickerError.message}`);
+                }
+                
+                // Method 2: Try to send directly as MP4 with forced mimetype
+                try {
+                    const FileType = require('file-type');
+                    const fileTypeResult = await FileType.fromBuffer(buffer);
+                    
+                    await safeSendMessage(sock, sender, {
+                        video: buffer,
+                        gifPlayback: true,
+                        ptt: false,
+                        mimetype: fileTypeResult?.mime || 'video/mp4',
+                        caption: `${gifName} reaction (as MP4)`,
+                    });
+                    logger.info(`Successfully sent test GIF as direct MP4`);
+                } catch (mp4Error) {
+                    logger.warn(`Could not send as MP4: ${mp4Error.message}`);
+                }
+                
+                // Method 3: Try with document method
+                try {
+                    await safeSendMessage(sock, sender, {
+                        document: buffer,
+                        mimetype: 'image/gif',
+                        fileName: `${gifName}.gif`,
+                        caption: `${gifName} reaction (as document)`
+                    });
+                    logger.info(`Successfully sent test GIF as document`);
+                } catch (docError) {
+                    logger.warn(`Could not send as document: ${docError.message}`);
+                    
+                    // Final error if all methods fail
+                    await safeSendText(sock, sender, `❌ Error sending GIF: None of the sending methods worked.`);
+                }
             }
         } catch (error) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `❌ Error testing GIF: ${error.message}`
             });
         }

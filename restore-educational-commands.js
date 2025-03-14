@@ -1,4 +1,13 @@
 /**
+ * Restore Educational Commands Module
+ * This script restores the educational commands from a backup
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+// Define the module content
+const moduleContent = `/**
  * Educational Command Module
  * Educational tools and utilities for WhatsApp Bot
  */
@@ -16,7 +25,7 @@ const educationalCommands = {
             const textToTranslate = textParts.join(' ');
 
             if (!targetLang || !textToTranslate) {
-                await safeSendText(sock, remoteJid, '*🌐 Usage:* .translate [target_language] [text]\nExample: .translate es Hello, how are you?');
+                await safeSendText(sock, remoteJid, '*🌐 Usage:* .translate [target_language] [text]\\nExample: .translate es Hello, how are you?');
                 return;
             }
 
@@ -24,14 +33,14 @@ const educationalCommands = {
             const validLanguageCodes = ['af', 'sq', 'am', 'ar', 'hy', 'az', 'eu', 'be', 'bn', 'bs', 'bg', 'ca', 'ceb', 'zh', 'zh-CN', 'zh-TW', 'co', 'hr', 'cs', 'da', 'nl', 'en', 'eo', 'et', 'fi', 'fr', 'fy', 'gl', 'ka', 'de', 'el', 'gu', 'ht', 'ha', 'haw', 'he', 'hi', 'hmn', 'hu', 'is', 'ig', 'id', 'ga', 'it', 'ja', 'jv', 'kn', 'kk', 'km', 'rw', 'ko', 'ku', 'ky', 'lo', 'la', 'lv', 'lt', 'lb', 'mk', 'mg', 'ms', 'ml', 'mt', 'mi', 'mr', 'mn', 'my', 'ne', 'no', 'ny', 'or', 'ps', 'fa', 'pl', 'pt', 'pa', 'ro', 'ru', 'sm', 'gd', 'sr', 'st', 'sn', 'sd', 'si', 'sk', 'sl', 'so', 'es', 'su', 'sw', 'sv', 'tl', 'tg', 'ta', 'tt', 'te', 'th', 'tr', 'tk', 'uk', 'ur', 'ug', 'uz', 'vi', 'cy', 'xh', 'yi', 'yo', 'zu'];
 
             if (!validLanguageCodes.includes(targetLang.toLowerCase())) {
-                await safeSendText(sock, remoteJid, '*❌ Invalid target language code*\nPlease use a valid 2-letter ISO language code (e.g., "es" for Spanish).');
+                await safeSendText(sock, remoteJid, '*❌ Invalid target language code*\\nPlease use a valid 2-letter ISO language code (e.g., "es" for Spanish).');
                 return;
             }
 
             await safeSendText(sock, remoteJid, '🔄 Translating...');
 
             // Use a free translation API
-            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(textToTranslate)}`;
+            const url = \`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=\${targetLang}&dt=t&q=\${encodeURIComponent(textToTranslate)}\`;
 
             const response = await axios.get(url);
 
@@ -39,9 +48,9 @@ const educationalCommands = {
                 const translation = response.data[0].map(item => item[0]).join('');
                 const detectedLang = response.data[2];
 
-                await safeSendText(sock, remoteJid, `*🌐 Translation (${detectedLang} → ${targetLang})*\n\n${translation}`);
+                await safeSendText(sock, remoteJid, \`*🌐 Translation (\${detectedLang} → \${targetLang})*\\n\\n\${translation}\`);
             } else {
-                await safeSendText(sock, remoteJid, '*❌ Translation failed*\nPlease try again with a different text or language.');
+                await safeSendText(sock, remoteJid, '*❌ Translation failed*\\nPlease try again with a different text or language.');
             }
         } catch (err) {
             logger.error('Error in translate command:', err);
@@ -59,47 +68,47 @@ const educationalCommands = {
             const word = args.join(' ').trim();
 
             if (!word) {
-                await safeSendText(sock, remoteJid, '*📚 Usage:* .dictionary [word]\nExample: .dictionary serendipity');
+                await safeSendText(sock, remoteJid, '*📚 Usage:* .dictionary [word]\\nExample: .dictionary serendipity');
                 return;
             }
 
             await safeSendText(sock, remoteJid, '🔍 Looking up word...');
 
             // Use a free dictionary API
-            const response = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+            const response = await axios.get(\`https://api.dictionaryapi.dev/api/v2/entries/en/\${encodeURIComponent(word)}\`);
 
             if (response.data && response.data.length > 0) {
                 const entry = response.data[0];
-                let result = `*📚 ${entry.word}*\n`;
+                let result = \`*📚 \${entry.word}*\\n\`;
                 
                 if (entry.phonetic) {
-                    result += `Pronunciation: ${entry.phonetic}\n`;
+                    result += \`Pronunciation: \${entry.phonetic}\\n\`;
                 }
                 
-                result += '\n';
+                result += '\\n';
 
                 // Get definitions
                 if (entry.meanings && entry.meanings.length > 0) {
                     entry.meanings.forEach((meaning, index) => {
                         if (index < 3) { // Limit to 3 meanings to avoid overflow
-                            result += `*${meaning.partOfSpeech}*\n`;
+                            result += \`*\${meaning.partOfSpeech}*\\n\`;
                             
                             meaning.definitions.slice(0, 2).forEach((def, idx) => {
-                                result += `${idx + 1}. ${def.definition}\n`;
+                                result += \`\${idx + 1}. \${def.definition}\\n\`;
                                 
                                 if (def.example) {
-                                    result += `   Example: "${def.example}"\n`;
+                                    result += \`   Example: "\${def.example}"\\n\`;
                                 }
                             });
                             
-                            result += '\n';
+                            result += '\\n';
                         }
                     });
                 }
                 
                 await safeSendText(sock, remoteJid, result);
             } else {
-                await safeSendText(sock, remoteJid, `*❌ Word not found*\nCould not find the word "${word}" in the dictionary.`);
+                await safeSendText(sock, remoteJid, \`*❌ Word not found*\\nCould not find the word "\${word}" in the dictionary.\`);
             }
         } catch (err) {
             logger.error('Error in dictionary command:', err);
@@ -121,16 +130,16 @@ const educationalCommands = {
             const expression = args.join(' ').trim();
 
             if (!expression) {
-                await safeSendText(sock, remoteJid, '*🔢 Usage:* .calculate [expression]\nExample: .calculate 2 + 2 * 3');
+                await safeSendText(sock, remoteJid, '*🔢 Usage:* .calculate [expression]\\nExample: .calculate 2 + 2 * 3');
                 return;
             }
 
             try {
                 // Safely evaluate the expression
                 const result = mathjs.evaluate(expression);
-                await safeSendText(sock, remoteJid, `*🔢 ${expression} = ${result}*`);
+                await safeSendText(sock, remoteJid, \`*🔢 \${expression} = \${result}*\`);
             } catch (error) {
-                await safeSendText(sock, remoteJid, `*❌ Math Error:* ${error.message}`);
+                await safeSendText(sock, remoteJid, \`*❌ Math Error:* \${error.message}\`);
             }
         } catch (err) {
             logger.error('Error in calculate command:', err);
@@ -147,7 +156,7 @@ const educationalCommands = {
             const element = args[0]?.trim();
 
             if (!element) {
-                await safeSendText(sock, remoteJid, '*🧪 Usage:* .periodic [element]\nExample: .periodic Na');
+                await safeSendText(sock, remoteJid, '*🧪 Usage:* .periodic [element]\\nExample: .periodic Na');
                 return;
             }
 
@@ -187,10 +196,10 @@ const educationalCommands = {
             const foundElement = elements[key];
 
             if (foundElement) {
-                const response = `*🧪 ${foundElement.name} (${foundElement.symbol})*\n\n• Atomic Number: ${foundElement.atomicNumber}\n• Atomic Weight: ${foundElement.weight} u\n\nElement ${foundElement.atomicNumber} in the periodic table.`;
+                const response = \`*🧪 \${foundElement.name} (\${foundElement.symbol})*\\n\\n• Atomic Number: \${foundElement.atomicNumber}\\n• Atomic Weight: \${foundElement.weight} u\\n\\nElement \${foundElement.atomicNumber} in the periodic table.\`;
                 await safeSendText(sock, remoteJid, response);
             } else {
-                await safeSendText(sock, remoteJid, `*❌ Element not found*\nCould not find element with symbol "${element}".`);
+                await safeSendText(sock, remoteJid, \`*❌ Element not found*\\nCould not find element with symbol "\${element}".\`);
             }
         } catch (err) {
             logger.error('Error in periodic command:', err);
@@ -214,3 +223,23 @@ module.exports = {
     category: 'educational',
     init: educationalCommands.init
 };
+`;
+
+// Path to the educational commands file
+const filePath = path.join(__dirname, 'src', 'commands', 'educational', 'commands.js');
+
+// Create directory if it doesn't exist
+const dirPath = path.dirname(filePath);
+if (!fs.existsSync(dirPath)) {
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
+// Write the file
+fs.writeFile(filePath, moduleContent, 'utf8', (err) => {
+  if (err) {
+    console.error('Error writing file:', err);
+    return;
+  }
+  
+  console.log('✅ Successfully restored educational commands module!');
+});

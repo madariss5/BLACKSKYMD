@@ -50,7 +50,7 @@ Type ${prefix}help [command] for detailed help on any command.`.trim();
             await safeSendText(sock, message.key.remoteJid, 'Pinging... 🏓');
             const ping = Date.now() - start;
 
-            await sock.sendMessage(message.key.remoteJid, {
+            await safeSendMessage(sock, message.key.remoteJid, {
                 text: `*🏓 Pong!*\n\n*Speed:* ${ping}ms\n*Status:* Active ✅`
             });
         } catch (err) {

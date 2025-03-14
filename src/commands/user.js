@@ -516,7 +516,7 @@ const userCommands = {
             try {
                 const cardPath = await createProfileCard(newProfile);
                 if (cardPath) {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         image: { url: cardPath },
                         caption: '🎉 Here\'s your new profile card!'
                     });
@@ -592,7 +592,7 @@ ${rankText}
                         '🎭 Your Profile Card' : 
                         `🎭 Profile Card: ${profile.name}`;
                         
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         image: { url: cardPath },
                         caption: caption
                     });
@@ -675,7 +675,7 @@ ${rankText}
             // If no theme provided, list available themes
             if (!theme) {
                 const availableThemes = Object.keys(colorThemes).join(', ');
-                await sock.sendMessage(sender, { 
+                await safeSendMessage(sock, sender, { 
                     text: `*🎨 Available Themes:*\n${availableThemes}\n\n*Usage:* .settheme [theme]\n*Example:* .settheme blue` 
                 });
                 return;
@@ -684,7 +684,7 @@ ${rankText}
             // Check if theme exists
             if (!colorThemes[theme]) {
                 const availableThemes = Object.keys(colorThemes).join(', ');
-                await sock.sendMessage(sender, { 
+                await safeSendMessage(sock, sender, { 
                     text: `*❌ Error:* Invalid theme!\n\n*Available Themes:*\n${availableThemes}` 
                 });
                 return;
@@ -695,7 +695,7 @@ ${rankText}
             userDatabase.updateUserProfile(sender, { theme: theme });
             
             // Send success message
-            await sock.sendMessage(sender, { 
+            await safeSendMessage(sock, sender, { 
                 text: `*✅ Success:* Profile theme set to *${theme}*!` 
             });
             
@@ -703,7 +703,7 @@ ${rankText}
             try {
                 const cardPath = await createProfileCard(profile, theme);
                 if (cardPath) {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         image: { url: cardPath },
                         caption: `🎨 Here's a preview of your profile card with the *${theme}* theme!`
                     });
@@ -759,7 +759,7 @@ ${rankText}
                 try {
                     const cardPath = await createProfileCard(profile);
                     if (cardPath) {
-                        await sock.sendMessage(sender, {
+                        await safeSendMessage(sock, sender, {
                             image: { url: cardPath },
                             caption: '🎭 Here\'s your updated profile card!'
                         });
@@ -808,7 +808,7 @@ ${rankText}
             try {
                 const cardPath = await levelingSystem.generateLevelCard(sender, profile);
                 if (cardPath) {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         image: { url: cardPath },
                         caption: `🏆 Your Level ${progress.currentLevel} Status Card`
                     });
@@ -850,7 +850,7 @@ ${rankText}
                 const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                 const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
-                await sock.sendMessage(sender, { 
+                await safeSendMessage(sock, sender, { 
                     text: `*⏰ Daily Reward:* Already claimed!\n\n*Next claim in:* ${hoursLeft}h ${minutesLeft}m` 
                 });
                 return;
@@ -948,7 +948,7 @@ ${rankText}
             const validTypes = ['xp', 'coins', 'level'];
 
             if (!validTypes.includes(type)) {
-                await sock.sendMessage(sender, { 
+                await safeSendMessage(sock, sender, { 
                     text: `*📊 Available Leaderboard Types:*\n${validTypes.join(', ')}` 
                 });
                 return;
@@ -989,7 +989,7 @@ ${users.map((user, i) => `${i + 1}. *${user.name}*: ${formatNumber(user.value)} 
                     if (topUserProfile) {
                         const cardPath = await levelingSystem.generateLevelCard(topUser.id, topUserProfile);
                         if (cardPath) {
-                            await sock.sendMessage(sender, {
+                            await safeSendMessage(sock, sender, {
                                 image: { url: cardPath },
                                 caption: `👑 Top user: ${topUser.name} (Level ${topUser.level})`
                             });
@@ -1071,7 +1071,7 @@ ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty
         profile.coins -= transferAmount;
         targetProfile.coins += transferAmount;
 
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `✅ Successfully transferred ${transferAmount} coins to ${targetProfile.name}`
         });
     }

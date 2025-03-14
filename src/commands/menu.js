@@ -114,7 +114,7 @@ const menuCommands = {
             // Send menu with image if possible
             try {
                 const imageUrl = 'https://i.ibb.co/Wn0nczF/BLACKSKY-icon.png';
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     image: { url: imageUrl },
                     caption: menuText
                 });
@@ -235,7 +235,7 @@ const menuCommands = {
         
         } catch (err) {
             logger.error('Help command error:', err);
-            await sock.sendMessage(message.key.remoteJid, { 
+            await safeSendMessage(sock, message.key.remoteJid, { 
                 text: `❌ ${languageManager.getText('basic.help.error', config.bot.language || 'en')}` 
             });
         }

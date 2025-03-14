@@ -66,7 +66,7 @@ const ownerCommands = {
             // Set maintenance mode in global config
             global.maintenanceMode = mode;
 
-            await sock.sendMessage(remoteJid, { 
+            await safeSendMessage(sock, remoteJid, { 
                 text: `🛠️ Maintenance mode ${mode ? 'enabled' : 'disabled'}\n${mode ? 'Only owner commands will work.' : 'Normal operations resumed.'}` 
             });
 
@@ -94,7 +94,7 @@ const ownerCommands = {
             // Set WhatsApp display name
             await sock.updateProfileName(name);
             logger.info(`Bot name changed to: ${name}`);
-            await sock.sendMessage(remoteJid, { text: `✅ Bot name changed to: ${name}` });
+            await safeSendMessage(sock, remoteJid, { text: `✅ Bot name changed to: ${name}` });
         } catch (err) {
             logger.error('Error changing bot name:', err);
             await safeSendText(sock, remoteJid, '❌ Error changing bot name. Please try again.' );
@@ -113,7 +113,7 @@ const ownerCommands = {
             // Set WhatsApp status/bio
             await sock.updateProfileStatus(bio);
             logger.info(`Bot bio updated to: ${bio}`);
-            await sock.sendMessage(remoteJid, { text: `✅ Bot bio updated to: ${bio}` });
+            await safeSendMessage(sock, remoteJid, { text: `✅ Bot bio updated to: ${bio}` });
         } catch (err) {
             logger.error('Error updating bot bio:', err);
             await safeSendText(sock, remoteJid, '❌ Error updating bot bio. Please try again.' );
@@ -132,7 +132,7 @@ const ownerCommands = {
             // Update prefix using the global config
             globalConfig.prefix = prefix;
             logger.info(`Bot prefix changed to: ${prefix}`);
-            await sock.sendMessage(remoteJid, { text: `✅ Prefix updated to: ${prefix}` });
+            await safeSendMessage(sock, remoteJid, { text: `✅ Prefix updated to: ${prefix}` });
         } catch (err) {
             logger.error('Error setting prefix:', err);
             await safeSendText(sock, remoteJid, '❌ Error updating prefix. Please try again.' );
@@ -156,7 +156,7 @@ const ownerCommands = {
             // Check if language is supported
             if (!languageManager.isLanguageSupported(lang)) {
                 const availableLangs = languageManager.getAvailableLanguages().join(', ');
-                await sock.sendMessage(remoteJid, { 
+                await safeSendMessage(sock, remoteJid, { 
                     text: `❌ Language '${lang}' is not supported.\nAvailable languages: ${availableLangs}` 
                 });
                 return;
@@ -167,7 +167,7 @@ const ownerCommands = {
 
             // Use the appropriate translation to respond
             const response = languageManager.getText('system.language_changed', lang);
-            await sock.sendMessage(remoteJid, { text: `✅ ${response}` });
+            await safeSendMessage(sock, remoteJid, { text: `✅ ${response}` });
             logger.info(`Bot language changed to: ${lang}`);
         } catch (err) {
             logger.error('Error setting language:', err);
@@ -194,7 +194,7 @@ const ownerCommands = {
             global.bannedUsers.add(normalizedNumber);
 
             logger.info(`Banned user: ${normalizedNumber}`);
-            await sock.sendMessage(remoteJid, { text: `🚫 User ${target} has been banned` });
+            await safeSendMessage(sock, remoteJid, { text: `🚫 User ${target} has been banned` });
         } catch (err) {
             logger.error('Error banning user:', err);
             await safeSendText(sock, remoteJid, '❌ Error banning user. Please check logs.' );
@@ -219,7 +219,7 @@ const ownerCommands = {
             }
 
             logger.info(`Unbanned user: ${normalizedNumber}`);
-            await sock.sendMessage(remoteJid, { text: `✅ User ${target} has been unbanned` });
+            await safeSendMessage(sock, remoteJid, { text: `✅ User ${target} has been unbanned` });
         } catch (err) {
             logger.error('Error unbanning user:', err);
             await safeSendText(sock, remoteJid, '❌ Error unbanning user. Please check logs.' );
@@ -235,7 +235,7 @@ const ownerCommands = {
             }
 
             const bannedList = Array.from(global.bannedUsers).join('\n• ');
-            await sock.sendMessage(remoteJid, { 
+            await safeSendMessage(sock, remoteJid, { 
                 text: `📋 Banned users list:\n• ${bannedList}` 
             });
         } catch (err) {
@@ -264,7 +264,7 @@ const ownerCommands = {
 
             for (const [chatId, chat] of Object.entries(chats)) {
                 try {
-                    await sock.sendMessage(chatId, { text: `📢 *Broadcast Message*\n\n${messageText}` });
+                    await safeSendMessage(sock, chatId, { text: `📢 *Broadcast Message*\n\n${messageText}` });
                     successCount++;
                 } catch (err) {
                     logger.error(`Failed to broadcast to ${chatId}:`, err);
@@ -272,7 +272,7 @@ const ownerCommands = {
                 }
             }
 
-            await sock.sendMessage(remoteJid, { 
+            await safeSendMessage(sock, remoteJid, { 
                 text: `📢 Broadcast completed\n✅ Success: ${successCount}\n❌ Failed: ${failCount}` 
             });
         } catch (err) {

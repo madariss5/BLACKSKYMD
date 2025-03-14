@@ -333,7 +333,7 @@ const groupCommands = {
             settings.antispam = action.toLowerCase() === 'on';
             await saveGroupSettings(remoteJid, settings);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `✅ Anti-spam has been turned ${action.toLowerCase()}`
             });
 
@@ -370,7 +370,7 @@ const groupCommands = {
             settings.antilink = action.toLowerCase() === 'on';
             await saveGroupSettings(remoteJid, settings);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `✅ Anti-link has been turned ${action.toLowerCase()}`
             });
 
@@ -407,7 +407,7 @@ const groupCommands = {
             settings.antitoxic = action.toLowerCase() === 'on';
             await saveGroupSettings(remoteJid, settings);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `✅ Anti-toxic has been turned ${action.toLowerCase()}`
             });
 
@@ -448,7 +448,7 @@ const groupCommands = {
             }
             await saveGroupSettings(remoteJid, settings);
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `✅ Anti-raid has been turned ${action.toLowerCase()}${
                     threshold ? ` with threshold of ${threshold} joins per minute` : ''
                 }`
@@ -503,7 +503,7 @@ const groupCommands = {
             await saveGroupSettings(remoteJid, settings);
 
             const warningCount = settings.warnings[target].length;
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `⚠️ User has been warned (${warningCount} warnings)\nReason: ${reason}`
             });
 
@@ -563,7 +563,7 @@ const groupCommands = {
             await saveGroupSettings(remoteJid, settings);
 
             const warningCount = settings.warnings[target].length;
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `✅ Removed 1 warning from user (${warningCount} warnings remaining)`
             });
 
@@ -602,7 +602,7 @@ const groupCommands = {
                 .map((w, i) => `${i + 1}. ${w.reason} (${new Date(w.time).toLocaleString()})`)
                 .join('\n');
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `⚠️ Warnings for user:\n${warningList}`
             });
 
@@ -728,7 +728,7 @@ const groupCommands = {
                     .map(([feature, enabled]) => `${feature}: ${enabled ? '✅ Enabled' : '❌ Disabled'}`)
                     .join('\n');
 
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     text: `*Group Features*\n\n${featureList}\n\nUse '.feature <name> <on/off>' to change settings`
                 });
                 return;
@@ -746,7 +746,7 @@ const groupCommands = {
             // Just show status of a specific feature if no action provided
             if (!action) {
                 const isEnabled = await isFeatureEnabled(remoteJid, featureName);
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     text: `Feature "${featureName}" is currently: ${isEnabled ? '✅ Enabled' : '❌ Disabled'}`
                 });
                 return;
@@ -764,11 +764,11 @@ const groupCommands = {
             const success = await setFeatureEnabled(remoteJid, featureName, enabled);
 
             if (success) {
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     text: `✅ Feature "${featureName}" has been ${enabled ? 'enabled' : 'disabled'}`
                 });
             } else {
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     text: `❌ Failed to update feature "${featureName}"`
                 });
             }
@@ -796,7 +796,7 @@ const groupCommands = {
             }
 
             const code = await sock.groupInviteCode(remoteJid);
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `🔗 Group Invite Link:\nhttps://chat.whatsapp.com/${code}`
             });
 
@@ -859,7 +859,7 @@ const groupCommands = {
             const mentions = metadata.participants.map(p => p.id);
             const message = args.length > 0 ? args.join(' ') : '👥 Group Members';
 
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `${message}\n\n${mentions.map(m => `@${m.split('@')[0]}`).join('\n')}`,
                 mentions
             });
@@ -1213,7 +1213,7 @@ const groupCommands = {
                     .map(([feature, enabled]) => `${feature}: ${enabled ? '✅ Enabled' : '❌ Disabled'}`)
                     .join('\n');
 
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     text: `*Group Features*\n\n${featureList}\n\nUse '.feature <name> <on/off>' to change settings`
                 });
                 return;
@@ -1231,7 +1231,7 @@ const groupCommands = {
             // Just show status of a specific feature if no action provided
             if (!action) {
                 const isEnabled = await isFeatureEnabled(remoteJid, featureName);
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     text: `Feature "${featureName}" is currently: ${isEnabled ? '✅ Enabled' : '❌ Disabled'}`
                 });
                 return;
@@ -1249,11 +1249,11 @@ const groupCommands = {
             const success = await setFeatureEnabled(remoteJid, featureName, enabled);
 
             if (success) {
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     text: `✅ Feature "${featureName}" has been ${enabled ? 'enabled' : 'disabled'}`
                 });
             } else {
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(sock, remoteJid, {
                     text: `❌ Failed to update feature "${featureName}"`
                 });
             }

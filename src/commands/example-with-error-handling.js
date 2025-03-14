@@ -22,7 +22,7 @@ module.exports = {
         const jid = message.key.remoteJid;
         const text = args.join(' ') || 'Echo!';
         
-        await sock.sendMessage(jid, { text });
+        await safeSendMessage(sock, jid, { text });
         return { success: true };
       } catch (error) {
         console.error('Error in echo command:', error);
@@ -57,14 +57,14 @@ module.exports = {
         
         // Check for calculation errors
         if (result.error) {
-          await sock.sendMessage(jid, { 
+          await safeSendMessage(sock, jid, { 
             text: `❌ Error: ${result.error}` 
           });
           return { success: false, error: result.error };
         }
         
         // Send result
-        await sock.sendMessage(jid, { 
+        await safeSendMessage(sock, jid, { 
           text: `🧮 *Calculation Result*\n\n*Expression:* ${expression}\n*Result:* ${result.formatted}` 
         });
         
@@ -74,7 +74,7 @@ module.exports = {
         console.error(`Error in calculate command: ${error.message}`);
         
         // Send user-friendly error message
-        await sock.sendMessage(jid, { 
+        await safeSendMessage(sock, jid, { 
           text: `❌ Sorry, I couldn't process that calculation.\n\nError: ${error.message}` 
         });
         
@@ -109,7 +109,7 @@ module.exports = {
       const randomValue = Math.floor(Math.random() * (max - min + 1)) + min;
       
       // Send the result
-      await sock.sendMessage(jid, { 
+      await safeSendMessage(sock, jid, { 
         text: `🎲 Random number between ${min} and ${max}: *${randomValue}*` 
       });
       

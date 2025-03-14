@@ -105,7 +105,7 @@ const groupNewCommands = {
                 .map((pin, i) => `${i + 1}. Pinned by: @${pin.pinnedBy.split('@')[0]} (${new Date(pin.timestamp).toLocaleString()})`)
                 .join('\n');
 
-            await sock.sendMessage(remoteJid, { 
+            await safeSendMessage(sock, remoteJid, { 
                 text: `📌 Pinned Messages:\n\n${pinnedList}`,
                 mentions: settings.pinnedMessages.map(pin => pin.pinnedBy)
             });

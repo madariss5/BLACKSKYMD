@@ -295,13 +295,13 @@ const nsfwCommands = {
             const validSettings = ['threshold', 'action', 'notification'];
 
             if (!setting || !validSettings.includes(setting)) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `Valid settings: ${validSettings.join(', ')}`
                 });
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `NSFW setting '${setting}' will be configurable soon.`
             });
 
@@ -429,7 +429,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ ${languageManager.getText('media.nsfw.cooldown', null, remaining)}`
                 });
                 return;
@@ -445,7 +445,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: waifuUrl },
                 caption: '🎭 NSFW Waifu'
             });
@@ -475,7 +475,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ ${languageManager.getText('media.nsfw.cooldown', null, remaining)}`
                 });
                 return;
@@ -491,7 +491,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: nekoUrl },
                 caption: '🐱 NSFW Neko'
             });
@@ -519,7 +519,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -533,7 +533,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Hentai'
             });
@@ -561,7 +561,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -575,7 +575,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Boobs'
             });
@@ -588,7 +588,9 @@ NSFW Statistics:
     },
 
     async ass(sock, sender) {
-        const { safeSendText, safeSendMessage } = require('../utils/jidHelper');
+        const { safeSendText, safeSendImage } = require('../utils/jidHelper');
+        const { fetchNsfwImage } = require('../utils/fetchNsfwImage');
+        const logger = require('../utils/logger');
         
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -609,109 +611,118 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/ass`);
-            if (!response || !response.url) {
+            // Use our dedicated fetchNsfwImage function which has built-in fallbacks
+            const imageUrl = await fetchNsfwImage('ass');
+            
+            if (!imageUrl) {
                 await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
                 return;
             }
 
-            await safeSendMessage(sock, sender, {
-                image: { url: response.url },
-                caption: '🔞 Ass'
-            });
-
+            // Use the safer safeSendImage with proper error handling
+            await safeSendImage(sock, sender, imageUrl, '🔞 Ass');
             logger.info(`NSFW ass image sent to ${sender}`);
         } catch (err) {
-            logger.error('Error in ass:', err);
+            logger.error('Error in ass command:', err);
             await safeSendText(sock, sender, 'Failed to fetch image.');
         }
     },
 
     async pussy(sock, sender) {
+        const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+        const { fetchNsfwImage } = require('../utils/fetchNsfwImage');
+        
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
-                await safeSendText(sock, sender, '❌ NSFW commands are disabled for this group'
-                );
+                await safeSendText(sock, sender, '❌ NSFW commands are disabled for this group');
                 return;
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>'
-                );
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
                 return;
             }
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
-                    text: `⏳ Please wait ${remaining} seconds before using this command again.`
+                await safeSendText(sock, sender, `⏳ Please wait ${remaining} seconds before using this command again.`);
+                return;
+            }
+
+            await safeSendText(sock, sender, 'Fetching image...');
+
+            // Use fetchNsfwImage function to get image with fallbacks
+            const imageUrl = await fetchNsfwImage('hentai'); // Using hentai as fallback if pussy category not available
+            
+            if (!imageUrl) {
+                await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
+                return;
+            }
+
+            // Try to send using safeSendImage first
+            try {
+                await safeSendImage(sock, sender, imageUrl, '🔞 Pussy');
+            } catch (imgErr) {
+                // Fall back to standard message with image
+                await safeSendMessage(sock, sender, {
+                    image: { url: imageUrl },
+                    caption: '🔞 Pussy'
                 });
-                return;
             }
-
-            await safeSendText(sock, sender, 'Fetching image...' );
-
-            const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/pussy`);
-            if (!response || !response.url) {
-                await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.' );
-                return;
-            }
-
-            await sock.sendMessage(sender, {
-                image: { url: response.url },
-                caption: '🔞 Pussy'
-            });
 
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
-            logger.error('Error in pussy:', err);
-            await safeSendText(sock, sender, 'Failed to fetch image.' );
+            logger.error('Error in pussy command:', err);
+            await safeSendText(sock, sender, 'Failed to fetch image.');
         }
     },
 
     async blowjob(sock, sender) {
         try {
             const { languageManager } = require('../utils/language');
+            const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+            const { fetchNsfwImage } = require('../utils/fetchNsfwImage');
 
             if (!await isNsfwEnabledForGroup(sender)) {
-                await safeSendText(sock, sender, '❌ ' + languageManager.getText('media.nsfw.disabled', null)
-                );
+                await safeSendText(sock, sender, '❌ ' + languageManager.getText('media.nsfw.disabled', null));
                 return;
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ ' + languageManager.getText('media.nsfw.age_verification', null)
-                );
+                await safeSendText(sock, sender, '⚠️ ' + languageManager.getText('media.nsfw.age_verification', null));
                 return;
             }
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
-                    text: `⏳ ${languageManager.getText('media.nsfw.cooldown', null, remaining)}`
+                await safeSendText(sock, sender, `⏳ ${languageManager.getText('media.nsfw.cooldown', null, remaining)}`);
+                return;
+            }
+
+            await safeSendText(sock, sender, languageManager.getText('media.nsfw.fetching', null));
+
+            const imageUrl = await fetchNsfwImage('blowjob');
+
+            if (!imageUrl) {
+                await safeSendText(sock, sender, languageManager.getText('media.error', null));
+                return;
+            }
+
+            // Try to send using safeSendImage first
+            try {
+                await safeSendImage(sock, sender, imageUrl, '🔞 Blowjob');
+            } catch (imgErr) {
+                // Fall back to standard message with image
+                await safeSendMessage(sock, sender, {
+                    image: { url: imageUrl },
+                    caption: '🔞 Blowjob'
                 });
-                return;
             }
-
-            await safeSendText(sock, sender, languageManager.getText('media.nsfw.fetching', null) );
-
-            const blowjobUrl = await fetchNsfwImage('blowjob');
-
-            if (!blowjobUrl) {
-                await safeSendText(sock, sender, languageManager.getText('media.error', null)
-                );
-                return;
-            }
-
-            await sock.sendMessage(sender, {
-                image: { url: blowjobUrl },
-                caption: '🔞 Blowjob'
-            });
 
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
-            logger.error('Error in blowjob:', err);
-            await safeSendText(sock, sender, 'Failed to fetch image.' );
+            logger.error('Error in blowjob command:', err);
+            await safeSendText(sock, sender, 'Failed to fetch image.');
         }
     },
 
@@ -731,7 +742,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -745,7 +756,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Anal'
             });
@@ -773,7 +784,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -787,7 +798,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Feet'
             });
@@ -814,7 +825,7 @@ NSFW Statistics:
 
         if (!applyCooldown(sender, 45)) {
             const remaining = getRemainingCooldown(sender);
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `⏳ Please wait ${remaining} seconds before using this command again.`
             });
             return;
@@ -891,7 +902,7 @@ NSFW Statistics:
 
         if (!applyCooldown(sender, 45)) {
             const remaining = getRemainingCooldown(sender);
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `⏳ Please wait ${remaining} seconds before using this command again.`
             });
             return;
@@ -930,7 +941,7 @@ NSFW Statistics:
 
         if (!applyCooldown(sender, 45)) {
             const remaining = getRemainingCooldown(sender);
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `⏳ Please wait ${remaining} seconds before using this command again.`
             });
             return;
@@ -969,7 +980,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -983,7 +994,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Uniform'
             });
@@ -1011,7 +1022,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -1025,7 +1036,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Thighs'
             });
@@ -1053,7 +1064,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -1067,7 +1078,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Femdom'
             });
@@ -1095,7 +1106,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -1109,7 +1120,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Tentacle'
             });
@@ -1137,7 +1148,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -1151,7 +1162,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Pantsu'
             });
@@ -1179,7 +1190,7 @@ NSFW Statistics:
 
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${remaining} seconds before using this command again.`
                 });
                 return;
@@ -1193,7 +1204,7 @@ NSFW Statistics:
                 return;
             }
 
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 image: { url: response.url },
                 caption: '🔞 Kitsune'
             });

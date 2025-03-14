@@ -371,7 +371,7 @@ const commands = {
         
         if (Date.now() - lastCrime < cooldown) {
             const timeLeft = Math.ceil((lastCrime + cooldown - Date.now()) / (1000 * 60 * 60));
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* The police are still looking for you! Try again in ${timeLeft} hours.`
             });
             return;
@@ -422,14 +422,14 @@ const commands = {
                 );
             }
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🦹‍♂️ Crime Successful:* Your ${scenario.name} went undetected!\n\nYou earned ${formatNumber(reward)} coins from your illegal activities.\n\nCurrent Balance: ${formatNumber(profile.coins)} coins`
             });
         } else {
             // Don't go below 0 coins
             profile.coins = Math.max(0, profile.coins - penalty);
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🚨 Crime Failed:* You were caught during your ${scenario.name}!\n\nYou paid ${formatNumber(penalty)} coins in fines and legal fees.\n\nCurrent Balance: ${formatNumber(profile.coins)} coins`
             });
         }
@@ -445,7 +445,7 @@ const commands = {
         let job = userJobs.get(sender);
         
         if (!job) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: '*❌ Error:* You don\'t have a job yet. Use .getjob [job name] to get a job!\n\n*Available Jobs:*\n' + 
                 jobsList.map(j => `• ${j.name} - Income: ${j.income} coins/hr (Level ${j.requirements.level}+)`).join('\n')
             });
@@ -454,7 +454,7 @@ const commands = {
         
         const cooldown = calculateWorkCooldown(job);
         if (cooldown > 0) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* You need to rest before working again. Try again in ${formatTimeRemaining(cooldown)}.`
             });
             return;
@@ -484,7 +484,7 @@ const commands = {
         userProfiles.set(sender, profile);
         userJobs.set(sender, job);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*💼 Work Complete!*\n\n${randomMessage}\n\nYour balance: ${formatNumber(profile.coins)} coins\nCooldown: 1 hour`
         });
     },
@@ -494,7 +494,7 @@ const commands = {
         if (!profile) return;
         
         if (args.length < 1) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: '*⚠️ Usage:* .getjob [job name]\n\n*Available Jobs:*\n' + 
                 jobsList.map(j => `• ${j.name} - Income: ${j.income} coins/hr (Level ${j.requirements.level}+)`).join('\n')
             });
@@ -505,7 +505,7 @@ const commands = {
         const job = jobsList.find(j => j.name.toLowerCase() === jobName.toLowerCase());
         
         if (!job) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: '*❌ Error:* Job not found. Please choose from the available jobs:\n\n' + 
                 jobsList.map(j => `• ${j.name} - Income: ${j.income} coins/hr (Level ${j.requirements.level}+)`).join('\n')
             });
@@ -513,7 +513,7 @@ const commands = {
         }
         
         if (profile.level < job.requirements.level) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*❌ Error:* You need to be level ${job.requirements.level} to work as a ${job.name}. Your current level: ${profile.level}`
             });
             return;
@@ -534,7 +534,7 @@ const commands = {
         // Save profile
         userProfiles.set(sender, profile);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*💼 Job Acquired!*\n\nYou are now working as a ${job.name}!\nSalary: ${job.income} coins/hr\n\nUse .work to start earning coins.`
         });
     },
@@ -553,7 +553,7 @@ const commands = {
         const jobName = job.name;
         userJobs.delete(sender);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*💼 Resignation:* You've successfully resigned from your position as a ${jobName}.\n\nUse .getjob to find a new job.`
         });
     },
@@ -575,7 +575,7 @@ const commands = {
             timestamp: Date.now()
         });
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*💤 AFK Status Set:* You are now AFK.\nReason: ${reason}\n\nAnyone who mentions you will be informed of your AFK status.`
         });
     },
@@ -600,7 +600,7 @@ const commands = {
         // Remove AFK status
         userAfk.delete(sender);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*🔄 AFK Status Removed:* Welcome back! You were AFK for ${hours}h ${minutes}m.`
         });
     },
@@ -637,7 +637,7 @@ const commands = {
         
         if (Date.now() - lastRep < cooldown) {
             const timeLeft = Math.ceil((lastRep + cooldown - Date.now()) / (1000 * 60 * 60));
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* You can give reputation again in ${timeLeft} hours.`
             });
             return;
@@ -656,11 +656,11 @@ const commands = {
         userProfiles.set(targetId, targetProfile);
         userProfiles.set(sender, profile);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*👍 Reputation:* You gave +1 reputation to ${targetProfile.name}!`
         });
         
-        await sock.sendMessage(targetId, {
+        await safeSendMessage(sock, targetId, {
             text: `*👍 Reputation:* ${profile.name} gave you +1 reputation! Your reputation is now ${targetProfile.reputation}.`
         });
     },
@@ -683,7 +683,7 @@ const commands = {
         
         if (Date.now() - lastFishing < cooldown) {
             const timeLeft = Math.ceil((lastFishing + cooldown - Date.now()) / 1000);
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* You need to wait before fishing again. Try again in ${formatTimeRemaining(timeLeft)}.`
             });
             return;
@@ -752,7 +752,7 @@ const commands = {
         // Save profile
         userProfiles.set(sender, profile);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*🎣 Fishing Success:* You caught a ${caughtFish.name} worth ${caughtFish.value} coins!\n\nYou can sell it with .sell fish [name|all]`
         });
     },
@@ -774,7 +774,7 @@ const commands = {
         
         if (Date.now() - lastMining < cooldown) {
             const timeLeft = Math.ceil((lastMining + cooldown - Date.now()) / 1000);
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* You need to rest before mining again. Try again in ${formatTimeRemaining(timeLeft)}.`
             });
             return;
@@ -834,7 +834,7 @@ const commands = {
         // Save profile
         userProfiles.set(sender, profile);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*⛏️ Mining Success:* You mined ${quantity} ${minedMineral.name}${quantity !== 1 ? 's' : ''} worth ${minedMineral.value * quantity} coins!\n\nYou can sell them with .sell mineral [name|all]`
         });
     },
@@ -870,7 +870,7 @@ const commands = {
         const inventory = type === 'fish' ? profile.inventory.fish : profile.inventory.minerals;
         
         if (!inventory || Object.keys(inventory).length === 0) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*❌ Error:* You don't have any ${type === 'fish' ? 'fish' : 'minerals'} to sell.`
             });
             return;
@@ -916,7 +916,7 @@ const commands = {
             );
             
             if (!matchedItem || !inventory[matchedItem]) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❌ Error:* You don't have any ${itemName}. Check your inventory with .inventory.`
                 });
                 return;
@@ -931,7 +931,7 @@ const commands = {
         profile.coins += totalEarned;
         userProfiles.set(sender, profile);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*💰 Sale Complete:* You sold ${itemsSold} ${type === 'fish' ? 'fish' : 'minerals'} for ${formatNumber(totalEarned)} coins!\n\nYour balance: ${formatNumber(profile.coins)} coins`
         });
     },
@@ -1112,7 +1112,7 @@ const commands = {
         }
         
         if (missingMaterials.length > 0) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*❌ Missing Materials:* You don't have all required materials to craft a ${requestedItem}.\n\nMissing: ${missingMaterials.join(', ')}`
             });
             return;
@@ -1120,7 +1120,7 @@ const commands = {
         
         // Check if already has the item
         if (profile.inventory[recipe.result]) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*❌ Error:* You already have a ${requestedItem}.`
             });
             return;
@@ -1148,7 +1148,7 @@ const commands = {
         // Save profile
         userProfiles.set(sender, profile);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*🔨 Crafting Success:* You have crafted a ${requestedItem}!`
         });
     },
@@ -1232,7 +1232,7 @@ const commands = {
         }
         
         if (amount > profile.coins) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*❌ Error:* You don't have enough coins. Your balance: ${formatNumber(profile.coins)} coins.`
             });
             return;
@@ -1274,7 +1274,7 @@ const commands = {
         
         const expectedReturn = Math.floor(amount * (1 + interestRate));
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*📊 Investment Made:*\n\nAmount: ${formatNumber(amount)} coins\nDuration: ${duration} day${duration !== 1 ? 's' : ''}\nInterest Rate: ${(interestRate * 100).toFixed(1)}%\nExpected Return: ${formatNumber(expectedReturn)} coins\n\nYour investment will mature in ${duration} day${duration !== 1 ? 's' : ''}.`
         });
     },
@@ -1382,7 +1382,7 @@ const commands = {
             if (mail.attachment.type === 'coins') {
                 profile.coins += mail.attachment.amount;
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*💰 Attachment Claimed:* You received ${formatNumber(mail.attachment.amount)} coins!`
                 });
             } else if (mail.attachment.type === 'item') {
@@ -1394,7 +1394,7 @@ const commands = {
                 // Add item
                 profile.inventory[mail.attachment.item] = true;
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*📦 Attachment Claimed:* You received a ${mail.attachment.name}!`
                 });
             }
@@ -1474,12 +1474,12 @@ const commands = {
             global.mailSystem.mailboxes.set(sender, mailbox);
             global.mailSystem.mailboxes.set(targetId, targetMailbox);
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*📨 Mail Sent:* Your mail to ${targetProfile.name} has been sent!`
             });
             
             // Notify recipient
-            await sock.sendMessage(targetId, {
+            await safeSendMessage(sock, targetId, {
                 text: `*📬 New Mail:* You have received a new mail from ${profile.name}!\n\nSubject: ${subject}\n\nUse .mail to check your inbox.`
             });
             
@@ -1542,7 +1542,7 @@ const commands = {
         
         if (now - lastReward < cooldown) {
             const timeLeft = Math.ceil((lastReward + cooldown - now) / (1000 * 60 * 60));
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* You've already claimed your daily reward! Try again in ${timeLeft} hours.`
             });
             return;
@@ -1701,7 +1701,7 @@ const commands = {
             const startupCost = businessInfo.upgradeBaseCost;
             
             if (profile.coins < startupCost) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❌ Error:* You need ${formatNumber(startupCost)} coins to start a business. You have ${formatNumber(profile.coins)} coins.`
                 });
                 return;
@@ -1721,7 +1721,7 @@ const commands = {
             // Save profile
             userProfiles.set(sender, profile);
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🏭 Business Started:* You've invested ${formatNumber(startupCost)} coins to start your own business!\n\nUse .business to view your business and .business collect to collect earnings.`
             });
             return;
@@ -1760,7 +1760,7 @@ const commands = {
             // Save profile
             userProfiles.set(sender, profile);
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*💰 Earnings Collected:* You collected ${formatNumber(pendingIncome)} coins from your business!\n\nTotal Profit: ${formatNumber(profile.business.totalProfit)} coins\nCurrent Balance: ${formatNumber(profile.coins)} coins`
             });
             return;
@@ -1771,7 +1771,7 @@ const commands = {
             const upgradeCost = Math.floor(businessInfo.upgradeBaseCost * Math.pow(businessInfo.upgradeCostMultiplier, profile.business.level));
             
             if (profile.coins < upgradeCost) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❌ Error:* You need ${formatNumber(upgradeCost)} coins to upgrade your business. You have ${formatNumber(profile.coins)} coins.`
                 });
                 return;
@@ -1789,7 +1789,7 @@ const commands = {
             // Save profile
             userProfiles.set(sender, profile);
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🏭 Business Upgraded:* You spent ${formatNumber(upgradeCost)} coins to upgrade your business to level ${profile.business.level}!\n\nNew Hourly Income: ${formatNumber(Math.floor(newHourlyIncome))} coins`
             });
             return;
@@ -1806,7 +1806,7 @@ const commands = {
             const automationCost = 50000;
             
             if (profile.coins < automationCost) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❌ Error:* You need ${formatNumber(automationCost)} coins to automate your business. You have ${formatNumber(profile.coins)} coins.`
                 });
                 return;
@@ -1821,7 +1821,7 @@ const commands = {
             // Save profile
             userProfiles.set(sender, profile);
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🤖 Business Automated:* You spent ${formatNumber(automationCost)} coins to fully automate your business!\n\nYour business will now continue to generate income beyond the 24-hour limit, and earnings will be automatically collected when you check your business status.`
             });
             return;
@@ -1940,7 +1940,7 @@ const commands = {
             const cooldownTime = profile.bounties.cooldown;
             if (cooldownTime > Date.now()) {
                 const timeLeft = Math.ceil((cooldownTime - Date.now()) / (1000 * 60));
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*⏳ Cooldown:* You need to rest before taking another bounty. Try again in ${timeLeft} minutes.`
                 });
                 return;
@@ -2014,12 +2014,12 @@ const commands = {
                 // Add new random bounty
                 global.bountySystem.activeBounties.push(generateBounty());
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🎯 Bounty Completed:* You successfully completed the ${bounty.name} bounty!\n\nReward: ${formatNumber(bounty.reward)} coins\nXP Gained: ${bounty.exp}\n\nYour Balance: ${formatNumber(profile.coins)} coins\nCooldown: ${cooldownMinutes} minutes`
                 });
             } else {
                 // Failed attempt
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❌ Bounty Failed:* You were unable to complete the ${bounty.name} bounty.\n\nThe bounty was too challenging. Try an easier one next time.\n\nCooldown: ${cooldownMinutes} minutes`
                 });
             }
@@ -2197,7 +2197,7 @@ const commands = {
             const creationCost = 10000;
             
             if (profile.coins < creationCost) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❌ Error:* You need ${formatNumber(creationCost)} coins to create a clan. You have ${formatNumber(profile.coins)} coins.`
                 });
                 return;
@@ -2223,7 +2223,7 @@ const commands = {
             // Save profile
             userProfiles.set(sender, profile);
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*👥 Clan Created:* You've successfully created the clan "${clanName}"!\n\nYou are the clan leader. Use .clan setdesc [text] to set a description and .clan invite @user to invite members.`
             });
             return;
@@ -2268,11 +2268,11 @@ const commands = {
             clan.members.push(sender);
             
             // Notify leader
-            await sock.sendMessage(clan.leader, {
+            await safeSendMessage(sock, clan.leader, {
                 text: `*👥 Clan Update:* ${profile.name} has joined your clan!`
             });
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*👥 Clan Joined:* You have successfully joined the clan "${clan.name}"!`
             });
             return;
@@ -2319,11 +2319,11 @@ const commands = {
                     
                     // Notify new leader
                     const newLeaderProfile = userProfiles.get(newLeaderId);
-                    await sock.sendMessage(newLeaderId, {
+                    await safeSendMessage(sock, newLeaderId, {
                         text: `*👑 Leadership Transferred:* ${profile.name} has left the clan and transferred leadership to you!`
                     });
                     
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*👥 Clan Left:* You have left the clan "${userClan.name}" and transferred leadership to ${newLeaderProfile ? newLeaderProfile.name : 'another member'}.`
                     });
                 } else if (userClan.members.length > 0) {
@@ -2334,18 +2334,18 @@ const commands = {
                     
                     // Notify new leader
                     const newLeaderProfile = userProfiles.get(newLeaderId);
-                    await sock.sendMessage(newLeaderId, {
+                    await safeSendMessage(sock, newLeaderId, {
                         text: `*👑 Leadership Transferred:* ${profile.name} has left the clan and transferred leadership to you!`
                     });
                     
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*👥 Clan Left:* You have left the clan "${userClan.name}" and transferred leadership to ${newLeaderProfile ? newLeaderProfile.name : 'another member'}.`
                     });
                 } else {
                     // No other members, disband the clan
                     global.clanSystem.clans.delete(clanName);
                     
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*👥 Clan Disbanded:* As you were the only member, the clan "${userClan.name}" has been disbanded.`
                     });
                 }
@@ -2354,11 +2354,11 @@ const commands = {
                 userClan.officers = userClan.officers.filter(id => id !== sender);
                 
                 // Notify leader
-                await sock.sendMessage(userClan.leader, {
+                await safeSendMessage(sock, userClan.leader, {
                     text: `*👥 Clan Update:* ${profile.name}, an officer, has left your clan.`
                 });
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*👥 Clan Left:* You have left the clan "${userClan.name}".`
                 });
             } else {
@@ -2366,11 +2366,11 @@ const commands = {
                 userClan.members = userClan.members.filter(id => id !== sender);
                 
                 // Notify leader
-                await sock.sendMessage(userClan.leader, {
+                await safeSendMessage(sock, userClan.leader, {
                     text: `*👥 Clan Update:* ${profile.name} has left your clan.`
                 });
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*👥 Clan Left:* You have left the clan "${userClan.name}".`
                 });
             }
@@ -2502,11 +2502,11 @@ const commands = {
             }
             
             // Send invitation
-            await sock.sendMessage(targetId, {
+            await safeSendMessage(sock, targetId, {
                 text: `*👥 Clan Invitation:*\n\n${profile.name} has invited you to join the clan "${userClan.name}"!\n\nUse .clan join ${clanName} to accept the invitation.`
             });
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*👥 Invitation Sent:* You've invited ${targetProfile.name} to join your clan.`
             });
             return;
@@ -2563,11 +2563,11 @@ const commands = {
             const targetName = targetProfile ? targetProfile.name : 'the user';
             
             // Notify target
-            await sock.sendMessage(targetId, {
+            await safeSendMessage(sock, targetId, {
                 text: `*👥 Clan Notification:* You have been removed from the clan "${userClan.name}" by ${profile.name}.`
             });
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*👥 Member Removed:* You have removed ${targetName} from your clan.`
             });
             return;
@@ -2606,11 +2606,11 @@ const commands = {
             const targetName = targetProfile ? targetProfile.name : 'the user';
             
             // Notify target
-            await sock.sendMessage(targetId, {
+            await safeSendMessage(sock, targetId, {
                 text: `*👥 Clan Promotion:* You have been promoted to officer in the clan "${userClan.name}"!`
             });
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*👥 Member Promoted:* You have promoted ${targetName} to officer.`
             });
             return;
@@ -2642,11 +2642,11 @@ const commands = {
             const targetName = targetProfile ? targetProfile.name : 'the user';
             
             // Notify target
-            await sock.sendMessage(targetId, {
+            await safeSendMessage(sock, targetId, {
                 text: `*👥 Clan Demotion:* You have been demoted from officer to member in the clan "${userClan.name}".`
             });
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*👥 Officer Demoted:* You have demoted ${targetName} to member.`
             });
             return;
@@ -2693,7 +2693,7 @@ const commands = {
         
         if (Date.now() - lastHunt < cooldown) {
             const timeLeft = Math.ceil((lastHunt + cooldown - Date.now()) / 1000);
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* You need to rest after your last hunt! Try again in ${formatTimeRemaining(timeLeft)}.`
             });
             return;
@@ -2742,11 +2742,11 @@ const commands = {
             profile.coins += selectedAnimal.reward.coins;
             
             // Create success message
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🏹 Hunt Successful!*\n\nYou successfully hunted a ${selectedAnimal.name}!\n\n*Rewards:*\n• ${selectedAnimal.reward.leather}x leather\n• ${selectedAnimal.reward.coins} coins\n\n*Current balance:* ${formatNumber(profile.coins)} coins`
             });
         } else {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🏹 Hunt Failed!*\n\nYou tried to hunt a ${selectedAnimal.name}, but it escaped!\n\n*Current balance:* ${formatNumber(profile.coins)} coins`
             });
         }
@@ -2809,7 +2809,7 @@ const commands = {
                         cropsList += `• ${crop.name} - Growth: ${crop.growTime}m, Value: ${crop.value} coins, Seed Cost: ${crop.seedCost} coins\n`;
                     });
                     
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*⚠️ Usage:* .farm plant [crop name]\n\n${cropsList}`
                     });
                     return;
@@ -2833,7 +2833,7 @@ const commands = {
                 
                 // Check if user has enough coins
                 if (profile.coins < cropInfo.seedCost) {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*❌ Error:* You don't have enough coins to buy ${cropInfo.name} seeds. You need ${cropInfo.seedCost} coins.`
                     });
                     return;
@@ -2846,7 +2846,7 @@ const commands = {
                     plantedAt: Date.now()
                 });
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🌱 Crop Planted!*\n\nYou planted ${cropInfo.name} seeds.\nGrowing time: ${cropInfo.growTime} minutes\nHarvest value: ${cropInfo.value} coins\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
                 });
                 break;
@@ -2909,7 +2909,7 @@ const commands = {
                 const upgradeCost = basePlotPrice * profile.farm.plots;
                 
                 if (args.length < 2 || args[1].toLowerCase() !== 'confirm') {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*🌾 Farm Upgrade:*\n\nCurrent plots: ${profile.farm.plots}\nUpgrade cost: ${formatNumber(upgradeCost)} coins\n\nTo confirm, use: .farm upgrade confirm`
                     });
                     return;
@@ -2917,7 +2917,7 @@ const commands = {
                 
                 // Check if user has enough coins
                 if (profile.coins < upgradeCost) {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*❌ Error:* You don't have enough coins for this upgrade. You need ${formatNumber(upgradeCost)} coins.`
                     });
                     return;
@@ -2927,7 +2927,7 @@ const commands = {
                 profile.coins -= upgradeCost;
                 profile.farm.plots += 1;
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🌾 Farm Upgraded!*\n\nYou purchased a new plot of land!\nTotal plots: ${profile.farm.plots}\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
                 });
                 break;
@@ -2951,7 +2951,7 @@ const commands = {
         
         if (Date.now() - lastAdventure < cooldown) {
             const timeLeft = Math.ceil((lastAdventure + cooldown - Date.now()) / 1000);
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* You're still tired from your last adventure! Try again in ${formatTimeRemaining(timeLeft)}.`
             });
             return;
@@ -3099,13 +3099,13 @@ const commands = {
                     }
                     
                     // Send quest completion message
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*🏆 Quest Completed: ${legendaryQuest.name}!*\n\nYou have completed 5 adventures and earned:\n• ${legendaryQuest.reward.coins} coins\n• ${legendaryQuest.reward.xp} XP\n• 1x Golden Amulet (Legendary Item)`
                     });
                 }
             }
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🗺️ Adventure Success!*\n\n${scenario}\n\n*Rewards:*\n${rewardsMessage}• ${bonusCoins} coins\n• ${xpReward} XP\n\n*Total value:* ${formatNumber(totalValue)} coins\n*Current balance:* ${formatNumber(profile.coins)} coins`
             });
         } else {
@@ -3119,7 +3119,7 @@ const commands = {
             
             const scenario = failureScenarios[Math.floor(Math.random() * failureScenarios.length)];
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🗺️ Adventure Failed!*\n\n${scenario}\n\nTry again later or choose an easier location.`
             });
         }
@@ -3209,7 +3209,7 @@ const commands = {
             }
             
             if (!meetsRequirements) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❌ Quest Requirements Not Met:*\n\nYou are missing the following:\n• ${missingRequirements.join('\n• ')}`
                 });
                 return;
@@ -3243,7 +3243,7 @@ const commands = {
                 rewardText += `\n• ${amount}x ${item}${description ? ` (${description})` : ''}`;
             });
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🏆 Quest Completed: ${quest.name}!*\n\nYou have successfully completed the quest and earned:\n${rewardText}\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
             });
             
@@ -3302,7 +3302,7 @@ const commands = {
             
             // Check if user has enough coins
             if (profile.coins < item.price) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❌ Error:* You don't have enough coins to buy ${item.id}. You need ${formatNumber(item.price)} coins.`
                 });
                 return;
@@ -3324,7 +3324,7 @@ const commands = {
                 // Deduct coins
                 profile.coins -= item.price;
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🎟️ Lottery Ticket Purchased!*\n\nYou have purchased a lottery ticket for ${formatNumber(item.price)} coins.\n\nThe next lottery drawing will occur soon. Good luck!\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
                 });
             } else if (item.id === 'gift_box') {
@@ -3372,7 +3372,7 @@ const commands = {
                 // Deduct price
                 profile.coins -= item.price;
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🎁 Gift Box Opened!*\n\nYou opened a gift box and found:\n${rewardsText}\nCurrent balance: ${formatNumber(profile.coins)} coins`
                 });
             } else if (item.id === 'xp_booster') {
@@ -3387,7 +3387,7 @@ const commands = {
                 // Deduct coins
                 profile.coins -= item.price;
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🔥 XP Booster Activated!*\n\nYour XP booster will be active for 24 hours, doubling all XP gains!\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
                 });
             } else {
@@ -3395,7 +3395,7 @@ const commands = {
                 profile.inventory[item.id] = (profile.inventory[item.id] || 0) + 1;
                 profile.coins -= item.price;
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🛒 Item Purchased!*\n\nYou bought 1x ${item.id} for ${formatNumber(item.price)} coins.\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
                 });
             }
@@ -3477,7 +3477,7 @@ const commands = {
         
         if (Date.now() - lastHourly < cooldown) {
             const timeLeft = Math.ceil((lastHourly + cooldown - Date.now()) / 1000);
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* You can claim your hourly reward in ${formatTimeRemaining(timeLeft)}.`
             });
             return;
@@ -3512,7 +3512,7 @@ const commands = {
         // Save profile
         userProfiles.set(sender, profile);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*⏰ Hourly Reward Claimed!*\n\nYou received ${formatNumber(totalReward)} coins!\n\n• Base: ${baseReward} coins\n• Level Bonus: ${levelBonus} coins\n• Streak Bonus (${profile.hourlyStreak.count}): ${streakBonus} coins\n\nCurrent balance: ${formatNumber(profile.coins)} coins\nCome back in 1 hour for your next reward!`
         });
     },
@@ -3527,7 +3527,7 @@ const commands = {
         
         if (Date.now() - lastWeekly < cooldown) {
             const timeLeft = Math.ceil((lastWeekly + cooldown - Date.now()) / 1000);
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*⏳ Cooldown:* You can claim your weekly reward in ${formatTimeRemaining(timeLeft)}.`
             });
             return;
@@ -3575,7 +3575,7 @@ const commands = {
         // Save profile
         userProfiles.set(sender, profile);
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*📅 Weekly Reward Claimed!*\n\nYou received ${formatNumber(totalReward)} coins and 1x ${selectedItem}!\n\n• Base: ${baseReward} coins\n• Level Bonus: ${levelBonus} coins\n\nCurrent balance: ${formatNumber(profile.coins)} coins\nCome back in 7 days for your next weekly reward!`
         });
     },
@@ -3599,7 +3599,7 @@ const commands = {
             
             // Check if user has enough coins
             if (profile.coins < totalCost) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❌ Error:* You don't have enough coins to buy ${count} lottery tickets. You need ${formatNumber(totalCost)} coins.`
                 });
                 return;
@@ -3616,7 +3616,7 @@ const commands = {
             profile.coins -= totalCost;
             userProfiles.set(sender, profile);
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🎟️ Lottery Tickets Purchased!*\n\nYou bought ${count} lottery ticket${count > 1 ? 's' : ''} for ${formatNumber(totalCost)} coins.\n\nYou now have ${lotteryParticipants.get(sender)} ticket${lotteryParticipants.get(sender) > 1 ? 's' : ''}.\n\nCurrent balance: ${formatNumber(profile.coins)} coins\n\nThe lottery drawing happens every 24 hours. Good luck!`
             });
             return;
@@ -3636,7 +3636,7 @@ const commands = {
         const userTickets = lotteryParticipants.get(sender) || 0;
         const winChance = totalTickets > 0 ? (userTickets / totalTickets) * 100 : 0;
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*🎲 Lottery Information:*\n\nTicket Price: 100 coins\nCurrent Prize Pool: ${formatNumber(poolAmount)} coins\nTotal Tickets: ${totalTickets}\n\nYour Tickets: ${userTickets}\nWin Chance: ${winChance.toFixed(2)}%\n\nUse .lottery buy [count] to purchase tickets.\nThe lottery drawing happens every 24 hours.\nLast winner: ${global.lastLotteryWinner || 'None yet'}`
         });
     },
@@ -3703,7 +3703,7 @@ const commands = {
                 .join('\n• ');
         }
         
-        await sock.sendMessage(sender, {
+        await safeSendMessage(sock, sender, {
             text: `*📜 Recipe: ${id}*\n\n*Description:* ${item.description}\n*Value:* ${item.value} coins\n\n*Required Materials:*\n• ${materialsText}${effectsText}\n\nUse .craft ${id} to craft this item.`
         });
     },
@@ -3730,7 +3730,7 @@ const commands = {
         }
         
         if (betAmount > profile.coins) {
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*❌ Error:* You don't have enough coins for this bet. You have ${formatNumber(profile.coins)} coins.`
             });
             return;
@@ -3754,14 +3754,14 @@ const commands = {
             const winAmount = betAmount * 5;
             profile.coins += (winAmount - betAmount); // Subtract the original bet since we're adding the win
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🎲 Dice Bet - YOU WON!*\n\nYou bet ${formatNumber(betAmount)} coins on ${betNumber}.\nDice rolled: ${diceRoll}\n\nYou won ${formatNumber(winAmount)} coins!\nCurrent balance: ${formatNumber(profile.coins)} coins`
             });
         } else {
             // Lose
             profile.coins -= betAmount;
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🎲 Dice Bet - You Lost*\n\nYou bet ${formatNumber(betAmount)} coins on ${betNumber}.\nDice rolled: ${diceRoll}\n\nYou lost ${formatNumber(betAmount)} coins.\nCurrent balance: ${formatNumber(profile.coins)} coins`
             });
         }
@@ -3838,7 +3838,7 @@ const commands = {
             const hungerBar = createBar(hunger);
             const loyaltyBar = createBar(pet.loyalty, 100);
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*🐾 Your Pet: ${pet.name} (${pet.type})*\n\n*Happiness:* ${happinessBar} ${happiness.toFixed(1)}/10\n*Health:* ${healthBar} ${health.toFixed(1)}/10\n*Hunger:* ${hungerBar} ${hunger.toFixed(1)}/10\n*Loyalty:* ${loyaltyBar} ${pet.loyalty.toFixed(1)}/100\n\nCommands:\n• .pets feed - Feed your pet (-hunger, +happiness)\n• .pets play - Play with your pet (+happiness)\n• .pets heal - Heal your pet (+health)\n• .pets rename [name] - Rename your pet`
             });
             
@@ -3876,7 +3876,7 @@ const commands = {
                 
                 // Check if user has enough coins
                 if (profile.coins < petType.cost) {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*❌ Error:* You don't have enough coins to adopt a ${petType.name}. You need ${formatNumber(petType.cost)} coins.`
                     });
                     return;
@@ -3909,7 +3909,7 @@ const commands = {
                 // Save profile
                 userProfiles.set(sender, profile);
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🐾 Pet Adopted!*\n\nYou have adopted a ${petType.name}!\n\nUse .pets to check on your pet's status and interact with it.\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
                 });
                 break;
@@ -3928,7 +3928,7 @@ const commands = {
                 const feedCost = 25; // coins to feed without pet food
                 
                 if (!hasPetFood && profile.coins < feedCost) {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*❌ Error:* You don't have pet food or enough coins to feed your pet. Feeding costs ${feedCost} coins.`
                     });
                     return;
@@ -3955,7 +3955,7 @@ const commands = {
                 petData.set(sender, pet);
                 userProfiles.set(sender, profile);
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🐾 Pet Fed!*\n\nYou fed your ${pet.name}!\n\nHunger: ${pet.hunger.toFixed(1)}/10\nHappiness: ${pet.happiness.toFixed(1)}/10\nHealth: ${pet.health.toFixed(1)}/10\n\n${hasPetFood ? 'You used 1 pet food from your inventory.' : `You spent ${feedCost} coins on food.`}\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
                 });
                 break;
@@ -3980,7 +3980,7 @@ const commands = {
                 // Save data
                 petData.set(sender, playPet);
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🐾 Playtime!*\n\nYou played with your ${playPet.name}! They seem much happier now.\n\nHappiness: ${playPet.happiness.toFixed(1)}/10\nHunger: ${playPet.hunger.toFixed(1)}/10\nLoyalty: ${playPet.loyalty.toFixed(1)}/100`
                 });
                 break;
@@ -3998,7 +3998,7 @@ const commands = {
                 const healCost = 50;
                 
                 if (profile.coins < healCost) {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*❌ Error:* You don't have enough coins to heal your pet. Healing costs ${healCost} coins.`
                     });
                     return;
@@ -4016,7 +4016,7 @@ const commands = {
                 petData.set(sender, healPet);
                 userProfiles.set(sender, profile);
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🐾 Pet Healed!*\n\nYou healed your ${healPet.name} back to full health!\n\nHealth: ${healPet.health.toFixed(1)}/10\nLoyalty: ${healPet.loyalty.toFixed(1)}/100\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
                 });
                 break;
@@ -4056,7 +4056,7 @@ const commands = {
                 // Save data
                 petData.set(sender, renamePet);
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*🐾 Pet Renamed!*\n\nYou renamed your pet from "${oldName}" to "${newName}"!`
                 });
                 break;
@@ -4090,7 +4090,7 @@ const commands = {
             const partnerProfile = userProfiles.get(marriage.partner);
             const partnerName = partnerProfile ? partnerProfile.name : 'Unknown';
             
-            await sock.sendMessage(sender, {
+            await safeSendMessage(sock, sender, {
                 text: `*❤️ Marriage Status:*\n\nYou are married to ${partnerName}.\nMarriage date: ${new Date(marriage.date).toDateString()}\nDuration: ${days} days\n\nUse .marriage gift to give a gift to your spouse.`
             });
             return;
@@ -4140,12 +4140,12 @@ const commands = {
                     time: Date.now()
                 });
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❤️ Marriage Proposal Sent!*\n\nYou proposed to ${targetProfile.name}!\nThey need to accept by using .marriage accept.`
                 });
                 
                 // Send message to target user
-                await sock.sendMessage(targetUser, {
+                await safeSendMessage(sock, targetUser, {
                     text: `*❤️ Marriage Proposal!*\n\n${profile.name} has proposed to you!\n\nUse .marriage accept to accept the proposal, or .marriage reject to decline.`
                 });
                 break;
@@ -4215,11 +4215,11 @@ const commands = {
                 if (proposerProfile) userProfiles.set(proposal.proposer, proposerProfile);
                 
                 // Send messages to both parties
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*❤️ Marriage Accepted!*\n\nCongratulations! You are now married to ${proposerName}!\n\nUse .marriage to check your marriage status.`
                 });
                 
-                await sock.sendMessage(proposal.proposer, {
+                await safeSendMessage(sock, proposal.proposer, {
                     text: `*❤️ Marriage Accepted!*\n\nCongratulations! ${profile.name} has accepted your proposal! You are now married!\n\nUse .marriage to check your marriage status.`
                 });
                 break;
@@ -4244,7 +4244,7 @@ const commands = {
                 await safeSendText(sock, sender, '*❤️ Proposal Rejected*\n\nYou have rejected the marriage proposal.'
                 );
                 
-                await sock.sendMessage(rejectProposer, {
+                await safeSendMessage(sock, rejectProposer, {
                     text: `*❤️ Proposal Rejected*\n\n${profile.name} has rejected your marriage proposal.`
                 });
                 break;
@@ -4278,11 +4278,11 @@ const commands = {
                 const divorceDuration = Date.now() - divorceMarriage.date;
                 const divorceDays = Math.floor(divorceDuration / (24 * 60 * 60 * 1000));
                 
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `*💔 Divorce Completed*\n\nYou are now divorced. Your marriage lasted ${divorceDays} days.`
                 });
                 
-                await sock.sendMessage(partner, {
+                await safeSendMessage(sock, partner, {
                     text: `*💔 Divorce Notice*\n\n${profile.name} has divorced you. Your marriage lasted ${divorceDays} days.`
                 });
                 break;
@@ -4330,7 +4330,7 @@ const commands = {
                     }
                     
                     if (amount > profile.coins) {
-                        await sock.sendMessage(sender, {
+                        await safeSendMessage(sock, sender, {
                             text: `*❌ Error:* You don't have enough coins. You have ${formatNumber(profile.coins)} coins.`
                         });
                         return;
@@ -4344,11 +4344,11 @@ const commands = {
                     userProfiles.set(sender, profile);
                     userProfiles.set(partner2, partnerProfile2);
                     
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*❤️ Gift Sent!*\n\nYou sent ${formatNumber(amount)} coins to your spouse!\n\nCurrent balance: ${formatNumber(profile.coins)} coins`
                     });
                     
-                    await sock.sendMessage(partner2, {
+                    await safeSendMessage(sock, partner2, {
                         text: `*❤️ Gift Received!*\n\nYour spouse ${profile.name} sent you ${formatNumber(amount)} coins!\n\nCurrent balance: ${formatNumber(partnerProfile2.coins)} coins`
                     });
                 } else if (giftType === 'item') {
@@ -4380,11 +4380,11 @@ const commands = {
                     userProfiles.set(sender, profile);
                     userProfiles.set(partner2, partnerProfile2);
                     
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `*❤️ Gift Sent!*\n\nYou sent ${amount}x ${itemName} to your spouse!`
                     });
                     
-                    await sock.sendMessage(partner2, {
+                    await safeSendMessage(sock, partner2, {
                         text: `*❤️ Gift Received!*\n\nYour spouse ${profile.name} sent you ${amount}x ${itemName}!`
                     });
                 } else {
