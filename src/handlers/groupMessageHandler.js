@@ -1,4 +1,6 @@
 const logger = require('../utils/logger');
+const { isJidGroup, ensureJidString, safeSendText, safeSendMessage } = require('../utils/jidHelper');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
 const { isAdmin } = require('../utils/permissions');
 
 // Store message timestamps for spam detection
@@ -89,10 +91,10 @@ function handleWarning(userId, groupId) {
 
 async function handleGroupMessage(sock, message) {
     try {
-        const remoteJid = message.key.remoteJid;
+        const remoteJid = ensureJidString(message.key.remoteJid);
 
         // Only process group messages
-        if (!remoteJid.endsWith('@g.us')) {
+        if (isJidGroup(!remoteJid)) {
             logger.debug('Message not from group, skipping');
             return;
         }

@@ -2,6 +2,7 @@
 const logger = require('../utils/logger');
 const axios = require('axios');
 const { safeSendText, safeSendMessage, safeSendImage, safeSendAnimatedGif } = require('../utils/jidHelper');
+const { languageManager } = require('../utils/language');
 
 // Cache for user information
 const userCache = new Map();
@@ -151,13 +152,24 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             // Continue with default names
         }
 
-        // Generate message text with better grammar
+        // Generate message text with better grammar and internationalization
         let message;
         if (target) {
-            message = targetName === 'everyone' || targetName === 'all'
-                ? `${senderName} ${type}s everyone ${emoji}`
-                : `${senderName} ${type}s ${targetName} ${emoji}`;
+            // Get translations for reaction to target
+            const toEveryoneKey = `reactions.${type}.toEveryone`;
+            const toTargetKey = `reactions.${type}.toTarget`;
+            
+            if (targetName === 'everyone' || targetName === 'all') {
+                message = languageManager.getText(toEveryoneKey, null, senderName, emoji) || 
+                          `${senderName} ${type}s everyone ${emoji}`;
+            } else {
+                message = languageManager.getText(toTargetKey, null, senderName, targetName, emoji) || 
+                          `${senderName} ${type}s ${targetName} ${emoji}`;
+            }
         } else {
+            // Get translation for self-reaction
+            const selfKey = `reactions.${type}.self`;
+            
             const actionMap = {
                 cry: 'crying',
                 dance: 'dancing',
@@ -168,7 +180,9 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                 wink: 'winking',
                 wave: 'waving'
             };
-            message = `${senderName} is ${actionMap[type] || type}ing ${emoji}`;
+            
+            message = languageManager.getText(selfKey, null, senderName, emoji) || 
+                      `${senderName} is ${actionMap[type] || type}ing ${emoji}`;
         }
 
         // Add fun anime-inspired text messages based on reaction type
@@ -269,17 +283,25 @@ const reactionCommands = {
             "Fast & Furious": ["yeet", "highfive", "bonk"]
         };
         
+        // Get category translations
+        const translatedCategories = {};
+        for (const category in categories) {
+            const translationKey = `reactions.categories.${category.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+            translatedCategories[languageManager.getText(translationKey) || category] = categories[category];
+        }
+        
         // Count available GIFs
         const availableGifs = Object.values(REACTION_GIFS)
             .filter(gifPath => fs.existsSync(gifPath) && fs.statSync(gifPath).size > 1000)
             .length;
             
-        // Create menu text
-        let menuText = `*🎬 Reaction GIFs Menu*\n`;
-        menuText += `Total working GIFs: ${availableGifs}/${Object.keys(REACTION_GIFS).length}\n\n`;
+        // Create menu text with translations
+        let menuText = `*${languageManager.getText('reactions.menu.title') || '🎬 Reaction GIFs Menu'}*\n`;
+        menuText += languageManager.getText('reactions.menu.workingGifs', null, availableGifs, Object.keys(REACTION_GIFS).length) || 
+                   `Total working GIFs: ${availableGifs}/${Object.keys(REACTION_GIFS).length}\n\n`;
         
         // Add categories
-        for (const [category, commands] of Object.entries(categories)) {
+        for (const [category, commands] of Object.entries(translatedCategories)) {
             const workingCommands = commands.filter(cmd => 
                 fs.existsSync(REACTION_GIFS[cmd]) && 
                 fs.statSync(REACTION_GIFS[cmd]).size > 1000
@@ -290,10 +312,10 @@ const reactionCommands = {
         }
         
         // Usage instructions
-        menuText += `*How to use:*\n`;
-        menuText += `• For self-reactions: !commandname\n`;
-        menuText += `• To target someone: !commandname @user\n\n`;
-        menuText += `Try !testgif [name] to preview any reaction GIF!`;
+        menuText += `*${languageManager.getText('reactions.menu.howToUse') || 'How to use:'}*\n`;
+        menuText += `• ${languageManager.getText('reactions.menu.selfUsage') || 'For self-reactions: !commandname'}\n`;
+        menuText += `• ${languageManager.getText('reactions.menu.targetUsage') || 'To target someone: !commandname @user'}\n\n`;
+        menuText += languageManager.getText('reactions.menu.testGif') || `Try !testgif [name] to preview any reaction GIF!`;
         
         await safeSendText(sock, sender, menuText);
     },
@@ -553,10 +575,43 @@ const reactionCommands = {
     }
 };
 
+// We're using the singleton language manager instance imported at the top of the file
+
 // Initialize function
 async function init() {
     try {
         logger.info('Initializing reactions module...');
+        
+        // Ensure reaction GIFs directory exists
+        if (!fs.existsSync(REACTIONS_DIR)) {
+            logger.warn(`Reaction GIFs directory not found at ${REACTIONS_DIR}. Creating directory...`);
+            try {
+                fs.mkdirSync(REACTIONS_DIR, { recursive: true });
+                logger.info(`Created reaction GIFs directory at ${REACTIONS_DIR}`);
+            } catch (dirError) {
+                logger.error(`Failed to create reaction GIFs directory: ${dirError.message}`);
+            }
+        }
+        
+        // Validate GIF files
+        const missingGifs = [];
+        const validGifs = [];
+        
+        for (const [type, gifPath] of Object.entries(REACTION_GIFS)) {
+            if (fs.existsSync(gifPath) && fs.statSync(gifPath).size > 1000) {
+                validGifs.push(type);
+                logger.info(`✅ Found valid GIF for ${type}: ${gifPath}`);
+            } else {
+                missingGifs.push(type);
+                logger.warn(`❌ Missing or invalid GIF for ${type}: ${gifPath}`);
+            }
+        }
+        
+        logger.info(`Reaction GIFs validation complete. Valid: ${validGifs.length}, Missing: ${missingGifs.length}`);
+        
+        // Language manager is already initialized by the singleton
+        logger.info('Using global language manager for reactions module');
+        
         return true;
     } catch (error) {
         logger.error('Failed to initialize reactions module:', error);

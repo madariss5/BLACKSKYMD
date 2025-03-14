@@ -1,4 +1,5 @@
 const logger = require('./logger');
+const { safeSendMessage, safeSendText, safeSendImage } = require('./jidHelper');
 
 /**
  * Handles errors in WhatsApp bot commands

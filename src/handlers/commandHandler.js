@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
 const fs = require('fs');
 const path = require('path');
 

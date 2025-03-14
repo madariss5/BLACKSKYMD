@@ -21,6 +21,7 @@ commands.set('help', async (sock, message) => {
     try {
         const sender = message.key.remoteJid;
 const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
         await safeSendText(sock, sender, '*Available Commands:*\n!ping - Check if bot is running\n!help - Show this help message' 
         );
     } catch (err) {

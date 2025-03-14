@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
 const config = require('../config/config');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const fs = require('fs').promises;

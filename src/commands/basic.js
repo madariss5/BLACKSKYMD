@@ -2,6 +2,7 @@ const logger = require('../utils/logger');
 const os = require('os');
 const { proto } = require('@whiskeysockets/baileys');
 const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+const { languageManager } = require('../utils/language');
 
 const basicCommands = {
     async help(sock, message, args) {
@@ -17,45 +18,45 @@ const basicCommands = {
             // General help message
             const prefix = require('../config/config').bot.prefix;
             const helpText = `
-*📚 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 Help*
+*📚 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 ${languageManager.getText('basic.help_title')}*
 
-Welcome to 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻! Here are some commands to get you started:
+${languageManager.getText('basic.help_welcome')}
 
-*Main Commands:*
-• ${prefix}menu - View all command categories
-• ${prefix}list - List all available commands
-• ${prefix}help [command] - Get help with specific command
+*${languageManager.getText('basic.main_commands')}:*
+• ${prefix}menu - ${languageManager.getText('basic.view_categories')}
+• ${prefix}list - ${languageManager.getText('basic.list_commands')}
+• ${prefix}help [command] - ${languageManager.getText('basic.get_help')}
 
-*Quick Start:*
-• ${prefix}ping - Check if bot is online
-• ${prefix}info - Get bot information
-• ${prefix}stats - View bot statistics
+*${languageManager.getText('basic.quick_start')}:*
+• ${prefix}ping - ${languageManager.getText('basic.check_online')}
+• ${prefix}info - ${languageManager.getText('basic.get_info')}
+• ${prefix}stats - ${languageManager.getText('basic.view_stats')}
 
-*For more commands, type:* ${prefix}menu
+*${languageManager.getText('basic.more_commands')}:* ${prefix}menu
 
-Type ${prefix}help [command] for detailed help on any command.`.trim();
+${languageManager.getText('basic.help_detail', null, prefix)}`.trim();
 
             await safeSendText(sock, message.key.remoteJid, helpText, {
                 mentions: message.mentions || []
             });
         } catch (err) {
             logger.error('Error in help command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error executing help command');
+            await safeSendText(sock, message.key.remoteJid, '❌ ' + languageManager.getText('errors.command_execution'));
         }
     },
 
     async ping(sock, message) {
         try {
             const start = Date.now();
-            await safeSendText(sock, message.key.remoteJid, 'Pinging... 🏓');
+            await safeSendText(sock, message.key.remoteJid, languageManager.getText('basic.ping_checking'));
             const ping = Date.now() - start;
 
             await safeSendMessage(sock, message.key.remoteJid, {
-                text: `*🏓 Pong!*\n\n*Speed:* ${ping}ms\n*Status:* Active ✅`
+                text: `*🏓 ${languageManager.getText('basic.ping_response')}*\n\n*${languageManager.getText('basic.ping_speed')}:* ${ping}ms\n*${languageManager.getText('basic.ping_status')}:* ${languageManager.getText('basic.ping_active')} ✅`
             });
         } catch (err) {
             logger.error('Error in ping command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error checking ping'
+            await safeSendText(sock, message.key.remoteJid, '❌ ' + languageManager.getText('errors.command_execution')
             );
         }
     },
@@ -63,22 +64,22 @@ Type ${prefix}help [command] for detailed help on any command.`.trim();
     async info(sock, message) {
         try {
             const info = `
-*ℹ️ Bot Information*
+*ℹ️ ${languageManager.getText('basic.info')}*
 
-*Version:* 1.0.0
+*${languageManager.getText('basic.version')}:* 1.0.0
 *Library:* @whiskeysockets/baileys
 *Node:* ${process.version}
 *Platform:* ${process.platform}
 *Memory:* ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
 *Uptime:* ${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m
 *Status:* Online ✅
-*Commands:* ${Object.keys(basicCommands).length} basic commands`.trim();
+*Commands:* ${Object.keys(basicCommands).length} ${languageManager.getText('system.basic_commands')}`.trim();
 
             await safeSendText(sock, message.key.remoteJid, info
             );
         } catch (err) {
             logger.error('Error in info command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error fetching bot info'
+            await safeSendText(sock, message.key.remoteJid, '❌ ' + languageManager.getText('errors.command_execution')
             );
         }
     },
@@ -92,7 +93,8 @@ Type ${prefix}help [command] for detailed help on any command.`.trim();
             };
 
             const statusText = `
-*🤖 Bot Status*
+*🤖 ${languageManager.getText('basic.status', null, 
+    `${Math.floor(status.uptime / 3600)}h ${Math.floor((status.uptime % 3600) / 60)}m`)}*
 
 *System:* Online ✅
 *CPU Usage:* ${Math.round(status.cpu.user / 1000000)}%
@@ -104,7 +106,7 @@ Type ${prefix}help [command] for detailed help on any command.`.trim();
             );
         } catch (err) {
             logger.error('Error in status command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error fetching status'
+            await safeSendText(sock, message.key.remoteJid, '❌ ' + languageManager.getText('errors.command_execution')
             );
         }
     },
@@ -112,30 +114,30 @@ Type ${prefix}help [command] for detailed help on any command.`.trim();
     async about(sock, message) {
         try {
             const about = `
-*About 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻*
+*${languageManager.getText('basic.about')}*
 
-A powerful WhatsApp bot with useful features and commands.
+${languageManager.getText('basic.about_description')}
 
-*Creator:* ${process.env.OWNER_NAME || 'Bot Developer'}
-*Version:* 1.0.0
-*Framework:* Baileys
-*Language:* JavaScript
-*License:* MIT
+*${languageManager.getText('basic.creator')}:* ${process.env.OWNER_NAME || 'Bot Developer'}
+*${languageManager.getText('basic.version')}:* 1.0.0
+*${languageManager.getText('basic.framework')}:* Baileys
+*${languageManager.getText('basic.language')}:* JavaScript
+*${languageManager.getText('basic.license')}:* MIT
 
-*Features:*
-• Group Management
-• Fun Commands
-• Utilities
-• Educational Tools
-• And more!
+*${languageManager.getText('basic.features')}:*
+• ${languageManager.getText('basic.group_management')}
+• ${languageManager.getText('basic.fun_commands')}
+• ${languageManager.getText('basic.utilities')}
+• ${languageManager.getText('basic.educational_tools')}
+• ${languageManager.getText('basic.and_more')}
 
-For support, contact the bot owner.`.trim();
+${languageManager.getText('basic.support_contact')}`.trim();
 
             await safeSendText(sock, message.key.remoteJid, about
             );
         } catch (err) {
             logger.error('Error in about command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error showing about info'
+            await safeSendText(sock, message.key.remoteJid, '❌ ' + languageManager.getText('errors.command_execution')
             );
         }
     },
@@ -148,15 +150,15 @@ For support, contact the bot owner.`.trim();
         };
 
         const info = `
-        📊 Bot Statistics:
-        • Users: ${stats.users}
-        • Groups: ${stats.groups}
-        • Commands: ${stats.commands}
-        • Uptime: ${Math.floor(stats.uptime / 3600)}h ${Math.floor((stats.uptime % 3600) / 60)}m
-        • Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
-        • Platform: ${process.platform}
-        • Node.js: ${process.version}
-        • CPU Usage: ${Math.round(process.cpuUsage().user / 1000000)}%
+        📊 ${languageManager.getText('basic.bot_statistics')}:
+        • ${languageManager.getText('basic.users')}: ${stats.users}
+        • ${languageManager.getText('basic.groups')}: ${stats.groups}
+        • ${languageManager.getText('basic.commands')}: ${stats.commands}
+        • ${languageManager.getText('basic.uptime')}: ${Math.floor(stats.uptime / 3600)}h ${Math.floor((stats.uptime % 3600) / 60)}m
+        • ${languageManager.getText('basic.memory_usage')}: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
+        • ${languageManager.getText('basic.platform')}: ${process.platform}
+        • ${languageManager.getText('basic.nodejs')}: ${process.version}
+        • ${languageManager.getText('basic.cpu_usage')}: ${Math.round(process.cpuUsage().user / 1000000)}%
                 `.trim();
 
         await safeSendText(sock, sender, info );
@@ -164,22 +166,22 @@ For support, contact the bot owner.`.trim();
 
     async dashboard(sock, sender) {
         const dashboard = `
-        📈 Bot Dashboard:
-        • Status: Online
-        • Performance: Good
-        • Error Rate: 0%
-        • API Status: Online
-        • Database: Connected
-        • Cache: Active
-        • Last Restart: ${new Date().toLocaleString()}
+        📈 ${languageManager.getText('basic.bot_dashboard')}:
+        • ${languageManager.getText('basic.status')}: Online
+        • ${languageManager.getText('basic.performance')}: Good
+        • ${languageManager.getText('basic.error_rate')}: 0%
+        • ${languageManager.getText('basic.api_status')}: Online
+        • ${languageManager.getText('basic.database')}: Connected
+        • ${languageManager.getText('basic.cache')}: Active
+        • ${languageManager.getText('basic.last_restart')}: ${new Date().toLocaleString()}
                 `.trim();
 
         await safeSendText(sock, sender, dashboard );
     },
     async changelog(sock, sender) {
         const changelog = `
-        📝 Recent Updates:
-        v1.0.0 (Current):
+        📝 ${languageManager.getText('basic.recent_updates')}:
+        v1.0.0 (${languageManager.getText('basic.current')}):
         • Added dynamic command loading
         • Improved error handling
         • Added media commands
@@ -188,7 +190,7 @@ For support, contact the bot owner.`.trim();
         • Improved stability
         
         v0.9.0:
-        • Initial release
+        • ${languageManager.getText('basic.initial_release')}
         • Basic functionality
         • Group management
         • Simple commands
@@ -199,7 +201,7 @@ For support, contact the bot owner.`.trim();
 
     async faq(sock, sender) {
         const faq = `
-        ❓ Frequently Asked Questions:
+        ❓ ${languageManager.getText('basic.faq_title')}:
         Q: How do I use the bot?
         A: Start with .help command
         
@@ -220,7 +222,7 @@ For support, contact the bot owner.`.trim();
     },
     async privacy(sock, sender) {
         const privacy = `
-        🔒 Privacy Policy:
+        🔒 ${languageManager.getText('basic.privacy_policy')}:
         1. Data Collection:
            • User IDs
            • Group IDs
@@ -245,7 +247,7 @@ For support, contact the bot owner.`.trim();
 
     async terms(sock, sender) {
         const terms = `
-        📋 Terms of Service:
+        📋 ${languageManager.getText('basic.terms_of_service')}:
         1. Acceptance
         By using this bot, you agree to these terms.
         
@@ -271,12 +273,12 @@ For support, contact the bot owner.`.trim();
 
     async speed(sock, sender) {
         const start = Date.now();
-        await safeSendText(sock, sender, 'Testing speed...' );
+        await safeSendText(sock, sender, languageManager.getText('basic.ping_checking') );
         const end = Date.now();
         const speed = end - start;
 
         const speedTest = `
-        🚀 Speed Test Results:
+        🚀 ${languageManager.getText('basic.ping_response')} ${languageManager.getText('basic.ping', null, speed)}
         • Response Time: ${speed}ms
         • Message Processing: ${speed - 10}ms
         • API Latency: ~${Math.round(speed * 0.7)}ms
@@ -286,16 +288,19 @@ For support, contact the bot owner.`.trim();
         await safeSendText(sock, sender, speedTest );
     },
     async system(sock, sender) {
+        const totalMemoryGB = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2);
+        const freeMemoryGB = (os.freemem() / 1024 / 1024 / 1024).toFixed(2);
+        
         const systemInfo = `
-        🖥️ System Information:
-        • OS: ${os.type()} ${os.release()}
-        • Architecture: ${os.arch()}
-        • CPU Cores: ${os.cpus().length}
-        • Total Memory: ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(2)} GB
-        • Free Memory: ${(os.freemem() / 1024 / 1024 / 1024).toFixed(2)} GB
-        • Platform: ${os.platform()}
-        • Hostname: ${os.hostname()}
-        • Kernel: ${os.version()}
+        🖥️ ${languageManager.getText('basic.system_info')}:
+        • ${languageManager.getText('basic.os')}: ${os.type()} ${os.release()}
+        • ${languageManager.getText('basic.architecture')}: ${os.arch()}
+        • ${languageManager.getText('basic.cpu_cores')}: ${os.cpus().length}
+        • ${languageManager.getText('basic.total_memory')}: ${totalMemoryGB} GB
+        • ${languageManager.getText('basic.free_memory')}: ${freeMemoryGB} GB
+        • ${languageManager.getText('basic.platform')}: ${os.platform()}
+        • ${languageManager.getText('basic.hostname')}: ${os.hostname()}
+        • ${languageManager.getText('basic.kernel')}: ${os.version()}
                 `.trim();
 
         await safeSendText(sock, sender, systemInfo );
@@ -303,14 +308,14 @@ For support, contact the bot owner.`.trim();
 
     async owner(sock, sender) {
         const ownerInfo = `
-        👑 Bot Owner Information:
-        • Name: ${process.env.OWNER_NAME || 'Bot Owner'}
-        • Number: ${process.env.OWNER_NUMBER || 'Not specified'}
-        • Website: ${process.env.OWNER_WEBSITE || 'Not specified'}
-        • Email: ${process.env.OWNER_EMAIL || 'Not specified'}
+        👑 ${languageManager.getText('basic.owner_info')}:
+        • ${languageManager.getText('basic.name')}: ${process.env.OWNER_NAME || 'Bot Owner'}
+        • ${languageManager.getText('basic.contact')}: ${process.env.OWNER_NUMBER || 'Not specified'}
+        • ${languageManager.getText('basic.website')}: ${process.env.OWNER_WEBSITE || 'Not specified'}
+        • ${languageManager.getText('basic.social')}: ${process.env.OWNER_SOCIAL || 'Not specified'}
         
-        For business inquiries or support:
-        Please contact the owner directly.
+        ${languageManager.getText('basic.business')}:
+        ${languageManager.getText('basic.contact_for_support')}.
                 `.trim();
 
         await safeSendText(sock, sender, ownerInfo );
@@ -318,12 +323,12 @@ For support, contact the bot owner.`.trim();
 
     async donate(sock, sender) {
         const donateInfo = `
-        💝 Support Bot Development:
-        • PayPal: ${process.env.PAYPAL || 'Not available'}
-        • Ko-fi: ${process.env.KOFI || 'Not available'}
-        • Patreon: ${process.env.PATREON || 'Not available'}
+        💝 ${languageManager.getText('basic.donate_title')}:
+        • ${languageManager.getText('basic.paypal')}: ${process.env.PAYPAL || 'Not available'}
+        • ${languageManager.getText('basic.kofi')}: ${process.env.KOFI || 'Not available'}
+        • ${languageManager.getText('basic.patreon')}: ${process.env.PATREON || 'Not available'}
         
-        Your support helps keep the bot running and improving!
+        ${languageManager.getText('basic.support_message')}
                 `.trim();
 
         await safeSendText(sock, sender, donateInfo );
@@ -331,40 +336,40 @@ For support, contact the bot owner.`.trim();
 
     async report(sock, sender, args) {
         if (!args.length) {
-            return await safeSendText(sock, sender, '⚠️ Please provide a bug report or feature request description!'
+            return await safeSendText(sock, sender, '⚠️ ' + languageManager.getText('errors.invalid_arguments', null, languageManager.getText('basic.report_usage'))
             );
         }
 
         const report = args.join(' ');
         logger.info(`New report from ${sender}: ${report}`);
 
-        await safeSendText(sock, sender, '✅ Thank you for your report! The bot owner will review it.'
+        await safeSendText(sock, sender, '✅ ' + languageManager.getText('basic.report_success')
         );
     },
 
     async feedback(sock, sender, args) {
         if (!args.length) {
-            return await safeSendText(sock, sender, '⚠️ Please provide your feedback!'
+            return await safeSendText(sock, sender, '⚠️ ' + languageManager.getText('errors.invalid_arguments', null, languageManager.getText('basic.feedback_usage'))
             );
         }
 
         const feedback = args.join(' ');
         logger.info(`New feedback from ${sender}: ${feedback}`);
 
-        await safeSendText(sock, sender, '✅ Thank you for your feedback! We appreciate your input.'
+        await safeSendText(sock, sender, '✅ ' + languageManager.getText('basic.feedback_success')
         );
     },
 
     async source(sock, sender) {
         const sourceInfo = `
-        📦 Bot Source Information:
-        • Version: ${process.env.BOT_VERSION || '1.0.0'}
-        • Framework: @whiskeysockets/baileys
-        • License: MIT
-        • Repository: ${process.env.REPO_URL || 'Private'}
-        • Contributors: ${process.env.CONTRIBUTORS || 'Various'}
+        📦 ${languageManager.getText('basic.source_info')}:
+        • ${languageManager.getText('basic.version')}: ${process.env.BOT_VERSION || '1.0.0'}
+        • ${languageManager.getText('basic.framework')}: @whiskeysockets/baileys
+        • ${languageManager.getText('basic.license')}: MIT
+        • ${languageManager.getText('basic.repository')}: ${process.env.REPO_URL || 'Private'}
+        • ${languageManager.getText('basic.contributors')}: ${process.env.CONTRIBUTORS || 'Various'}
         
-        Want to contribute? Contact the owner!
+        ${languageManager.getText('basic.contribute_message')}
                 `.trim();
 
         await safeSendText(sock, sender, sourceInfo );
@@ -378,13 +383,13 @@ For support, contact the bot owner.`.trim();
         const seconds = Math.floor(runtime % 60);
 
         const runtimeInfo = `
-        ⏰ Bot Runtime Details:
-        • Days: ${days}
-        • Hours: ${hours}
-        • Minutes: ${minutes}
-        • Seconds: ${seconds}
+        ⏰ ${languageManager.getText('basic.runtime_info')}:
+        • ${languageManager.getText('basic.days')}: ${days}
+        • ${languageManager.getText('basic.hours')}: ${hours}
+        • ${languageManager.getText('basic.minutes')}: ${minutes}
+        • ${languageManager.getText('basic.seconds')}: ${seconds}
         
-        Total Uptime: ${days}d ${hours}h ${minutes}m ${seconds}s
+        ${languageManager.getText('basic.total_uptime')}: ${days}d ${hours}h ${minutes}m ${seconds}s
                 `.trim();
 
         await safeSendText(sock, sender, runtimeInfo );
@@ -392,15 +397,15 @@ For support, contact the bot owner.`.trim();
 
     async premium(sock, sender) {
         const premiumInfo = `
-        💎 Premium Features:
-        • Priority Support
-        • Unlimited Usage
-        • Exclusive Commands
-        • No Cooldowns
-        • Custom Features
-        • Early Access
+        💎 ${languageManager.getText('basic.premium')}:
+        • ${languageManager.getText('basic.priority_support')}
+        • ${languageManager.getText('basic.unlimited_usage')}
+        • ${languageManager.getText('basic.exclusive_commands')}
+        • ${languageManager.getText('basic.no_cooldown')}
+        • ${languageManager.getText('basic.custom_features')}
+        • ${languageManager.getText('basic.early_access')}
         
-        Contact owner to upgrade!
+        ${languageManager.getText('basic.contact_owner_upgrade')}
                 `.trim();
 
         await safeSendText(sock, sender, premiumInfo );
@@ -408,12 +413,12 @@ For support, contact the bot owner.`.trim();
 
     async support(sock, sender) {
         const supportInfo = `
-        🆘 Need Help?
-        • Use .help for commands
-        • Use .report for bugs
-        • Use .feedback for suggestions
-        • Join support group: ${process.env.SUPPORT_GROUP || 'Not available'}
-        • Contact owner: .owner
+        🆘 ${languageManager.getText('basic.need_help')}
+        • ${languageManager.getText('basic.use_help')}
+        • ${languageManager.getText('basic.use_report')}
+        • ${languageManager.getText('basic.use_feedback')}
+        • ${languageManager.getText('basic.join_group')}: ${process.env.SUPPORT_GROUP || 'Not available'}
+        • ${languageManager.getText('basic.contact_owner_cmd')}: .owner
                 `.trim();
 
         await safeSendText(sock, sender, supportInfo );
@@ -421,16 +426,16 @@ For support, contact the bot owner.`.trim();
 
     async credits(sock, sender) {
         const creditsInfo = `
-        👏 Credits & Acknowledgments:
-        • @whiskeysockets/baileys - Core Library
-        • Node.js Community
-        • Bot Contributors
-        • API Providers
-        • Resource Providers
-        • Beta Testers
-        • Active Users
+        👏 ${languageManager.getText('basic.credits')}:
+        • @whiskeysockets/baileys - ${languageManager.getText('basic.core_library')}
+        • ${languageManager.getText('basic.node_community')}
+        • ${languageManager.getText('basic.bot_contributors')}
+        • ${languageManager.getText('basic.api_providers')}
+        • ${languageManager.getText('basic.resource_providers')}
+        • ${languageManager.getText('basic.beta_testers')}
+        • ${languageManager.getText('basic.active_users')}
         
-        Special thanks to everyone who helped make this bot possible!
+        ${languageManager.getText('basic.special_thanks')}
                 `.trim();
 
         await safeSendText(sock, sender, creditsInfo );

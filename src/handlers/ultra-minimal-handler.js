@@ -225,9 +225,9 @@ async function messageHandler(sock, message) {
                     console.log('Command executed successfully:', commandName);
                 } catch (err) {
                     logger.error(`Error executing command ${commandName}:`, err);
-                    await sock.sendMessage(message.key.remoteJid, {
-                        text: `❌ Error executing command: ${err.message || 'Unknown error'}. Please try again.`
-                    });
+                    await safeSendText(sock, message.key.remoteJid, 
+                        `❌ Error executing command: ${err.message || 'Unknown error'}. Please try again.`
+                    );
                 }
             } else {
                 console.log('Command not found:', commandName);
@@ -245,9 +245,9 @@ async function messageHandler(sock, message) {
                     suggestText = `\n\nDid you mean: ${similarCommands.map(cmd => `*!${cmd}*`).join(', ')}?`;
                 }
                 
-                await sock.sendMessage(message.key.remoteJid, {
-                    text: `❌ Command *!${commandName}* not found. Try !help or !menu for available commands.${suggestText}`
-                });
+                await safeSendText(sock, message.key.remoteJid,
+                    `❌ Command *!${commandName}* not found. Try !help or !menu for available commands.${suggestText}`
+                );
             }
 
             // Stop typing indicator

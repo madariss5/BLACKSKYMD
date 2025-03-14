@@ -5,6 +5,7 @@
  */
 
 const fs = require('fs');
+const { safeSendMessage, safeSendText, safeSendImage } = require('./jidHelper');
 const path = require('path');
 const crypto = require('crypto');
 

@@ -4,6 +4,7 @@
  */
 
 const logger = require('./logger');
+const { safeSendMessage, safeSendText, safeSendImage } = require('./jidHelper');
 
 /**
  * Handle an error that occurred during command execution
@@ -57,7 +58,7 @@ async function handleCommandError(sock, jid, error, commandName, moduleName, opt
       
       // Only attempt to send message if sock and jid are valid
       if (sock && typeof sock.sendMessage === 'function' && jid && jid !== 'unknown') {
-        await sock.sendMessage(jid, { text: errorMessage });
+        await safeSendMessage(sock, jid, { text: errorMessage });
       } else {
         logger.warn(`Can't send error message: Invalid sock or JID (command: ${commandName}, module: ${moduleName})`);
       }

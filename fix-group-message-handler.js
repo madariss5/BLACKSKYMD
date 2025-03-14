@@ -3,122 +3,105 @@
  * This script fixes "jid.endsWith is not a function" errors in the group message handler
  */
 
-const fs = require('fs').promises;
+const fs = require('fs');
 const path = require('path');
+const util = require('util');
 
-// Logger for the script
-const logger = {
-  info: (msg) => console.log(`[INFO] ${msg}`),
-  success: (msg) => console.log(`[SUCCESS] ${msg}`),
-  error: (msg, err) => console.error(`[ERROR] ${msg}`, err || '')
-};
+const readFile = util.promisify(fs.readFile);
+const writeFile = util.promisify(fs.writeFile);
 
-// Path to the group message handler
-const GROUP_MESSAGE_HANDLER_PATH = './src/handlers/groupMessageHandler.js';
-
-// Helper to safely get file content
 async function getFileContent(filePath) {
   try {
-    return await fs.readFile(filePath, 'utf8');
+    return await readFile(filePath, 'utf8');
   } catch (err) {
-    logger.error(`Failed to read file: ${filePath}`, err);
+    console.error(`Error reading file ${filePath}:`, err);
     return null;
   }
 }
 
-// Helper to safely write file content
 async function writeFileContent(filePath, content) {
   try {
-    await fs.writeFile(filePath, content, 'utf8');
+    await writeFile(filePath, content, 'utf8');
     return true;
   } catch (err) {
-    logger.error(`Failed to write file: ${filePath}`, err);
+    console.error(`Error writing file ${filePath}:`, err);
     return false;
   }
 }
 
-// Fix the group message handler
 async function fixGroupMessageHandler() {
-  logger.info('Starting group message handler JID error fix...');
+  console.log('Fixing group message handler...');
   
-  // Get the group message handler content
-  const content = await getFileContent(GROUP_MESSAGE_HANDLER_PATH);
-  if (!content) {
-    logger.error('Failed to read group message handler');
-    return;
+  const filePath = path.join(__dirname, 'src', 'handlers', 'groupMessageHandler.js');
+  
+  const fileContent = await getFileContent(filePath);
+  if (!fileContent) {
+    console.error('Failed to read group message handler file');
+    return false;
   }
   
-  // Add the import for the JID helpers if not already present
-  let updatedContent = content;
-  const importStatement = "const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');";
+  // Add enhanced JID validation
+  let updatedContent = fileContent;
   
-  if (!updatedContent.includes('safeSendText') && !updatedContent.includes('safeSendMessage')) {
-    // Find a good place to add the import
-    const lines = updatedContent.split('\n');
-    let importLine = 0;
-    
-    // Find the end of imports or beginning of code
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.startsWith('const ') || line.startsWith('let ') || line.startsWith('var ')) {
-        importLine = i + 1;
-      } else if (line.includes('function ') || line.includes('class ')) {
-        break;
-      }
-    }
-    
-    // Insert the import
-    lines.splice(importLine, 0, importStatement);
-    updatedContent = lines.join('\n');
-    logger.info('Added JID helper import');
+  // Check if we need to add the isJidGroup import
+  if (!updatedContent.includes('isJidGroup')) {
+    updatedContent = updatedContent.replace(
+      /^(const|let|var|import)(.*)$/m,
+      '$1$2\nconst { isJidGroup, ensureJidString, safeSendText, safeSendMessage } = require(\'../utils/jidHelper\');'
+    );
   }
   
-  // Replace sock.sendMessage calls with safeSendText/safeSendMessage
-  
-  // Replace simple text messages
+  // Replace standard JID validation with safe helpers
   updatedContent = updatedContent.replace(
-    /await\s+sock\.sendMessage\s*\(\s*([^,\)]+)\s*,\s*{\s*text:\s*([^}]+)\s*}\s*\)/g,
-    'await safeSendText(sock, $1, $2)'
+    /\bif\s*\(\s*([^.]+)\.endsWith\s*\(\s*['"]@g\.us['"]\s*\)\s*\)/g,
+    'if (isJidGroup($1))'
   );
   
-  // Replace sock.sendMessage with other content types
+  // Replace direct JID string operations with safe versions
   updatedContent = updatedContent.replace(
-    /await\s+sock\.sendMessage\s*\(\s*([^,\)]+)\s*,\s*({[^}]+image[^}]+}|{[^}]+sticker[^}]+})\s*\)/g,
-    'await safeSendMessage(sock, $1, $2)'
+    /\b([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)\.endsWith\s*\(\s*['"]@g\.us['"]\s*\)/g,
+    'isJidGroup($1)'
   );
   
-  // Replace any remaining sock.sendMessage calls
+  // Add JID safety to message sender functions
   updatedContent = updatedContent.replace(
-    /await\s+sock\.sendMessage\s*\(\s*([^,\)]+)\s*,\s*({[^}]+})\s*\)/g,
-    'await safeSendMessage(sock, $1, $2)'
+    /sock\.sendMessage\s*\(\s*([^,]+),\s*\{([^}]+)\}\s*\)/g,
+    'safeSendMessage(sock, $1, {$2})'
   );
   
-  // Count how many replacements were made
-  const originalCallCount = (content.match(/sock\.sendMessage/g) || []).length;
-  const remainingCallCount = (updatedContent.match(/sock\.sendMessage/g) || []).length;
-  const fixedCount = originalCallCount - remainingCallCount;
+  // Add safe text sending
+  updatedContent = updatedContent.replace(
+    /sock\.sendMessage\s*\(\s*([^,]+),\s*\{\s*text:\s*([^}]+)\s*\}\s*\)/g,
+    'safeSendText(sock, $1, $2)'
+  );
   
-  if (fixedCount > 0) {
-    // Write the updated content
-    const writeSuccess = await writeFileContent(GROUP_MESSAGE_HANDLER_PATH, updatedContent);
-    
-    if (writeSuccess) {
-      logger.success(`Fixed ${fixedCount} sock.sendMessage calls in group message handler`);
-    } else {
-      logger.error('Failed to write updated group message handler');
+  // Fix all instances where JID is used directly without validation
+  updatedContent = updatedContent.replace(
+    /const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*message\.key\.remoteJid/g,
+    'const $1 = ensureJidString(message.key.remoteJid)'
+  );
+  
+  if (updatedContent !== fileContent) {
+    if (await writeFileContent(filePath, updatedContent)) {
+      console.log('✅ Successfully fixed group message handler!');
+      return true;
     }
   } else {
-    logger.info('No changes needed in group message handler');
+    console.log('✓ No additional JID fixes needed for group message handler');
+    return true;
   }
+  
+  return false;
 }
 
-// Execute the fix
-fixGroupMessageHandler()
-  .then(() => {
-    console.log('Group message handler fix completed.');
-    process.exit(0);
-  })
-  .catch(err => {
-    console.error('Script execution failed:', err);
+fixGroupMessageHandler().then(success => {
+  if (success) {
+    console.log('Group message handler fix completed successfully');
+  } else {
+    console.error('Failed to fix group message handler');
     process.exit(1);
-  });
+  }
+}).catch(err => {
+  console.error('Error in fix process:', err);
+  process.exit(1);
+});

@@ -1,242 +1,303 @@
 {
   "system": {
-    "connected": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 successfully connected",
-    "bot_active": "𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 is active",
-    "command_not_found": "Unknown command: %s\nUse %shelp to see available commands",
-    "command_disabled": "This command is currently disabled.",
-    "no_permission": "You do not have permission to use this command.",
-    "cooldown": "Please wait %.1f seconds before using %s again.",
-    "error": "Error processing command. Please try again later.",
-    "language_changed": "Language has been changed to English",
-    "welcome_message": "Welcome to 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻!\nUse %shelp to see available commands.",
+    "language_changed": "Language set to English",
+    "error": "Error",
+    "success": "Success",
+    "command_not_found": "Command not found",
+    "insufficient_permissions": "You don't have permission to use this command",
+    "cooldown": "Please wait before using this command again",
+    "bot_info": "BLACKSKY-MD WhatsApp Bot\nVersion: %s\nOwner: %s\nPrefix: %s",
+    "unknown_error": "An unknown error occurred",
+    "try_again": "Please try again later",
+    "basic_commands": "basic commands"
+  },
+  "basic": {
+    "help": "Here are the available commands: %s",
+    "help_detail": "Type %shelp [command] for detailed help on any command.",
+    "help_title": "Help",
+    "help_welcome": "Welcome to 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻! Here are some commands to get you started:",
+    "main_commands": "Main Commands",
+    "quick_start": "Quick Start",
+    "view_categories": "View all command categories",
+    "list_commands": "List all available commands",
+    "get_help": "Get help with specific command",
+    "check_online": "Check if bot is online",
+    "get_info": "Get bot information",
+    "view_stats": "View bot statistics",
+    "more_commands": "For more commands, type",
+    "ping": "Pong! Response time: %s ms",
+    "ping_checking": "Pinging... 🏓",
+    "ping_response": "Pong!",
+    "ping_speed": "Speed",
+    "ping_status": "Status",
+    "ping_active": "Active",
+    "info": "Bot Information",
+    "about": "About BLACKSKY-MD Bot",
+    "status": "Bot Status: Online\nUptime: %s",
+    "owner": "Bot Owner Contact",
+    "version": "Bot Version: %s",
+    "system_info": "System Information",
+    "os": "OS",
+    "architecture": "Architecture",
+    "cpu_cores": "CPU Cores",
+    "total_memory": "Total Memory",
+    "free_memory": "Free Memory",
+    "platform": "Platform",
+    "hostname": "Hostname",
+    "kernel": "Kernel",
+    "runtime_info": "Bot Runtime Details",
+    "days": "Days",
+    "hours": "Hours",
+    "minutes": "Minutes",
+    "seconds": "Seconds",
+    "total_uptime": "Total Uptime",
+    "premium": "Premium Features",
+    "priority_support": "Priority Support",
+    "unlimited_usage": "Unlimited Usage",
+    "exclusive_commands": "Exclusive Commands",
+    "no_cooldown": "No Cooldowns",
+    "custom_features": "Custom Features",
+    "early_access": "Early Access",
+    "contact_owner_upgrade": "Contact owner to upgrade!",
+    "need_help": "Need Help?",
+    "use_help": "Use .help for commands",
+    "use_report": "Use .report for bugs",
+    "use_feedback": "Use .feedback for suggestions",
+    "join_group": "Join support group",
+    "contact_owner_cmd": "Contact owner",
+    "credits": "Credits & Acknowledgments",
+    "core_library": "Core Library",
+    "node_community": "Node.js Community",
+    "bot_contributors": "Bot Contributors",
+    "api_providers": "API Providers",
+    "resource_providers": "Resource Providers",
+    "beta_testers": "Beta Testers",
+    "active_users": "Active Users",
+    "special_thanks": "Special thanks to everyone who helped make this bot possible!",
+    "donate_title": "Support Bot Development",
+    "paypal": "PayPal",
+    "kofi": "Ko-fi",
+    "patreon": "Patreon",
+    "support_message": "Your support helps keep the bot running and improving!",
+    "source_info": "Bot Source Information",
+    "framework": "Framework",
+    "license": "License",
+    "repository": "Repository",
+    "contributors": "Contributors",
+    "contribute_message": "Want to contribute? Contact the owner!",
+    "report_usage": "report [description]",
+    "feedback_usage": "feedback [message]",
+    "report_success": "Your report has been submitted. Thank you!",
+    "feedback_success": "Your feedback has been submitted. Thank you!",
+    "owner_info": "Bot Owner Information",
+    "name": "Name",
+    "creator": "Creator",
+    "contact": "Contact",
+    "website": "Website",
+    "social": "Social",
+    "business": "Business Inquiries",
+    "contact_for_support": "Contact for support or inquiries",
+    "bot_statistics": "Bot Statistics",
+    "users": "Users",
+    "groups": "Groups",
+    "commands": "Commands",
     "uptime": "Uptime",
-    "maintenance_mode": "Maintenance mode is enabled. Please try again later.",
-    "prefix_text": "Prefix",
-    "processing": "Processing...",
-    "commands_loaded": "%d commands loaded"
-  },
-  "leveling": {
-    "level_up_title": "Level Up!",
-    "congrats": "Congratulations! You've reached level %s!",
-    "coin_reward": "+%s coins added to your balance",
-    "xp_tip": "Keep chatting to earn more XP",
-    "current_xp": "Current XP: %s",
-    "next_level": "Next level: %s XP needed",
-    "achievement_unlocked": "Level %s Achievement Unlocked!"
-  },
-  "commands": {
-    "help": {
-      "description": "Shows help for available commands",
-      "usage": ".help [command]",
-      "list_title": "Available Commands:",
-      "command_info": "Command: %s\nDescription: %s\nUsage: %s"
-    },
-    "menu": {
-      "description": "Shows the command menu with categories",
-      "usage": ".menu",
-      "success": "Menu sent successfully",
-      "error": "Error displaying menu"
-    },
-    "sticker": {
-      "description": "Creates a sticker from image or video",
-      "usage": ".sticker [name]",
-      "no_media": "Please send an image or video",
-      "processing": "Creating sticker...",
-      "error": "Error creating sticker"
-    },
-    "play": {
-      "description": "Plays music",
-      "usage": ".play [song name or URL]",
-      "no_query": "Please provide a song name or URL",
-      "searching": "Searching for song...",
-      "not_found": "Song not found",
-      "playing": "Now playing: %s",
-      "error": "Error playing song"
-    },
-    "language": {
-      "description": "Changes the bot's language",
-      "usage": ".language [en|de]",
-      "available": "Available languages: %s\nCurrent language: %s",
-      "not_supported": "Language '%s' is not supported. Available languages: %s",
-      "success": "Language changed successfully",
-      "error": "Failed to change language"
-    }
+    "memory_usage": "Memory Usage",
+    "platform": "Platform",
+    "nodejs": "Node.js",
+    "cpu_usage": "CPU Usage",
+    "bot_dashboard": "Bot Dashboard",
+    "status": "Status",
+    "performance": "Performance",
+    "error_rate": "Error Rate",
+    "api_status": "API Status",
+    "database": "Database",
+    "cache": "Cache",
+    "last_restart": "Last Restart",
+    "recent_updates": "Recent Updates",
+    "current": "Current",
+    "initial_release": "Initial release",
+    "faq_title": "Frequently Asked Questions",
+    "privacy_policy": "Privacy Policy",
+    "terms_of_service": "Terms of Service",
+    "about_description": "A powerful WhatsApp bot with useful features and commands.",
+    "creator": "Creator",
+    "framework": "Framework",
+    "language": "Language",
+    "features": "Features",
+    "group_management": "Group Management",
+    "fun_commands": "Fun Commands",
+    "utilities": "Utilities",
+    "educational_tools": "Educational Tools",
+    "and_more": "And more!",
+    "support_contact": "For support, contact the bot owner."
   },
   "group": {
-    "admin_required": "You must be an admin to use this command",
-    "user_not_found": "User not found",
-    "user_is_admin": "User is already an admin",
-    "user_not_admin": "User is not an admin",
-    "action_success": "Action completed successfully",
-    "action_failed": "Action failed",
-    "kick": {
-      "description": "Removes a user from the group",
-      "usage": ".kick @user",
-      "success": "User has been removed from the group",
-      "error": "Error removing user"
-    },
-    "add": {
-      "description": "Adds a user to the group",
-      "usage": ".add [number]",
-      "success": "User has been added to the group",
-      "error": "Error adding user"
-    }
-  },
-  "educational": {
-    "define": {
-      "description": "Shows word definition",
-      "usage": ".define [word]",
-      "not_found": "No definition found",
-      "searching": "Searching definition..."
-    },
-    "translate": {
-      "description": "Translates text to other languages",
-      "usage": ".translate [target_language] [text]",
-      "error": "Translation failed"
-    }
-  },
-  "menu": {
-    "title": "📋 BLACKSKY-MD Command Menu",
-    "footer": "Use .help [command] for detailed help",
-    "categories": "CATEGORIES",
-    "commands": "Commands",
-    "command_list": "COMMAND LIST",
-    "category_info": "%s - %d commands",
-    "command_help_info": "Send .help [command] for detailed usage",
-    "command_info": "Command Info",
-    "category": "Category",
-    "description": "Description",
-    "usage": "Usage",
-    "command_not_found": "Command \"%s\" not found. Use `%smenu` to view available commands.",
-    "command_help": "COMMAND HELP",
-    "help_examples": "Examples",
-    "available_commands": "Available Commands",
-    "total_commands": "Total: %s commands",
-    "see_commands": "Use `%slist [category]` to view commands in a category",
-    "error_generating": "Error generating menu. Please try again.",
-    "error_listing": "Error listing commands. Please try again.",
-    "no_info_available": "No additional information available.",
-    "bot_menu": "BOT MENU",
-    "welcome": "Welcome to the menu",
-    "select_category": "Select a category",
-    "main_menu": "MAIN MENU",
-    "quick_commands": "QUICK COMMANDS",
-    "popular_commands": "POPULAR COMMANDS",
-    "commands_count": "Commands: %s",
-    "support_group": "Support Group",
-    "prefix_info": "Prefix: %s",
-    "back_to_menu": "Back to Menu",
-    "menu_footer": "Tip: Use %shelp for more details",
-    "basic_category": "📱 Basic Commands",
-    "media_category": "🎬 Media Commands",
-    "group_category": "👥 Group Commands",
-    "fun_category": "🎮 Fun Commands",
-    "sticker_category": "🔖 Sticker Commands",
-    "owner_category": "👑 Owner Commands",
-    "utility_category": "🛠️ Utilities",
-    "education_category": "📚 Education Commands",
-    "user_category": "👤 User Profile",
-    "user_extended_category": "👥 Extended User Profiles",
-    "nsfw_category": "🔞 NSFW",
-    "reactions_category": "🎭 Reactions",
-    "menu_category": "📋 Menu Commands",
-    "educational_category": "📚 Educational"
+    "admin_only": "This command is for admins only",
+    "bot_admin_required": "Bot needs to be an admin to use this command",
+    "kick_success": "User kicked successfully",
+    "add_success": "User added successfully",
+    "promote_success": "User promoted to admin",
+    "demote_success": "Admin demoted to user",
+    "group_only": "This command can only be used in groups"
   },
   "media": {
-    "no_media": "Please send a media file to use this command",
-    "processing": "Processing your media...",
-    "success": "Here's your processed media!",
-    "error": "Failed to process media. Please try again.",
-    "invalid_format": "Invalid media format. Please try again with the correct format.",
-    "play": {
-      "description": "Play audio from file or URL",
-      "no_query": "Please provide a song name or URL",
-      "searching": "Searching for song...",
-      "not_found": "Song not found",
-      "playing": "Now playing: %s",
-      "error": "Failed to play song"
+    "sticker_created": "Sticker created successfully",
+    "processing": "Processing media...",
+    "download_failed": "Failed to download media",
+    "missing_query": "Please provide a search query",
+    "video_too_large": "Video is too large to process"
+  },
+  "fun": {
+    "quote": "Quote: %s",
+    "joke": "Joke: %s",
+    "fact": "Fact: %s",
+    "trivia": "Trivia: %s",
+    "challenge": "Here's your challenge: %s",
+    "tictactoe_start": "Tic-Tac-Toe game started!",
+    "hangman_start": "Hangman game started!",
+    "game_win": "Congratulations! You won!",
+    "game_loss": "Game over! You lost.",
+    "game_draw": "Game ended in a draw."
+  },
+  "nsfw": {
+    "not_enabled": "NSFW commands are not enabled for this chat",
+    "verification_required": "You need to verify your age first. Use !verify (password)",
+    "content_warning": "NSFW content warning",
+    "restricted_chat": "This chat is not allowed to use NSFW commands",
+    "cooldown": "Please wait before requesting more NSFW content",
+    "usage_toggle": "Usage: !togglensfw <on|off>",
+    "enabled": "NSFW content enabled for this group",
+    "disabled": "NSFW content disabled for this group",
+    "verify_usage": "Age verification required. Please use the command: !verify <your_age>",
+    "age_requirement": "You must be at least 18 years old to access NSFW content.",
+    "verification_success": "Age verification successful. You can now use NSFW commands.",
+    "verification_failed": "Age verification failed. Please try again.",
+    "fetching": "Fetching NSFW content..."
+  },
+  "reactions": {
+    "sending": "Sending %s reaction...",
+    "self_target": "You can't target yourself for this reaction",
+    "missing_target": "Please mention someone to send this reaction to",
+    "menu": {
+      "title": "🎬 Reaction GIFs Menu",
+      "workingGifs": "Total working GIFs: %s/%s",
+      "howToUse": "How to use",
+      "selfUsage": "For self-reactions: !commandname",
+      "targetUsage": "To target someone: !commandname @user",
+      "testGif": "Try !testgif [name] to preview any reaction GIF!"
     },
-    "sticker": {
-      "description": "Create sticker from media",
-      "processing": "Creating sticker...",
-      "success": "Here's your sticker!",
-      "error": "Failed to create sticker",
-      "emojimix": {
-        "description": "Mix two emojis together",
-        "invalid_format": "Please provide two emojis separated by +\nExample: 😀+😭",
-        "processing": "Mixing emojis...",
-        "success": "Here's your mixed emoji sticker!",
-        "error": "Failed to mix emojis"
-      },
-      "ttp": {
-        "description": "Convert text to sticker",
-        "no_text": "Please provide text to convert",
-        "processing": "Creating text sticker...",
-        "success": "Here's your text sticker!",
-        "error": "Failed to create text sticker"
-      },
-      "attp": {
-        "description": "Convert text to animated sticker",
-        "no_text": "Please provide text to convert",
-        "processing": "Creating animated text sticker...",
-        "success": "Here's your animated text sticker!",
-        "error": "Failed to create animated text sticker"
-      }
+    "categories": {
+      "basicreactions": "Basic Reactions",
+      "expressions": "Expressions",
+      "physicalactions": "Physical Actions",
+      "walkingdead": "Walking Dead",
+      "fastfurious": "Fast & Furious"
     },
-    "toimg": {
-      "description": "Convert sticker to image",
-      "processing": "Converting sticker to image...",
-      "success": "Here's your image!",
-      "error": "Failed to convert sticker"
+    "hug": {
+      "self": "%s is giving hugs %s",
+      "toTarget": "%s hugs %s %s",
+      "toEveryone": "%s hugs everyone %s"
     },
-    "tovideo": {
-      "description": "Convert animated sticker to video",
-      "processing": "Converting sticker to video...",
-      "success": "Here's your video!",
-      "error": "Failed to convert sticker"
+    "pat": {
+      "self": "%s is patting %s",
+      "toTarget": "%s pats %s %s",
+      "toEveryone": "%s pats everyone %s"
     },
-    "enhance": {
-      "description": "Enhance image quality",
-      "processing": "Enhancing image quality...",
-      "success": "Here's your enhanced image!",
-      "error": "Failed to enhance image"
+    "kiss": {
+      "self": "%s is blowing kisses %s",
+      "toTarget": "%s kisses %s %s",
+      "toEveryone": "%s kisses everyone %s"
     },
-    "sharpen": {
-      "description": "Sharpen image",
-      "invalid_level": "Sharpening level must be between 1 and 10",
-      "processing": "Sharpening image...",
-      "success": "Image sharpened with level %d!",
-      "error": "Failed to sharpen image"
+    "cuddle": {
+      "self": "%s is cuddling %s",
+      "toTarget": "%s cuddles with %s %s",
+      "toEveryone": "%s cuddles with everyone %s"
     },
-    "reverse": {
-      "description": "Reverse video playback",
-      "processing": "Reversing video...",
-      "success": "Here's your reversed video!",
-      "error": "Failed to reverse video"
+    "smile": {
+      "self": "%s is smiling %s",
+      "toTarget": "%s smiles at %s %s",
+      "toEveryone": "%s smiles at everyone %s"
     },
-    "youtube": {
-      "ytmp4": {
-        "description": "Download YouTube video",
-        "invalid_url": "Please provide a valid YouTube video URL",
-        "processing": "Downloading YouTube video...",
-        "success": "Here's your YouTube video!",
-        "error": "Failed to download YouTube video"
-      },
-      "ytmp3": {
-        "description": "Download YouTube audio",
-        "invalid_url": "Please provide a valid YouTube video URL",
-        "processing": "Downloading YouTube audio...",
-        "success": "Here's your YouTube audio!",
-        "error": "Failed to download YouTube audio"
-      },
-      "video": {
-        "description": "Play YouTube video",
-        "no_query": "Please provide a video name or URL",
-        "searching": "Searching for video...",
-        "not_found": "Video not found",
-        "playing": "Now playing: %s",
-        "error": "Failed to play video"
-      }
+    "happy": {
+      "self": "%s is happy %s",
+      "toTarget": "%s is happy with %s %s",
+      "toEveryone": "%s is happy with everyone %s"
+    },
+    "wave": {
+      "self": "%s is waving %s",
+      "toTarget": "%s waves at %s %s",
+      "toEveryone": "%s waves at everyone %s"
+    },
+    "dance": {
+      "self": "%s is dancing %s",
+      "toTarget": "%s dances with %s %s",
+      "toEveryone": "%s dances with everyone %s"
+    },
+    "cry": {
+      "self": "%s is crying %s",
+      "toTarget": "%s cries because of %s %s",
+      "toEveryone": "%s cries with everyone %s"
+    },
+    "blush": {
+      "self": "%s is blushing %s",
+      "toTarget": "%s blushes at %s %s",
+      "toEveryone": "%s blushes at everyone %s"
+    },
+    "laugh": {
+      "self": "%s is laughing %s",
+      "toTarget": "%s laughs with %s %s",
+      "toEveryone": "%s laughs with everyone %s"
+    },
+    "wink": {
+      "self": "%s is winking %s",
+      "toTarget": "%s winks at %s %s",
+      "toEveryone": "%s winks at everyone %s"
+    },
+    "poke": {
+      "self": "%s is poking %s",
+      "toTarget": "%s pokes %s %s",
+      "toEveryone": "%s pokes everyone %s"
+    },
+    "slap": {
+      "self": "%s is slapping %s",
+      "toTarget": "%s slaps %s %s",
+      "toEveryone": "%s slaps everyone %s"
+    },
+    "bonk": {
+      "self": "%s is bonking %s",
+      "toTarget": "%s bonks %s %s",
+      "toEveryone": "%s bonks everyone %s"
+    },
+    "bite": {
+      "self": "%s is biting %s",
+      "toTarget": "%s bites %s %s",
+      "toEveryone": "%s bites everyone %s"
+    },
+    "punch": {
+      "self": "%s is punching %s",
+      "toTarget": "%s punches %s %s",
+      "toEveryone": "%s punches everyone %s"
+    },
+    "highfive": {
+      "self": "%s is high-fiving %s",
+      "toTarget": "%s high-fives %s %s",
+      "toEveryone": "%s high-fives everyone %s"
+    },
+    "yeet": {
+      "self": "%s is yeeting %s",
+      "toTarget": "%s yeets %s %s",
+      "toEveryone": "%s yeets everyone %s"
     }
+  },
+  "errors": {
+    "fetch_failed": "Failed to fetch data from API",
+    "invalid_arguments": "Invalid arguments. Usage: %s",
+    "api_error": "API error: %s",
+    "not_implemented": "This feature is not implemented yet",
+    "network_error": "Network error. Please check your connection",
+    "timeout": "Request timed out",
+    "toggle_failed": "Failed to toggle NSFW settings.",
+    "command_execution": "Error executing command"
   }
 }

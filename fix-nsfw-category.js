@@ -3,223 +3,134 @@
  * This script fixes "jid.endsWith is not a function" errors in the NSFW command category
  */
 
-const fs = require('fs').promises;
+const fs = require('fs');
 const path = require('path');
+const util = require('util');
 
-// Logger for the script
-const logger = {
-  info: (msg) => console.log(`[INFO] ${msg}`),
-  success: (msg) => console.log(`[SUCCESS] ${msg}`),
-  error: (msg, err) => console.error(`[ERROR] ${msg}`, err || '')
-};
+const readFile = util.promisify(fs.readFile);
+const writeFile = util.promisify(fs.writeFile);
 
-// Path to the NSFW module
-const NSFW_MODULE_PATH = './src/commands/nsfw.js';
-
-// Pattern to search for sock.sendMessage calls
-const SEND_MESSAGE_REGEX = /await\s+sock\.sendMessage\s*\(\s*([^,\)]+)\s*,\s*({[^}]+}|[^,)]+)\s*\)/g;
-
-// Helper to safely get file content
 async function getFileContent(filePath) {
   try {
-    return await fs.readFile(filePath, 'utf8');
+    return await readFile(filePath, 'utf8');
   } catch (err) {
-    logger.error(`Failed to read file: ${filePath}`, err);
+    console.error(`Error reading file ${filePath}:`, err);
     return null;
   }
 }
 
-// Helper to safely write file content
 async function writeFileContent(filePath, content) {
   try {
-    await fs.writeFile(filePath, content, 'utf8');
+    await writeFile(filePath, content, 'utf8');
     return true;
   } catch (err) {
-    logger.error(`Failed to write file: ${filePath}`, err);
+    console.error(`Error writing file ${filePath}:`, err);
     return false;
   }
 }
 
-// Fix the NSFW module
 async function fixNsfwModule() {
-  logger.info('Starting NSFW module JID error fix...');
+  console.log('Fixing NSFW module...');
   
-  // Get the NSFW module content
-  const content = await getFileContent(NSFW_MODULE_PATH);
-  if (!content) {
-    logger.error('Failed to read NSFW module');
-    return;
+  const filePath = path.join(__dirname, 'src', 'commands', 'nsfw.js');
+  
+  if (!fs.existsSync(filePath)) {
+    console.error(`NSFW module not found at ${filePath}`);
+    return false;
   }
   
-  // Add the import for the JID helpers if not already present
-  let updatedContent = content;
-  const importStatement = "const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');";
-  
-  if (!updatedContent.includes('safeSendText') && !updatedContent.includes('safeSendMessage')) {
-    // Find a good place to add the import
-    const lines = updatedContent.split('\n');
-    let importLine = 0;
-    
-    // Find the end of imports or beginning of code
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.startsWith('const ') || line.startsWith('let ') || line.startsWith('var ')) {
-        importLine = i + 1;
-      } else if (line.includes('function ') || line.includes('class ')) {
-        break;
-      }
-    }
-    
-    // Insert the import
-    lines.splice(importLine, 0, importStatement);
-    updatedContent = lines.join('\n');
-    logger.info('Added JID helper import');
+  const fileContent = await getFileContent(filePath);
+  if (!fileContent) {
+    console.error('Failed to read NSFW module file');
+    return false;
   }
   
-  // Fix the commands one by one
-  const commands = [
-    'isNSFW', 'nsfwSettings', 'nsfwStats', 'verify', 'nsfwHelp',
-    'waifu', 'neko', 'hentai', 'boobs', 'pussy', 'blowjob', 'anal', 'feet',
-    'gifboobs', 'gifhentai', 'gifblowjob', 'uniform', 'thighs', 'femdom',
-    'tentacle', 'pantsu', 'kitsune'
-  ];
+  // Add enhanced JID validation
+  let updatedContent = fileContent;
   
-  for (const command of commands) {
-    // Find the command function
-    const commandRegex = new RegExp(`async\\s+${command}\\s*\\(sock,\\s*sender(?:,\\s*args)?\\)\\s*{`, 'g');
-    
-    if (commandRegex.test(updatedContent)) {
-      // Find the function body
-      const functionStartIndex = updatedContent.search(commandRegex);
-      if (functionStartIndex === -1) continue;
-      
-      // Get the function content
-      let openBraces = 0;
-      let closeBraces = 0;
-      let endIndex = functionStartIndex;
-      
-      // Find the end of the function
-      for (let i = functionStartIndex; i < updatedContent.length; i++) {
-        if (updatedContent[i] === '{') openBraces++;
-        if (updatedContent[i] === '}') {
-          closeBraces++;
-          if (openBraces === closeBraces) {
-            endIndex = i + 1;
-            break;
-          }
-        }
-      }
-      
-      const functionBody = updatedContent.substring(functionStartIndex, endIndex);
-      
-      // Skip already fixed functions
-      if (functionBody.includes('safeSendText') || functionBody.includes('safeSendMessage')) {
-        logger.info(`Command ${command} already fixed, skipping`);
-        continue;
-      }
-      
-      // Fix the function body
-      let fixedBody = functionBody;
-      
-      // Replace simple text messages
-      fixedBody = fixedBody.replace(
-        /await\s+sock\.sendMessage\s*\(\s*sender\s*,\s*{\s*text:\s*([^}]+)\s*}\s*\)/g,
-        'await safeSendText(sock, sender, $1)'
+  // Check if we need to add the JID helper imports
+  if (!updatedContent.includes('isJidGroup')) {
+    if (updatedContent.includes('require(\'../utils/jidHelper\')')) {
+      // Add to existing import
+      updatedContent = updatedContent.replace(
+        /const\s*\{\s*([^}]*)\s*\}\s*=\s*require\(['"]\.\.\/utils\/jidHelper['"]\)/,
+        'const { $1, isJidGroup, isJidUser, safeSendMessage, safeSendText, safeSendImage } = require(\'../utils/jidHelper\')'
       );
-      
-      // Replace image messages
-      fixedBody = fixedBody.replace(
-        /await\s+sock\.sendMessage\s*\(\s*sender\s*,\s*{\s*image:([^}]+),\s*caption:([^}]+)\s*}\s*\)/g,
-        'await safeSendMessage(sock, sender, { image:$1, caption:$2 })'
-      );
-      
-      // Replace other messages
-      fixedBody = fixedBody.replace(
-        /await\s+sock\.sendMessage\s*\(\s*sender\s*,\s*({[^}]+})\s*\)/g,
-        'await safeSendMessage(sock, sender, $1)'
-      );
-      
-      // Update the content
-      if (fixedBody !== functionBody) {
-        updatedContent = updatedContent.replace(functionBody, fixedBody);
-        logger.success(`Fixed command: ${command}`);
-      } else {
-        logger.info(`No changes needed for command: ${command}`);
-      }
     } else {
-      logger.info(`Command ${command} not found`);
+      // Add new import
+      updatedContent = updatedContent.replace(
+        /(const|let|var|import)(.*)(\r?\n)/,
+        '$1$2$3const { isJidGroup, isJidUser, safeSendMessage, safeSendText, safeSendImage } = require(\'../utils/jidHelper\');\n'
+      );
     }
   }
   
-  // Add JID helper import to the function if it's missing
-  const functionRegex = /async\s+function\s+sendNsfwGif\s*\(sock,\s*sender,\s*url,\s*caption\)\s*{/g;
-  if (functionRegex.test(updatedContent)) {
-    // Find the function body
-    const functionStartIndex = updatedContent.search(functionRegex);
-    if (functionStartIndex !== -1) {
-      // Get function start line
-      const lines = updatedContent.substring(0, functionStartIndex).split('\n');
-      const functionStartLine = lines.length;
-      
-      // Replace the function with a fixed version
-      const allLines = updatedContent.split('\n');
-      if (!allLines[functionStartLine].includes('safeSendText') && 
-          !allLines[functionStartLine].includes('safeSendMessage')) {
-        
-        // Add the import
-        allLines.splice(functionStartLine, 0, "    const { safeSendText, safeSendMessage } = require('../utils/jidHelper');");
-        
-        // Update the function content
-        let inFunction = false;
-        for (let i = functionStartLine; i < allLines.length; i++) {
-          if (allLines[i].includes('sendNsfwGif')) {
-            inFunction = true;
-          }
-          
-          if (inFunction) {
-            // Replace sock.sendMessage with safeSendMessage
-            allLines[i] = allLines[i].replace(
-              /sock\.sendMessage\s*\(\s*normalizedJid\s*,/g,
-              'safeSendMessage(sock, sender,'
-            );
-            
-            // Replace sock.sendMessage in catch block
-            allLines[i] = allLines[i].replace(
-              /sock\.sendMessage\s*\(\s*fallbackJid\s*,\s*{\s*text:\s*([^}]+)\s*}\s*\)/g,
-              'safeSendText(sock, sender, $1)'
-            );
-            
-            // Exit when we reach end of function
-            if (allLines[i].trim() === '}' && inFunction) {
-              inFunction = false;
-              break;
-            }
-          }
-        }
-        
-        updatedContent = allLines.join('\n');
-        logger.success('Fixed sendNsfwGif function');
-      }
+  // Replace standard JID validation with safe helpers
+  updatedContent = updatedContent.replace(
+    /\bif\s*\(\s*([^.]+)\.endsWith\s*\(\s*['"]@g\.us['"]\s*\)\s*\)/g,
+    'if (isJidGroup($1))'
+  );
+  
+  updatedContent = updatedContent.replace(
+    /\bif\s*\(\s*([^.]+)\.endsWith\s*\(\s*['"]@s\.whatsapp\.net['"]\s*\)\s*\)/g,
+    'if (isJidUser($1))'
+  );
+  
+  // Replace direct JID string operations with safe versions
+  updatedContent = updatedContent.replace(
+    /\b([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)\.endsWith\s*\(\s*['"]@g\.us['"]\s*\)/g,
+    'isJidGroup($1)'
+  );
+  
+  updatedContent = updatedContent.replace(
+    /\b([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)\.endsWith\s*\(\s*['"]@s\.whatsapp\.net['"]\s*\)/g,
+    'isJidUser($1)'
+  );
+  
+  // Fix the group check in all NSFW commands
+  updatedContent = updatedContent.replace(
+    /const\s+remoteJid\s*=\s*sender\.key\.remoteJid/g,
+    'const remoteJid = ensureJidString(sender.key.remoteJid)'
+  );
+  
+  // Replace message sending
+  updatedContent = updatedContent.replace(
+    /await\s+sock\.sendMessage\s*\(\s*([^,]+),\s*\{\s*image:\s*([^,]+),\s*caption:\s*([^}]+)\s*\}\s*\)/g,
+    'await safeSendImage(sock, $1, $2, $3)'
+  );
+  
+  updatedContent = updatedContent.replace(
+    /await\s+sock\.sendMessage\s*\(\s*([^,]+),\s*\{\s*text:\s*([^}]+)\s*\}\s*\)/g,
+    'await safeSendText(sock, $1, $2)'
+  );
+  
+  // General sendMessage cases
+  updatedContent = updatedContent.replace(
+    /await\s+sock\.sendMessage\s*\(\s*([^,]+),\s*\{([^}]+)\}\s*\)/g,
+    'await safeSendMessage(sock, $1, {$2})'
+  );
+  
+  if (updatedContent !== fileContent) {
+    if (await writeFileContent(filePath, updatedContent)) {
+      console.log('✅ Successfully fixed NSFW module!');
+      return true;
     }
-  }
-  
-  // Write the updated content
-  const writeSuccess = await writeFileContent(NSFW_MODULE_PATH, updatedContent);
-  
-  if (writeSuccess) {
-    logger.success('Successfully fixed NSFW module');
   } else {
-    logger.error('Failed to write updated NSFW module');
+    console.log('✓ No additional JID fixes needed for NSFW module');
+    return true;
   }
+  
+  return false;
 }
 
-// Execute the fix
-fixNsfwModule()
-  .then(() => {
-    console.log('NSFW module fix completed.');
-    process.exit(0);
-  })
-  .catch(err => {
-    console.error('Script execution failed:', err);
+fixNsfwModule().then(success => {
+  if (success) {
+    console.log('NSFW module fix completed successfully');
+  } else {
+    console.error('Failed to fix NSFW module');
     process.exit(1);
-  });
+  }
+}).catch(err => {
+  console.error('Error in fix process:', err);
+  process.exit(1);
+});

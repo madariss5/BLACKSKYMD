@@ -8,8 +8,17 @@ const FormData = require('form-data');
 const sharp = require('sharp');
 const ffmpeg = require('fluent-ffmpeg');
 const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
+const { languageManager } = require('../utils/language');
 
 const TEMP_DIR = path.join(__dirname, '../../temp/nsfw');
+
+// API endpoints for NSFW content
+const API_ENDPOINTS = {
+    HMTAI: 'https://hmtai.hatsunia.cfd/v2',
+    WAIFU: 'https://api.waifu.pics/nsfw',
+    NEKO: 'https://nekos.life/api/v2',
+    FALLBACK: 'https://api.waifu.im/search'
+};
 
 async function getFileTypeFromBuffer(buffer) {
     try {
@@ -196,7 +205,7 @@ function getRemainingCooldown(userId) {
 }
 
 async function sendNsfwGif(sock, sender, url, caption) {
-    const { safeSendMessage, safeSendText } = require('../utils/jidHelper');
+    const { safeSendMessage, safeSendText, isJidGroup, isJidUser, safeSendImage } = require('../utils/jidHelper');
     
     try {
         // Download GIF first
@@ -245,19 +254,20 @@ const nsfwCommands = {
         try {
             const [action] = args;
             if (!action || !['on', 'off'].includes(action.toLowerCase())) {
-                await safeSendText(sock, sender, 'Usage: !togglensfw <on|off>');
+                await safeSendText(sock, sender, languageManager.getText('nsfw.usage_toggle'));
                 return;
             }
 
             const isEnabled = action.toLowerCase() === 'on';
             await saveNsfwSettingsForGroup(sender, isEnabled);
 
-            await safeSendText(sock, sender, `NSFW content ${isEnabled ? 'enabled' : 'disabled'} for this group`);
+            const statusKey = isEnabled ? 'nsfw.enabled' : 'nsfw.disabled';
+            await safeSendText(sock, sender, languageManager.getText(statusKey, null, sender));
 
             logger.info(`NSFW toggled ${action.toLowerCase()} for ${sender}`);
         } catch (err) {
             logger.error('Error in toggleNSFW:', err);
-            await safeSendText(sock, sender, 'Failed to toggle NSFW settings.');
+            await safeSendText(sock, sender, languageManager.getText('errors.toggle_failed'));
         }
     },
 
@@ -333,30 +343,29 @@ NSFW Statistics:
     },
 
     async verify(sock, sender, args) {
+        const { safeSendText } = require('../utils/jidHelper');
+        
         try {
             const [age] = args;
             const parsedAge = parseInt(age);
 
             if (!age || isNaN(parsedAge)) {
-                await safeSendText(sock, sender, `⚠️ Age verification required. Please use the command: !verify <your_age>`
-                );
+                await safeSendText(sock, sender, '⚠️ ' + languageManager.getText('nsfw.verify_usage'));
                 return;
             }
 
             if (parsedAge < 18) {
-                await safeSendText(sock, sender, `❌ You must be at least 18 years old to access NSFW content.`
-                );
+                await safeSendText(sock, sender, '❌ ' + languageManager.getText('nsfw.age_requirement'));
                 return;
             }
 
             setUserVerification(sender, true);
-            await safeSendText(sock, sender, `✅ Age verification successful. You can now use NSFW commands.`
-            );
+            await safeSendText(sock, sender, '✅ ' + languageManager.getText('nsfw.verification_success'));
 
             logger.info(`User ${sender} verified for NSFW content, age: ${parsedAge}`);
         } catch (err) {
             logger.error('Error in verify:', err);
-            await safeSendText(sock, sender, 'Age verification failed. Please try again.' );
+            await safeSendText(sock, sender, languageManager.getText('nsfw.verification_failed'));
         }
     },
 

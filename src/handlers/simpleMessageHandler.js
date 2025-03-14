@@ -3,6 +3,7 @@
  */
 
 const { commandLoader } = require('../utils/commandLoader');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
 const logger = require('../utils/logger');
 
 // Bot configuration

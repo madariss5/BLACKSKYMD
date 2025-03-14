@@ -24,17 +24,32 @@ class LanguageManager {
 
     async loadTranslations() {
         try {
-            const translationsDir = path.join(__dirname, '../translations');
-            console.log(`Loading translations from directory: ${translationsDir}`);
+            // Try multiple possible locations for translations directory
+            const possibleDirs = [
+                path.join(__dirname, '../translations'),
+                path.join(process.cwd(), 'src/translations'),
+                path.join(process.cwd(), 'translations')
+            ];
             
-            // Check if directory exists
-            try {
-                await fs.access(translationsDir);
-            } catch (err) {
-                console.error(`Translations directory not found: ${translationsDir}`);
-                // Create directory
+            let translationsDir = null;
+            
+            // Find the first directory that exists
+            for (const dir of possibleDirs) {
+                try {
+                    await fs.access(dir);
+                    console.log(`✅ Found translations directory: ${dir}`);
+                    translationsDir = dir;
+                    break;
+                } catch (err) {
+                    console.log(`Directory not found: ${dir}`);
+                }
+            }
+            
+            // If no directory found, create one
+            if (!translationsDir) {
+                translationsDir = possibleDirs[0];
+                console.error(`❌ No translations directory found, creating: ${translationsDir}`);
                 await fs.mkdir(translationsDir, { recursive: true });
-                console.log(`Created translations directory: ${translationsDir}`);
                 
                 // Initialize with empty translations to prevent crashes
                 this.translations.set(this.defaultLanguage, {});
@@ -123,9 +138,16 @@ class LanguageManager {
             // Use provided language, fallback to config, then default
             const language = lang || config.bot.language || this.defaultLanguage;
             
-            // Only log if verbose mode is enabled
-            if (this.verbose) {
-                console.log(`Getting text for key: ${key}, language: ${language}`);
+            // Ensure we have translations loaded
+            if (this.translations.size === 0) {
+                logger.warn(`No translations loaded yet, returning key: ${key}`);
+                return key;
+            }
+            
+            // Only enable verbose logging during development/debugging
+            if (this.verbose && process.env.DEBUG_TRANSLATIONS === 'true') {
+                logger.debug(`Requested key: ${key}, language: ${language}`);
+                logger.debug(`Available languages: ${Array.from(this.translations.keys()).join(', ')}`);
             }
 
             // Get translations for requested language
@@ -133,8 +155,8 @@ class LanguageManager {
 
             // If translation not found in requested language, try default
             if (!langData && language !== this.defaultLanguage) {
-                if (this.verbose) {
-                    console.log(`Falling back to default language for: ${language}`);
+                if (this.verbose && process.env.DEBUG_TRANSLATIONS === 'true') {
+                    logger.debug(`Falling back to default language: ${this.defaultLanguage}`);
                 }
                 langData = this.translations.get(this.defaultLanguage);
             }
@@ -149,16 +171,8 @@ class LanguageManager {
             const keys = key.split('.');
             let text = langData;
 
-            // Debug the keys and text if verbose
-            if (this.verbose) {
-                console.log(`Looking for keys: ${keys.join('.')} in language: ${language}`);
-            }
-
             for (const k of keys) {
                 if (!text || typeof text !== 'object') {
-                    if (this.verbose) {
-                        console.log(`Key path broken at: ${k}, current value:`, text);
-                    }
                     break;
                 }
                 text = text[k];
@@ -179,7 +193,7 @@ class LanguageManager {
             // Replace placeholders with args
             return text.replace(/%s/g, () => args.shift() || '%s');
         } catch (err) {
-            console.error(`Error getting translation for key ${key}:`, err);
+            logger.error(`Error getting translation for key ${key}:`, err);
             return key;
         }
     }
@@ -190,12 +204,12 @@ class LanguageManager {
      */
     logMissingOnce(message) {
         if (this.translationMissingLog.size < this.maxLoggedMissing && !this.translationMissingLog.has(message)) {
-            console.warn(message);
+            logger.warn(message);
             this.translationMissingLog.add(message);
             
             // If we've reached the limit, log a warning
             if (this.translationMissingLog.size === this.maxLoggedMissing) {
-                console.warn(`Reached maximum number of logged missing translations (${this.maxLoggedMissing}). Further missing translations will be suppressed.`);
+                logger.warn(`Reached maximum number of logged missing translations (${this.maxLoggedMissing}). Further missing translations will be suppressed.`);
             }
         }
     }

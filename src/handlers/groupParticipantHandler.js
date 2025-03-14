@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
 const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 async function handleGroupParticipantsUpdate(sock, { id, participants, action }) {
