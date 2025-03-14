@@ -3,112 +3,120 @@
  * Designed for maximum reliability
  */
 
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 const logger = console;
 
 // Commands storage
 const commands = new Map();
 
-// Import all commands from the commands directory
-try {
-    const commandsModule = require('../commands/index');
+// Import all commands from the commands directory recursively
+async function loadCommands() {
+    try {
+        const commandsPath = path.join(__dirname, '../commands');
+        const files = await getAllFiles(commandsPath);
+        let loadedCount = 0;
 
-    // Load commands from the module
-    if (commandsModule && commandsModule.commands) {
-        logger.log('Loading commands from modules...');
-        Object.entries(commandsModule.commands).forEach(([name, func]) => {
-            if (typeof func === 'function' && name !== 'init') {
-                commands.set(name, async (sock, message, args) => {
-                    try {
-                        return await func(sock, message, args);
-                    } catch (err) {
-                        logger.error(`Error executing command ${name}:`, err);
-                        throw err;
+        logger.log('Loading commands from:', commandsPath);
+
+        for (const file of files) {
+            if (file.endsWith('.js') && !['index.js'].includes(path.basename(file))) {
+                try {
+                    const filePath = file;
+                    const moduleData = require(filePath);
+                    const category = path.basename(file, '.js');
+
+                    if (moduleData.commands) {
+                        Object.entries(moduleData.commands).forEach(([name, func]) => {
+                            if (typeof func === 'function' && name !== 'init') {
+                                commands.set(name, async (sock, message, args) => {
+                                    try {
+                                        return await func(sock, message, args);
+                                    } catch (err) {
+                                        logger.error(`Error executing command ${name}:`, err);
+                                        throw err;
+                                    }
+                                });
+                                loadedCount++;
+                                logger.log(`Loaded command: ${name} from ${category}`);
+                            }
+                        });
+
+                        // Initialize module if it has init function
+                        if (typeof moduleData.init === 'function') {
+                            moduleData.init().catch(err => {
+                                logger.error(`Error initializing module ${category}:`, err);
+                            });
+                        }
                     }
-                });
+                } catch (err) {
+                    logger.error(`Error loading commands from ${file}:`, err);
+                }
             }
-        });
-        logger.log(`Loaded ${commands.size} commands from modules`);
+        }
+
+        logger.log(`Successfully loaded ${loadedCount} commands`);
+    } catch (err) {
+        logger.error('Error loading commands:', err);
     }
-} catch (err) {
-    logger.error('Error loading command modules:', err);
+}
+
+// Recursively get all files in directory
+async function getAllFiles(dir) {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const files = await Promise.all(entries.map(entry => {
+        const fullPath = path.join(dir, entry.name);
+        return entry.isDirectory() ? getAllFiles(fullPath) : fullPath;
+    }));
+    return files.flat();
 }
 
 // Add fallback commands if they don't exist
-if (!commands.has('ping')) {
-    commands.set('ping', async (sock, message) => {
-        try {
-            logger.log('Executing ping command');
-            const sender = message.key.remoteJid;
-            await sock.sendMessage(sender, { text: '🏓 Pong! Bot is working.' });
-        } catch (err) {
-            logger.error('Error in ping command:', err);
-        }
-    });
+function addFallbackCommands() {
+    if (!commands.has('ping')) {
+        commands.set('ping', async (sock, message) => {
+            try {
+                const sender = message.key.remoteJid;
+                await sock.sendMessage(sender, { text: '🏓 Pong! Bot is working.' });
+            } catch (err) {
+                logger.error('Error in ping command:', err);
+            }
+        });
+    }
+
+    if (!commands.has('help')) {
+        commands.set('help', async (sock, message) => {
+            try {
+                const sender = message.key.remoteJid;
+                const commandList = Array.from(commands.keys()).join(', ');
+                await sock.sendMessage(sender, { 
+                    text: `*Available Commands*\n${commandList}`
+                });
+            } catch (err) {
+                logger.error('Error in help command:', err);
+            }
+        });
+    }
+
+    if (!commands.has('menu')) {
+        commands.set('menu', async (sock, message) => {
+            try {
+                const sender = message.key.remoteJid;
+                const commandList = Array.from(commands.keys()).sort();
+                let menuText = `*📋 Command Menu*\n\n`;
+                menuText += `Total Commands: ${commandList.length}\n\n`;
+                menuText += commandList.map(cmd => `• !${cmd}`).join('\n');
+                await sock.sendMessage(sender, { text: menuText });
+            } catch (err) {
+                logger.error('Error in menu command:', err);
+            }
+        });
+    }
 }
 
-if (!commands.has('help')) {
-    commands.set('help', async (sock, message) => {
-        try {
-            logger.log('Executing help command');
-            const sender = message.key.remoteJid;
-            const commandList = Array.from(commands.keys()).join(', ');
-            await sock.sendMessage(sender, { 
-                text: `*Available Commands*\n${commandList}`
-            });
-        } catch (err) {
-            logger.error('Error in help command:', err);
-        }
-    });
-}
-
-if (!commands.has('status')) {
-    commands.set('status', async (sock, message) => {
-        try {
-            const sender = message.key.remoteJid;
-            const uptime = process.uptime();
-            const hours = Math.floor(uptime / 3600);
-            const minutes = Math.floor((uptime % 3600) / 60);
-            const seconds = Math.floor(uptime % 60);
-
-            const statusText = `*📊 Bot Status*\n\n` +
-                            `🟢 *Status:* Online\n` +
-                            `⏱️ *Uptime:* ${hours}h ${minutes}m ${seconds}s\n` +
-                            `🧩 *Commands:* ${commands.size}\n`;
-
-            await sock.sendMessage(sender, { text: statusText });
-        } catch (err) {
-            logger.error('Error in status command:', err);
-        }
-    });
-}
-
-if (!commands.has('about')) {
-    commands.set('about', async (sock, message) => {
-        try {
-            if (!message.key?.remoteJid) return;
-            const sender = message.key.remoteJid;
-
-            const aboutText = `*🤖 BLACKSKY-MD Bot*\n\n` +
-                            `A reliable WhatsApp bot with multi-level fallback system.\n\n` +
-                            `*Version:* 1.0.0\n` +
-                            `*Framework:* @whiskeysockets/baileys\n` +
-                            `*Commands:* ${commands.size}\n\n` +
-                            `Type *!help* for available commands.`;
-
-            await sock.sendMessage(sender, { text: aboutText });
-        } catch (err) {
-            logger.error('Error in about command:', err);
-        }
-    });
-}
-
-// Message handler
+// Message handler with improved error handling
 async function messageHandler(sock, message) {
     try {
-        logger.log('Message received:', JSON.stringify(message, null, 2));
-
         // Basic validation
         if (!message?.message || !message.key?.remoteJid) {
             logger.log('Invalid message format');
@@ -121,8 +129,6 @@ async function messageHandler(sock, message) {
                        message.message?.imageMessage?.caption ||
                        message.message?.videoMessage?.caption;
 
-        logger.log('Message content:', content);
-
         if (!content) {
             logger.log('No text content found');
             return;
@@ -130,13 +136,11 @@ async function messageHandler(sock, message) {
 
         // Check for command prefix
         if (content.startsWith('!') || content.startsWith('.')) {
-            logger.log('Command detected:', content);
-
             const prefix = content.charAt(0);
             const [commandName, ...args] = content.slice(1).trim().split(' ');
             const cmd = commandName.toLowerCase();
 
-            logger.log('Attempting to execute command:', cmd);
+            logger.log('Processing command:', cmd, 'with args:', args);
 
             // Show typing indicator
             try {
@@ -151,14 +155,15 @@ async function messageHandler(sock, message) {
                     logger.log('Command executed successfully:', cmd);
                 } catch (err) {
                     logger.error('Error executing command:', err);
+                    const errorMessage = err.message || 'Unknown error occurred';
                     await sock.sendMessage(message.key.remoteJid, {
-                        text: 'Error executing command. Please try again.'
+                        text: `❌ Error executing command: ${errorMessage}. Please try again.`
                     });
                 }
             } else {
                 logger.log('Command not found:', cmd);
                 await sock.sendMessage(message.key.remoteJid, {
-                    text: `Command not found. Try !help for available commands.`
+                    text: `❌ Command not found. Try !help or !menu for available commands.`
                 });
             }
 
@@ -168,14 +173,12 @@ async function messageHandler(sock, message) {
             } catch (err) {
                 logger.error('Error clearing presence:', err);
             }
-        } else {
-            logger.log('Not a command message');
         }
     } catch (err) {
         logger.error('Error in message handler:', err);
         try {
             await sock.sendMessage(message.key.remoteJid, {
-                text: 'An error occurred while processing your message.'
+                text: '❌ An error occurred while processing your message.'
             });
         } catch (sendErr) {
             logger.error('Failed to send error message:', sendErr);
@@ -188,15 +191,11 @@ async function init() {
     try {
         logger.log('Initializing ultra minimal handler');
 
-        // Initialize command modules if available
-        try {
-            if (require('../commands/index').initializeModules) {
-                await require('../commands/index').initializeModules();
-                logger.log('Command modules initialized');
-            }
-        } catch (err) {
-            logger.error('Error initializing command modules:', err);
-        }
+        // Load all commands first
+        await loadCommands();
+
+        // Add fallback commands
+        addFallbackCommands();
 
         logger.log(`Handler initialized with ${commands.size} commands`);
         logger.log('Available commands:', Array.from(commands.keys()));

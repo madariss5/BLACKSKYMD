@@ -91,7 +91,7 @@ async function isNsfwEnabledForGroup(groupId) {
 async function saveNsfwSettingsForGroup(groupId, enabled) {
     try {
         const settings = await getGroupSettings(groupId);
-        settings.nsfw = { 
+        settings.nsfw = {
             ...settings.nsfw,
             enabled,
             updatedAt: Date.now()
@@ -136,7 +136,7 @@ async function fetchApi(url, fallbacks = []) {
     };
 
     try {
-        const response = await axios.get(url, { 
+        const response = await axios.get(url, {
             timeout: 5000,
             headers
         });
@@ -150,7 +150,7 @@ async function fetchApi(url, fallbacks = []) {
             for (const fallbackUrl of fallbacks) {
                 try {
                     logger.info(`Trying fallback API: ${fallbackUrl}`);
-                    const response = await axios.get(fallbackUrl, { 
+                    const response = await axios.get(fallbackUrl, {
                         timeout: 5000,
                         headers
                     });
@@ -171,7 +171,7 @@ function applyCooldown(userId, seconds = 60) {
     const cooldownExpiry = userCooldowns.get(userId);
 
     if (cooldownExpiry && cooldownExpiry > now) {
-        return false; 
+        return false;
     }
 
     userCooldowns.set(userId, now + (seconds * 1000));
@@ -191,25 +191,40 @@ function getRemainingCooldown(userId) {
 
 async function sendNsfwGif(sock, sender, url, caption) {
     try {
+        // Download GIF first
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data);
+
+        // Send as animated sticker
         await sock.sendMessage(sender, {
-            video: { url },
-            caption: caption,
+            sticker: buffer,
+            mimetype: 'image/gif',
+            gifAttribution: 'TENOR',
             gifPlayback: true,
-            mimetype: 'video/mp4'
+            caption: caption,
+            stickerAuthor: "BLACKSKY-MD",
+            stickerName: "nsfw_gif",
+            contextInfo: {
+                forwardingScore: 999,
+                isForwarded: true,
+                externalAdReply: {
+                    title: caption,
+                    mediaType: 1,
+                    renderLargerThumbnail: true
+                }
+            }
         });
+
         logger.info(`NSFW GIF sent successfully to ${sender}`);
     } catch (err) {
         logger.error('Error sending NSFW GIF:', err);
         try {
+            // Fallback to regular message if GIF fails
             await sock.sendMessage(sender, {
-                image: { url },
-                caption: caption
+                text: `${caption}\n\n(GIF failed to send)`
             });
-        } catch (imgErr) {
-            logger.error('Failed to send as image:', imgErr);
-            await sock.sendMessage(sender, {
-                text: 'Failed to send media. Please try again.'
-            });
+        } catch (sendErr) {
+            logger.error('Failed to send error message:', sendErr);
         }
     }
 }
@@ -222,17 +237,17 @@ const nsfwCommands = {
         try {
             const [action] = args;
             if (!action || !['on', 'off'].includes(action.toLowerCase())) {
-                await sock.sendMessage(sender, { 
-                    text: 'Usage: !togglensfw <on|off>' 
+                await sock.sendMessage(sender, {
+                    text: 'Usage: !togglensfw <on|off>'
                 });
                 return;
             }
 
             const isEnabled = action.toLowerCase() === 'on';
             await saveNsfwSettingsForGroup(sender, isEnabled);
-            
-            await sock.sendMessage(sender, { 
-                text: `NSFW content ${isEnabled ? 'enabled' : 'disabled'} for this group` 
+
+            await sock.sendMessage(sender, {
+                text: `NSFW content ${isEnabled ? 'enabled' : 'disabled'} for this group`
             });
 
             logger.info(`NSFW toggled ${action.toLowerCase()} for ${sender}`);
@@ -246,8 +261,8 @@ const nsfwCommands = {
         try {
             const imageUrl = args[0];
             if (!imageUrl) {
-                await sock.sendMessage(sender, { 
-                    text: 'Please provide an image URL or reply to an image' 
+                await sock.sendMessage(sender, {
+                    text: 'Please provide an image URL or reply to an image'
                 });
                 return;
             }
@@ -259,12 +274,12 @@ const nsfwCommands = {
                 return;
             }
 
-            await sock.sendMessage(sender, { 
-                text: 'Analyzing content safety...' 
+            await sock.sendMessage(sender, {
+                text: 'Analyzing content safety...'
             });
 
-            await sock.sendMessage(sender, { 
-                text: 'Content appears to be safe. For more accurate detection, an AI service integration is needed.' 
+            await sock.sendMessage(sender, {
+                text: 'Content appears to be safe. For more accurate detection, an AI service integration is needed.'
             });
 
             logger.info(`NSFW check requested for ${sender}`);
@@ -280,14 +295,14 @@ const nsfwCommands = {
             const validSettings = ['threshold', 'action', 'notification'];
 
             if (!setting || !validSettings.includes(setting)) {
-                await sock.sendMessage(sender, { 
-                    text: `Valid settings: ${validSettings.join(', ')}` 
+                await sock.sendMessage(sender, {
+                    text: `Valid settings: ${validSettings.join(', ')}`
                 });
                 return;
             }
 
-            await sock.sendMessage(sender, { 
-                text: `NSFW setting '${setting}' will be configurable soon.` 
+            await sock.sendMessage(sender, {
+                text: `NSFW setting '${setting}' will be configurable soon.`
             });
 
             logger.info(`NSFW settings update requested by ${sender}`);
@@ -321,33 +336,33 @@ NSFW Statistics:
         try {
             const [age] = args;
             const parsedAge = parseInt(age);
-            
+
             if (!age || isNaN(parsedAge)) {
                 await sock.sendMessage(sender, {
                     text: `⚠️ Age verification required. Please use the command: !verify <your_age>`
                 });
                 return;
             }
-            
+
             if (parsedAge < 18) {
                 await sock.sendMessage(sender, {
                     text: `❌ You must be at least 18 years old to access NSFW content.`
                 });
                 return;
             }
-            
+
             setUserVerification(sender, true);
             await sock.sendMessage(sender, {
                 text: `✅ Age verification successful. You can now use NSFW commands.`
             });
-            
+
             logger.info(`User ${sender} verified for NSFW content, age: ${parsedAge}`);
         } catch (err) {
             logger.error('Error in verify:', err);
             await sock.sendMessage(sender, { text: 'Age verification failed. Please try again.' });
         }
     },
-    
+
     async nsfwHelp(sock, sender) {
         try {
             if (!isNsfwEnabledForGroup(sender)) {
@@ -356,7 +371,7 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             const helpText = `
 📜 *NSFW Commands List*
 
@@ -390,7 +405,7 @@ NSFW Statistics:
 
 *All commands require age verification.*
             `.trim();
-            
+
             await sock.sendMessage(sender, { text: helpText });
             logger.info(`NSFW help requested by ${sender}`);
         } catch (err) {
@@ -398,26 +413,26 @@ NSFW Statistics:
             await sock.sendMessage(sender, { text: 'Failed to provide NSFW help.' });
         }
     },
-    
+
 
     async waifu(sock, sender) {
         try {
             const { languageManager } = require('../utils/language');
-            
+
             if (!await isNsfwEnabledForGroup(sender)) {
                 await sock.sendMessage(sender, {
                     text: '❌ ' + languageManager.getText('media.nsfw.disabled', null)
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ ' + languageManager.getText('media.nsfw.age_verification', null)
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -425,48 +440,48 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: languageManager.getText('media.nsfw.fetching', null) });
-            
+
             const waifuUrl = await fetchNsfwImage('waifu');
-            
+
             if (!waifuUrl) {
-                await sock.sendMessage(sender, { 
-                    text: languageManager.getText('media.error', null) 
+                await sock.sendMessage(sender, {
+                    text: languageManager.getText('media.error', null)
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: waifuUrl },
                 caption: '🎭 NSFW Waifu'
             });
-            
+
             logger.info(`NSFW waifu image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in waifu:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch waifu image due to server error.' });
         }
     },
-    
+
     async neko(sock, sender) {
         try {
             const { languageManager } = require('../utils/language');
-            
+
             if (!await isNsfwEnabledForGroup(sender)) {
                 await sock.sendMessage(sender, {
                     text: '❌ ' + languageManager.getText('media.nsfw.disabled', null)
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ ' + languageManager.getText('media.nsfw.age_verification', null)
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -474,30 +489,30 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: languageManager.getText('media.nsfw.fetching', null) });
-            
+
             const nekoUrl = await fetchNsfwImage('neko');
-            
+
             if (!nekoUrl) {
-                await sock.sendMessage(sender, { 
-                    text: languageManager.getText('media.error', null) 
+                await sock.sendMessage(sender, {
+                    text: languageManager.getText('media.error', null)
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: nekoUrl },
                 caption: '🐱 NSFW Neko'
             });
-            
+
             logger.info(`NSFW neko image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in neko:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch neko image.' });
         }
     },
-    
+
     async hentai(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -506,14 +521,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -521,27 +536,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching hentai image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/hentai`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Hentai'
             });
-            
+
             logger.info(`NSFW hentai image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in hentai:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch hentai image.' });
         }
     },
-    
+
     async boobs(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -550,14 +565,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -565,27 +580,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/boobs`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Boobs'
             });
-            
+
             logger.info(`NSFW boobs image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in boobs:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async ass(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -594,14 +609,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -609,27 +624,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/ass`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Ass'
             });
-            
+
             logger.info(`NSFW ass image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in ass:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async pussy(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -638,14 +653,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -653,45 +668,45 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/pussy`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Pussy'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in pussy:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async blowjob(sock, sender) {
         try {
             const { languageManager } = require('../utils/language');
-            
+
             if (!await isNsfwEnabledForGroup(sender)) {
                 await sock.sendMessage(sender, {
                     text: '❌ ' + languageManager.getText('media.nsfw.disabled', null)
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ ' + languageManager.getText('media.nsfw.age_verification', null)
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -699,30 +714,30 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: languageManager.getText('media.nsfw.fetching', null) });
-            
+
             const blowjobUrl = await fetchNsfwImage('blowjob');
-            
+
             if (!blowjobUrl) {
-                await sock.sendMessage(sender, { 
-                    text: languageManager.getText('media.error', null) 
+                await sock.sendMessage(sender, {
+                    text: languageManager.getText('media.error', null)
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: blowjobUrl },
                 caption: '🔞 Blowjob'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in blowjob:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async anal(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -731,14 +746,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -746,27 +761,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/anal`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Anal'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in anal:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async feet(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -775,14 +790,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -790,27 +805,26 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/foot`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Feet'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in feet:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
 
     async gifboobs(sock, sender) {
         if (!await isNsfwEnabledForGroup(sender)) {
@@ -846,8 +860,8 @@ NSFW Statistics:
         const response = await fetchApi(primaryUrl, fallbacks);
 
         if (!response || !response.url) {
-            await sock.sendMessage(sender, { 
-                text: 'Failed to fetch GIF. Please try again later.' 
+            await sock.sendMessage(sender, {
+                text: 'Failed to fetch GIF. Please try again later.'
             });
             return;
         }
@@ -880,10 +894,10 @@ NSFW Statistics:
 
         await sock.sendMessage(sender, { text: 'Fetching GIF...' });
 
-        const primaryUrl = 'https://api.waifu.pics/nsfw/ass'; //Example URL - Replace with actual API endpoint
+        const primaryUrl = 'https://api.waifu.pics/nsfw/ass';
         const fallbacks = [
             'https://api.nekos.fun/api/ass',
-            'https://api.hmtai.me/nsfw/ass' //Example URL - Replace with actual API endpoint
+            'https://api.hmtai.me/nsfw/ass'
         ];
 
         const response = await fetchApi(primaryUrl, fallbacks);
@@ -921,11 +935,10 @@ NSFW Statistics:
 
         await sock.sendMessage(sender, { text: 'Fetching GIF...' });
 
-        const primaryUrl = 'https://api.waifu.pics/nsfw/hentai'; //Example URL - Replace with actual API endpoint
+        const primaryUrl = 'https://api.waifu.pics/nsfw/hentai';
         const fallbacks = [
             'https://api.nekos.fun/api/hentai',
-            'https://api.hmtai.me/nsfw/hentai' //Example URL - Replace with actual API endpoint
-
+            'https://api.hmtai.me/nsfw/hentai'
         ];
 
         const response = await fetchApi(primaryUrl, fallbacks);
@@ -956,17 +969,17 @@ NSFW Statistics:
         if (!applyCooldown(sender, 45)) {
             const remaining = getRemainingCooldown(sender);
             await sock.sendMessage(sender, {
-                text:text: `⏳ Please wait ${remaining} seconds before using this command again.`
+                text: `⏳ Please wait ${remaining} seconds before using this command again.`
             });
             return;
         }
 
         await sock.sendMessage(sender, { text: 'Fetching GIF...' });
 
-        const primaryUrl = 'https://api.waifu.pics/nsfw/blowjob'; //Example URL - Replace with actual API endpoint
+        const primaryUrl = 'https://api.waifu.pics/nsfw/blowjob';
         const fallbacks = [
             'https://api.nekos.fun/api/blowjob',
-            'https://api.hmtai.me/nsfw/blowjob' //Example URL - Replace with actual API endpoint
+            'https://api.hmtai.me/nsfw/blowjob'
         ];
 
         const response = await fetchApi(primaryUrl, fallbacks);
@@ -978,24 +991,22 @@ NSFW Statistics:
 
         await sendNsfwGif(sock, sender, response.url, '🔞 NSFW GIF');
     },
-    
 
     async uniform(sock, sender) {
-        try {
-            if (!await isNsfwEnabledForGroup(sender)) {
+        try {if (!await isNsfwEnabledForGroup(sender)) {
                 await sock.sendMessage(sender, {
                     text: '❌ NSFW commands are disabled for this group'
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -1003,27 +1014,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/uniform`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Uniform'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in uniform:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async thighs(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -1032,14 +1043,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -1047,27 +1058,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/thighs`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Thighs'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in thighs:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async femdom(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -1076,14 +1087,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -1091,27 +1102,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/femdom`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Femdom'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in femdom:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async tentacle(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -1120,14 +1131,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -1135,27 +1146,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/tentacle`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Tentacle'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in tentacle:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async pantsu(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -1164,14 +1175,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -1179,27 +1190,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/pantsu`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Pantsu'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in pantsu:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
     async kitsune(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -1208,14 +1219,14 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             if (!isUserVerified(sender)) {
                 await sock.sendMessage(sender, {
                     text: '⚠️ You need to verify your age first. Use !verify <your_age>'
                 });
                 return;
             }
-            
+
             if (!applyCooldown(sender, 30)) {
                 const remaining = getRemainingCooldown(sender);
                 await sock.sendMessage(sender, {
@@ -1223,27 +1234,27 @@ NSFW Statistics:
                 });
                 return;
             }
-            
+
             await sock.sendMessage(sender, { text: 'Fetching image...' });
-            
+
             const response = await fetchApi(`${API_ENDPOINTS.HMTAI}/nsfw/nsfwNeko`);
             if (!response || !response.url) {
                 await sock.sendMessage(sender, { text: 'Failed to fetch image. Please try again later.' });
                 return;
             }
-            
+
             await sock.sendMessage(sender, {
                 image: { url: response.url },
                 caption: '🔞 Kitsune'
             });
-            
+
             logger.info(`NSFW image sent to ${sender}`);
         } catch (err) {
             logger.error('Error in kitsune:', err);
             await sock.sendMessage(sender, { text: 'Failed to fetch image.' });
         }
     },
-    
+
 };
 
 const commands = nsfwCommands;
