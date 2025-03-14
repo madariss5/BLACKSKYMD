@@ -3,6 +3,9 @@
  * Used when other handlers fail to initialize
  */
 
+// Import essential utilities
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+
 // No external dependencies to minimize failure risk
 const commands = new Map();
 
@@ -20,8 +23,6 @@ commands.set('ping', async (sock, message) => {
 commands.set('help', async (sock, message) => {
     try {
         const sender = message.key.remoteJid;
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
-const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
         await safeSendText(sock, sender, '*Available Commands:*\n!ping - Check if bot is running\n!help - Show this help message' 
         );
     } catch (err) {
@@ -60,7 +61,7 @@ async function messageHandler(sock, message) {
                 await command(sock, message);
                 console.log(`Executed command: ${commandName}`);
             } else {
-                await sock.sendMessage(sender, { 
+                await safeSendMessage(sock, sender, { 
                     text: `Unknown command: ${commandName}. Use !help for available commands.` 
                 });
             }

@@ -1,3 +1,6 @@
-Source: attached_assets folder
-Replacement file: 2Lmc.gif
-Replaced: 2025-03-14T21:35:32.020Z
+Title: Unnamed GIF
+Search Query: anime punch
+Source: Tenor API
+Tenor ID: 16481806839486202440
+Downloaded: 2025-03-14T21:54:14.043Z
+Tenor URL: https://tenor.com/tNG0SgRln3Q.gif

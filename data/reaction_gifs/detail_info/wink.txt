@@ -1,4 +1,6 @@
-Reaction: wink
-File: wink.gif
-Size: 3.2M
-Source: Anime/Other
+Title: Unnamed GIF
+Search Query: anime wink
+Source: Tenor API
+Tenor ID: 10778468647988492986
+Downloaded: 2025-03-14T21:54:14.644Z
+Tenor URL: https://tenor.com/9Esu.gif

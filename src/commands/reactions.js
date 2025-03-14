@@ -14,35 +14,68 @@ const fs = require('fs');
 
 // Path to reaction GIFs directory
 const REACTIONS_DIR = path.join(process.cwd(), 'data', 'reaction_gifs');
+const ANIMATED_GIFS_DIR = path.join(process.cwd(), 'animated_gifs');
+
+// Get path to GIF with fallback 
+function getGifPath(filename) {
+    const primaryPath = path.join(REACTIONS_DIR, filename);
+    const fallbackPath = path.join(ANIMATED_GIFS_DIR, filename);
+    
+    // Check if the primary file exists and has a reasonable size
+    try {
+        if (fs.existsSync(primaryPath)) {
+            const stats = fs.statSync(primaryPath);
+            // If file exists and has reasonable size (>1KB), use primary path
+            if (stats.size > 1024) {
+                return primaryPath;
+            }
+        }
+        
+        // Try fallback path if primary doesn't exist or is too small
+        if (fs.existsSync(fallbackPath)) {
+            const stats = fs.statSync(fallbackPath);
+            // If fallback exists and has reasonable size, use it
+            if (stats.size > 1024) {
+                return fallbackPath;
+            }
+        }
+        
+        // Return primary path as default, validation will happen later
+        return primaryPath;
+    } catch (err) {
+        logger.warn(`Error checking GIF paths for ${filename}: ${err.message}`);
+        return primaryPath; // Return primary path as default
+    }
+}
 
 // Map of reaction types to their corresponding GIF files
 const REACTION_GIFS = {
     // Basic reactions
-    hug: path.join(REACTIONS_DIR, 'hug.gif'),
-    pat: path.join(REACTIONS_DIR, 'pat.gif'), // Not provided yet
-    kiss: path.join(REACTIONS_DIR, 'kiss.gif'),
-    cuddle: path.join(REACTIONS_DIR, 'cuddle.gif'),
+    hug: getGifPath('hug.gif'),
+    pat: getGifPath('pat.gif'),
+    kiss: getGifPath('kiss.gif'),
+    cuddle: getGifPath('cuddle.gif'),
     
     // Expressions
-    smile: path.join(REACTIONS_DIR, 'smile.gif'),
-    happy: path.join(REACTIONS_DIR, 'happy.gif'),
-    wave: path.join(REACTIONS_DIR, 'wave.gif'),
-    dance: path.join(REACTIONS_DIR, 'dance.gif'),
-    cry: path.join(REACTIONS_DIR, 'cry.gif'),
-    blush: path.join(REACTIONS_DIR, 'blush.gif'),
-    laugh: path.join(REACTIONS_DIR, 'laugh.gif'),
-    wink: path.join(REACTIONS_DIR, 'wink.gif'),
+    smile: getGifPath('smile.gif'),
+    happy: getGifPath('happy.gif'),
+    wave: getGifPath('wave.gif'),
+    dance: getGifPath('dance.gif'),
+    cry: getGifPath('cry.gif'),
+    blush: getGifPath('blush.gif'),
+    laugh: getGifPath('laugh.gif'),
+    wink: getGifPath('wink.gif'),
     
     // Physical actions
-    poke: path.join(REACTIONS_DIR, 'poke.gif'), // Not provided yet
-    slap: path.join(REACTIONS_DIR, 'slap.gif'),
-    bonk: path.join(REACTIONS_DIR, 'bonk.gif'), // Not provided yet
-    bite: path.join(REACTIONS_DIR, 'bite.gif'), // Not provided yet
-    punch: path.join(REACTIONS_DIR, 'punch.gif'), // Not provided yet
-    highfive: path.join(REACTIONS_DIR, 'highfive.gif'), // Not provided yet
+    poke: getGifPath('poke.gif'),
+    slap: getGifPath('slap.gif'),
+    bonk: getGifPath('bonk.gif'),
+    bite: getGifPath('bite.gif'),
+    punch: getGifPath('punch.gif'),
+    highfive: getGifPath('highfive.gif'),
     
     // Other actions
-    yeet: path.join(REACTIONS_DIR, 'yeet.gif') // Not provided yet
+    yeet: getGifPath('yeet.gif')
 };
 
 // Helper function to validate mentions
@@ -284,7 +317,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                     
                     // Send as video with gifPlayback
                     const mp4Buffer = fs.readFileSync(mp4Path);
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         video: mp4Buffer,
                         gifPlayback: true,
                         caption: ''

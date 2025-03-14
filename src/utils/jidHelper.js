@@ -246,6 +246,8 @@ async function safeSendAnimatedGif(sock, jid, gif, caption = '', options = {}) {
             logger.info(`MP4 conversion successful, size: ${(mp4Buffer.length/1024).toFixed(2)} KB`);
             
             // CRITICAL: Send with specific options for animation support
+            // We're in the safeSendMessage implementation, so we use sock.sendMessage directly here
+            // to avoid infinite recursion
             const result = await sock.sendMessage(normalizedJid, {
                 video: mp4Buffer,
                 caption,
@@ -276,6 +278,8 @@ async function safeSendAnimatedGif(sock, jid, gif, caption = '', options = {}) {
             try {
                 logger.info(`Attempting fallback: Sending as GIF document`);
                 
+                // We're in the safeSendMessage implementation, so we use sock.sendMessage directly here
+                // to avoid infinite recursion (fallback method)
                 const result = await sock.sendMessage(normalizedJid, {
                     document: buffer,
                     mimetype: 'image/gif',
@@ -292,6 +296,8 @@ async function safeSendAnimatedGif(sock, jid, gif, caption = '', options = {}) {
                 // Last resort: Try as static image if everything else fails
                 try {
                     logger.warn(`All animation methods failed, using static image fallback`);
+                    // We're in the safeSendMessage implementation, so we use sock.sendMessage directly here
+                    // to avoid infinite recursion (last resort method)
                     const result = await sock.sendMessage(normalizedJid, {
                         image: buffer,
                         caption: `${caption} (static fallback - animation failed)`,

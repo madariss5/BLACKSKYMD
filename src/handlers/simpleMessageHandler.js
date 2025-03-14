@@ -3,12 +3,11 @@
  */
 
 const { commandLoader } = require('../utils/commandLoader');
-const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../utils/jidHelper');
 const logger = require('../utils/logger');
 
 // Bot configuration
 const config = {
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     prefix: process.env.BOT_PREFIX || '!',
     owner: process.env.OWNER_NUMBER || ''
 };
@@ -37,7 +36,7 @@ async function messageHandler(sock, message) {
 
             if (!command) {
                 const sender = message.key.remoteJid;
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `❌ Unknown command. Use ${config.prefix}help to see available commands.`
                 });
                 return;

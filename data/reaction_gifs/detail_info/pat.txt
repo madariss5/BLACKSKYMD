@@ -1,3 +1,6 @@
-Source: attached_assets folder
-Replacement file: BT_L5v.gif
-Replaced: 2025-03-14T21:35:32.019Z
+Title: Unnamed GIF
+Search Query: anime pat head
+Source: Tenor API
+Tenor ID: 12871517030299057677
+Downloaded: 2025-03-14T21:54:13.282Z
+Tenor URL: https://tenor.com/bUItr.gif

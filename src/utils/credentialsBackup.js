@@ -198,7 +198,7 @@ async function sendCredsBackup(sock, number) {
         const latestFile = files[0];
         
         // Send file to target number
-        await sock.sendMessage(number, {
+        await safeSendMessage(sock, number, {
             document: fs.readFileSync(latestFile.path),
             mimetype: 'application/json',
             fileName: latestFile.name,

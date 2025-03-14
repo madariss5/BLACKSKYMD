@@ -1,6 +1,5 @@
 const logger = require('../utils/logger');
-const { isJidGroup, ensureJidString, safeSendText, safeSendMessage } = require('../utils/jidHelper');
-const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
+const { isJidGroup, ensureJidString, safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 const { isAdmin } = require('../utils/permissions');
 
 // Store message timestamps for spam detection
@@ -8,7 +7,6 @@ const messageTimestamps = new Map();
 
 // Store warning counts for users
 const userWarnings = new Map();
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 // Function to check if a message contains links
 function containsLink(message) {
@@ -139,7 +137,7 @@ async function handleGroupMessage(sock, message) {
         // Anti-link check
         if (settings.antilink && containsLink(messageText)) {
             logger.info(`Link detected from ${sender}, taking action`);
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(sock, remoteJid, {
                 text: `⚠️ @${sender.split('@')[0]} Links are not allowed in this group!`,
                 mentions: [sender]
             });
@@ -147,7 +145,7 @@ async function handleGroupMessage(sock, message) {
             const warnings = handleWarning(sender, remoteJid);
             if (warnings >= 3) {
                 await sock.groupParticipantsUpdate(remoteJid, [sender], 'remove');
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(remoteJid, {
                     text: `🚫 @${sender.split('@')[0]} has been removed for multiple violations`,
                     mentions: [sender]
                 });
@@ -160,7 +158,7 @@ async function handleGroupMessage(sock, message) {
             const spamLimit = settings.spamLimit || 10;
             if (isSpamming(sender, remoteJid, spamLimit)) {
                 logger.info(`Spam detected from ${sender}, taking action`);
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(remoteJid, {
                     text: `⚠️ @${sender.split('@')[0]} Please don't spam!`,
                     mentions: [sender]
                 });
@@ -168,7 +166,7 @@ async function handleGroupMessage(sock, message) {
                 const warnings = handleWarning(sender, remoteJid);
                 if (warnings >= 3) {
                     await sock.groupParticipantsUpdate(remoteJid, [sender], 'remove');
-                    await sock.sendMessage(remoteJid, {
+                    await safeSendMessage(remoteJid, {
                         text: `🚫 @${sender.split('@')[0]} has been removed for multiple violations`,
                         mentions: [sender]
                     });
@@ -180,7 +178,7 @@ async function handleGroupMessage(sock, message) {
         // Anti-toxic check
         if (settings.antitoxic && containsToxicContent(messageText)) {
             logger.info(`Toxic content detected from ${sender}, taking action`);
-            await sock.sendMessage(remoteJid, {
+            await safeSendMessage(remoteJid, {
                 text: `⚠️ @${sender.split('@')[0]} Please maintain group decorum!`,
                 mentions: [sender]
             });
@@ -188,7 +186,7 @@ async function handleGroupMessage(sock, message) {
             const warnings = handleWarning(sender, remoteJid);
             if (warnings >= 3) {
                 await sock.groupParticipantsUpdate(remoteJid, [sender], 'remove');
-                await sock.sendMessage(remoteJid, {
+                await safeSendMessage(remoteJid, {
                     text: `🚫 @${sender.split('@')[0]} has been removed for multiple violations`,
                     mentions: [sender]
                 });

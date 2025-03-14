@@ -669,4 +669,7 @@ const utilityCommands = {
     }
 };
 
-module.exports = utilityCommands;
+module.exports = {
+    commands: utilityCommands,
+    init: utilityCommands.init
+};

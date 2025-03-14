@@ -3,13 +3,15 @@
  * Educational tools and utilities for WhatsApp Bot
  */
 
+// Import required modules
+const logger = require('../../utils/logger');
+const axios = require('axios');
+const mathjs = require('mathjs');
+const { safeSendText } = require('../../utils/jidHelper');
+
 // Create a basic educational module
 const educationalCommands = {
     async translate(sock, message, args) {
-        const { safeSendText } = require('../../utils/jidHelper');
-        const axios = require('axios');
-        const logger = require('../../utils/logger');
-        
         try {
             const remoteJid = message.key.remoteJid;
             const [targetLang, ...textParts] = args;
@@ -50,10 +52,6 @@ const educationalCommands = {
     },
 
     async dictionary(sock, message, args) {
-        const { safeSendText } = require('../../utils/jidHelper');
-        const axios = require('axios');
-        const logger = require('../../utils/logger');
-        
         try {
             const remoteJid = message.key.remoteJid;
             const word = args.join(' ').trim();
@@ -112,10 +110,6 @@ const educationalCommands = {
     },
 
     async calculate(sock, message, args) {
-        const { safeSendText } = require('../../utils/jidHelper');
-        const mathjs = require('mathjs');
-        const logger = require('../../utils/logger');
-        
         try {
             const remoteJid = message.key.remoteJid;
             const expression = args.join(' ').trim();
@@ -139,9 +133,6 @@ const educationalCommands = {
     },
 
     async periodic(sock, message, args) {
-        const { safeSendText } = require('../../utils/jidHelper');
-        const logger = require('../../utils/logger');
-        
         try {
             const remoteJid = message.key.remoteJid;
             const element = args[0]?.trim();

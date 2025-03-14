@@ -10,10 +10,12 @@ const axios = require('axios');
 const FormData = require('form-data');
 const audioQueue = new Map();
 const ytdl = require('ytdl-core');
+const youtubeDl = require('youtube-dl-exec');
 const yts = require('yt-search');
 const { getLyrics } = require('genius-lyrics-api');
 const webp = require('node-webpmux');
 const { isFeatureEnabled } = require('../utils/groupSettings');
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 // Initialize required directories
 const initializeDirectories = async () => {
@@ -32,7 +34,6 @@ const initializeDirectories = async () => {
 
 // Initialize module
 const init = async () => {
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     try {
         return await initializeDirectories();
     } catch (err) {
@@ -109,23 +110,70 @@ const mediaCommands = {
                     return;
                 }
                 audioUrl = searchResults.videos[0].url;
+                await safeSendText(sock, remoteJid, `*✅ Found:* ${searchResults.videos[0].title}\n\n*⏳ Now downloading...*` );
             }
 
-            const stream = ytdl(audioUrl, { filter: 'audioonly' });
-            const chunks = [];
-
-            stream.on('data', chunk => chunks.push(chunk));
-            stream.on('end', async () => {
-                const buffer = Buffer.concat(chunks);
-                await safeSendMessage(sock, remoteJid, { 
-                    audio: { url: buffer },
-                    mimetype: 'audio/mp4'
+            // Create a temporary directory and file paths
+            const tempDir = path.join(__dirname, '../../temp');
+            await fsPromises.mkdir(tempDir, { recursive: true });
+            const outputPath = path.join(tempDir, `${Date.now()}.mp3`);
+            
+            try {
+                // Download using youtube-dl-exec (more reliable than ytdl-core)
+                await youtubeDl(audioUrl, {
+                    extractAudio: true,
+                    audioFormat: 'mp3',
+                    output: outputPath,
+                    noCheckCertificate: true,
+                    preferFreeFormats: true,
+                    youtubeSkipDashManifest: true
                 });
-            });
-
+                
+                // Read the downloaded file
+                const fileBuffer = await fsPromises.readFile(outputPath);
+                
+                // Send the audio file
+                await safeSendMessage(sock, remoteJid, { 
+                    audio: { url: fileBuffer },
+                    mimetype: 'audio/mp3'
+                });
+                
+                // Clean up
+                await fsPromises.unlink(outputPath).catch(err => {
+                    logger.error('Error deleting temporary file:', err);
+                });
+                
+            } catch (downloadErr) {
+                logger.error('Error downloading with youtube-dl:', downloadErr);
+                
+                // Fallback to ytdl-core if youtube-dl fails
+                try {
+                    await safeSendText(sock, remoteJid, '*⚠️ Using alternative method...*');
+                    
+                    const stream = ytdl(audioUrl, { filter: 'audioonly' });
+                    const chunks = [];
+                    
+                    stream.on('data', chunk => chunks.push(chunk));
+                    
+                    await new Promise((resolve, reject) => {
+                        stream.on('end', resolve);
+                        stream.on('error', reject);
+                        setTimeout(() => reject(new Error('Download timeout')), 60000); // 60 second timeout
+                    });
+                    
+                    const buffer = Buffer.concat(chunks);
+                    await safeSendMessage(sock, remoteJid, { 
+                        audio: { url: buffer },
+                        mimetype: 'audio/mp4'
+                    });
+                } catch (fallbackErr) {
+                    logger.error('Fallback download failed:', fallbackErr);
+                    throw new Error('Both download methods failed');
+                }
+            }
         } catch (err) {
             logger.error('Error in play command:', err);
-            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to play audio' );
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to play audio. The service might be temporarily unavailable.' );
         }
     },
 
@@ -232,21 +280,67 @@ const mediaCommands = {
 
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Downloading audio...' );
 
-            const stream = ytdl(args[0], { filter: 'audioonly' });
-            const chunks = [];
-
-            stream.on('data', chunk => chunks.push(chunk));
-            stream.on('end', async () => {
-                const buffer = Buffer.concat(chunks);
-                await safeSendMessage(sock, remoteJid, { 
-                    audio: { url: buffer },
-                    mimetype: 'audio/mp4'
+            // Create a temporary directory and file paths
+            const tempDir = path.join(process.cwd(), 'temp');
+            await fsPromises.mkdir(tempDir, { recursive: true });
+            const outputPath = path.join(tempDir, `${Date.now()}.mp3`);
+            
+            try {
+                // Download using youtube-dl-exec (more reliable than ytdl-core)
+                await youtubeDl(args[0], {
+                    extractAudio: true,
+                    audioFormat: 'mp3',
+                    output: outputPath,
+                    noCheckCertificate: true,
+                    preferFreeFormats: true,
+                    youtubeSkipDashManifest: true
                 });
-            });
-
+                
+                // Read the downloaded file
+                const fileBuffer = await fsPromises.readFile(outputPath);
+                
+                // Send the audio file
+                await safeSendMessage(sock, remoteJid, { 
+                    audio: { url: fileBuffer },
+                    mimetype: 'audio/mp3'
+                });
+                
+                // Clean up
+                await fsPromises.unlink(outputPath).catch(err => {
+                    logger.error('Error deleting temporary file:', err);
+                });
+                
+            } catch (downloadErr) {
+                logger.error('Error downloading with youtube-dl:', downloadErr);
+                
+                // Fallback to ytdl-core if youtube-dl fails
+                try {
+                    await safeSendText(sock, remoteJid, '*⚠️ Using alternative method...*');
+                    
+                    const stream = ytdl(args[0], { filter: 'audioonly' });
+                    const chunks = [];
+                    
+                    stream.on('data', chunk => chunks.push(chunk));
+                    
+                    await new Promise((resolve, reject) => {
+                        stream.on('end', resolve);
+                        stream.on('error', reject);
+                        setTimeout(() => reject(new Error('Download timeout')), 60000); // 60 second timeout
+                    });
+                    
+                    const buffer = Buffer.concat(chunks);
+                    await safeSendMessage(sock, remoteJid, { 
+                        audio: { url: buffer },
+                        mimetype: 'audio/mp4'
+                    });
+                } catch (fallbackErr) {
+                    logger.error('Fallback download failed:', fallbackErr);
+                    throw new Error('Both download methods failed');
+                }
+            }
         } catch (err) {
             logger.error('Error in ytmp3 command:', err);
-            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to download audio' );
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to download audio. The service might be temporarily unavailable.' );
         }
     },
 
@@ -266,20 +360,63 @@ const mediaCommands = {
 
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Downloading video...' );
 
-            const stream = ytdl(args[0], { filter: 'videoandaudio' });
-            const chunks = [];
-
-            stream.on('data', chunk => chunks.push(chunk));
-            stream.on('end', async () => {
-                const buffer = Buffer.concat(chunks);
-                await safeSendMessage(sock, remoteJid, { 
-                    video: { url: buffer }
+            // Create a temporary directory and file paths
+            const tempDir = path.join(__dirname, '../../temp');
+            await fsPromises.mkdir(tempDir, { recursive: true });
+            const outputPath = path.join(tempDir, `${Date.now()}.mp4`);
+            
+            try {
+                // Download using youtube-dl-exec (more reliable than ytdl-core)
+                await youtubeDl(args[0], {
+                    format: 'best[height<=480]', // Limit resolution for WhatsApp compatibility
+                    output: outputPath,
+                    noCheckCertificate: true,
+                    youtubeSkipDashManifest: true
                 });
-            });
-
+                
+                // Read the downloaded file
+                const fileBuffer = await fsPromises.readFile(outputPath);
+                
+                // Send the video file
+                await safeSendMessage(sock, remoteJid, { 
+                    video: { url: fileBuffer }
+                });
+                
+                // Clean up
+                await fsPromises.unlink(outputPath).catch(err => {
+                    logger.error('Error deleting temporary file:', err);
+                });
+                
+            } catch (downloadErr) {
+                logger.error('Error downloading with youtube-dl:', downloadErr);
+                
+                // Fallback to ytdl-core if youtube-dl fails
+                try {
+                    await safeSendText(sock, remoteJid, '*⚠️ Using alternative method...*');
+                    
+                    const stream = ytdl(args[0], { filter: 'videoandaudio', quality: 'highest' });
+                    const chunks = [];
+                    
+                    stream.on('data', chunk => chunks.push(chunk));
+                    
+                    await new Promise((resolve, reject) => {
+                        stream.on('end', resolve);
+                        stream.on('error', reject);
+                        setTimeout(() => reject(new Error('Download timeout')), 60000); // 60 second timeout
+                    });
+                    
+                    const buffer = Buffer.concat(chunks);
+                    await safeSendMessage(sock, remoteJid, { 
+                        video: { url: buffer }
+                    });
+                } catch (fallbackErr) {
+                    logger.error('Fallback download failed:', fallbackErr);
+                    throw new Error('Both download methods failed');
+                }
+            }
         } catch (err) {
             logger.error('Error in ytmp4 command:', err);
-            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to download video' );
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to download video. The service might be temporarily unavailable.' );
         }
     },
 

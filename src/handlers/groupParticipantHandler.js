@@ -1,6 +1,5 @@
 const logger = require('../utils/logger');
-const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../utils/jidHelper');
 
 async function handleGroupParticipantsUpdate(sock, { id, participants, action }) {
     try {
@@ -41,9 +40,10 @@ async function handleGroupParticipantsUpdate(sock, { id, participants, action })
                             .replace('{group}', groupMetadata.subject)
                             .replace('{memberCount}', groupMetadata.participants.length);
 
-                        await safeSendText(sock, id, welcomeMsg,
+                        await safeSendMessage(sock, id, {
+                            text: welcomeMsg,
                             mentions: [participant]
-                        );
+                        });
                     }
                 }
                 break;
@@ -57,9 +57,10 @@ async function handleGroupParticipantsUpdate(sock, { id, participants, action })
                             .replace('{group}', groupMetadata.subject)
                             .replace('{memberCount}', groupMetadata.participants.length);
 
-                        await safeSendText(sock, id, goodbyeMsg,
+                        await safeSendMessage(sock, id, {
+                            text: goodbyeMsg,
                             mentions: [participant]
-                        );
+                        });
                     }
                 }
                 break;
@@ -67,7 +68,7 @@ async function handleGroupParticipantsUpdate(sock, { id, participants, action })
             case 'promote':
                 // Handle promotion events
                 for (const participant of participants) {
-                    await sock.sendMessage(id, {
+                    await safeSendMessage(sock, id, {
                         text: `👑 @${participant.split('@')[0]} has been promoted to admin`,
                         mentions: [participant]
                     });
@@ -77,7 +78,7 @@ async function handleGroupParticipantsUpdate(sock, { id, participants, action })
             case 'demote':
                 // Handle demotion events
                 for (const participant of participants) {
-                    await sock.sendMessage(id, {
+                    await safeSendMessage(sock, id, {
                         text: `⬇️ @${participant.split('@')[0]} has been demoted from admin`,
                         mentions: [participant]
                     });

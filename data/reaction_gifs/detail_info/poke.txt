@@ -1,4 +1,6 @@
-Reaction: poke
-File: poke.gif
-Size: 1.4M
-Source: Walking Dead
+Title: Unnamed GIF
+Search Query: anime poke
+Source: Tenor API
+Tenor ID: 13003129460001111615
+Downloaded: 2025-03-14T21:54:13.789Z
+Tenor URL: https://tenor.com/pEIDmd3S6DH.gif

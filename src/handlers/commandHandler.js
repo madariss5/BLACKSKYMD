@@ -1,11 +1,10 @@
 const logger = require('../utils/logger');
-const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../utils/jidHelper');
 const fs = require('fs');
 const path = require('path');
 
 // Command storage
 const commands = new Map();
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 // Load all commands from the commands directory
 async function loadCommands() {
@@ -133,7 +132,7 @@ async function loadCommands() {
                             })
                             .join('\n');
         
-                        await sock.sendMessage(sender, {
+                        await safeSendMessage(sock, sender, {
                             text: `*Available Commands:*\n\n${commandList}`
                         });
                     } catch (err) {
@@ -250,14 +249,14 @@ async function processCommand(sock, message, commandText, options = {}) {
                     logger.info(`Command ${cmdName} executed successfully from modules`);
                     return;
                 } else {
-                    await sock.sendMessage(sender, {
+                    await safeSendMessage(sock, sender, {
                         text: `❌ Unknown command: ${cmdName}\nUse !help to see available commands.`
                     });
                     return;
                 }
             } catch (moduleErr) {
                 logger.error(`Error trying to execute command ${cmdName} from modules:`, moduleErr);
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `❌ Unknown command: ${cmdName}\nUse !help to see available commands.`
                 });
                 return;

@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const { safeSendMessage, safeSendText, safeSendImage } = require('../../utils/jidHelper');
+const { safeSendMessage, safeSendText, safeSendImage } = require('../utils/jidHelper');
 const config = require('../config/config');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const fs = require('fs').promises;
@@ -18,7 +18,6 @@ const typingStates = new Map();
 
 // Store command handler reference
 let commandProcessor = null;
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 /**
  * Initialize message handler
@@ -253,7 +252,7 @@ async function messageHandler(sock, message) {
             const command = commandText.split(' ')[0];
             const cooldown = checkCommandCooldown(sender, command);
             if (cooldown > 0) {
-                await sock.sendMessage(sender, {
+                await safeSendMessage(sock, sender, {
                     text: `⏳ Please wait ${cooldown} seconds before using this command again.`
                 });
                 return;

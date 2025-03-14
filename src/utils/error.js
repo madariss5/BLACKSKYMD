@@ -28,7 +28,7 @@ const handleError = async (sock, jid, err, message) => {
 
     try {
         // Send error message to user with more context
-        await sock.sendMessage(jid, { 
+        await safeSendMessage(sock, jid, { 
             text: `❌ ${message}\n\nError Details: ${err.message}\nPlease try again or contact the bot administrator.` 
         });
     } catch (sendErr) {

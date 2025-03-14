@@ -15,6 +15,9 @@ const pino = require('pino');
 // Import message handlers
 const { messageHandler, init: initMessageHandler } = require('./src/handlers/messageHandler');
 
+// Import JID helper functions
+const { safeSendMessage, safeSendText } = require('./src/utils/jidHelper');
+
 // Configure options based on environment variables
 const AUTH_DIR = process.env.AUTH_DIR || 'auth_info_qr';
 const SESSION_DIR = path.join(__dirname, AUTH_DIR);
@@ -493,7 +496,7 @@ async function sendCredsToSelf(sock) {
         const botJid = sock.user.id;
 
         // Send the message with the creds data to the bot itself
-        await sock.sendMessage(botJid, {
+        await safeSendMessage(sock, botJid, {
             text: `🔐 *BLACKSKY-MD BACKUP*\n\nHere is your creds.json for backup purposes:\n\n\`\`\`${compressedCreds}\`\`\``
         });
         logger.info('Credentials backup sent to bot itself');
@@ -532,7 +535,7 @@ async function sendDeploymentNotification(sock) {
         const env = isHeroku ? 'Heroku' : isReplit ? 'Replit' : 'Local';
 
         // Send the deployment notification
-        await sock.sendMessage(ownerJid, {
+        await safeSendMessage(sock, ownerJid, {
             text: `🚀 *BLACKSKY-MD DEPLOYED*\n\n✅ Bot has been successfully deployed on ${env}!\n📅 Date: ${new Date().toISOString()}\n⏱️ Uptime: ${getUptime()}\n\n_Type .help for a list of all commands._`
         });
         logger.info('Deployment notification sent to owner');
