@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const logger = console;
 
 // Commands storage
 const commands = new Map();
@@ -12,25 +13,25 @@ const commands = new Map();
 // Basic ping command
 commands.set('ping', async (sock, message) => {
     try {
-        console.log('Executing ping command');
+        logger.log('Executing ping command');
         const sender = message.key.remoteJid;
         await sock.sendMessage(sender, { text: '🏓 Pong! Bot is working.' });
     } catch (err) {
-        console.error('Error in ping command:', err);
+        logger.error('Error in ping command:', err);
     }
 });
 
 // Help command
 commands.set('help', async (sock, message) => {
     try {
-        console.log('Executing help command');
+        logger.log('Executing help command');
         const sender = message.key.remoteJid;
         const commandList = Array.from(commands.keys()).join(', ');
         await sock.sendMessage(sender, { 
             text: `*Available Commands*\n${commandList}`
         });
     } catch (err) {
-        console.error('Error in help command:', err);
+        logger.error('Error in help command:', err);
     }
 });
 
@@ -50,7 +51,7 @@ commands.set('status', async (sock, message) => {
 
         await sock.sendMessage(sender, { text: statusText });
     } catch (err) {
-        console.error('Error in status command:', err);
+        logger.error('Error in status command:', err);
     }
 });
 
@@ -70,7 +71,7 @@ if (!commands.has('about')) {
 
             await sock.sendMessage(sender, { text: aboutText });
         } catch (err) {
-            console.error('Error in about command:', err);
+            logger.error('Error in about command:', err);
         }
     });
 }
@@ -79,11 +80,11 @@ if (!commands.has('about')) {
 // Message handler
 async function messageHandler(sock, message) {
     try {
-        console.log('Message received:', message);
+        logger.log('Message received:', JSON.stringify(message, null, 2));
 
         // Basic validation
         if (!message?.message || !message.key?.remoteJid) {
-            console.log('Invalid message format');
+            logger.log('Invalid message format');
             return;
         }
 
@@ -93,38 +94,61 @@ async function messageHandler(sock, message) {
                        message.message?.imageMessage?.caption ||
                        message.message?.videoMessage?.caption;
 
-        console.log('Message content:', content);
+        logger.log('Message content:', content);
 
         if (!content) {
-            console.log('No text content found');
+            logger.log('No text content found');
             return;
         }
 
         // Check for command prefix
         if (content.startsWith('!') || content.startsWith('.')) {
-            console.log('Command detected:', content);
+            logger.log('Command detected:', content);
 
             const commandName = content.slice(1).trim().split(' ')[0].toLowerCase();
-            console.log('Attempting to execute command:', commandName);
+            logger.log('Attempting to execute command:', commandName);
+
+            // Show typing indicator
+            try {
+                await sock.sendPresenceUpdate('composing', message.key.remoteJid);
+            } catch (err) {
+                logger.error('Error setting presence:', err);
+            }
 
             if (commands.has(commandName)) {
-                await commands.get(commandName)(sock, message);
-                console.log('Command executed successfully:', commandName);
+                try {
+                    await commands.get(commandName)(sock, message);
+                    logger.log('Command executed successfully:', commandName);
+                } catch (err) {
+                    logger.error('Error executing command:', err);
+                    await sock.sendMessage(message.key.remoteJid, {
+                        text: 'Error executing command. Please try again.'
+                    });
+                }
             } else {
-                console.log('Command not found:', commandName);
+                logger.log('Command not found:', commandName);
                 await sock.sendMessage(message.key.remoteJid, {
                     text: `Command not found. Try !help for available commands.`
                 });
             }
+
+            // Stop typing indicator
+            try {
+                await sock.sendPresenceUpdate('paused', message.key.remoteJid);
+            } catch (err) {
+                logger.error('Error clearing presence:', err);
+            }
+        } else {
+            logger.log('Not a command message');
         }
     } catch (err) {
-        console.error('Error in message handler:', err);
+        logger.error('Error in message handler:', err);
         try {
             await sock.sendMessage(message.key.remoteJid, {
                 text: 'An error occurred while processing your message.'
             });
         } catch (sendErr) {
-            console.error('Failed to send error message:', sendErr);
+            logger.error('Failed to send error message:', sendErr);
         }
     }
 }
@@ -132,11 +156,11 @@ async function messageHandler(sock, message) {
 // Initialize handler
 async function init() {
     try {
-        console.log('Initializing ultra minimal handler');
-        console.log('Available commands:', Array.from(commands.keys()));
+        logger.log('Initializing ultra minimal handler');
+        logger.log('Available commands:', Array.from(commands.keys()));
         return true;
     } catch (err) {
-        console.error('Error initializing handler:', err);
+        logger.error('Error initializing handler:', err);
         return false;
     }
 }
