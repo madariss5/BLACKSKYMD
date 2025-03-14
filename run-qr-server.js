@@ -3,5 +3,7 @@
  * This script starts the QR code generation server directly.
  */
 
-console.log("Starting direct QR code server...");
-require('./direct-qr-server.js');
+console.log('Starting direct QR code server...');
+
+// Run the dedicated QR server
+require('./simple-qr');
