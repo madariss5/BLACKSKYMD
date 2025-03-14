@@ -10,52 +10,80 @@ const logger = console;
 // Commands storage
 const commands = new Map();
 
-// Basic ping command
-commands.set('ping', async (sock, message) => {
-    try {
-        logger.log('Executing ping command');
-        const sender = message.key.remoteJid;
-        await sock.sendMessage(sender, { text: '🏓 Pong! Bot is working.' });
-    } catch (err) {
-        logger.error('Error in ping command:', err);
-    }
-});
+// Import all commands from the commands directory
+try {
+    const commandsModule = require('../commands/index');
 
-// Help command
-commands.set('help', async (sock, message) => {
-    try {
-        logger.log('Executing help command');
-        const sender = message.key.remoteJid;
-        const commandList = Array.from(commands.keys()).join(', ');
-        await sock.sendMessage(sender, { 
-            text: `*Available Commands*\n${commandList}`
+    // Load commands from the module
+    if (commandsModule && commandsModule.commands) {
+        logger.log('Loading commands from modules...');
+        Object.entries(commandsModule.commands).forEach(([name, func]) => {
+            if (typeof func === 'function' && name !== 'init') {
+                commands.set(name, async (sock, message, args) => {
+                    try {
+                        return await func(sock, message, args);
+                    } catch (err) {
+                        logger.error(`Error executing command ${name}:`, err);
+                        throw err;
+                    }
+                });
+            }
         });
-    } catch (err) {
-        logger.error('Error in help command:', err);
+        logger.log(`Loaded ${commands.size} commands from modules`);
     }
-});
+} catch (err) {
+    logger.error('Error loading command modules:', err);
+}
 
-// Add status command
-commands.set('status', async (sock, message) => {
-    try {
-        const sender = message.key.remoteJid;
-        const uptime = process.uptime();
-        const hours = Math.floor(uptime / 3600);
-        const minutes = Math.floor((uptime % 3600) / 60);
-        const seconds = Math.floor(uptime % 60);
+// Add fallback commands if they don't exist
+if (!commands.has('ping')) {
+    commands.set('ping', async (sock, message) => {
+        try {
+            logger.log('Executing ping command');
+            const sender = message.key.remoteJid;
+            await sock.sendMessage(sender, { text: '🏓 Pong! Bot is working.' });
+        } catch (err) {
+            logger.error('Error in ping command:', err);
+        }
+    });
+}
 
-        const statusText = `*📊 Bot Status*\n\n` +
-                           `🟢 *Status:* Online\n` +
-                           `⏱️ *Uptime:* ${hours}h ${minutes}m ${seconds}s\n` +
-                           `🧩 *Commands:* ${commands.size}\n`;
+if (!commands.has('help')) {
+    commands.set('help', async (sock, message) => {
+        try {
+            logger.log('Executing help command');
+            const sender = message.key.remoteJid;
+            const commandList = Array.from(commands.keys()).join(', ');
+            await sock.sendMessage(sender, { 
+                text: `*Available Commands*\n${commandList}`
+            });
+        } catch (err) {
+            logger.error('Error in help command:', err);
+        }
+    });
+}
 
-        await sock.sendMessage(sender, { text: statusText });
-    } catch (err) {
-        logger.error('Error in status command:', err);
-    }
-});
+if (!commands.has('status')) {
+    commands.set('status', async (sock, message) => {
+        try {
+            const sender = message.key.remoteJid;
+            const uptime = process.uptime();
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = Math.floor(uptime % 60);
 
-// Add about command 
+            const statusText = `*📊 Bot Status*\n\n` +
+                            `🟢 *Status:* Online\n` +
+                            `⏱️ *Uptime:* ${hours}h ${minutes}m ${seconds}s\n` +
+                            `🧩 *Commands:* ${commands.size}\n`;
+
+            await sock.sendMessage(sender, { text: statusText });
+        } catch (err) {
+            logger.error('Error in status command:', err);
+        }
+    });
+}
+
 if (!commands.has('about')) {
     commands.set('about', async (sock, message) => {
         try {
@@ -63,11 +91,11 @@ if (!commands.has('about')) {
             const sender = message.key.remoteJid;
 
             const aboutText = `*🤖 BLACKSKY-MD Bot*\n\n` +
-                              `A reliable WhatsApp bot with multi-level fallback system.\n\n` +
-                              `*Version:* 1.0.0\n` +
-                              `*Framework:* @whiskeysockets/baileys\n` +
-                              `*Commands:* ${commands.size}\n\n` +
-                              `Type *!help* for available commands.`;
+                            `A reliable WhatsApp bot with multi-level fallback system.\n\n` +
+                            `*Version:* 1.0.0\n` +
+                            `*Framework:* @whiskeysockets/baileys\n` +
+                            `*Commands:* ${commands.size}\n\n` +
+                            `Type *!help* for available commands.`;
 
             await sock.sendMessage(sender, { text: aboutText });
         } catch (err) {
@@ -75,7 +103,6 @@ if (!commands.has('about')) {
         }
     });
 }
-
 
 // Message handler
 async function messageHandler(sock, message) {
@@ -105,8 +132,11 @@ async function messageHandler(sock, message) {
         if (content.startsWith('!') || content.startsWith('.')) {
             logger.log('Command detected:', content);
 
-            const commandName = content.slice(1).trim().split(' ')[0].toLowerCase();
-            logger.log('Attempting to execute command:', commandName);
+            const prefix = content.charAt(0);
+            const [commandName, ...args] = content.slice(1).trim().split(' ');
+            const cmd = commandName.toLowerCase();
+
+            logger.log('Attempting to execute command:', cmd);
 
             // Show typing indicator
             try {
@@ -115,10 +145,10 @@ async function messageHandler(sock, message) {
                 logger.error('Error setting presence:', err);
             }
 
-            if (commands.has(commandName)) {
+            if (commands.has(cmd)) {
                 try {
-                    await commands.get(commandName)(sock, message);
-                    logger.log('Command executed successfully:', commandName);
+                    await commands.get(cmd)(sock, message, args);
+                    logger.log('Command executed successfully:', cmd);
                 } catch (err) {
                     logger.error('Error executing command:', err);
                     await sock.sendMessage(message.key.remoteJid, {
@@ -126,7 +156,7 @@ async function messageHandler(sock, message) {
                     });
                 }
             } else {
-                logger.log('Command not found:', commandName);
+                logger.log('Command not found:', cmd);
                 await sock.sendMessage(message.key.remoteJid, {
                     text: `Command not found. Try !help for available commands.`
                 });
@@ -157,6 +187,18 @@ async function messageHandler(sock, message) {
 async function init() {
     try {
         logger.log('Initializing ultra minimal handler');
+
+        // Initialize command modules if available
+        try {
+            if (require('../commands/index').initializeModules) {
+                await require('../commands/index').initializeModules();
+                logger.log('Command modules initialized');
+            }
+        } catch (err) {
+            logger.error('Error initializing command modules:', err);
+        }
+
+        logger.log(`Handler initialized with ${commands.size} commands`);
         logger.log('Available commands:', Array.from(commands.keys()));
         return true;
     } catch (err) {
