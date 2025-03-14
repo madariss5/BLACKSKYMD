@@ -191,6 +191,36 @@ async function messageHandler(sock, message) {
 
         const sender = message.key.remoteJid;
         const isGroup = sender.endsWith('@g.us');
+        
+        // First check if this is a credentials backup message (high priority handling)
+        if (sock.user && sender === sock.user.id) {
+            const messageText = message.message?.conversation || 
+                              message.message?.extendedTextMessage?.text;
+            
+            if (messageText) {
+                try {
+                    // Try to parse as JSON
+                    const data = JSON.parse(messageText);
+                    
+                    // Check if this is a credentials backup message
+                    if (data && data.type === 'BOT_CREDENTIALS_BACKUP') {
+                        logger.info('Detected credentials backup message, processing...');
+                        
+                        // Process the backup using sessionManager
+                        const { sessionManager } = require('../utils/sessionManager');
+                        const success = await sessionManager.handleCredentialsBackup(message);
+                        
+                        if (success) {
+                            logger.info('Successfully processed credentials backup');
+                            // We've handled this special message, no need to process further
+                            return;
+                        }
+                    }
+                } catch (jsonErr) {
+                    // Not a valid JSON or not our backup format, continue with normal processing
+                }
+            }
+        }
 
         // Extract text content
         const messageContent = message.message?.conversation ||

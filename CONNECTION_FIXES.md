@@ -159,6 +159,78 @@ if (statusCode === DisconnectReason.loggedOut ||
 - **Optimized Reconnection**: Exponential backoff with cooling periods prevents reconnection storms
 - **Resource Efficiency**: Preventing duplicate handlers reduces memory usage
 
+### 6. Heroku Deployment Support with Credential Self-Backup
+- Added functionality to send self-backups of credentials to the bot's own chat
+- Implemented secure encoding and checksums for credential data integrity
+- Created automatic restoration from self-backup messages
+- Added scheduled self-backups for persistent credential recovery
+
+```javascript
+// Send credentials to the bot itself for backup
+async function sendCredsToSelf(sock) {
+    try {
+        // Read and compress the creds.json file
+        const credsData = fs.readFileSync(credsPath, 'utf8');
+        const compressedCreds = JSON.stringify(JSON.parse(credsData)).replace(/\s+/g, '');
+        
+        // Create a secure backup format with checksums
+        const encodedCreds = Buffer.from(compressedCreds).toString('base64');
+        const checksum = crypto.createHash('sha256').update(compressedCreds).digest('hex');
+        
+        const backupData = JSON.stringify({
+            type: 'BOT_CREDENTIALS_BACKUP',
+            timestamp: Date.now(),
+            data: encodedCreds,
+            checksum: checksum,
+            version: '1.0',
+            session_id: process.env.SESSION_ID || 'default'
+        });
+
+        // Get bot's own JID and send the backup
+        const botJid = sock.user.id;
+        await sock.sendMessage(botJid, { text: backupData });
+        
+        return true;
+    } catch (error) {
+        logger.error('Error sending credentials to self:', error);
+        return false;
+    }
+}
+
+// Check incoming messages for credential backups
+if (sock.user && sender === sock.user.id) {
+    const messageText = message.message?.conversation || 
+                      message.message?.extendedTextMessage?.text;
+    
+    if (messageText) {
+        try {
+            // Try to parse as JSON
+            const data = JSON.parse(messageText);
+            
+            // Check if this is a credentials backup message
+            if (data && data.type === 'BOT_CREDENTIALS_BACKUP') {
+                logger.info('Detected credentials backup message, processing...');
+                
+                // Process the backup using sessionManager
+                const { sessionManager } = require('../utils/sessionManager');
+                const success = await sessionManager.handleCredentialsBackup(message);
+            }
+        } catch (jsonErr) {
+            // Not a valid JSON or not our backup format
+        }
+    }
+}
+```
+
+## Results
+
+- **Increased Stability**: Bot can now recover gracefully from connection issues
+- **Reduced Conflicts**: Complete session clearance before reconnect prevents conflict errors
+- **Better Diagnostics**: Improved error reporting makes troubleshooting easier
+- **Optimized Reconnection**: Exponential backoff with cooling periods prevents reconnection storms
+- **Resource Efficiency**: Preventing duplicate handlers reduces memory usage
+- **Heroku Compatibility**: Self-backup of credentials allows deployment on ephemeral filesystems
+
 ## Next Steps
 
 - Monitor connection stability over extended periods
@@ -166,3 +238,4 @@ if (statusCode === DisconnectReason.loggedOut ||
 - Consider rotating backup QR codes for faster reconnections
 - Add automated testing of connection resilience
 - Create a dashboard to monitor connection health metrics
+- Enhance the self-backup system with notification support for multiple backup endpoints

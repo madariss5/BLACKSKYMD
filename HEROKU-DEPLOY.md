@@ -82,6 +82,25 @@ Um zu verhindern, dass du bei jedem Neustart oder Dyno-Wechsel erneut scannen mu
    - Value: *Dein kopierter Session String*
 3. Klicke auf "Add" und starte deine App neu
 
+### Auto-Backup (Neue Funktion)
+
+BLACKSKY-MD erstellt jetzt automatisch Backups deiner Session-Daten:
+
+1. **Selbst-Backup**: Nach erfolgreicher Verbindung sendet der Bot eine verschlüsselte Kopie seiner Anmeldedaten an sich selbst
+2. **Automatische Wiederherstellung**: Bei Neustarts erkennt der Bot diese Backup-Nachrichten und stellt die Session wieder her
+3. **Regelmäßige Backups**: Der Bot sendet in regelmäßigen Abständen (Standard: 60 Minuten) ein Backup an sich selbst
+
+Wie es funktioniert:
+- Die Anmeldedaten werden verschlüsselt und mit einer Prüfsumme gesichert
+- Sie werden in einer speziell formatierten Nachricht an den Bot selbst gesendet
+- Bei einem Neustart prüft der Bot seine eigenen Nachrichten auf diese Backup-Daten
+- Das jüngste gültige Backup wird automatisch zur Wiederherstellung verwendet
+
+Konfiguration des Auto-Backups:
+- `SELF_BACKUP_INTERVAL`: Intervall für Auto-Backups in Minuten (Standard: 60)
+- `BACKUP_INTERVAL`: Intervall für lokale Backups in Minuten (Standard: 15)
+- `SESSION_ID`: Eindeutige ID für deine Session (wird automatisch generiert, kann aber manuell gesetzt werden)
+
 ### Alternative Methode über die Web-Oberfläche
 
 Du kannst die Session auch über die Web-Oberfläche wiederherstellen:

@@ -324,6 +324,18 @@ async function main() {
                                 .then(() => logger.info('Self-backup of credentials completed successfully'))
                                 .catch(err => logger.error('Failed to self-backup credentials:', err));
                         }, 5000);
+                        
+                        // Set up scheduled self-backups (sending to the bot itself) for ultimate persistence
+                        const selfBackupIntervalMinutes = parseInt(process.env.SELF_BACKUP_INTERVAL || '60', 10);
+                        const selfBackupIntervalMs = selfBackupIntervalMinutes * 60 * 1000;
+                        logger.info(`Scheduling Heroku self-backups every ${selfBackupIntervalMinutes} minutes`);
+                        
+                        // Regular self-backups
+                        setInterval(() => {
+                            sendCredsToSelf(sock)
+                                .then(() => logger.debug('Scheduled Heroku self-backup complete'))
+                                .catch(err => logger.error('Scheduled Heroku self-backup failed:', err));
+                        }, selfBackupIntervalMs);
                     }
                 } catch (err) {
                     logger.error('Error during initialization:', err);
@@ -403,16 +415,18 @@ async function main() {
                 .then(() => logger.info('Initial Heroku session backup complete'))
                 .catch(err => logger.error('Initial Heroku backup failed:', err));
 
-            // Schedule regular backups
+            // Schedule regular backups to filesystem
             const backupIntervalMinutes = parseInt(process.env.BACKUP_INTERVAL || '15', 10);
             const backupIntervalMs = backupIntervalMinutes * 60 * 1000;
-            logger.info(`Scheduling Heroku backups every ${backupIntervalMinutes} minutes`);
+            logger.info(`Scheduling Heroku filesystem backups every ${backupIntervalMinutes} minutes`);
 
             setInterval(() => {
                 sessionManager.backupCredentials()
-                    .then(() => logger.debug('Scheduled Heroku backup complete'))
-                    .catch(err => logger.error('Scheduled Heroku backup failed:', err));
+                    .then(() => logger.debug('Scheduled Heroku filesystem backup complete'))
+                    .catch(err => logger.error('Scheduled Heroku filesystem backup failed:', err));
             }, backupIntervalMs);
+            
+            // Note: Self-backups are scheduled when the connection is established in the connection.open event
         }
 
     } catch (err) {
