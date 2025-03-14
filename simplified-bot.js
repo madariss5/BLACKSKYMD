@@ -182,201 +182,178 @@ const saveCreds = (creds) => {
     }
 };
 
+// Enhanced connection configuration
+const CONNECTION_CONFIG = {
+    maxRetries: 5,
+    baseRetryDelay: 5000,
+    maxRetryDelay: 60000,
+    connectTimeout: 60000,
+    keepAliveInterval: 30000,
+    qrTimeout: 60000,
+    logoutClearDelay: 2000
+};
+
+// Track connection state
+const connectionState = {
+    isConnected: false,
+    isConnecting: false,
+    retryCount: 0,
+    retryTimeout: null,
+    lastError: null,
+    connectionLock: false
+};
+
+// Connection cleanup helper
+async function cleanupConnection() {
+    try {
+        if (connectionState.retryTimeout) {
+            clearTimeout(connectionState.retryTimeout);
+            connectionState.retryTimeout = null;
+        }
+        connectionState.isConnecting = false;
+        connectionState.connectionLock = false;
+    } catch (err) {
+        logger.error('Cleanup error:', err);
+    }
+}
+
 // Initialize WhatsApp connection
 async function connectToWhatsApp() {
+    // Prevent multiple connection attempts
+    if (connectionState.isConnecting || connectionState.connectionLock) {
+        logger.info('Connection attempt blocked - already in progress');
+        return;
+    }
+
     try {
-        // Ensure directories exist
+        connectionState.isConnecting = true;
+        connectionState.connectionLock = true;
+
+        // Initialize directories
         await initializeDirectories();
-
-        // Initialize handler first
-        console.log('Initializing message handler...');
-        await handler.init();
-        console.log('Message handler initialized successfully');
-
-        // Get authentication state
-        const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
         // Clear any previous sessions to prevent conflict errors
         try {
             await fs.promises.rm(SESSION_DIR, { recursive: true, force: true });
             await fs.promises.mkdir(SESSION_DIR, { recursive: true });
-            console.log('✅ Successfully cleared auth session to prevent conflict errors');
+            logger.info('✅ Successfully cleared auth session to prevent conflict errors');
         } catch (err) {
-            console.error('Error clearing session:', err);
+            logger.error('Error clearing session:', err);
         }
-        
+
+        // Get authentication state
+        const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
+
         // Create a fresh socket connection with enhanced configuration
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            logger: logger, // Use pino logger instead of console.log
-            // Enhanced connection settings to reduce reconnections
-            connectTimeoutMs: 60000, // Increased timeout
-            keepAliveIntervalMs: 30000, // Less frequent pings
-            retryRequestDelayMs: 5000, // More delay between retries
-            maxRetries: 3, // Fewer retries to avoid excessive reconnection attempts
-            // Unique browser profile to prevent conflicts
-            browser: ['BLACKSKY-MD', 'Chrome', '104.0.0.0' + Date.now()],
-            // Connection behavior
-            markOnlineOnConnect: true,
+            logger: logger,
+            browser: ['BLACKSKY-MD', 'Chrome', '104.0.0.0'],
+            connectTimeoutMs: CONNECTION_CONFIG.connectTimeout,
+            keepAliveIntervalMs: CONNECTION_CONFIG.keepAliveInterval,
+            qrTimeout: CONNECTION_CONFIG.qrTimeout,
+            defaultQueryTimeoutMs: CONNECTION_CONFIG.connectTimeout,
             emitOwnEvents: false,
             syncFullHistory: false,
-            // Baileys transaction options
-            transactionOpts: {
-                maxCommitRetries: 2,
-                delayBetweenTriesMs: 1000
-            },
-            // Messages fetch options
-            getMessage: async () => {
-                return { conversation: 'Hello' };
-            },
-            // Custom options to reduce conflicts
-            fireAndForget: true, // Don't wait for server ack
+            markOnlineOnConnect: true,
+            retryRequestDelayMs: 5000,
+            maxRetries: 2,
+            // Connection behavior
             patchMessageBeforeSending: (message) => {
-                // Add current timestamp to make messages unique
                 const now = new Date();
                 message.messageTimestamp = now / 1000;
                 return message;
             }
         });
 
-        // Track connection state
-        let isConnected = false;
-        let reconnectAttempt = 0;
-        let connectionLock = false;
-        let messageHandlerInitialized = false;
-
         // Connection update handler with improved reconnection logic
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            console.log('Connection update:', update); // Log all updates
+            logger.info('Connection update:', update);
 
             // Update bot status
             if (connection) {
                 botStats.status = connection;
-                console.log(`Connection status changed to: ${connection}`);
+                logger.info(`Connection status changed to: ${connection}`);
             }
 
             if (connection === 'open') {
-                console.log('🟢 Connected to WhatsApp');
-                // Reset connection tracking
-                isConnected = true;
-                reconnectAttempt = 0;
-                connectionLock = false;
+                logger.info('🟢 Connected to WhatsApp');
+                connectionState.isConnected = true;
+                connectionState.isConnecting = false;
+                connectionState.connectionLock = false;
+                connectionState.retryCount = 0;
+                connectionState.lastError = null;
 
+                // Initialize message handler
                 try {
-                    // Initialize message handler if not already initialized
-                    if (!messageHandlerInitialized) {
-                        await handler.init();
-                        console.log('✅ Message handler initialized');
-                        messageHandlerInitialized = true;
-                    }
-
-                    // Clear any existing message handlers to prevent duplicates
-                    sock.ev.removeAllListeners('messages.upsert');
-
-                    // Register new message handler
-                    sock.ev.on('messages.upsert', async (m) => {
-                        if (m.type === 'notify') {
-                            for (const msg of m.messages) {
-                                try {
-                                    await handler.messageHandler(sock, msg);
-                                } catch (err) {
-                                    console.error('Error processing message:', err);
-                                    botStats.errors++;
-                                    botStats.lastError = err.message;
+                    if (!sock.ev.listenerCount('messages.upsert')) {
+                        sock.ev.on('messages.upsert', async (m) => {
+                            if (m.type === 'notify') {
+                                for (const msg of m.messages) {
+                                    try {
+                                        await handler.messageHandler(sock, msg);
+                                    } catch (err) {
+                                        logger.error('Error processing message:', err);
+                                        botStats.errors++;
+                                        botStats.lastError = err.message;
+                                    }
                                 }
                             }
-                        }
-                    });
-
-                    // Send test message to confirm handler is working
-                    try {
-                        const remoteJid = sock.user.id;
-                        await sock.sendMessage(remoteJid, { text: '🤖 Bot is online and ready!' });
-                        console.log('Test message sent successfully');
-                    } catch (err) {
-                        console.error('Failed to send test message:', err);
-                        // Don't attempt reconnection for test message failures
-                        botStats.errors++;
-                        botStats.lastError = err.message;
+                        });
                     }
-
                 } catch (err) {
-                    console.error('Error in connection setup:', err);
-                    botStats.errors++;
-                    botStats.lastError = err.message;
+                    logger.error('Error initializing message handler:', err);
                 }
             } else if (connection === 'close') {
-                // Only attempt reconnection if not already locked
-                if (!connectionLock) {
-                    console.log('🔴 Connection closed');
-                    
-                    // Check if we should reconnect based on error code
-                    const statusCode = (lastDisconnect?.error)?.output?.statusCode;
-                    const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                    
-                    // Log detailed disconnect reason
-                    console.log(`Disconnect reason: ${statusCode} (${getErrorDescription(statusCode)})`);
-                    
-                    if (shouldReconnect) {
-                        // Use exponential backoff for reconnection attempts
-                        reconnectAttempt++;
-                        const delay = Math.min(30000, Math.pow(2, reconnectAttempt) * 1000); // Max 30s delay
-                        
-                        console.log(`Reconnecting after ${delay}ms (attempt ${reconnectAttempt})...`);
-                        connectionLock = true;
-                        
-                        // Schedule reconnection with delay
-                        setTimeout(async () => {
-                            if (connectionLock) {
-                                connectionLock = false;
-                                console.log('Executing scheduled reconnection...');
-                                
-                                // Clear session completely before reconnecting
-                                try {
-                                    console.log('Clearing session data before reconnection...');
-                                    await fs.promises.rm(SESSION_DIR, { recursive: true, force: true });
-                                    await fs.promises.mkdir(SESSION_DIR, { recursive: true });
-                                    console.log('✅ Successfully cleared auth session before reconnection');
-                                } catch (err) {
-                                    console.error('Error clearing session before reconnection:', err);
-                                }
-                                
-                                connectToWhatsApp();
-                            }
-                        }, delay);
-                    } else {
-                        console.log('Not reconnecting - user logged out');
+                connectionState.isConnected = false;
+                connectionState.isConnecting = false;
+
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
+                                     statusCode !== DisconnectReason.multideviceMismatch &&
+                                     connectionState.retryCount < CONNECTION_CONFIG.maxRetries;
+
+                logger.info(`Connection closed with status code: ${statusCode}`);
+
+                if (shouldReconnect) {
+                    connectionState.retryCount++;
+                    // Exponential backoff with max delay
+                    const delay = Math.min(
+                        CONNECTION_CONFIG.maxRetryDelay,
+                        CONNECTION_CONFIG.baseRetryDelay * Math.pow(2, connectionState.retryCount - 1)
+                    );
+
+                    logger.info(`Reconnecting in ${delay/1000}s (Attempt ${connectionState.retryCount}/${CONNECTION_CONFIG.maxRetries})`);
+
+                    // Clear any existing retry timeout
+                    if (connectionState.retryTimeout) {
+                        clearTimeout(connectionState.retryTimeout);
                     }
+
+                    connectionState.retryTimeout = setTimeout(async () => {
+                        await cleanupConnection();
+                        connectToWhatsApp();
+                    }, delay);
                 } else {
-                    console.log('Connection attempt already in progress, ignoring close event');
+                    logger.info('Connection closed permanently');
+                    if (statusCode === DisconnectReason.loggedOut) {
+                        // Add delay before clearing auth to prevent race conditions
+                        setTimeout(async () => {
+                            await cleanupConnection();
+                            try {
+                                await fs.promises.rm(SESSION_DIR, { recursive: true, force: true });
+                                await fs.promises.mkdir(SESSION_DIR, { recursive: true });
+                                connectToWhatsApp();
+                            } catch (err) {
+                                logger.error('Error clearing auth data:', err);
+                            }
+                        }, CONNECTION_CONFIG.logoutClearDelay);
+                    }
                 }
-            } else if (connection === 'connecting') {
-                console.log('Connecting to WhatsApp...');
-            }
-            
-            // Show QR code update if we have one
-            if (qr) {
-                console.log('New QR code received');
             }
         });
-        
-        // Helper function to get error descriptions
-        function getErrorDescription(code) {
-            const errorMap = {
-                401: 'Unauthorized',
-                403: 'Forbidden',
-                408: 'Request Timeout',
-                429: 'Too Many Requests',
-                440: 'Session Expired',
-                500: 'Server Error',
-                515: 'Registration Failed',
-                428: 'Challenge Failed'
-            };
-            return errorMap[code] || 'Unknown Error';
-        }
-        
 
         // Handle credentials update
         sock.ev.on('creds.update', saveCreds);
@@ -412,14 +389,20 @@ async function connectToWhatsApp() {
 
         return sock;
     } catch (err) {
-        console.error('Fatal error in WhatsApp connection:', err);
-        botStats.errors++;
-        botStats.lastError = err.message;
-        // Try to reconnect after error
-        setTimeout(() => {
-            console.log('Retrying connection after fatal error...');
-            connectToWhatsApp();
-        }, 10000); // Longer delay after fatal error
+        logger.error('Fatal error in WhatsApp connection:', err);
+        connectionState.lastError = err;
+
+        // Cleanup and retry
+        await cleanupConnection();
+
+        if (connectionState.retryCount < CONNECTION_CONFIG.maxRetries) {
+            connectionState.retryCount++;
+            const delay = Math.min(
+                CONNECTION_CONFIG.maxRetryDelay,
+                CONNECTION_CONFIG.baseRetryDelay * Math.pow(2, connectionState.retryCount - 1)
+            );
+            setTimeout(connectToWhatsApp, delay);
+        }
     }
 }
 
