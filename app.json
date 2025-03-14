@@ -1,11 +1,23 @@
 {
   "name": "BLACKSKY-MD WhatsApp Bot",
-  "description": "A sophisticated WhatsApp multi-device bot delivering intelligent, interactive, and educational messaging experiences with advanced personalization and user engagement capabilities.",
-  "repository": "https://github.com/madariss5/BLACKSKY",
-  "logo": "https://raw.githubusercontent.com/madariss5/BLACKSKY/main/generated-icon.png",
-  "keywords": ["whatsapp", "bot", "multi-device", "baileys", "md-bot", "blacksky"],
-  "success_url": "/",
-  "stack": "heroku-20",
+  "description": "Advanced WhatsApp Multi-Device Bot with enhanced connection stability",
+  "repository": "https://github.com/yourusername/blacksky-md",
+  "logo": "https://raw.githubusercontent.com/yourusername/blacksky-md/main/generated-icon.png",
+  "keywords": ["whatsapp", "bot", "baileys", "node", "javascript"],
+  "env": {
+    "PREFIX": {
+      "description": "Bot command prefix",
+      "value": "!"
+    },
+    "OWNER_NUMBER": {
+      "description": "Your WhatsApp number without + or country code (e.g., 1234567890)",
+      "value": ""
+    },
+    "NODE_ENV": {
+      "description": "Environment for Node.js",
+      "value": "production"
+    }
+  },
   "buildpacks": [
     {
       "url": "heroku/nodejs"
@@ -17,69 +29,16 @@
       "url": "https://github.com/clhuang/heroku-buildpack-webp-binaries.git"
     }
   ],
-  "env": {
-    "SESSION_STRING": {
-      "description": "WhatsApp session credentials (Base64 encoded). You can leave this blank and add it via the web interface after deployment.",
-      "required": false
-    },
-    "SESSION_ID": {
-      "description": "Unique session ID for multi-device support (deprecated - SESSION_STRING is preferred)",
-      "required": false,
-      "value": ""
-    },
-    "PREFIX": {
-      "description": "Command prefix (e.g., '.')",
-      "value": ".",
-      "required": true
-    },
-    "BOT_PREFIX": {
-      "description": "Alternative command prefix (default: .) - Use PREFIX instead",
-      "required": false,
-      "value": "."
-    },
-    "OWNER_NUMBER": {
-      "description": "Your WhatsApp number with country code (example: 491234567890)",
-      "required": true
-    },
-    "BOT_NAME": {
-      "description": "Name for your bot",
-      "value": "BLACKSKY-MD",
-      "required": false
-    },
-    "LANGUAGE": {
-      "description": "Primary and secondary languages (comma-separated)",
-      "value": "en,de",
-      "required": false
-    },
-    "STICKER_PACKNAME": {
-      "description": "Name for sticker packs",
-      "value": "BLACKSKY-MD",
-      "required": false
-    },
-    "STICKER_AUTHOR": {
-      "description": "Author name for stickers",
-      "value": "Bot",
-      "required": false
-    },
-    "ENABLE_NSFW": {
-      "description": "Enable NSFW features (true/false)",
-      "value": "false",
-      "required": false
-    },
-    "ENABLE_GAMES": {
-      "description": "Enable games features (true/false)",
-      "value": "true",
-      "required": false
-    },
-    "ENABLE_MEDIA": {
-      "description": "Enable media processing features (true/false)",
-      "value": "true",
-      "required": false
-    },
-    "ENABLE_EDUCATIONAL": {
-      "description": "Enable educational features (true/false)",
-      "value": "true",
-      "required": false
+  "addons": [
+    {
+      "plan": "heroku-redis:hobby-dev",
+      "as": "REDIS"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
     }
   }
 }

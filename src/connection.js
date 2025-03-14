@@ -296,18 +296,27 @@ async function startConnection() {
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
         // Create socket with enhanced settings to prevent conflicts
+        const browserId = `BLACKSKY-MD-${Date.now().toString().slice(-6)}`;
+        logger.info(`Using browser ID: ${browserId}`);
+        
         sock = makeWASocket({
             auth: state,
-            printQRInTerminal: false,
-            logger: pino({ level: 'silent' }),
+            printQRInTerminal: true, // Enable terminal QR as backup
+            logger: pino({ 
+                level: 'warn',
+                transport: {
+                    target: 'pino-pretty',
+                    options: { colorize: true }
+                }
+            }),
             // Use a unique browser ID for each connection to prevent conflicts
-            browser: ['BLACKSKY-MD', 'Chrome', '121.0.0.' + Date.now()],
+            browser: [browserId, 'Chrome', '110.0.0'],
             // Enhanced connection settings to reduce reconnections
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
-            keepAliveIntervalMs: 30000,
+            keepAliveIntervalMs: 10000, // Lower interval to keep connection alive
             emitOwnEvents: false,
-            retryRequestDelayMs: 5000,
+            retryRequestDelayMs: 2000, // Lower retry delay to be more responsive
             fireInitQueries: true,
             downloadHistory: false,
             syncFullHistory: false,
@@ -315,17 +324,13 @@ async function startConnection() {
             markOnlineOnConnect: false,
             version: [2, 2323, 4],
             transactionOpts: { 
-                maxCommitRetries: 10, 
-                delayBetweenTriesMs: 5000 
+                maxCommitRetries: 5, 
+                delayBetweenTriesMs: 2000 
             },
-            // Custom options to reduce conflicts
-            fireAndForget: true, // Don't wait for server ack
-            patchMessageBeforeSending: (message) => {
-                // Add timestamp to make messages unique
-                const now = new Date();
-                message.messageTimestamp = now / 1000;
-                return message;
-            }
+            // Optimize for Replit environment
+            linkPreviewImageThumbnailWidth: 300, // Lower resource usage
+            mediaCache: new Map(), // In-memory media cache
+            getMessage: async () => { return { conversation: 'hello' }; }
         });
 
         sock.ev.on('connection.update', async (update) => {

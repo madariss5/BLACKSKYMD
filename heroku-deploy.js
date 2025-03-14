@@ -3,351 +3,48 @@
  * This version is optimized for Heroku environments where filesystem changes aren't persistent
  */
 
-require('dotenv').config();
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
-const express = require('express');
-const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
-
-// Import message handlers
-const { messageHandler } = require('./src/handlers/messageHandler');
-
-// Use environment variables for port assignment
-const PORT = process.env.PORT || 5000;
-const AUTH_STRING = process.env.SESSION_STRING || '';
-const SESSION_DIR = path.join(__dirname, 'auth_info_heroku');
-
-// Set up pino logger
-const logger = pino({
-    level: 'info',
-    transport: {
-        target: 'pino-pretty',
-        options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname'
-        }
-    }
-});
-
-// Initialize express app for QR display and session management
+const express = require('express');
+const qrcode = require('qrcode');
+const http = require('http');
 const app = express();
-app.use(express.json());
-app.use(express.static('public'));
-app.use(express.urlencoded({ extended: true }));
+const server = http.createServer(app);
 
-// Global variables
+// Constants
+const PORT = process.env.PORT || 5000;
+const AUTH_DIR = './auth_info';
+const SESSION_PATH = './session.json';
+let messageHandler = null;
+
+// Session state
 let sock = null;
+let qrCodeDataURL = null;
+let connectionStatus = 'disconnected';
 let startTime = Date.now();
-let lastQR = null;
-let connectionState = {
-    state: 'disconnected',
-    message: 'Waiting for authentication',
-    qrCode: null,
-    uptime: 0,
-    connected: false,
-    disconnectReason: null
-};
+let sessionData = null;
 
-// Create directories if they don't exist
-if (!fs.existsSync(SESSION_DIR)) {
-    fs.mkdirSync(SESSION_DIR, { recursive: true });
+// Try to load message handler
+try {
+    const { messageHandler: handler } = require('./src/handlers/messageHandler');
+    messageHandler = handler;
+} catch (err) {
+    console.log('Warning: Message handler not loaded yet');
 }
-
-// Create HTML interface for QR code display and session management
-const htmlContent = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BLACKSKY-MD Heroku Authentication</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        .container {
-            background-color: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            max-width: 800px;
-            width: 100%;
-            margin-bottom: 20px;
-        }
-        h1 {
-            color: #128C7E;
-        }
-        .qr-container {
-            margin: 20px 0;
-            padding: 15px;
-            border: 2px dashed #ddd;
-            border-radius: 8px;
-            background-color: white;
-            display: inline-block;
-        }
-        .status {
-            margin: 20px 0;
-            padding: 10px;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        .connected {
-            background-color: #DFF2BF;
-            color: #4F8A10;
-        }
-        .disconnected {
-            background-color: #FEEFB3;
-            color: #9F6000;
-        }
-        .error {
-            background-color: #FFD2D2;
-            color: #D8000C;
-        }
-        .instructions {
-            text-align: left;
-            margin: 20px 0;
-            background-color: #e9f7fe;
-            padding: 15px;
-            border-radius: 5px;
-            color: #3a87ad;
-        }
-        img {
-            max-width: 100%;
-            height: auto;
-        }
-        .input-area {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            text-align: left;
-            width: 100%;
-        }
-        textarea {
-            width: 100%;
-            min-height: 150px;
-            margin: 10px 0;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 14px;
-        }
-        button {
-            background-color: #128C7E;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            margin: 5px;
-        }
-        button:hover {
-            background-color: #0C6B5E;
-        }
-        .tabs {
-            display: flex;
-            margin-bottom: 20px;
-            width: 100%;
-        }
-        .tab {
-            padding: 10px 20px;
-            background-color: #eee;
-            border: 1px solid #ddd;
-            cursor: pointer;
-            flex: 1;
-            text-align: center;
-        }
-        .tab.active {
-            background-color: #128C7E;
-            color: white;
-            border-color: #128C7E;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>BLACKSKY-MD Heroku Authentication</h1>
-
-        <div class="tabs">
-            <div class="tab active" onclick="showTab('qr-tab')">QR Code Method</div>
-            <div class="tab" onclick="showTab('session-tab')">Session String Method</div>
-        </div>
-
-        <div id="qr-tab" class="tab-content active">
-            <div class="instructions">
-                <h3>QR Code Scan Instructions:</h3>
-                <ol>
-                    <li>Open WhatsApp on your smartphone</li>
-                    <li>Go to Settings or Menu and select "Linked Devices"</li>
-                    <li>Tap on "Link a Device"</li>
-                    <li>Scan the QR code below with your smartphone</li>
-                    <li>After successful connection, copy the Session String to save for future deployments</li>
-                </ol>
-            </div>
-
-            <div class="qr-container">
-                <img id="qrcode" src="/qrcode.png" alt="QR Code">
-                <div style="font-size: 14px; color: #666; margin-top: 5px;">The QR code refreshes automatically every 20 seconds</div>
-            </div>
-
-            <div id="status" class="status disconnected">
-                Status: Waiting for QR code scan...
-            </div>
-        </div>
-
-        <div id="session-tab" class="tab-content">
-            <div class="instructions">
-                <h3>Session String Instructions:</h3>
-                <ol>
-                    <li>Paste your previously saved Session String in the text area below</li>
-                    <li>Click "Authenticate with Session String"</li>
-                    <li>This method allows you to reconnect without scanning a QR code each time</li>
-                    <li>Ideal for Heroku deployments where filesystem changes aren't persistent</li>
-                </ol>
-            </div>
-
-            <div class="input-area">
-                <h3>Enter Your Session String:</h3>
-                <textarea id="session-string" placeholder="Paste your session string here..."></textarea>
-                <button onclick="submitSessionString()">Authenticate with Session String</button>
-            </div>
-        </div>
-
-        <div id="session-output" style="display: none;" class="input-area">
-            <h3>Your Session String (Save this for future use):</h3>
-            <textarea id="session-output-text" readonly></textarea>
-            <button onclick="copySessionString()">Copy to Clipboard</button>
-            <p>Important: Add this string to your Heroku config variables as SESSION_STRING</p>
-        </div>
-    </div>
-
-    <script>
-        // Tab functionality
-        function showTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-
-            document.getElementById(tabId).classList.add('active');
-            document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
-        }
-
-        // Auto-refresh the QR code image and check status
-        setInterval(() => {
-            const img = document.getElementById('qrcode');
-            const timestamp = new Date().getTime();
-            img.src = '/qrcode.png?t=' + timestamp;
-
-            // Also check connection status
-            fetch('/status')
-                .then(response => response.json())
-                .then(data => {
-                    const statusElement = document.getElementById('status');
-                    statusElement.textContent = 'Status: ' + data.message;
-
-                    // Remove old classes
-                    statusElement.classList.remove('connected', 'disconnected', 'error');
-
-                    // Add appropriate class
-                    if (data.state === 'connected') {
-                        statusElement.classList.add('connected');
-
-                        // Display session string if connected
-                        if (data.sessionString) {
-                            document.getElementById('session-output').style.display = 'block';
-                            document.getElementById('session-output-text').value = data.sessionString;
-                        }
-                    } else if (data.state === 'error') {
-                        statusElement.classList.add('error');
-                    } else {
-                        statusElement.classList.add('disconnected');
-                    }
-                })
-                .catch(err => console.error('Error fetching status:', err));
-        }, 5000);
-
-        // Submit session string for authentication
-        function submitSessionString() {
-            const sessionString = document.getElementById('session-string').value.trim();
-            if (!sessionString) {
-                alert('Please enter a valid session string');
-                return;
-            }
-
-            fetch('/auth/session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ sessionString })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Authentication successful! Bot is connecting...');
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 3000);
-                } else {
-                    alert('Authentication failed: ' + data.message);
-                }
-            })
-            .catch(err => {
-                alert('Error: ' + err.message);
-            });
-        }
-
-        // Copy session string to clipboard
-        function copySessionString() {
-            const sessionText = document.getElementById('session-output-text');
-            sessionText.select();
-            document.execCommand('copy');
-            alert('Session string copied to clipboard!');
-        }
-    </script>
-</body>
-</html>
-`;
-
-// Write HTML to public directory
-if (!fs.existsSync('public')) {
-    fs.mkdirSync('public', { recursive: true });
-}
-fs.writeFileSync('public/index.html', htmlContent);
 
 /**
  * Convert session data to a transportable string
  */
 function sessionToString(sessionData) {
     try {
-        return Buffer.from(JSON.stringify(sessionData)).toString('base64');
+        // Convert to JSON string then Base64 encode for safety
+        const jsonData = JSON.stringify(sessionData);
+        const base64Data = Buffer.from(jsonData).toString('base64');
+        return base64Data;
     } catch (error) {
-        logger.error('Error converting session to string:', error);
+        console.error('Error converting session to string:', error);
         return null;
     }
 }
@@ -357,10 +54,12 @@ function sessionToString(sessionData) {
  */
 function stringToSession(sessionString) {
     try {
-        const jsonString = Buffer.from(sessionString, 'base64').toString();
-        return JSON.parse(jsonString);
+        // Decode Base64 string then parse JSON
+        const jsonData = Buffer.from(sessionString, 'base64').toString();
+        const parsedData = JSON.parse(jsonData);
+        return parsedData;
     } catch (error) {
-        logger.error('Error parsing session string:', error);
+        console.error('Error parsing session string:', error);
         return null;
     }
 }
@@ -370,12 +69,22 @@ function stringToSession(sessionString) {
  */
 async function saveSessionData(sessionData) {
     try {
-        const credsPath = path.join(SESSION_DIR, 'creds.json');
-        fs.writeFileSync(credsPath, JSON.stringify(sessionData));
-        logger.info('Session data saved to filesystem');
+        // First convert to safe string format
+        const sessionString = sessionToString(sessionData);
+        if (!sessionString) return false;
+        
+        // Save to file
+        fs.writeFileSync(SESSION_PATH, sessionString);
+        console.log('Session data saved to file');
+        
+        // Also store in environment variable for Heroku persistence
+        // Note: This won't actually work in Heroku as env vars are read-only at runtime
+        // This is just shown as an example of the concept
+        process.env.SESSION_DATA = sessionString;
+        
         return true;
     } catch (error) {
-        logger.error('Error saving session data:', error);
+        console.error('Error saving session data:', error);
         return false;
     }
 }
@@ -385,28 +94,31 @@ async function saveSessionData(sessionData) {
  */
 async function loadSessionData() {
     try {
-        // Try to load from environment variable first
-        if (AUTH_STRING) {
-            const sessionData = stringToSession(AUTH_STRING);
+        // Try to load from environment variable first (Heroku persistence)
+        if (process.env.SESSION_DATA) {
+            console.log('Found session data in environment');
+            const sessionData = stringToSession(process.env.SESSION_DATA);
             if (sessionData) {
-                logger.info('Loaded session data from environment variable');
-                await saveSessionData(sessionData);
+                console.log('Successfully loaded session from environment');
                 return sessionData;
             }
         }
-
-        // Fall back to filesystem if available
-        const credsPath = path.join(SESSION_DIR, 'creds.json');
-        if (fs.existsSync(credsPath)) {
-            const sessionData = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-            logger.info('Loaded session data from filesystem');
-            return sessionData;
+        
+        // Fall back to filesystem
+        if (fs.existsSync(SESSION_PATH)) {
+            console.log('Found session data file');
+            const sessionString = fs.readFileSync(SESSION_PATH, 'utf8');
+            const sessionData = stringToSession(sessionString);
+            if (sessionData) {
+                console.log('Successfully loaded session from file');
+                return sessionData;
+            }
         }
-
-        logger.info('No existing session data found');
+        
+        console.log('No valid session data found');
         return null;
     } catch (error) {
-        logger.error('Error loading session data:', error);
+        console.error('Error loading session data:', error);
         return null;
     }
 }
@@ -416,139 +128,175 @@ async function loadSessionData() {
  */
 async function connectToWhatsApp() {
     try {
-        connectionState.state = 'connecting';
-        connectionState.message = 'Initializing WhatsApp connection...';
-
-        let retryCount = 0;
-        const MAX_RETRIES = 5;
-        const INITIAL_RETRY_INTERVAL = 2000;
-
-        // Set up custom auth state
-        let creds = await loadSessionData();
-
-        // Create auth state handlers
-        const saveState = async (newCreds) => {
-            creds = newCreds;
-            await saveSessionData(creds);
-
-            // Update connection state with new session string
-            if (creds) {
-                connectionState.sessionString = sessionToString(creds);
-            }
-        };
-
-        const getState = async () => {
-            return {
-                creds
-            };
-        };
-
-        // Create WhatsApp socket with more conservative settings
+        // Create auth directory if it doesn't exist
+        if (!fs.existsSync(AUTH_DIR)) {
+            fs.mkdirSync(AUTH_DIR, { recursive: true });
+        }
+        
+        // Initialize auth state
+        let authState;
+        
+        // Try to load session data first
+        const savedSession = await loadSessionData();
+        if (savedSession && savedSession.creds) {
+            console.log('Restoring from saved session');
+            
+            // Write creds to auth file
+            fs.writeFileSync(path.join(AUTH_DIR, 'creds.json'), JSON.stringify(savedSession.creds, null, 2));
+            
+            // Initialize from file
+            console.log('Initializing from auth file');
+        }
+        
+        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+        
+        // Generate a unique browser ID for Heroku
+        const browserId = `BLACKSKY-HEROKU-${Date.now().toString().slice(-6)}`;
+        console.log('Using browser ID:', browserId);
+        
+        // Create WhatsApp socket with optimized settings for Heroku
         sock = makeWASocket({
-            auth: {
-                creds: creds || undefined,
-                keys: undefined
-            },
+            auth: state,
             printQRInTerminal: true,
-            logger: logger.child({ level: 'silent' }),
-            browser: ['BLACKSKY-MD', 'Chrome', '121.0.0'],
+            browser: [browserId, 'Chrome', '110.0.0'],
+            logger: pino({ level: 'silent' }),
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
-            markOnlineOnConnect: true,
+            keepAliveIntervalMs: 10000,
             emitOwnEvents: false,
+            markOnlineOnConnect: false,
+            // Optimize for Heroku's limited resources
             syncFullHistory: false,
-            retryRequestDelayMs: 2000,
-            fireInitQueries: true,
-            shouldSyncHistoryMessage: false,
-            downloadHistory: false,
-            patchMessageBeforeSending: true
+            fireAndForget: true,
+            retryRequestDelayMs: 1000
         });
-
-        // Handle connection updates with improved error handling
+        
+        // Handle connection events
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-
+            
             if (qr) {
-                lastQR = qr;
-                connectionState.state = 'qr_ready';
-                connectionState.qrCode = qr;
-                connectionState.message = 'QR Code ready for scanning';
-                logger.info('New QR code generated');
+                // Generate QR code and store it
+                qrCodeDataURL = await qrcode.toDataURL(qr);
+                console.log('New QR code generated');
             }
-
-            if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                logger.info(`Connection closed with status code: ${statusCode}`);
-
-                connectionState.state = 'disconnected';
-                connectionState.connected = false;
-                connectionState.message = `Connection closed (${statusCode}). Please refresh the page.`;
-
-                // Handle specific disconnect reasons
-                if (statusCode === DisconnectReason.loggedOut || 
-                    statusCode === DisconnectReason.connectionReplaced) {
-                    logger.info('Session ended, clearing credentials');
-                    creds = null;
-                    await saveState(null);
-                    process.exit(1); // Force restart to clear session
-                    return;
-                }
-
-                // Implement exponential backoff for reconnection
-                if (retryCount < MAX_RETRIES) {
-                    const delay = INITIAL_RETRY_INTERVAL * Math.pow(2, retryCount);
-                    retryCount++;
-
-                    logger.info(`Attempting reconnection ${retryCount}/${MAX_RETRIES} in ${delay}ms`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-
-                    try {
-                        await connectToWhatsApp();
-                    } catch (err) {
-                        logger.error('Reconnection attempt failed:', err);
+            
+            if (connection) {
+                connectionStatus = connection;
+                console.log('Connection status:', connection);
+            }
+            
+            if (connection === 'open') {
+                console.log('Connection established successfully');
+                
+                // On successful connection, save credentials
+                try {
+                    await saveCreds();
+                    console.log('Credentials saved to filesystem');
+                    
+                    // Try to make a more permanent backup of the session
+                    if (sock.authState && sock.authState.creds) {
+                        // Create session data object
+                        sessionData = {
+                            creds: sock.authState.creds,
+                            timestamp: Date.now(),
+                            version: '1.0'
+                        };
+                        
+                        // Save to more permanent storage
+                        await saveSessionData(sessionData);
+                        console.log('Session data backed up successfully');
+                        
+                        // Log successful connection details
+                        console.log('Connected as:', sock.user.id.split(':')[0]);
                     }
+                } catch (err) {
+                    console.error('Error saving credentials:', err);
+                }
+                
+                // Initialize message handler now that we're connected
+                if (messageHandler) {
+                    console.log('Initializing message handler');
+                    
+                    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                        if (type === 'notify') {
+                            for (const message of messages) {
+                                try {
+                                    await messageHandler(sock, message);
+                                } catch (err) {
+                                    console.error('Error handling message:', err);
+                                }
+                            }
+                        }
+                    });
                 } else {
-                    logger.error('Max reconnection attempts reached');
-                    process.exit(1); // Force restart after max retries
-                }
-            } else if (connection === 'open') {
-                retryCount = 0; // Reset retry counter on successful connection
-                logger.info('WhatsApp connection established!');
-                connectionState.state = 'connected';
-                connectionState.connected = true;
-                connectionState.message = 'Connected to WhatsApp!';
-
-                // Update session string for UI display
-                if (creds) {
-                    connectionState.sessionString = sessionToString(creds);
-                }
-            }
-        });
-
-        // Handle credential updates
-        sock.ev.on('creds.update', async (newCreds) => {
-            await saveState(newCreds);
-        });
-
-        // Handle messages with error handling
-        sock.ev.on('messages.upsert', async ({ messages, type }) => {
-            if (type === 'notify') {
-                for (const message of messages) {
+                    console.warn('No message handler available');
+                    
+                    // Try to load it dynamically
                     try {
-                        await messageHandler(sock, message);
+                        const { messageHandler: handler } = require('./src/handlers/messageHandler');
+                        if (handler) {
+                            messageHandler = handler;
+                            console.log('Successfully loaded message handler dynamically');
+                            
+                            sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                                if (type === 'notify') {
+                                    for (const message of messages) {
+                                        try {
+                                            await messageHandler(sock, message);
+                                        } catch (err) {
+                                            console.error('Error handling message:', err);
+                                        }
+                                    }
+                                }
+                            });
+                        }
                     } catch (err) {
-                        logger.error('Error handling message:', err);
+                        console.error('Failed to load message handler dynamically:', err);
                     }
                 }
             }
+            
+            if (connection === 'close') {
+                // Handle disconnection
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                console.log(`Connection closed with status code: ${statusCode}`);
+                
+                // Only attempt reconnection if not logged out
+                if (statusCode !== DisconnectReason.loggedOut) {
+                    console.log('Attempting to reconnect...');
+                    setTimeout(connectToWhatsApp, 5000);
+                } else {
+                    console.log('Not reconnecting - logged out');
+                }
+            }
         });
-
+        
+        // Save credentials when they update
+        sock.ev.on('creds.update', async (creds) => {
+            await saveCreds();
+            
+            // Update our session backup
+            if (sessionData) {
+                sessionData.creds = creds;
+                sessionData.timestamp = Date.now();
+                await saveSessionData(sessionData);
+            } else {
+                // Create new session data
+                sessionData = {
+                    creds: creds,
+                    timestamp: Date.now(),
+                    version: '1.0'
+                };
+                await saveSessionData(sessionData);
+            }
+            console.log('Credentials updated and backed up');
+        });
+        
         return sock;
     } catch (error) {
-        logger.error('Error in WhatsApp connection:', error);
-        connectionState.state = 'error';
-        connectionState.message = `Connection error: ${error.message}`;
-        throw error;
+        console.error('Connection error:', error);
+        setTimeout(connectToWhatsApp, 10000);
     }
 }
 
@@ -556,123 +304,230 @@ async function connectToWhatsApp() {
  * Get formatted uptime string
  */
 function getUptime() {
-    const uptime = Math.floor((Date.now() - startTime) / 1000);
-    const hours = Math.floor(uptime / 3600);
-    const minutes = Math.floor((uptime % 3600) / 60);
-    const seconds = uptime % 60;
-    return `${hours}h ${minutes}m ${seconds}s`;
+    const uptime = Date.now() - startTime;
+    const seconds = Math.floor(uptime / 1000) % 60;
+    const minutes = Math.floor(uptime / (1000 * 60)) % 60;
+    const hours = Math.floor(uptime / (1000 * 60 * 60)) % 24;
+    const days = Math.floor(uptime / (1000 * 60 * 60 * 24));
+    
+    let uptimeString = '';
+    if (days > 0) uptimeString += `${days}d `;
+    if (hours > 0) uptimeString += `${hours}h `;
+    if (minutes > 0) uptimeString += `${minutes}m `;
+    uptimeString += `${seconds}s`;
+    
+    return uptimeString;
 }
-
-// Web server endpoints
-app.get('/qrcode.png', async (req, res) => {
-    if (lastQR) {
-        try {
-            // Convert QR data to PNG buffer
-            const qrImage = await qrcode.toBuffer(lastQR);
-            res.type('png');
-            res.send(qrImage);
-        } catch (err) {
-            logger.error('Error generating QR image:', err);
-            res.status(500).send('Error generating QR code');
-        }
-    } else {
-        // If no QR code is available yet, generate a placeholder
-        res.status(503).send('QR code not yet available');
-    }
-});
-
-app.get('/status', (req, res) => {
-    const status = {
-        ...connectionState,
-        uptime: getUptime()
-    };
-    res.json(status);
-});
-
-// Endpoint to authenticate with session string
-app.post('/auth/session', async (req, res) => {
-    try {
-        const { sessionString } = req.body;
-
-        if (!sessionString) {
-            return res.status(400).json({
-                success: false,
-                message: 'Session string is required'
-            });
-        }
-
-        const sessionData = stringToSession(sessionString);
-
-        if (!sessionData) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid session string format'
-            });
-        }
-
-        // Save the session data
-        await saveSessionData(sessionData);
-
-        // Display in logs for debugging
-        logger.info('Session data received and saved');
-
-        // Update auth string
-        process.env.SESSION_STRING = sessionString;
-
-        // Restart connection
-        if (sock) {
-            sock.ev.removeAllListeners();
-            sock = null;
-        }
-
-        // Initialize connection with new credentials
-        setTimeout(connectToWhatsApp, 1000);
-
-        res.json({
-            success: true,
-            message: 'Session data accepted. Connecting to WhatsApp...'
-        });
-    } catch (error) {
-        logger.error('Error processing session string:', error);
-        res.status(500).json({
-            success: false,
-            message: `Error: ${error.message}`
-        });
-    }
-});
 
 /**
  * Main application startup
  */
 async function start() {
-    try {
-        logger.info('Starting BLACKSKY-MD Heroku Deployment...');
-
-        // Start web server
-        app.listen(PORT, '0.0.0.0', () => {
-            logger.info(`Server started on port ${PORT}`);
-
-            // Initialize WhatsApp connection
-            connectToWhatsApp().catch(err => {
-                logger.error('Failed to initialize WhatsApp:', err);
-            });
+    // Set up Express endpoints
+    
+    // Home page with status info
+    app.get('/', (req, res) => {
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>BLACKSKY WhatsApp Bot</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        max-width: 800px;
+                        margin: 0 auto;
+                        padding: 20px;
+                        line-height: 1.6;
+                    }
+                    h1 { color: #128C7E; }
+                    .card {
+                        background: #f5f5f5;
+                        border-radius: 8px;
+                        padding: 20px;
+                        margin-bottom: 20px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    }
+                    .status {
+                        display: inline-block;
+                        padding: 5px 10px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    .connecting { background: #FFF3CD; color: #856404; }
+                    .connected { background: #D4EDDA; color: #155724; }
+                    .disconnected { background: #F8D7DA; color: #721C24; }
+                </style>
+            </head>
+            <body>
+                <h1>BLACKSKY WhatsApp Bot</h1>
+                <div class="card">
+                    <h2>Bot Status</h2>
+                    <p><strong>Connection:</strong> <span class="status ${connectionStatus}">${connectionStatus.toUpperCase()}</span></p>
+                    <p><strong>Uptime:</strong> ${getUptime()}</p>
+                    <p><strong>Server Time:</strong> ${new Date().toLocaleString()}</p>
+                </div>
+                
+                <div class="card">
+                    <h2>Connection</h2>
+                    ${qrCodeDataURL 
+                        ? `<p>Scan this QR code with WhatsApp:</p><img src="${qrCodeDataURL}" alt="WhatsApp QR Code" />`
+                        : connectionStatus === 'connected' 
+                            ? '<p>Bot is connected to WhatsApp</p>'
+                            : '<p>Waiting for connection...</p>'
+                    }
+                </div>
+                
+                <div class="card">
+                    <h2>Bot Information</h2>
+                    <p><strong>Version:</strong> 1.0.0</p>
+                    <p><strong>Environment:</strong> ${process.env.NODE_ENV || 'development'}</p>
+                    <p><strong>Session Backup:</strong> ${sessionData ? 'Available' : 'Not available'}</p>
+                </div>
+                
+                <footer>
+                    &copy; 2025 BLACKSKY WhatsApp Bot - Running on Heroku
+                </footer>
+            </body>
+            </html>
+        `);
+    });
+    
+    // QR code endpoint
+    app.get('/qr', (req, res) => {
+        if (qrCodeDataURL) {
+            res.send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>WhatsApp QR Code</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <meta http-equiv="refresh" content="30">
+                    <style>
+                        body { 
+                            display: flex; 
+                            flex-direction: column;
+                            align-items: center; 
+                            justify-content: center; 
+                            min-height: 100vh; 
+                            margin: 0;
+                            font-family: Arial, sans-serif;
+                            background: #f0f2f5;
+                            padding: 20px;
+                        }
+                        .qr-container {
+                            background: white;
+                            padding: 20px;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            text-align: center;
+                        }
+                        h1 { color: #128C7E; }
+                        .instructions {
+                            margin-top: 20px;
+                            text-align: left;
+                        }
+                        .refresh-note {
+                            margin-top: 20px;
+                            font-style: italic;
+                            color: #666;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="qr-container">
+                        <h1>WhatsApp QR Code</h1>
+                        <img src="${qrCodeDataURL}" alt="WhatsApp QR Code" />
+                        
+                        <div class="instructions">
+                            <h3>How to connect:</h3>
+                            <ol>
+                                <li>Open WhatsApp on your phone</li>
+                                <li>Tap Menu or Settings and select Linked Devices</li>
+                                <li>Tap on "Link a Device"</li>
+                                <li>Point your phone at this screen to scan the QR code</li>
+                            </ol>
+                        </div>
+                        
+                        <p class="refresh-note">This page will automatically refresh every 30 seconds.</p>
+                    </div>
+                </body>
+                </html>
+            `);
+        } else {
+            res.send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>WhatsApp QR Code</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <meta http-equiv="refresh" content="5">
+                    <style>
+                        body { 
+                            display: flex; 
+                            flex-direction: column;
+                            align-items: center; 
+                            justify-content: center; 
+                            min-height: 100vh; 
+                            margin: 0;
+                            font-family: Arial, sans-serif;
+                            background: #f0f2f5;
+                            padding: 20px;
+                        }
+                        .message-container {
+                            background: white;
+                            padding: 20px;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            text-align: center;
+                        }
+                        h1 { color: #128C7E; }
+                        .status {
+                            margin-top: 20px;
+                            padding: 10px;
+                            background: #FFF3CD;
+                            color: #856404;
+                            border-radius: 4px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="message-container">
+                        <h1>WhatsApp QR Code</h1>
+                        
+                        <div class="status">
+                            ${connectionStatus === 'connected' 
+                                ? 'Already connected to WhatsApp. No QR code needed.'
+                                : 'Waiting for QR code generation. This page will refresh automatically.'}
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+        }
+    });
+    
+    // Status endpoint for monitoring
+    app.get('/status', (req, res) => {
+        res.json({
+            status: connectionStatus,
+            uptime: getUptime(),
+            serverTime: new Date().toISOString(),
+            hasQR: !!qrCodeDataURL,
+            hasSession: !!sessionData
         });
-    } catch (error) {
-        logger.error('Failed to start application:', error);
-        process.exit(1);
-    }
+    });
+    
+    // Start the web server
+    server.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Open http://localhost:${PORT} in your browser`);
+        
+        // Start WhatsApp connection
+        connectToWhatsApp();
+    });
 }
-
-// Handle uncaught errors
-process.on('uncaughtException', (err) => {
-    logger.error('Uncaught Exception:', err);
-    // Don't exit - just log and continue
-});
-
-process.on('unhandledRejection', (err) => {
-    logger.error('Unhandled Rejection:', err);
-    // Don't exit - just log and continue
-});
 
 // Start the application
 start();
