@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.ffmpeg
     pkgs.jq
     pkgs.librsvg
     pkgs.libjpeg

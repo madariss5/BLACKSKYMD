@@ -213,78 +213,27 @@ async function safeSendAnimatedGif(sock, jid, gif, caption = '', options = {}) {
             logger.info(`GIF buffer size: ${(originalSize / 1024).toFixed(2)} KB`);
         }
 
-        // Detect file type from buffer if possible
-        let mimeType = 'image/gif';
+        // CRITICAL FIX: Always ensure that GIF is properly sent as an animated video
         try {
-            // file-type is an ESM module
-            const fileTypeModule = await import('file-type');
-            const fileTypeResult = await fileTypeModule.fileTypeFromBuffer(buffer);
-            if (fileTypeResult) {
-                mimeType = fileTypeResult.mime;
-                logger.info(`Detected MIME type: ${mimeType} for GIF`);
-            }
-        } catch (typeError) {
-            logger.warn(`Could not detect file type: ${typeError.message}`);
-            // Continue with default mime type
-        }
-        
-        // Get the keepFormat option from the passed options
-        const keepFormat = options.keepFormat === true;
-        
-        // Try to optimize the GIF if it's too large (>1MB)
-        if (originalSize > 1024 * 1024) {
-            try {
-                logger.info(`GIF is large (${(originalSize/1024/1024).toFixed(2)}MB), attempting optimization${keepFormat ? ' while preserving GIF format' : ''}...`);
-                
-                // Optimize the GIF using our utility
-                const optimizeResult = await mediaEffects.optimizeGif(buffer, {
-                    maxSize: 1.5 * 1024 * 1024,  // 1.5MB target
-                    maxWidth: 512,
-                    maxHeight: 512,
-                    quality: 85,
-                    keepAsGif: keepFormat  // Use the option from the function call
-                });
-                
-                if (optimizeResult.wasOptimized) {
-                    const reduction = Math.round((optimizeResult.sizeReduction / originalSize) * 100);
-                    logger.info(`GIF optimization successful (format: ${optimizeResult.format}): ${(optimizeResult.optimizedSize/1024).toFixed(2)}KB (${reduction}% smaller)`);
-                    
-                    // Use the optimized buffer for sending
-                    buffer = optimizeResult.buffer;
-                    
-                    // Update MIME type if format changed
-                    if (optimizeResult.format === 'webp') {
-                        mimeType = 'image/webp';
-                    }
-                } else {
-                    logger.info(`GIF optimization skipped: ${optimizeResult.error || 'already optimal'}`);
-                }
-            } catch (optimizeError) {
-                logger.warn(`GIF optimization failed: ${optimizeError.message}, proceeding with original`);
-                // Continue with the original buffer
-            }
-        }
-
-        // Method 1: Convert to MP4 first, then send (most reliable for animations)
-        try {
-            logger.info(`Converting GIF to MP4 for animation compatibility`);
-            // Create a temporary directory
             const tempDir = await mediaEffects.ensureTempDir();
             const tempGifPath = path.join(tempDir, `temp-${Date.now()}.gif`);
             const mp4Path = path.join(tempDir, `temp-${Date.now()}.mp4`);
             
-            // Write buffer to file
+            // Write buffer to file for processing
             fs.writeFileSync(tempGifPath, buffer);
             
-            // Convert GIF to MP4 using ffmpeg with high quality settings
+            // Convert GIF to MP4 with specific settings to ensure animation works
             await new Promise((resolve, reject) => {
                 ffmpeg(tempGifPath)
                     .outputOptions([
                         '-movflags faststart',
                         '-pix_fmt yuv420p',
                         '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
-                        '-b:v', '1M',  // Higher bitrate for better quality
-                        '-r', '24'     // Force 24fps for smoother animation
+                        '-b:v', '2M',     // Higher bitrate for better quality
+                        '-r', '30',        // Higher framerate for smoother animation
+                        '-shortest',       // Finish encoding when shortest input stream ends
+                        '-an',             // No audio
+                        '-f', 'mp4'        // Force MP4 format
                     ])
                     .output(mp4Path)
                     .on('end', resolve)
@@ -292,21 +241,26 @@ async function safeSendAnimatedGif(sock, jid, gif, caption = '', options = {}) {
                     .run();
             });
             
-            // Send as video with gifPlayback enabled
+            // Read the MP4 file
             const mp4Buffer = fs.readFileSync(mp4Path);
             logger.info(`MP4 conversion successful, size: ${(mp4Buffer.length/1024).toFixed(2)} KB`);
             
+            // CRITICAL: Send with specific options for animation support
             const result = await sock.sendMessage(normalizedJid, {
                 video: mp4Buffer,
                 caption,
-                gifPlayback: true,
-                ptt: false,
-                mimetype: 'video/mp4',
+                gifPlayback: true,      // This is critical for GIF animation
+                ptt: false,             // Not voice note
+                seconds: 0,             // No expiration
+                viewOnce: false,        // Not view-once content
+                mediaType: 2,           // 2 = video type
+                mimetype: 'video/mp4',  // Correct MIME type
                 ...options
             });
-            logger.info(`Successfully sent as MP4 video with animation!`);
             
-            // Clean up temp files
+            logger.info(`✅ Successfully sent GIF as animated MP4!`);
+            
+            // Clean up the temporary files
             try {
                 fs.unlinkSync(tempGifPath);
                 fs.unlinkSync(mp4Path);
@@ -315,97 +269,41 @@ async function safeSendAnimatedGif(sock, jid, gif, caption = '', options = {}) {
             }
             
             return result;
-        } catch (mp4Error) {
-            logger.warn(`MP4 conversion failed: ${mp4Error.message}`);
+        } catch (mainError) {
+            logger.error(`Main MP4 conversion method failed: ${mainError.message}`);
             
-            // Fallback: try direct video with gifPlayback
+            // Fallback method: Try as direct document with GIF MIME type
             try {
-                logger.info(`Attempting direct gifPlayback as fallback (size: ${(buffer.length/1024).toFixed(2)} KB)`);
+                logger.info(`Attempting fallback: Sending as GIF document`);
+                
                 const result = await sock.sendMessage(normalizedJid, {
-                    video: buffer,
-                    caption,
-                    gifPlayback: true,
-                    mimetype: 'video/mp4',
+                    document: buffer,
+                    mimetype: 'image/gif',
+                    fileName: `animation-${Date.now()}.gif`,
+                    caption: `${caption} (animated GIF)`,
                     ...options
                 });
-                logger.info(`Successfully sent as direct video with GIF playback!`);
+                
+                logger.info(`Successfully sent as GIF document!`);
                 return result;
-            } catch (gifError) {
-                logger.warn(`Could not send as GIF playback video: ${gifError.message}`);
+            } catch (docError) {
+                logger.warn(`Document fallback failed: ${docError.message}`);
+                
+                // Last resort: Try as static image if everything else fails
+                try {
+                    logger.warn(`All animation methods failed, using static image fallback`);
+                    const result = await sock.sendMessage(normalizedJid, {
+                        image: buffer,
+                        caption: `${caption} (static fallback - animation failed)`,
+                        ...options
+                    });
+                    logger.info(`Sent as static image (fallback)!`);
+                    return result;
+                } catch (imageError) {
+                    logger.error(`All methods failed: ${imageError.message}`);
+                    return null;
+                }
             }
-        }
-
-        // Method 2: Try to send as document with GIF MIME type
-        try {
-            logger.info(`Attempting to send GIF as document`);
-            const result = await sock.sendMessage(normalizedJid, {
-                document: buffer,
-                mimetype: 'image/gif',
-                fileName: `animation-${Date.now()}.gif`,
-                caption,
-                ...options
-            });
-            logger.info(`Successfully sent as document!`);
-            return result;
-        } catch (docError) {
-            logger.warn(`Could not send as document: ${docError.message}`);
-        }
-
-        // Method 3: Try to send as animated sticker (This often shows as grey box)
-        try {
-            logger.info(`Attempting to send as animated sticker (${(buffer.length/1024).toFixed(2)} KB)`);
-            const result = await sock.sendMessage(normalizedJid, {
-                sticker: buffer,
-                isAnimated: true,
-                ...options
-            });
-            logger.info(`Successfully sent as animated sticker!`);
-            return result;
-        } catch (stickerError) {
-            logger.warn(`Could not send as animated sticker: ${stickerError.message}`);
-        }
-        
-        // Method 4: Try alternate approach for animated content
-        try {
-            logger.info(`Attempting to send as animated image`);
-            // Create special options for animated content
-            const animatedOptions = {
-                ...options,
-                viewOnce: false,        // Ensure it's not a view-once message
-                isAnimated: true,       // Signal that this is animated content
-                seconds: 8,             // Duration hint (may help with some clients)
-                mediaType: 2,           // 2 = video type  
-                animated: true          // Explicitly mark as animated
-            };
-            
-            // Try sending as a specially crafted video message
-            const result = await sock.sendMessage(normalizedJid, {
-                video: buffer,
-                jpegThumbnail: null,    // Let WhatsApp generate a thumbnail
-                caption,
-                gifPlayback: true,      // Crucial for GIF behavior
-                shouldLoop: true,       // Loop the animation
-                ...animatedOptions
-            });
-            logger.info(`Successfully sent as animated image!`);
-            return result;
-        } catch (mp4Error) {
-            logger.warn(`Animated image method failed: ${mp4Error.message}`);
-        }
-        
-        // Method 5: Try as regular image (static fallback - last resort)
-        try {
-            logger.info(`Attempting to send as static image (last resort)`);
-            const result = await sock.sendMessage(normalizedJid, {
-                image: buffer,
-                caption: `${caption} (static fallback)`,
-                ...options
-            });
-            logger.info(`Successfully sent as static image!`);
-            return result;
-        } catch (imageError) {
-            logger.error(`All GIF sending methods failed: ${imageError.message}`);
-            return null;
         }
     } catch (error) {
         logger.error(`Error in safeSendAnimatedGif: ${error.message}`);

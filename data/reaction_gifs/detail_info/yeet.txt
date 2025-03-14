@@ -1,4 +1,3 @@
-Reaction: yeet
-File: yeet.gif
-Size: 234K
-Source: Fast & Furious
+Source: attached_assets folder
+Replacement file: B6ya.gif
+Replaced: 2025-03-14T21:35:32.020Z

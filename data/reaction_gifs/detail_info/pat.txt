@@ -1,4 +1,3 @@
-Reaction: pat
-File: pat.gif
-Size: 234K
-Source: Walking Dead
+Source: attached_assets folder
+Replacement file: BT_L5v.gif
+Replaced: 2025-03-14T21:35:32.019Z
