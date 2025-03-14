@@ -10,6 +10,28 @@ const logger = console;
 // Commands storage
 const commands = new Map();
 
+// Helper function to calculate Levenshtein distance between two strings
+// Used for suggesting similar commands when a command is not found
+function levenshteinDistance(a, b) {
+    const matrix = Array(b.length + 1).fill().map(() => Array(a.length + 1).fill(0));
+    
+    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+    
+    for (let j = 1; j <= b.length; j++) {
+        for (let i = 1; i <= a.length; i++) {
+            const substitutionCost = a[i - 1] === b[j - 1] ? 0 : 1;
+            matrix[j][i] = Math.min(
+                matrix[j][i - 1] + 1, // deletion
+                matrix[j - 1][i] + 1, // insertion
+                matrix[j - 1][i - 1] + substitutionCost // substitution
+            );
+        }
+    }
+    
+    return matrix[b.length][a.length];
+}
+
 // Import all commands from the commands directory recursively
 async function loadCommands() {
     try {
@@ -132,7 +154,7 @@ function addFallbackCommands() {
     }
 }
 
-// Update message handler to provide better logging
+// Enhanced message handler with improved command detection
 async function messageHandler(sock, message) {
     try {
         // Basic validation
@@ -141,24 +163,53 @@ async function messageHandler(sock, message) {
             return;
         }
 
-        // Get message content
+        // Detailed logging for troubleshooting
+        if (process.env.DEBUG_BOT === 'true') {
+            logger.log('Message object:', JSON.stringify(message, null, 2));
+        }
+
+        // Get message content from various formats
         const content = message.message?.conversation || 
                        message.message?.extendedTextMessage?.text ||
                        message.message?.imageMessage?.caption ||
-                       message.message?.videoMessage?.caption;
+                       message.message?.videoMessage?.caption ||
+                       message.message?.documentMessage?.caption ||
+                       message.message?.viewOnceMessage?.message?.imageMessage?.caption ||
+                       message.message?.viewOnceMessage?.message?.videoMessage?.caption ||
+                       message.message?.listResponseMessage?.title ||
+                       message.message?.buttonsResponseMessage?.selectedButtonId ||
+                       message.message?.templateButtonReplyMessage?.selectedId;
 
         if (!content) {
             logger.log('No text content found');
             return;
         }
 
-        // Check for command prefix
-        if (content.startsWith('!') || content.startsWith('/') || content.startsWith('.')) {
-            const prefix = content.charAt(0);
-            const [commandName, ...args] = content.slice(1).trim().split(' ');
-            const cmd = commandName.toLowerCase();
+        // Determine if message is a command by checking prefixes
+        const validPrefixes = ['!', '/', '.'];
+        const prefix = content.charAt(0);
+        const isCommand = validPrefixes.includes(prefix);
 
-            logger.log('\nProcessing command:', cmd, 'with args:', args);
+        if (isCommand) {
+            // Extract command name and arguments
+            // This improved version handles quotes and special characters better
+            let args = [];
+            let commandName = '';
+            
+            // Check if there are spaces after the command
+            if (content.indexOf(' ') !== -1) {
+                commandName = content.slice(1, content.indexOf(' ')).toLowerCase();
+                // Properly split args respecting quotes
+                const argString = content.slice(content.indexOf(' ') + 1);
+                // Simple arg parsing
+                args = argString.split(' ').filter(arg => arg.trim() !== '');
+            } else {
+                // Command with no args
+                commandName = content.slice(1).toLowerCase();
+            }
+
+            // Log command processing
+            console.log(`\nProcessing command: ${commandName} with args:`, args);
 
             // Show typing indicator
             try {
@@ -167,20 +218,34 @@ async function messageHandler(sock, message) {
                 logger.error('Error setting presence:', err);
             }
 
-            if (commands.has(cmd)) {
+            if (commands.has(commandName)) {
                 try {
-                    await commands.get(cmd)(sock, message, args);
-                    logger.log('Command executed successfully:', cmd);
+                    await commands.get(commandName)(sock, message, args);
+                    console.log('Command executed successfully:', commandName);
                 } catch (err) {
-                    logger.error('Error executing command:', err);
+                    logger.error(`Error executing command ${commandName}:`, err);
                     await sock.sendMessage(message.key.remoteJid, {
-                        text: `❌ Error executing command: ${err.message}. Please try again.`
+                        text: `❌ Error executing command: ${err.message || 'Unknown error'}. Please try again.`
                     });
                 }
             } else {
-                logger.log('Command not found:', cmd);
+                console.log('Command not found:', commandName);
+                
+                // Check for similar commands to suggest
+                const allCommands = Array.from(commands.keys());
+                const similarCommands = allCommands.filter(cmd => 
+                    cmd.includes(commandName) || 
+                    commandName.includes(cmd) || 
+                    levenshteinDistance(cmd, commandName) <= 2
+                ).slice(0, 3);
+                
+                let suggestText = '';
+                if (similarCommands.length > 0) {
+                    suggestText = `\n\nDid you mean: ${similarCommands.map(cmd => `*!${cmd}*`).join(', ')}?`;
+                }
+                
                 await sock.sendMessage(message.key.remoteJid, {
-                    text: `❌ Command not found. Try !help or !menu for available commands.`
+                    text: `❌ Command *!${commandName}* not found. Try !help or !menu for available commands.${suggestText}`
                 });
             }
 

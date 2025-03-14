@@ -1,6 +1,7 @@
 /**
- * Simple QR Web Server for WhatsApp Bot
- * Displays QR code in a user-friendly web interface
+ * WhatsApp QR Web Server and Connection Manager
+ * This file manages both the QR code display and the WhatsApp connection
+ * The bot functionality is handled by the main index.js file
  */
 
 const express = require('express');
@@ -10,6 +11,8 @@ const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = requi
 const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
+const logger = require('./utils/logger');
+const handler = require('./handlers/ultra-minimal-handler');
 
 // Create Express app
 const app = express();
@@ -20,6 +23,7 @@ const PORT = 5007; // Changed to port 5007 to avoid conflicts
 let latestQR = null;
 let connectionStatus = 'disconnected';
 let sock = null;
+let qrGenerationAttempt = 0;
 
 // Auth directory
 const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info');
@@ -27,6 +31,9 @@ const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info');
 // Ensure auth directory exists
 if (!fs.existsSync(AUTH_DIRECTORY)) {
     fs.mkdirSync(AUTH_DIRECTORY, { recursive: true });
+} else {
+    // Don't clean auth directory - we want to keep existing credentials
+    logger.info('Auth directory already exists, using existing credentials');
 }
 
 // Serve static HTML page with QR code
@@ -36,7 +43,7 @@ app.get('/', (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-        <title>WhatsApp Bot QR Code</title>
+        <title>BLACKSKY-MD WhatsApp Bot</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="refresh" content="30">
         <style>
@@ -110,12 +117,36 @@ app.get('/', (req, res) => {
                 max-width: 100%;
                 height: auto;
             }
+            .bot-status {
+                margin-top: 20px;
+                padding: 15px;
+                background-color: #f5f5f5;
+                border-radius: 5px;
+                font-size: 0.9em;
+            }
+            .command-examples {
+                text-align: left;
+                background-color: #f0f8ff;
+                padding: 15px;
+                border-radius: 5px;
+                margin-top: 15px;
+            }
+            .command-examples h3 {
+                margin-top: 0;
+                font-size: 1em;
+            }
+            .command-examples code {
+                background-color: #e6f2ff;
+                padding: 2px 4px;
+                border-radius: 3px;
+                font-family: monospace;
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>BLACKSKY-MD</h1>
-            <h2>WhatsApp QR Code Connection</h2>
+            <h2>WhatsApp Bot Connection</h2>
 
             <div class="status ${connectionStatus}">
                 Status: ${connectionStatus === 'connected' 
@@ -128,11 +159,31 @@ app.get('/', (req, res) => {
             <div class="qr-container">
                 ${latestQR 
                     ? `<img src="${latestQR}" alt="WhatsApp QR Code" width="300" height="300">`
-                    : `<p>Generating QR code... Please wait.</p><p>If no QR appears after 15 seconds, click refresh.</p>`
+                    : connectionStatus === 'connected'
+                        ? `<p>✅ Successfully connected to WhatsApp!</p>
+                           <p>Your bot is now active and responding to commands.</p>`
+                        : `<p>Generating QR code... Please wait.</p>
+                           <p>If no QR appears after 15 seconds, click refresh.</p>`
                 }
             </div>
 
-            <button class="refresh-button" onclick="location.reload()">Refresh</button>
+            ${connectionStatus === 'connected' ? `
+                <div class="bot-status">
+                    <strong>Bot Status:</strong> Active and ready to use<br>
+                    <strong>Commands Available:</strong> ${handler?.commands?.size || 'Loading...'}<br>
+                    <strong>Prefix:</strong> !, /, or .
+                </div>
+                <div class="command-examples">
+                    <h3>Try these commands in WhatsApp:</h3>
+                    <ul>
+                        <li><code>!ping</code> - Check if bot is responding</li>
+                        <li><code>!menu</code> - View all available commands</li>
+                        <li><code>!help</code> - Get help with using the bot</li>
+                    </ul>
+                </div>
+            ` : `
+                <button class="refresh-button" onclick="location.reload()">Refresh</button>
+            `}
 
             <div class="instructions">
                 <strong>Instructions:</strong>
@@ -158,30 +209,39 @@ async function displayQR(qr) {
         // Generate QR code as data URL
         latestQR = await qrcode.toDataURL(qr);
         connectionStatus = 'connecting';
-        console.log(`\nQR Code ready! Visit http://localhost:${PORT} to scan\n`);
+        qrGenerationAttempt++;
+        logger.info(`QR Code generated (attempt ${qrGenerationAttempt}). Visit http://localhost:${PORT} to scan.`);
     } catch (err) {
-        console.error('Failed to generate QR code:', err);
+        logger.error('Failed to generate QR code:', err);
     }
 }
 
 // Start WhatsApp connection
 async function startConnection() {
     try {
+        // Initialize handler
+        await handler.init();
+        logger.info('Command handler initialized');
+        
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRECTORY);
-
+        logger.info('Auth state loaded');
+        
         // Create WhatsApp socket connection
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            browser: ['WhatsApp Bot', 'Chrome', '100.0.0'],
+            browser: ['BLACKSKY-MD', 'Chrome', '100.0.0'],
             logger: pino({ level: 'silent' }),
             connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 60000
+            defaultQueryTimeoutMs: 60000,
+            markOnlineOnConnect: true,
+            syncFullHistory: false
         });
 
         // Handle connection events
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
+            logger.info('Connection update:', update?.connection || 'No connection data');
 
             if (qr) {
                 await displayQR(qr);
@@ -191,7 +251,14 @@ async function startConnection() {
                 connectionStatus = 'connected';
                 latestQR = null; // Clear QR code once connected
                 await saveCreds();
-                console.log('\nConnection established successfully!\n');
+                logger.info('Connection established successfully!');
+                
+                try {
+                    const user = sock.user;
+                    logger.info('Connected as:', user.name || user.verifiedName || user.id.split(':')[0]);
+                } catch (e) {
+                    logger.error('Could not get user details:', e.message);
+                }
             }
 
             if (connection === 'close') {
@@ -199,30 +266,52 @@ async function startConnection() {
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
                 connectionStatus = 'disconnected';
-                console.log(`\nConnection closed due to ${lastDisconnect?.error?.message}\n`);
+                logger.info(`Connection closed with status code: ${statusCode || 'Unknown'}`);
 
                 if (shouldReconnect) {
-                    console.log('Reconnecting...');
+                    logger.info('Reconnecting...');
                     setTimeout(startConnection, 5000);
                 } else {
-                    console.log('Not reconnecting - user logged out');
+                    logger.info('Not reconnecting - user logged out');
                 }
             }
         });
 
+        // Handle credentials update
         sock.ev.on('creds.update', saveCreds);
+        
+        // Wire up message handler
+        sock.ev.on('messages.upsert', async (m) => {
+            if (m.type === 'notify') {
+                try {
+                    await handler.messageHandler(sock, m.messages[0]);
+                } catch (err) {
+                    logger.error('Message handling error:', err);
+                }
+            }
+        });
 
+        return sock;
     } catch (err) {
-        console.error('Error starting connection:', err);
+        logger.error('Error starting connection:', err);
         connectionStatus = 'disconnected';
         setTimeout(startConnection, 5000);
     }
 }
 
+// API endpoint to check bot status
+app.get('/status', (req, res) => {
+    res.json({
+        status: connectionStatus,
+        commandsLoaded: handler?.commands?.size || 0,
+        qrAvailable: latestQR !== null
+    });
+});
+
 // Start the server
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`\nQR Web Server running at http://localhost:${PORT}\n`);
-    console.log('Use this URL to access the WhatsApp QR code scanning interface\n');
+    logger.info(`\n✅ QR Web Server running at http://localhost:${PORT}\n`);
+    logger.info('✅ Use this URL to access the WhatsApp QR code scanning interface\n');
     startConnection();
 });
 

@@ -42,9 +42,15 @@ function validateMention(target) {
            target === 'all';
 }
 
-// Fast user name fetching with caching
+// Improved user name fetching with better error handling
 async function getUserName(sock, jid) {
     try {
+        // Handle null/undefined jid
+        if (!jid) {
+            return "Someone";
+        }
+        
+        // Return cached name if available
         if (userCache.has(jid)) {
             const cached = userCache.get(jid);
             if (Date.now() - cached.timestamp < USER_CACHE_TIMEOUT) {
@@ -53,38 +59,59 @@ async function getUserName(sock, jid) {
             userCache.delete(jid);
         }
 
-        let name;
+        let name = null;
+        
+        // Get contact from store instead of directly accessing contacts
         try {
-            const contact = await sock.contacts[jid] || {};
-            name = contact?.pushName ||
-                  contact?.verifiedName ||
-                  contact?.name ||
-                  contact?.notify;
-
-            if (!name) {
+            // Try to get contact from store
+            if (sock.store && typeof sock.store.contacts === 'object') {
+                const contact = sock.store.contacts[jid];
+                name = contact?.pushName || contact?.verifiedName || contact?.name || contact?.notify;
+            } 
+            
+            // Try direct contact access as fallback
+            if (!name && sock.contacts && typeof sock.contacts === 'object') {
+                const contact = sock.contacts[jid];
+                name = contact?.pushName || contact?.verifiedName || contact?.name || contact?.notify;
+            }
+            
+            // Last resort - try to fetch status
+            if (!name && typeof sock.fetchStatus === 'function') {
                 const status = await sock.fetchStatus(jid).catch(() => null);
                 name = status?.status?.name;
             }
         } catch (err) {
-            logger.warn(`Error getting contact info: ${err.message}`);
+            logger.warn(`Error getting contact info for ${jid}: ${err.message}`);
         }
 
-        name = name || jid.split('@')[0];
-
-        // Format phone numbers nicely
-        if (name.match(/^\d+$/)) {
-            name = name.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+        // Default to phone number if no name found
+        if (!name) {
+            // Extract phone number from JID
+            const phoneMatch = jid.match(/^(\d+)@/);
+            name = phoneMatch ? phoneMatch[1] : jid.split('@')[0];
+            
+            // Format phone numbers nicely if they match expected pattern
+            if (name.match(/^\d{10,}$/)) {
+                // Try to format as (XXX) XXX-XXXX
+                try {
+                    name = name.replace(/(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3');
+                } catch (e) {
+                    // If formatting fails, keep original
+                }
+            }
         }
 
+        // Cache the result
         userCache.set(jid, { name, timestamp: Date.now() });
         return name;
     } catch (err) {
         logger.error(`Error fetching user name: ${err.message}`);
-        return jid.split('@')[0];
+        // Return a safe fallback
+        return jid?.split('@')[0] || "User";
     }
 }
 
-// Enhanced reaction message sending with proper GIF handling
+// Completely redesigned reaction message sending function
 async function sendReactionMessage(sock, sender, target, type, customGifUrl, emoji) {
     try {
         // Validation
@@ -101,9 +128,18 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             return;
         }
 
-        // Get user names
-        const senderName = await getUserName(sock, sender);
-        const targetName = target ? await getUserName(sock, targetJid) : null;
+        // Get user names with better error handling
+        let senderName = "User";
+        let targetName = "Someone";
+        try {
+            senderName = await getUserName(sock, sender);
+            if (target) {
+                targetName = await getUserName(sock, targetJid);
+            }
+        } catch (nameError) {
+            logger.warn(`Error getting names: ${nameError.message}`);
+            // Continue with default names
+        }
 
         // Generate message text with better grammar
         let message;
@@ -125,47 +161,70 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             message = `${senderName} is ${actionMap[type] || type}ing ${emoji}`;
         }
 
-        // Download GIF first
-        const response = await axios.get(gifUrl, { 
-            responseType: 'arraybuffer',
-            timeout: 10000, // 10 second timeout
-            headers: {
-                'User-Agent': 'WhatsApp-MD-Bot/1.0'
-            }
-        });
-
-        const buffer = Buffer.from(response.data);
-
-        // Send as animated sticker
-        await sock.sendMessage(sender, {
-            sticker: buffer,
-            mimetype: 'image/gif',
-            gifAttribution: 'TENOR',
-            gifPlayback: true,
-            caption: message,
-            stickerAuthor: "BLACKSKY-MD",
-            stickerName: `${type}_reaction`,
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                externalAdReply: {
-                    title: message,
-                    mediaType: 1,
-                    renderLargerThumbnail: true
+        // Try to download GIF
+        let buffer;
+        try {
+            const response = await axios.get(gifUrl, { 
+                responseType: 'arraybuffer',
+                timeout: 15000, // 15 second timeout
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 }
-            }
-        });
+            });
+            buffer = Buffer.from(response.data);
+        } catch (downloadError) {
+            logger.warn(`Error downloading GIF: ${downloadError.message}`);
+            // Send text-only message as fallback
+            await sock.sendMessage(sender, { 
+                text: `${message}\n\n(Image could not be loaded)` 
+            });
+            return;
+        }
 
-        logger.info(`Successfully sent ${type} reaction to ${sender}`);
+        // Try to send as image first (more reliable than sticker)
+        try {
+            await sock.sendMessage(sender, {
+                image: buffer,
+                caption: message,
+                mimetype: 'image/gif',
+                gifPlayback: true
+            });
+            logger.info(`Successfully sent ${type} reaction to ${sender}`);
+            return;
+        } catch (imageError) {
+            logger.warn(`Could not send as image, trying as sticker: ${imageError.message}`);
+            // Fall through to try sticker method
+        }
+
+        // Try to send as sticker if image fails
+        try {
+            await sock.sendMessage(sender, {
+                sticker: buffer,
+                mimetype: 'image/gif',
+                gifPlayback: true
+            });
+            
+            // Send caption as separate message since stickers can't have captions
+            await sock.sendMessage(sender, { text: message });
+            
+            logger.info(`Successfully sent ${type} reaction as sticker to ${sender}`);
+        } catch (stickerError) {
+            logger.error(`Failed to send as sticker: ${stickerError.message}`);
+            
+            // Last resort - send text only
+            await sock.sendMessage(sender, { 
+                text: `${message}\n\n(Could not process reaction image)` 
+            });
+        }
     } catch (error) {
         logger.error('Error sending reaction message:', error);
         try {
-            // Fallback to regular message if GIF fails
+            // Final fallback to regular message
             await sock.sendMessage(sender, { 
-                text: `${message || ''}\n\n❌ Error: ${error.message}` 
+                text: `*${type.toUpperCase()} REACTION* ${emoji}\n\n${error.message}` 
             });
         } catch (sendErr) {
-            logger.error('Failed to send error message:', sendErr);
+            logger.error('Failed to send any message:', sendErr);
         }
     }
 }

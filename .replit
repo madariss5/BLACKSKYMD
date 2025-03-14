@@ -13,26 +13,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "QR Web Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "WhatsApp Bot"
-
-[[workflows.workflow]]
-name = "QR Web Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node src/qr-web-server.js"
-waitForPort = 5006
 
 [[workflows.workflow]]
 name = "Run Bot"
@@ -55,8 +36,8 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node --no-warnings src/index.js"
-waitForPort = 5000
+args = "cd /home/runner/workspace && node --no-warnings src/qr-web-server.js"
+waitForPort = 5007
 
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
