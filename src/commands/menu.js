@@ -244,27 +244,50 @@ const menuCommands = {
 async function loadAllCommands() {
     try {
         const commandsPath = path.join(__dirname);
-        const commandFiles = await fs.readdir(commandsPath);
         const allCommands = {};
         let totalCommands = 0;
 
+        // Function to recursively get all files
+        async function getAllFiles(dir) {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            const files = await Promise.all(entries.map(async entry => {
+                const fullPath = path.join(dir, entry.name);
+                return entry.isDirectory() ? getAllFiles(fullPath) : fullPath;
+            }));
+            return files.flat();
+        }
+
+        // Get all JS files including those in subdirectories
+        const commandFiles = await getAllFiles(commandsPath);
+        logger.info(`Found ${commandFiles.length} potential command files`);
+
         // Process each command file
         for (const file of commandFiles) {
-            if (file.endsWith('.js') && !['index.js', 'menu.js'].includes(file)) {
+            if (file.endsWith('.js') && !['index.js', 'menu.js'].includes(path.basename(file))) {
                 try {
-                    const filePath = path.join(commandsPath, file);
-                    const moduleData = require(filePath);
-                    const category = path.basename(file, '.js');
+                    const moduleData = require(file);
+                    let category = path.basename(path.dirname(file));
 
+                    // If it's in the root commands directory, use the filename as category
+                    if (category === 'commands') {
+                        category = path.basename(file, '.js');
+                    }
+
+                    // Get commands from module
                     let commands = moduleData.commands || moduleData;
                     if (typeof commands === 'object') {
+                        // Filter valid commands
                         const commandList = Object.keys(commands).filter(cmd =>
                             typeof commands[cmd] === 'function' && cmd !== 'init'
                         );
 
                         if (commandList.length > 0) {
-                            allCommands[category] = commandList;
+                            if (!allCommands[category]) {
+                                allCommands[category] = [];
+                            }
+                            allCommands[category].push(...commandList);
                             totalCommands += commandList.length;
+                            logger.info(`Loaded ${commandList.length} commands from ${category}`);
                         }
                     }
                 } catch (err) {
@@ -273,6 +296,28 @@ async function loadAllCommands() {
             }
         }
 
+        // Also check the index.js for additional commands
+        try {
+            const indexCommands = require('./index').commands;
+            if (indexCommands && typeof indexCommands === 'object') {
+                const mainCommands = Object.keys(indexCommands).filter(cmd =>
+                    typeof indexCommands[cmd] === 'function' && cmd !== 'init'
+                );
+
+                if (mainCommands.length > 0) {
+                    if (!allCommands['main']) {
+                        allCommands['main'] = [];
+                    }
+                    allCommands['main'].push(...mainCommands);
+                    totalCommands += mainCommands.length;
+                    logger.info(`Loaded ${mainCommands.length} commands from index.js`);
+                }
+            }
+        } catch (err) {
+            logger.error('Error loading commands from index.js:', err);
+        }
+
+        logger.info(`Total commands loaded: ${totalCommands} from ${Object.keys(allCommands).length} categories`);
         return { allCommands, totalCommands };
     } catch (err) {
         logger.error('Error loading commands:', err);
