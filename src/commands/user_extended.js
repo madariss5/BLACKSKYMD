@@ -4547,5 +4547,19 @@ const commands = {
 // Export using the expected module structure
 module.exports = {
     commands: commands,
-    category: 'user_extended'
+    category: 'user_extended',
+    async init() {
+        try {
+            logger.info('Initializing user extended module...');
+            
+            // Create directories if they don't exist
+            await initDirectories();
+            
+            logger.info('User extended module initialized successfully');
+            return true;
+        } catch (err) {
+            logger.error('Error initializing user extended module:', err);
+            throw err;
+        }
+    }
 };
