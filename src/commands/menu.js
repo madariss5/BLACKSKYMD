@@ -44,9 +44,11 @@ const categoryNames = {
     'default': 'Misc'
 };
 
+// Import necessary utilities
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+
 // Menu command handlers
 const menuCommands = {
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     async menu(sock, message, args) {
         try {
             const sender = message.key.remoteJid;
@@ -118,7 +120,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
                 });
             } catch (imgErr) {
                 logger.warn('Failed to send menu with image, sending text-only', imgErr);
-                await safeSendText(sock, sender, menuText );
+                await safeSendText(sock, sender, menuText);
             }
 
         } catch (err) {
@@ -158,7 +160,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
         
-                await safeSendText(sock, sender, helpText );
+                await safeSendText(sock, sender, helpText);
                 return;
             }
         
@@ -225,7 +227,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
         
-                await safeSendText(sock, sender, helpText );
+                await safeSendText(sock, sender, helpText);
             } else {
                 await safeSendText(sock, sender, languageManager.getText('menu.command_not_found', userLang, commandName, prefix)
                 );

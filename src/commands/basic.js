@@ -1,9 +1,9 @@
 const logger = require('../utils/logger');
 const os = require('os');
 const { proto } = require('@whiskeysockets/baileys');
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 const basicCommands = {
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     async help(sock, message, args) {
         try {
             // If specific command help is requested, forward to menu.js help
@@ -35,20 +35,19 @@ Welcome to 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻! Here are some commands to g
 
 Type ${prefix}help [command] for detailed help on any command.`.trim();
 
-            await safeSendText(sock, message.key.remoteJid, helpText,
+            await safeSendText(sock, message.key.remoteJid, helpText, {
                 mentions: message.mentions || []
-            );
+            });
         } catch (err) {
             logger.error('Error in help command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error executing help command'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error executing help command');
         }
     },
 
     async ping(sock, message) {
         try {
             const start = Date.now();
-            await safeSendText(sock, message.key.remoteJid, 'Pinging... 🏓' );
+            await safeSendText(sock, message.key.remoteJid, 'Pinging... 🏓');
             const ping = Date.now() - start;
 
             await sock.sendMessage(message.key.remoteJid, {

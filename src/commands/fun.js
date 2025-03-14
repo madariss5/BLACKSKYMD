@@ -771,12 +771,10 @@ const funCommands = {
             }
 
             const result = Math.floor(Math.random() * sides) + 1;
-            await safeSendText(sock, sender, `🎲 *Dice Roll (d${sides)*\n\nYou rolled: ${result}\n\nRoll again with !roll [sides]`
-            });
+            await safeSendText(sock, sender, `🎲 *Dice Roll (d${sides})*\n\nYou rolled: ${result}\n\nRoll again with !roll [sides]`);
         } catch (err) {
             logger.error('Dice roll error:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error rolling dice. Please try again.'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error rolling dice. Please try again.');
         }
     },
 

@@ -6,6 +6,7 @@ const messageTimestamps = new Map();
 
 // Store warning counts for users
 const userWarnings = new Map();
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 // Function to check if a message contains links
 function containsLink(message) {
@@ -140,7 +141,7 @@ async function handleGroupMessage(sock, message) {
                 text: `⚠️ @${sender.split('@')[0]} Links are not allowed in this group!`,
                 mentions: [sender]
             });
-            await sock.sendMessage(remoteJid, { delete: message.key });
+            await safeSendMessage(sock, remoteJid, { delete: message.key });
             const warnings = handleWarning(sender, remoteJid);
             if (warnings >= 3) {
                 await sock.groupParticipantsUpdate(remoteJid, [sender], 'remove');
@@ -161,7 +162,7 @@ async function handleGroupMessage(sock, message) {
                     text: `⚠️ @${sender.split('@')[0]} Please don't spam!`,
                     mentions: [sender]
                 });
-                await sock.sendMessage(remoteJid, { delete: message.key });
+                await safeSendMessage(sock, remoteJid, { delete: message.key });
                 const warnings = handleWarning(sender, remoteJid);
                 if (warnings >= 3) {
                     await sock.groupParticipantsUpdate(remoteJid, [sender], 'remove');
@@ -181,7 +182,7 @@ async function handleGroupMessage(sock, message) {
                 text: `⚠️ @${sender.split('@')[0]} Please maintain group decorum!`,
                 mentions: [sender]
             });
-            await sock.sendMessage(remoteJid, { delete: message.key });
+            await safeSendMessage(sock, remoteJid, { delete: message.key });
             const warnings = handleWarning(sender, remoteJid);
             if (warnings >= 3) {
                 await sock.groupParticipantsUpdate(remoteJid, [sender], 'remove');

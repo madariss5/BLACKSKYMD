@@ -6,7 +6,7 @@ const mathjs = require('mathjs');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const logger = require('../../utils/logger');
 const axios = require('axios');
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+const { safeSendText, safeSendMessage, safeSendImage } = require('../../utils/jidHelper');
 
 // Safe file operations wrapper
 async function safeFileOperation(operation, defaultValue = {}) {
@@ -95,11 +95,10 @@ const commands = {
         try {
             const remoteJid = message.key.remoteJid;
             const [targetLang, ...textParts] = args;
-            const textToTranslate = textParts.join(' ');
+            const textToTranslate = textParts.join('');
 
             if (!targetLang || !textToTranslate) {
-                await safeSendText(sock, remoteJid, '*🌐 Usage:* .translate [target_language] [text]\nExample: .translate es Hello, how are you?'
-                );
+                await safeSendText(sock, remoteJid, '*🌐 Usage:* .translate [target_language] [text]\nExample: .translate es Hello, how are you?');
                 return;
             }
 
@@ -127,8 +126,7 @@ const commands = {
                     text: `*🌐 Translation (${detectedLang} → ${targetLang})*\n\n${translation}`
                 });
             } else {
-                await safeSendText(sock, remoteJid, '*❌ Translation failed*\nPlease try again with a different text or language.'
-                );
+                await safeSendText(sock, remoteJid, '*❌ Translation failed*\nPlease try again with a different text or language.');
             }
         } catch (err) {
             await handleError(sock, message.key.remoteJid, err, 'Error translating text');
@@ -139,11 +137,10 @@ const commands = {
     async grammar(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const text = args.join(' ');
+            const text = args.join('');
 
             if (!text) {
-                await safeSendText(sock, remoteJid, '*📝 Usage:* .grammar [text]\nExample: .grammar I have went to the store yesterday.'
-                );
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .grammar [text]\nExample: .grammar I have went to the store yesterday.');
                 return;
             }
 
@@ -229,12 +226,10 @@ const commands = {
 
                     await safeSendText(sock, remoteJid, response );
                 } else {
-                    await safeSendText(sock, remoteJid, `*✅ Grammar Check*\n\nNo common grammatical issues found in your text. Note that this is a simple check and may not catch all errors.`
-                    );
+                    await safeSendText(sock, remoteJid, `*✅ Grammar Check*\n\nNo common grammatical issues found in your text. Note that this is a simple check and may not catch all errors.`);
                 }
             } catch (error) {
-                await safeSendText(sock, remoteJid, `*❌ Grammar check failed*\nAn error occurred while checking your text.`
-                );
+                await safeSendText(sock, remoteJid, `*❌ Grammar check failed*\nAn error occurred while checking your text.`);
                 logger.error(`Grammar check error: ${error.message}`);
             }
         } catch (err) {
@@ -249,8 +244,7 @@ const commands = {
             const [action, language, ...words] = args;
 
             if (!action || !['add', 'test', 'list'].includes(action)) {
-                await safeSendText(sock, remoteJid, '*📝 Usage:* .vocabulary [add|test|list] [language] [words]\nExample: .vocabulary add es casa,perro,gato'
-                );
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .vocabulary [add|test|list] [language] [words]\nExample: .vocabulary add es casa,perro,gato');
                 return;
             }
 
@@ -268,13 +262,12 @@ const commands = {
             switch (action) {
                 case 'add':
                     if (!language || words.length === 0) {
-                        await safeSendText(sock, remoteJid, '*❌ Please provide language and words*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Please provide language and words*');
                         return;
                     }
 
                     vocabulary[language] = vocabulary[language] || [];
-                    const newWords = words.join(' ').split(',');
+                    const newWords = words.join('').split(',');
                     vocabulary[language].push(...newWords);
 
                     await fsPromises.writeFile(vocabPath, JSON.stringify(vocabulary, null, 2));
@@ -285,8 +278,7 @@ const commands = {
 
                 case 'test':
                     if (!vocabulary[language] || vocabulary[language].length === 0) {
-                        await safeSendText(sock, remoteJid, '*❌ No vocabulary found for this language*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ No vocabulary found for this language*');
                         return;
                     }
 
@@ -294,19 +286,17 @@ const commands = {
                         .sort(() => 0.5 - Math.random())
                         .slice(0, 5);
 
-                    await safeSendText(sock, remoteJid, `*📝 Vocabulary Test (${language):*\n\n${randomWords.join('\n')}`
-                    });
+                    await safeSendText(sock, remoteJid, `*📝 Vocabulary Test (${language}):*\n\n${randomWords.join('\n')}`);
                     break;
 
                 case 'list':
                     if (!vocabulary[language]) {
-                        await safeSendText(sock, remoteJid, '*❌ No vocabulary found for this language*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ No vocabulary found for this language*');
                         return;
                     }
 
                     await sock.sendMessage(remoteJid, {
-                        text: `*📚 ${language} Vocabulary:*\n\n${vocabulary[language].join(', ')}`
+                        text: `*📚 ${language} Vocabulary:*\n\n${vocabulary[language].join(',')}`
                     });
                     break;
             }
@@ -322,8 +312,7 @@ const commands = {
             const [topic] = args;
 
             if (!topic) {
-                await safeSendText(sock, remoteJid, '*🔢 Usage:* .mathPractice [topic]\nAvailable topics: algebra, calculus, geometry'
-                );
+                await safeSendText(sock, remoteJid, '*🔢 Usage:* .mathPractice [topic]\nAvailable topics: algebra, calculus, geometry');
                 return;
             }
 
@@ -364,7 +353,7 @@ const commands = {
             };
 
             if (!problems[topic]) {
-                await safeSendText(sock, remoteJid, '*❌ Invalid topic*\nAvailable topics: ' + Object.keys(problems).join(', ')
+                await safeSendText(sock, remoteJid, '*❌ Invalid topic*\nAvailable topics: ' + Object.keys(problems).join(',')
                 );
                 return;
             }
@@ -412,8 +401,7 @@ const commands = {
 
             const userSolution = solutions[remoteJid];
             if (!userSolution || new Date() - new Date(userSolution.timestamp) > 3600000) {
-                await safeSendText(sock, remoteJid, '*❌ No active math problem found or solution expired*'
-                );
+                await safeSendText(sock, remoteJid, '*❌ No active math problem found or solution expired*');
                 return;
             }
 
@@ -432,7 +420,7 @@ const commands = {
     async define(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const word = args.join(' ');
+            const word = args.join('');
             if (!word) {
                 await safeSendText(sock, remoteJid, '📚 Please provide a word to define' );
                 return;
@@ -473,11 +461,10 @@ const commands = {
     async calculate(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const expression = args.join(' ');
+            const expression = args.join('');
 
             if (!expression) {
-                await safeSendText(sock, remoteJid, '*🧮 Usage:* .calculate [expression]\nExample: .calculate 5 * (3 + 2) / 4'
-                );
+                await safeSendText(sock, remoteJid, '*🧮 Usage:* .calculate [expression]\nExample: .calculate 5 * (3 + 2) / 4');
                 return;
             }
 
@@ -516,11 +503,10 @@ const commands = {
     async wikipedia(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const query = args.join(' ');
+            const query = args.join('');
 
             if (!query) {
-                await safeSendText(sock, remoteJid, '*🔍 Usage:* .wikipedia [search term]\nExample: .wikipedia Albert Einstein'
-                );
+                await safeSendText(sock, remoteJid, '*🔍 Usage:* .wikipedia [search term]\nExample: .wikipedia Albert Einstein');
                 return;
             }
 
@@ -568,7 +554,7 @@ const commands = {
                 if (searchResponse.data.query.search.length > 1) {
                     const otherResults = searchResponse.data.query.search.slice(1, 4)
                         .map(result => result.title)
-                        .join('\n• ');
+                        .join('\n•');
 
                     await sock.sendMessage(remoteJid, {
                         text: `*📋 Other relevant articles:*\n\n• ${otherResults}\n\nTo view any of these, use .wikipedia followed by the article title.`
@@ -588,11 +574,10 @@ const commands = {
     async mathsolve(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const equation = args.join(' ');
+            const equation = args.join('');
 
             if (!equation) {
-                await safeSendText(sock, remoteJid, '*📝 Usage:* .mathsolve [equation]\nExample: .mathsolve 2x + 5 = 15'
-                );
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .mathsolve [equation]\nExample: .mathsolve 2x + 5 = 15');
                 return;
             }
 
@@ -609,11 +594,10 @@ const commands = {
     async graph(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const equation = args.join(' ');
+            const equation = args.join('');
 
             if (!equation) {
-                await safeSendText(sock, remoteJid, '*📝 Usage:* .graph [equation]\nExample: .graph x^2 + 2*x + 1'
-                );
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .graph [equation]\nExample: .graph x^2 + 2*x + 1');
                 return;
             }
 
@@ -636,8 +620,7 @@ const commands = {
             const [topic, ...parameters] = args;
 
             if (!topic) {
-                await safeSendText(sock, remoteJid, '*🔬 Usage:* .scienceSimulation [topic] [parameters]\nAvailable topics: gravity, waves, circuits'
-                );
+                await safeSendText(sock, remoteJid, '*🔬 Usage:* .scienceSimulation [topic] [parameters]\nAvailable topics: gravity, waves, circuits');
                 return;
             }
 
@@ -672,7 +655,7 @@ const commands = {
             };
 
             if (!simulations[topic]) {
-                await safeSendText(sock, remoteJid, '*❌ Invalid simulation topic*\nAvailable topics: ' + Object.keys(simulations).join(', ')
+                await safeSendText(sock, remoteJid, '*❌ Invalid simulation topic*\nAvailable topics: ' + Object.keys(simulations).join(',')
                 );
                 return;
             }
@@ -680,7 +663,7 @@ const commands = {
             const sim = simulations[topic];
             if (parameters.length !== sim.parameters.length) {
                 await sock.sendMessage(remoteJid, {
-                    text: `*❌ Required parameters:* ${sim.parameters.join(', ')}`
+                    text: `*❌ Required parameters:* ${sim.parameters.join(',')}`
                 });
                 return;
             }
@@ -711,8 +694,7 @@ const commands = {
             const [language, level = 'beginner'] = args;
 
             if (!language) {
-                await safeSendText(sock, remoteJid, '*🗣️ Usage:* .languageExercise [language] [level]\nSupported languages: spanish, french, german'
-                );
+                await safeSendText(sock, remoteJid, '*🗣️ Usage:* .languageExercise [language] [level]\nSupported languages: spanish, french, german');
                 return;
             }
 
@@ -760,8 +742,7 @@ const commands = {
             };
 
             if (!exercises[language] || !exercises[language][level]) {
-                await safeSendText(sock, remoteJid, '*❌ Language or level not available*'
-                );
+                await safeSendText(sock, remoteJid, '*❌ Language or level not available*');
                 return;
             }
 
@@ -821,29 +802,26 @@ const commands = {
             switch (action) {
                 case 'create':
                     if (!subject || details.length === 0) {
-                        await safeSendText(sock, remoteJid, '*❌ Please provide subject and study plan details*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Please provide subject and study plan details*');
                         return;
                     }
 
                     plans[subject] = {
-                        details: details.join(' '),
+                        details: details.join(''),
                         created: new Date().toISOString(),
                         lastStudied: null,
                         progress: 0
                     };
 
                     await fsPromises.writeFile(plansPath, JSON.stringify(plans, null, 2));
-                    await safeSendText(sock, remoteJid, '*✅ Study plan created successfully*'
-                    );
+                    await safeSendText(sock, remoteJid, '*✅ Study plan created successfully*');
                     break;
 
                 case 'view':
                     if (!subject) {
                         const subjects = Object.keys(plans);
                         if (subjects.length === 0) {
-                            await safeSendText(sock, remoteJid, '*❌ No study plans found*'
-                            );
+                            await safeSendText(sock, remoteJid, '*❌ No study plans found*');
                             return;
                         }
 
@@ -856,8 +834,7 @@ const commands = {
                     }
 
                     if (!plans[subject]) {
-                        await safeSendText(sock, remoteJid, '*❌ Study plan not found*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Study plan not found*');
                         return;
                     }
 
@@ -875,21 +852,18 @@ const commands = {
 
                 case 'update':
                     if (!subject || details.length === 0) {
-                        await safeSendText(sock, remoteJid, '*❌ Please provide subject and progress update*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Please provide subject and progress update*');
                         return;
                     }
 
                     if (!plans[subject]) {
-                        await safeSendText(sock, remoteJid, '*❌ Study plan not found*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Study plan not found*');
                         return;
                     }
 
                     const progress = parseInt(details[0]);
                     if (isNaN(progress) || progress < 0 || progress > 100) {
-                        await safeSendText(sock, remoteJid, '*❌ Progress must be a number between 0 and 100*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Progress must be a number between 0 and 100*');
                         return;
                     }
 
@@ -914,8 +888,7 @@ const commands = {
             const [subject = '', difficulty = 'medium'] = args;
 
             if (!subject) {
-                await safeSendText(sock, remoteJid, '*📚 Interactive Quiz*\n\nAvailable subjects:\n• Math\n• Science\n• Language\n• History\n\nUsage: .interactiveQuiz [subject] [easy|medium|hard]'
-                );
+                await safeSendText(sock, remoteJid, '*📚 Interactive Quiz*\n\nAvailable subjects:\n• Math\n• Science\n• Language\n• History\n\nUsage: .interactiveQuiz [subject] [easy|medium|hard]');
                 return;
             }
 
@@ -981,8 +954,7 @@ const commands = {
             };
 
             if (!questions[subject.toLowerCase()]) {
-                await safeSendText(sock, remoteJid, '❌ Invalid subject. Available subjects: Math, Science'
-                );
+                await safeSendText(sock, remoteJid, '❌ Invalid subject. Available subjects: Math, Science');
                 return;
             }
 
@@ -1016,8 +988,7 @@ const commands = {
             await safeSendText(sock, remoteJid, quizMessage );
         } catch (err) {
             logger.error('Error in interactive quiz:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error creating quiz. Please try again.'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error creating quiz. Please try again.');
         }
     },
 
@@ -1027,8 +998,7 @@ const commands = {
             const answer = parseInt(args[0]);
 
             if (!global.quizzes || !global.quizzes.has(remoteJid)) {
-                await safeSendText(sock, remoteJid, '❌ No active quiz found. Use .interactiveQuiz to start a new quiz!'
-                );
+                await safeSendText(sock, remoteJid, '❌ No active quiz found. Use .interactiveQuiz to start a new quiz!');
                 return;
             }
 
@@ -1037,8 +1007,7 @@ const commands = {
             // Check if quiz has expired (5 minutes)
             if (Date.now() - quiz.timestamp > 5 * 60 * 1000) {
                 global.quizzes.delete(remoteJid);
-                await safeSendText(sock, remoteJid, '⏰ Quiz has expired. Use .interactiveQuiz to start a new one!'
-                );
+                await safeSendText(sock, remoteJid, '⏰ Quiz has expired. Use .interactiveQuiz to start a new one!');
                 return;
             }
 
@@ -1074,15 +1043,14 @@ const commands = {
             }
         } catch (err) {
             logger.error('Error in quiz answer:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error processing answer. Please try again.'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error processing answer. Please try again.');
         }
     },
 
     async chemReaction(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const reaction = args.join(' ');
+            const reaction = args.join('');
 
             if (!reaction) {
                 await safeSendText(sock, remoteJid, `*⚗️ Chemical Reaction Balancer*
@@ -1093,16 +1061,14 @@ Example: .chemReaction H2 + O2 -> H2O
 • Use + between reactants
 • Use -> or = for products
 • Use numbers for coefficients
-• Use subscripts as numbers (H2O)`
-                );
+• Use subscripts as numbers (H2O)`);
                 return;
             }
 
             // Parse reaction components
             const [reactants, products] = reaction.split(/->|=/);
             if (!reactants || !products) {
-                await safeSendText(sock, remoteJid, '❌ Invalid reaction format. Use -> or = between reactants and products.'
-                );
+                await safeSendText(sock, remoteJid, '❌ Invalid reaction format. Use -> or = between reactants and products.');
                 return;
             }
 
@@ -1127,7 +1093,7 @@ Example: .chemReaction H2 + O2 -> H2O
             };
 
             // Simplified matching
-            const key = reactantList.map(r => r.replace(/[0-9]/g, '')).join(' ');
+            const key = reactantList.map(r => r.replace(/[0-9]/g, '')).join('');
             const matchedReaction = commonReactions[key];
 
             if (matchedReaction) {
@@ -1135,14 +1101,12 @@ Example: .chemReaction H2 + O2 -> H2O
                     text: `*⚗️ Balanced Reaction:*\n${matchedReaction.balanced}\n\n*Explanation:*\n${matchedReaction.explanation}`
                 });
             } else {
-                await safeSendText(sock, remoteJid, '❌ Sorry, I can only balance common reactions at the moment. Try H2 + O2, CH4 + O2, or Na + Cl2'
-                );
+                await safeSendText(sock, remoteJid, '❌ Sorry, I can only balance common reactions at the moment. Try H2 + O2, CH4 + O2, or Na + Cl2');
             }
 
         } catch (err) {
             logger.error('Error in chemical reaction:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error balancing reaction. Please check your input.'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error balancing reaction. Please check your input.');
         }
     },
 
@@ -1152,8 +1116,7 @@ Example: .chemReaction H2 + O2 -> H2O
             const [subject] = args;
 
             if (!subject) {
-                await safeSendText(sock, remoteJid, '*📚 Usage:* .quiz [subject]\nAvailable subjects: math, science, history, geography'
-                );
+                await safeSendText(sock, remoteJid, '*📚 Usage:* .quiz [subject]\nAvailable subjects: math, science, history, geography');
                 return;
             }
 
@@ -1209,7 +1172,7 @@ Example: .chemReaction H2 + O2 -> H2O
             };
 
             if (!quizzes[subject]) {
-                await safeSendText(sock, remoteJid, '*❌ Invalid subject*\nAvailable subjects: ' + Object.keys(quizzes).join(', ')
+                await safeSendText(sock, remoteJid, '*❌ Invalid subject*\nAvailable subjects: ' + Object.keys(quizzes).join(',')
                 );
                 return;
             }
@@ -1251,8 +1214,7 @@ Example: .chemReaction H2 + O2 -> H2O
             switch (action) {
                 case 'create':
                     if (!subject || content.length === 0) {
-                        await safeSendText(sock, remoteJid, '*❌ Please provide subject and flashcard content*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Please provide subject and flashcard content*');
                         return;
                     }
 
@@ -1260,22 +1222,19 @@ Example: .chemReaction H2 + O2 -> H2O
                     const [front, back] = cardContent.split('::');
 
                     if (!front || !back) {
-                        await safeSendText(sock, remoteJid, '*❌ Invalid flashcard format*\nUse front::back format'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Invalid flashcard format*\nUse front::back format');
                         return;
                     }
 
                     flashcards.push({ front, back, created: new Date().toISOString() });
                     await fsPromises.writeFile(flashcardsPath, JSON.stringify(flashcards, null, 2));
 
-                    await safeSendText(sock, remoteJid, '*✅ Flashcard created successfully*'
-                    );
+                    await safeSendText(sock, remoteJid, '*✅ Flashcard created successfully*');
                     break;
 
                 case 'review':
                     if (!flashcards.length) {
-                        await safeSendText(sock, remoteJid, '*❌ No flashcards found for this subject*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ No flashcards found for this subject*');
                         return;
                     }
 
@@ -1287,8 +1246,7 @@ Example: .chemReaction H2 + O2 -> H2O
 
                 case 'list':
                     if (!flashcards.length) {
-                        await safeSendText(sock, remoteJid, '*❌ No flashcards found for this subject*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ No flashcards found for this subject*');
                         return;
                     }
 
@@ -1312,8 +1270,7 @@ Example: .chemReaction H2 + O2 -> H2O
             const [minutes] = args;
 
             if (!minutes || isNaN(minutes) || minutes <= 0 || minutes > 120) {
-                await safeSendText(sock, remoteJid, '*⏰ Usage:* .studytimer [minutes]\nSet a timer between 1-120 minutes'
-                );
+                await safeSendText(sock, remoteJid, '*⏰ Usage:* .studytimer [minutes]\nSet a timer between 1-120 minutes');
                 return;
             }
 
@@ -1341,11 +1298,10 @@ Example: .chemReaction H2 + O2 -> H2O
     async periodic(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const element = args.join(' ');
+            const element = args.join('');
 
             if (!element) {
-                await safeSendText(sock, remoteJid, '*⚛️ Usage:* .periodic [element]\nExample: .periodic Hydrogen'
-                );
+                await safeSendText(sock, remoteJid, '*⚛️ Usage:* .periodic [element]\nExample: .periodic Hydrogen');
                 return;
             }
 
@@ -1376,8 +1332,7 @@ Example: .chemReaction H2 + O2 -> H2O
 
             const elementData = periodicTable[element.toLowerCase()];
             if (!elementData) {
-                await safeSendText(sock, remoteJid, '*❌ Element not found*\nPlease check the spelling and try again.'
-                );
+                await safeSendText(sock, remoteJid, '*❌ Element not found*\nPlease check the spelling and try again.');
                 return;
             }
 
@@ -1398,11 +1353,10 @@ Example: .chemReaction H2 + O2 -> H2O
     async history(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const query = args.join(' ');
+            const query = args.join('');
 
             if (!query) {
-                await safeSendText(sock, remoteJid, '*📚 Usage:* .history [period|event]\nExample: .history World War 2'
-                );
+                await safeSendText(sock, remoteJid, '*📚 Usage:* .history [period|event]\nExample: .history World War 2');
                 return;
             }
 
@@ -1432,8 +1386,7 @@ Example: .chemReaction H2 + O2 -> H2O
 
             const event = historicalEvents[query.toLowerCase()];
             if (!event) {
-                await safeSendText(sock, remoteJid, '*❌ Historical event not found*\nPlease try a different query.'
-                );
+                await safeSendText(sock, remoteJid, '*❌ Historical event not found*\nPlease try a different query.');
                 return;
             }
 
@@ -1476,8 +1429,7 @@ Example: .chemReaction H2 + O2 -> H2O
             switch (action) {
                 case 'create':
                     if (!topic || nodes.length === 0) {
-                        await safeSendText(sock, remoteJid, '*❌ Please provide topic and initial nodes*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Please provide topic and initial nodes*');
                         return;
                     }
 
@@ -1488,14 +1440,12 @@ Example: .chemReaction H2 + O2 -> H2O
                     };
 
                     await fsPromises.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
-                    await safeSendText(sock, remoteJid, '*✅ Mind map created successfully*'
-                    );
+                    await safeSendText(sock, remoteJid, '*✅ Mind map created successfully*');
                     break;
 
                 case 'view':
                     if (!mindmaps[topic]) {
-                        await safeSendText(sock, remoteJid, '*❌ Mind map not found*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Mind map not found*');
                         return;
                     }
 
@@ -1510,8 +1460,7 @@ Example: .chemReaction H2 + O2 -> H2O
 
                 case 'add':
                     if (!mindmaps[topic]) {
-                        await safeSendText(sock, remoteJid, '*❌ Mind map not found*'
-                        );
+                        await safeSendText(sock, remoteJid, '*❌ Mind map not found*');
                         return;
                     }
 
@@ -1520,8 +1469,7 @@ Example: .chemReaction H2 + O2 -> H2O
                     mindmaps[topic].updated = new Date().toISOString();
 
                     await fsPromises.writeFile(mindmapsPath, JSON.stringify(mindmaps, null, 2));
-                    await safeSendText(sock, remoteJid, '*✅ Nodes added to mind map*'
-                    );
+                    await safeSendText(sock, remoteJid, '*✅ Nodes added to mind map*');
                     break;
             }
 
@@ -1582,10 +1530,9 @@ Example: .chemReaction H2 + O2 -> H2O
                 }
             };
 
-            const event = eventQuery.join(' ');
+            const event = eventQuery.join('');
             if (!historicalData[era] || !historicalData[era][event]) {
-                await safeSendText(sock, remoteJid, '*❌ Event not found in database*'
-                );
+                await safeSendText(sock, remoteJid, '*❌ Event not found in database*');
                 return;
             }
 
@@ -1623,16 +1570,14 @@ Example: .chemReaction H2 + O2 -> H2O
             };
 
             if (!citationStyles[style.toLowerCase()]) {
-                await safeSendText(sock, remoteJid, '*❌ Invalid citation style*\nAvailable styles: apa, mla, chicago'
-                );
+                await safeSendText(sock, remoteJid, '*❌ Invalid citation style*\nAvailable styles: apa, mla, chicago');
                 return;
             }
 
             const [author, title, year, source] = sourceDetails;
             const citation = citationStyles[style.toLowerCase()](author, title, year, source);
 
-            await safeSendText(sock, remoteJid, `*📝 Citation (${style.toUpperCase()):*\n\n${citation}`
-            });
+            await safeSendText(sock, remoteJid, `*📝 Citation (${style.toUpperCase()}):*\n\n${citation}`);
         } catch (err){
             await handleError(sock, message.key.remoteJid, err, 'Error generating citation');
         }
@@ -1641,7 +1586,7 @@ Example: .chemReaction H2 + O2 -> H2O
     async literatureAnalysis(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const text = args.join(' ');
+            const text = args.join('');
 
             if (!text) {
                 await safeSendText(sock, remoteJid, '*📖 Usage:* .literatureAnalysis [text]\nExample: .literatureAnalysis "To be or not to be"'
@@ -1705,11 +1650,10 @@ Example: .chemReaction H2 + O2 -> H2O
     async mathExplain(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const problem = args.join(' ');
+            const problem = args.join('');
 
             if (!problem) {
-                await safeSendText(sock, remoteJid, '*🔢 Usage:* .mathExplain [problem]\nExample: .mathExplain solve quadratic equation x^2 + 2x + 1 = 0'
-                );
+                await safeSendText(sock, remoteJid, '*🔢 Usage:* .mathExplain [problem]\nExample: .mathExplain solve quadratic equation x^2 + 2x + 1 = 0');
                 return;
             }
 
@@ -1765,8 +1709,7 @@ Example: .chemReaction H2 + O2 -> H2O
             const [action, subject, ...content] = args;
 
             if (!action || !['create', 'review', 'list'].includes(action)) {
-                await safeSendText(sock, remoteJid, `*📚 Flashcards*\n\nUsage:\n.flashcards create [subject] [front::back]\n.flashcards review [subject]\n.flashcards list [subject]`
-                );
+                await safeSendText(sock, remoteJid, `*📚 Flashcards*\n\nUsage:\n.flashcards create [subject] [front::back]\n.flashcards review [subject]\n.flashcards list [subject]`);
                 return;
             }
 
@@ -1784,15 +1727,13 @@ Example: .chemReaction H2 + O2 -> H2O
             switch (action) {
                 case 'create':
                     if (!subject || content.length === 0) {
-                        await safeSendText(sock, remoteJid, '❌ Please provide subject and content (front::back)'
-                        );
+                        await safeSendText(sock, remoteJid, '❌ Please provide subject and content (front::back)');
                         return;
                     }
 
-                    const [front, back] = content.join(' ').split('::').map(s => s.trim());
+                    const [front, back] = content.join('').split('::').map(s => s.trim());
                     if (!front || !back) {
-                        await safeSendText(sock, remoteJid, '❌ Invalid format. Use front::back'
-                        );
+                        await safeSendText(sock, remoteJid, '❌ Invalid format. Use front::back');
                         return;
                     }
 
@@ -1805,14 +1746,12 @@ Example: .chemReaction H2 + O2 -> H2O
                     });
 
                     await fsPromises.writeFile(flashcardsPath, JSON.stringify(flashcards, null, 2));
-                    await safeSendText(sock, remoteJid, '✅ Flashcard created successfully'
-                    );
+                    await safeSendText(sock, remoteJid, '✅ Flashcard created successfully');
                     break;
 
                 case 'review':
                     if (!subject || !flashcards[subject] || flashcards[subject].length === 0) {
-                        await safeSendText(sock, remoteJid, '❌ No flashcards found for this subject'
-                        );
+                        await safeSendText(sock, remoteJid, '❌ No flashcards found for this subject');
                         return;
                     }
 
@@ -1834,8 +1773,7 @@ Example: .chemReaction H2 + O2 -> H2O
 
                 case 'list':
                     if (!subject && Object.keys(flashcards).length === 0) {
-                        await safeSendText(sock, remoteJid, '❌ No flashcards found'
-                        );
+                        await safeSendText(sock, remoteJid, '❌ No flashcards found');
                         return;
                     }
 
@@ -1850,8 +1788,7 @@ Example: .chemReaction H2 + O2 -> H2O
                     }
 
                     if (!flashcards[subject]) {
-                        await safeSendText(sock, remoteJid, '❌ No flashcards found for this subject'
-                        );
+                        await safeSendText(sock, remoteJid, '❌ No flashcards found for this subject');
                         return;
                     }
 
@@ -1864,8 +1801,7 @@ Example: .chemReaction H2 + O2 -> H2O
             }
         } catch (err) {
             logger.error('Error in flashcards command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error managing flashcards'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error managing flashcards');
         }
     },
 
@@ -1874,16 +1810,14 @@ Example: .chemReaction H2 + O2 -> H2O
             const remoteJid = message.key.remoteJid;
 
             if (!global.flashcardReviews || !global.flashcardReviews.has(remoteJid)) {
-                await safeSendText(sock, remoteJid, '❌ No active flashcard review. Use .flashcards review [subject] to start'
-                );
+                await safeSendText(sock, remoteJid, '❌ No active flashcard review. Use .flashcards review [subject] to start');
                 return;
             }
 
             const review = global.flashcardReviews.get(remoteJid);
             if (Date.now() - review.timestamp > 5 * 60 * 1000) {
                 global.flashcardReviews.delete(remoteJid);
-                await safeSendText(sock, remoteJid, '⏰ Review expired. Start a new review with .flashcards review'
-                );
+                await safeSendText(sock, remoteJid, '⏰ Review expired. Start a new review with .flashcards review');
                 return;
             }
 
@@ -1894,8 +1828,7 @@ Example: .chemReaction H2 + O2 -> H2O
 
         } catch (err) {
             logger.error('Error in reveal command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error revealing answer'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error revealing answer');
         }
     },
 
@@ -1906,8 +1839,7 @@ Example: .chemReaction H2 + O2 -> H2O
             const duration = parseInt(minutes);
 
             if (isNaN(duration) || duration < 1 || duration > 120) {
-                await safeSendText(sock, remoteJid, '❌ Please provide a valid duration (1-120 minutes)\n\nUsage: .studytimer [minutes]'
-                );
+                await safeSendText(sock, remoteJid, '❌ Please provide a valid duration (1-120 minutes)\n\nUsage: .studytimer [minutes]');
                 return;
             }
 
@@ -1923,8 +1855,7 @@ Example: .chemReaction H2 + O2 -> H2O
             });
 
             const timer = setTimeout(async () => {
-                await safeSendText(sock, remoteJid, `✅ Study session complete!\n\nTime to take a break.`
-                );
+                await safeSendText(sock, remoteJid, `✅ Study session complete!\n\nTime to take a break.`);
                 global.studyTimers.delete(remoteJid);
             }, duration * 60 * 1000);
 
@@ -1936,19 +1867,17 @@ Example: .chemReaction H2 + O2 -> H2O
 
         } catch (err) {
             logger.error('Error in studytimer command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error starting study timer'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error starting study timer');
         }
     },
 
     async periodic(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
-            const element = args.join(' ').trim();
+            const element = args.join('').trim();
 
             if (!element) {
-                await safeSendText(sock, remoteJid, '*⚛️ Periodic Table*\n\nUsage: .periodic [element]\nExample: .periodic Hydrogen'
-                );
+                await safeSendText(sock, remoteJid, '*⚛️ Periodic Table*\n\nUsage: .periodic [element]\nExample: .periodic Hydrogen');
                 return;
             }
 
@@ -1992,7 +1921,7 @@ Example: .chemReaction H2 + O2 -> H2O
 
             const elementData = elements[element.toLowerCase()];
             if (!elementData) {
-                await safeSendText(sock, remoteJid, '❌ Element not found in database.\n\nAvailable elements: ' + Object.keys(elements).join(', ')
+                await safeSendText(sock, remoteJid, '❌ Element not found in database.\n\nAvailable elements: ' + Object.keys(elements).join(',')
                 );
                 return;
             }
@@ -2008,8 +1937,7 @@ Properties: ${elementData.properties}`;
 
         } catch (err) {
             logger.error('Error in periodic command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error fetching element data'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error fetching element data');
         }
     },
 
@@ -2017,7 +1945,7 @@ Properties: ${elementData.properties}`;
         try {
             const remoteJid = message.key.remoteJid;
             const [period = '', ...eventNameParts] = args;
-            const eventName = eventNameParts.join(' ');
+            const eventName = eventNameParts.join('');
 
             if (!period) {
                 await safeSendText(sock, remoteJid, `*📜 Historical Events*
@@ -2029,8 +1957,7 @@ Available periods:
 • ancient
 • medieval
 • modern
-• contemporary`
-                );
+• contemporary`);
                 return;
             }
 
@@ -2051,8 +1978,7 @@ Available periods:
             };
 
             if (!historicalEvents[period.toLowerCase()]) {
-                await safeSendText(sock, remoteJid, '❌ Invalid period. Available periods: ancient, medieval, modern'
-                );
+                await safeSendText(sock, remoteJid, '❌ Invalid period. Available periods: ancient, medieval, modern');
                 return;
             }
 
@@ -2066,8 +1992,7 @@ Available periods:
 
             const historicalEvent = historicalEvents[period.toLowerCase()][eventName.toLowerCase()];
             if (!historicalEvent) {
-                await safeSendText(sock, remoteJid, '❌ Event not found for this period'
-                );
+                await safeSendText(sock, remoteJid, '❌ Event not found for this period');
                 return;
             }
 
@@ -2075,8 +2000,7 @@ Available periods:
 
         } catch (err) {
             logger.error('Error in history command:', err);
-            await safeSendText(sock, message.key.remoteJid, '❌ Error fetching historical data'
-            );
+            await safeSendText(sock, message.key.remoteJid, '❌ Error fetching historical data');
         }
     }
 };

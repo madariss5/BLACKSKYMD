@@ -3,8 +3,9 @@ const config = require('../config/config');
 const { languageManager } = require('../utils/language');
 const axios = require('axios');
 
-const utilityCommands = {
 const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+
+const utilityCommands = {
     async weather(sock, sender, args) {
         try {
             const city = args.join(' ');
@@ -42,8 +43,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
         try {
             const [from, to, ...text] = args;
             if (!from || !to || text.length === 0) {
-                await safeSendText(sock, sender, 'Usage: !translate [from] [to] [text]\nExample: !translate en es Hello' 
-                );
+                await safeSendText(sock, sender, 'Usage: !translate [from] [to] [text]\nExample: !translate en es Hello');
                 return;
             }
 
@@ -89,7 +89,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             }
 
             const sanitized = expression
-                .replace(/[^0-9+\-*/(). ]/g, '')
+                .replace(/[^0-9+\-*/(). ]/g, ')
                 .replace(/\/{2,}/g, '/') 
                 .replace(/\*{2,}/g, '*'); 
 
@@ -105,13 +105,10 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
                 return;
             }
 
-            await sock.sendMessage(sender, { 
-                text: `🧮 ${expression} = ${Number(result.toFixed(8))}` 
-            });
+            await safeSendText(sock, sender, `🧮 ${expression} = ${Number(result.toFixed(8))}`);
         } catch (err) {
             logger.error('Calculate command error:', err);
-            await safeSendText(sock, sender, '❌ Invalid expression. Please provide a valid mathematical expression.' 
-            );
+            await safeSendText(sock, sender, '❌ Invalid expression. Please provide a valid mathematical expression.');
         }
     },
 
@@ -141,14 +138,13 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
     async covid(sock, sender, args) {
         const country = args.join(' ') || 'World';
         // TODO: Implement COVID-19 statistics API integration
-        await sock.sendMessage(sender, { text: `Getting COVID-19 stats for ${country}...` });
+        await safeSendText(sock, sender, `Getting COVID-19 stats for ${country}...`);
     },
 
     async currency(sock, sender, args) {
         const [amount, from, to] = args;
         if (!amount || !from || !to) {
-            await safeSendText(sock, sender, 'Usage: !currency [amount] [from] [to]\nExample: !currency 100 USD EUR' 
-            );
+            await safeSendText(sock, sender, 'Usage: !currency [amount] [from] [to]\nExample: !currency 100 USD EUR');
             return;
         }
         // TODO: Implement currency conversion
@@ -172,14 +168,13 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             return;
         }
         // TODO: Implement Wikipedia API integration
-        await sock.sendMessage(sender, { text: `Searching Wikipedia for: ${query}` });
+        await safeSendText(sock, sender, `Searching Wikipedia for: ${query}`);
     },
 
     async poll(sock, sender, args) {
         const [question, ...options] = args.join(' ').split('|').map(item => item.trim());
         if (!question || options.length < 2) {
-            await safeSendText(sock, sender, 'Usage: !poll Question | Option1 | Option2 | ...' 
-            );
+            await safeSendText(sock, sender, 'Usage: !poll Question | Option1 | Option2 | ...');
             return;
         }
         const pollText = `📊 Poll: ${question}\n\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
@@ -189,7 +184,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
     async news(sock, sender, args) {
         const category = args[0] || 'general';
         // TODO: Implement news API integration
-        await sock.sendMessage(sender, { text: `Getting ${category} news...` });
+        await safeSendText(sock, sender, `Getting ${category} news...`);
     },
 
     async timezone(sock, sender, args) {
@@ -199,15 +194,14 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             return;
         }
         // TODO: Implement timezone API integration
-        await sock.sendMessage(sender, { text: `Getting time for ${location}...` });
+        await safeSendText(sock, sender, `Getting time for ${location}...`);
     },
 
     async encode(sock, sender, args) {
         try {
             const [type, ...text] = args;
             if (!type || text.length === 0) {
-                await safeSendText(sock, sender, '⚠️ Usage: .encode [type] [text]\nTypes: base64, hex, binary\nExample: .encode base64 Hello World' 
-                );
+                await safeSendText(sock, sender, '⚠️ Usage: .encode [type] [text]\nTypes: base64, hex, binary\nExample: .encode base64 Hello World');
                 return;
             }
 
@@ -226,17 +220,16 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
                     result = Buffer.from(input).toString('hex');
                     break;
                 case 'binary':
-                    result = input.split('').map(char => 
+                    result = input.split(' ').map(char => 
                         char.charCodeAt(0).toString(2).padStart(8, '0')
                     ).join(' ');
                     break;
                 default:
-                    await safeSendText(sock, sender, '❌ Invalid encoding type. Available types: base64, hex, binary' 
-                    );
+                    await safeSendText(sock, sender, '❌ Invalid encoding type. Available types: base64, hex, binary');
                     return;
             }
 
-            await safeSendText(sock, sender, `🔄 Encoded (${type):\n${result}` });
+            await safeSendText(sock, sender, `🔄 Encoded (${type}):\n${result}`);
         } catch (err) {
             logger.error('Encode command error:', err);
             await safeSendText(sock, sender, '❌ Error encoding text. Please try again.' );
@@ -247,8 +240,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
         try {
             const [type, ...text] = args;
             if (!type || text.length === 0) {
-                await safeSendText(sock, sender, '⚠️ Usage: .decode [type] [text]\nTypes: base64, hex, binary\nExample: .decode base64 SGVsbG8gV29ybGQ=' 
-                );
+                await safeSendText(sock, sender, '⚠️ Usage: .decode [type] [text]\nTypes: base64, hex, binary\nExample: .decode base64 SGVsbG8gV29ybGQ=');
                 return;
             }
 
@@ -278,19 +270,17 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
                     }
                     result = input.split(' ')
                         .map(bin => String.fromCharCode(parseInt(bin, 2)))
-                        .join('');
+                        .join(' ');
                     break;
                 default:
-                    await safeSendText(sock, sender, '❌ Invalid decoding type. Available types: base64, hex, binary' 
-                    );
+                    await safeSendText(sock, sender, '❌ Invalid decoding type. Available types: base64, hex, binary');
                     return;
             }
 
-            await sock.sendMessage(sender, { text: `🔄 Decoded: ${result}` });
+            await safeSendText(sock, sender, `🔄 Decoded: ${result}`);
         } catch (err) {
             logger.error('Decode command error:', err);
-            await safeSendText(sock, sender, '❌ Invalid input for decoding. Please check your input format and try again.' 
-            );
+            await safeSendText(sock, sender, '❌ Invalid input for decoding. Please check your input format and try again.');
         }
     },
 
@@ -306,7 +296,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             return;
         }
         // TODO: Implement Wolfram Alpha API integration
-        await sock.sendMessage(sender, { text: `Querying Wolfram Alpha: ${query}` });
+        await safeSendText(sock, sender, `Querying Wolfram Alpha: ${query}`);
     },
 
     async github(sock, sender, args) {
@@ -316,7 +306,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             return;
         }
         // TODO: Implement GitHub API integration
-        await sock.sendMessage(sender, { text: `Searching GitHub for: ${query}` });
+        await safeSendText(sock, sender, `Searching GitHub for: ${query}`);
     },
 
     async npm(sock, sender, args) {
@@ -326,13 +316,13 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             return;
         }
         // TODO: Implement NPM API integration
-        await sock.sendMessage(sender, { text: `Searching NPM for: ${packageName}` });
+        await safeSendText(sock, sender, `Searching NPM for: ${packageName}`);
     },
 
     async ipinfo(sock, sender, args) {
         const ip = args[0] || 'self';
         // TODO: Implement IP information API integration
-        await sock.sendMessage(sender, { text: `Getting information for IP: ${ip}` });
+        await safeSendText(sock, sender, `Getting information for IP: ${ip}`);
     },
 
     async whois(sock, sender, args) {
@@ -342,7 +332,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             return;
         }
         // TODO: Implement WHOIS lookup
-        await sock.sendMessage(sender, { text: `Looking up WHOIS for: ${domain}` });
+        await safeSendText(sock, sender, `Looking up WHOIS for: ${domain}`);
     },
     async ocr(sock, sender) {
         // TODO: Implement optical character recognition
@@ -432,7 +422,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
     async crypto(sock, sender, args) {
         const coin = args[0]?.toLowerCase() || 'bitcoin';
         // TODO: Implement cryptocurrency price check
-        await sock.sendMessage(sender, { text: `Getting ${coin} price...` });
+        await safeSendText(sock, sender, `Getting ${coin} price...`);
     },
 
     async stocks(sock, sender, args) {
@@ -442,13 +432,12 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             return;
         }
         // TODO: Implement stock price check
-        await sock.sendMessage(sender, { text: `Getting ${symbol} stock price...` });
+        await safeSendText(sock, sender, `Getting ${symbol} stock price...`);
     },
 
     async reminder(sock, sender, args) {
         if (args.length < 2) {
-            await safeSendText(sock, sender, 'Usage: !reminder [time] [message]\nExample: !reminder 30m Check laundry' 
-            );
+            await safeSendText(sock, sender, 'Usage: !reminder [time] [message]\nExample: !reminder 30m Check laundry');
             return;
         }
         // TODO: Implement reminder system
@@ -468,8 +457,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
     async poll2(sock, sender, args) {
         const [question, ...options] = args.join(' ').split('|');
         if (!question || options.length < 2) {
-            await safeSendText(sock, sender, 'Usage: !poll Question | Option1 | Option2 | ...' 
-            );
+            await safeSendText(sock, sender, 'Usage: !poll Question | Option1 | Option2 | ...');
             return;
         }
         // TODO: Implement poll creation
@@ -479,8 +467,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
     async todo(sock, sender, args) {
         const [action, ...item] = args;
         if (!action || !['add', 'remove', 'list'].includes(action)) {
-            await safeSendText(sock, sender, 'Usage: !todo <add|remove|list> [item]' 
-            );
+            await safeSendText(sock, sender, 'Usage: !todo <add|remove|list> [item]');
             return;
         }
         // TODO: Implement todo list
@@ -490,8 +477,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
     async notes(sock, sender, args) {
         const [action, ...content] = args;
         if (!action || !['add', 'view', 'delete'].includes(action)) {
-            await safeSendText(sock, sender, 'Usage: !notes <add|view|delete> [content]' 
-            );
+            await safeSendText(sock, sender, 'Usage: !notes <add|view|delete> [content]');
             return;
         }
         // TODO: Implement notes system
@@ -506,8 +492,8 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
                 return;
             }
 
-            const reversed = text.split('').reverse().join('');
-            await sock.sendMessage(sender, { text: `🔄 ${reversed}` });
+            const reversed = text.split(' ').reverse().join(' ');
+            await safeSendText(sock, sender, `🔄 ${reversed}`);
         } catch (err) {
             logger.error('Reverse command error:', err);
             await safeSendText(sock, sender, '❌ Error reversing text' );
@@ -524,11 +510,11 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
 
             const mocked = text
                 .toLowerCase()
-                .split('')
+                .split(' ')
                 .map((char, i) => i % 2 === 0 ? char : char.toUpperCase())
-                .join('');
+                .join(' ');
 
-            await sock.sendMessage(sender, { text: `🔡 ${mocked}` });
+            await safeSendText(sock, sender, `🔡 ${mocked}`);
         } catch (err) {
             logger.error('Mock command error:', err);
             await safeSendText(sock, sender, '❌ Error mocking text' );
@@ -539,15 +525,12 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
         try {
             const sides = parseInt(args[0]) || 6;
             if (sides < 2 || sides > 100) {
-                await safeSendText(sock, sender, '⚠️ Please specify a number of sides between 2 and 100' 
-                );
+                await safeSendText(sock, sender, '⚠️ Please specify a number of sides between 2 and 100');
                 return;
             }
 
             const result = Math.floor(Math.random() * sides) + 1;
-            await sock.sendMessage(sender, { 
-                text: `🎲 You rolled a ${result} (d${sides})` 
-            });
+            await safeSendText(sock, sender, `🎲 You rolled a ${result} (d${sides})`);
         } catch (err) {
             logger.error('Roll command error:', err);
             await safeSendText(sock, sender, '❌ Error rolling dice' );
@@ -558,9 +541,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
         try {
             const result = Math.random() < 0.5 ? 'Heads' : 'Tails';
             const emoji = result === 'Heads' ? '🪙' : '💫';
-            await sock.sendMessage(sender, { 
-                text: `${emoji} Coin flip: ${result}!` 
-            });
+            await safeSendText(sock, sender, `${emoji} Coin flip: ${result}!`);
         } catch (err) {
             logger.error('Flip command error:', err);
             await safeSendText(sock, sender, '❌ Error flipping coin' );
@@ -571,8 +552,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
         try {
             const options = args.join(' ').split('|').map(opt => opt.trim()).filter(Boolean);
             if (options.length < 2) {
-                await safeSendText(sock, sender, '⚠️ Please provide at least 2 options separated by |\nExample: .choose pizza | burger | salad' 
-                );
+                await safeSendText(sock, sender, '⚠️ Please provide at least 2 options separated by |\nExample: .choose pizza | burger | salad');
                 return;
             }
 
@@ -596,7 +576,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
 
             const words = text.trim().split(/\s+/).length;
             const chars = text.length;
-            const chars_no_space = text.replace(/\s+/g, '').length;
+            const chars_no_space = text.replace(/\s+/g, ').length;
 
             const message = `📊 Word Count:
 • Words: ${words}
@@ -615,8 +595,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             let [min = 1, max = 100] = args.map(Number);
 
             if (isNaN(min) || isNaN(max) || min >= max || min < -1000000 || max > 1000000) {
-                await safeSendText(sock, sender, '⚠️ Please provide valid numbers between -1000000 and 1000000\nExample: .random 1 100' 
-                );
+                await safeSendText(sock, sender, '⚠️ Please provide valid numbers between -1000000 and 1000000\nExample: .random 1 100');
                 return;
             }
 
@@ -625,9 +604,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             [min, max] = [Math.min(min, max), Math.max(min, max)];
 
             const result = Math.floor(Math.random() * (max - min + 1)) + min;
-            await sock.sendMessage(sender, { 
-                text: `🎲 Random number between ${min} and ${max}: ${result}` 
-            });
+            await safeSendText(sock, sender, `🎲 Random number between ${min} and ${max}: ${result}`);
         } catch (err) {
             logger.error('Random command error:', err);
             await safeSendText(sock, sender, '❌ Error generating random number' );
@@ -662,8 +639,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
         try {
             const [type, ...text] = args;
             if (!type || !text.length) {
-                await safeSendText(sock, sender, '⚠️ Usage: .case <upper|lower> [text]' 
-                );
+                await safeSendText(sock, sender, '⚠️ Usage: .case <upper|lower> [text]');
                 return;
             }
 
@@ -682,7 +658,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
                     return;
             }
 
-            await sock.sendMessage(sender, { text: `🔡 ${result}` });
+            await safeSendText(sock, sender, `🔡 ${result}`);
         } catch (err) {
             logger.error('Case command error:', err);
             await safeSendText(sock, sender, '❌ Error converting case' );
@@ -706,7 +682,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
                 await sock.sendMessage(sender, { 
                     text: `🌐 *Language Settings*\n\n` +
                           `Current language: ${currentLang}\n` +
-                          `Available languages: ${availableLangs.join(', ')}\n\n` +
+                          `Available languages: ${availableLangs.join(',')}\n\n` +
                           `To change your language, use:\n.language [code]` 
                 });
                 return;
@@ -718,11 +694,9 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
             
             // Check if language is supported
             if (!languageManager.isLanguageSupported(lang)) {
-                const availableLangs = languageManager.getAvailableLanguages().join(', ');
+                const availableLangs = languageManager.getAvailableLanguages().join(',');
                 console.log(`Language ${lang} is not supported. Available: ${availableLangs}`);
-                await sock.sendMessage(sender, { 
-                    text: `❌ Language '${lang}' is not supported.\nAvailable languages: ${availableLangs}` 
-                });
+                await safeSendText(sock, sender, `❌ Language '${lang}' is not supported.\nAvailable languages: ${availableLangs}`);
                 return;
             }
             

@@ -2,13 +2,13 @@ const logger = require('../utils/logger');
 const { isAdmin, isBotAdmin } = require('../utils/permissions');
 const { downloadMediaMessage } = require('../utils/helpers');
 const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 const path = require('path');
 const fs = require('fs');
 const fsPromises = fs.promises;
 
 // Extended group command handlers
 const groupNewCommands = {
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     async pin(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;

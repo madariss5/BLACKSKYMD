@@ -2,6 +2,7 @@ const logger = require('../utils/logger');
 const { isAdmin, isBotAdmin } = require('../utils/permissions');
 const { downloadMediaMessage } = require('../utils/helpers');
 const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 const path = require('path');
 const fs = require('fs');
 const fsPromises = fs.promises;
@@ -10,7 +11,6 @@ const fsPromises = fs.promises;
 const initializeDirectories = async () => {
     try {
         const dirs = [
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
             path.join(__dirname, '../../data/groups'),
             path.join(__dirname, '../../data/groups/settings'),
             path.join(__dirname, '../../data/groups/media')

@@ -1,6 +1,7 @@
 // Import required modules
 const logger = require('../utils/logger');
 const axios = require('axios');
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 // Cache for user information
 const userCache = new Map();
@@ -15,7 +16,6 @@ const REACTIONS_DIR = path.join(process.cwd(), 'data', 'reaction_gifs');
 
 // Map of reaction types to their corresponding GIF files
 const REACTION_GIFS = {
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     // Basic reactions
     hug: path.join(REACTIONS_DIR, 'hug.gif'),
     pat: path.join(REACTIONS_DIR, 'pat.gif'), // Not provided yet
@@ -213,7 +213,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         }
 
         // First send the text message for immediate response
-        await safeSendText(sock, sender, decoratedMessage );
+        await safeSendText(sock, sender, decoratedMessage);
         logger.info(`Successfully sent ${type} reaction text to ${sender}`);
         
         // Then try to send the GIF if available
@@ -304,7 +304,7 @@ const reactionCommands = {
         menuText += `• To target someone: !commandname @user\n\n`;
         menuText += `Try !testgif [name] to preview any reaction GIF!`;
         
-        await safeSendText(sock, sender, menuText );
+        await safeSendText(sock, sender, menuText);
     },
     
     // Reaction status/diagnostic command - checks local GIF files
@@ -343,8 +343,7 @@ const reactionCommands = {
         statusText += "\n\n*Usage*: Simply type !commandname (e.g. !hug, !slap)";
         statusText += "\nTo target someone: !commandname @user";
         
-        await safeSendText(sock, sender, statusText
-        );
+        await safeSendText(sock, sender, statusText);
 
         // If detailed flag is provided, print detailed information for debugging
         if (args[0] === 'detailed') {
@@ -359,8 +358,7 @@ const reactionCommands = {
                 detailedText += `Error: ${result.error || 'None'}\n\n`;
             }
             
-            await safeSendText(sock, sender, detailedText
-            );
+            await safeSendText(sock, sender, detailedText);
         }
     },
     
@@ -374,10 +372,9 @@ const reactionCommands = {
             const gifFiles = fs.readdirSync(REACTIONS_DIR)
                 .filter(file => file.endsWith('.gif'));
             
-            await safeSendText(sock, sender, `*Available GIFs for Testing (${gifFiles.length)*\n\n` + 
+            await safeSendText(sock, sender, `*Available GIFs for Testing (${gifFiles.length})*\n\n` + 
                       gifFiles.map(file => `• ${file.replace('.gif', '')}`).join('\n') +
-                      '\n\nUsage: !testgif [reaction_name]'
-            });
+                      '\n\nUsage: !testgif [reaction_name]');
             return;
         }
         
@@ -438,8 +435,7 @@ const reactionCommands = {
                 logger.warn(`Could not send as image: ${imageError.message}`);
                 
                 // Final error if both methods fail
-                await safeSendText(sock, sender, `❌ Error sending GIF: Could not send as video or image.`
-                );
+                await safeSendText(sock, sender, `❌ Error sending GIF: Could not send as video or image.`);
             }
         } catch (error) {
             await sock.sendMessage(sender, {
