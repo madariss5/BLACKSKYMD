@@ -65,7 +65,7 @@ mainApp.get('/', (req, res) => {
                         <p>Status: ${connectionStatus}</p>
                         <p>Uptime: ${Math.floor(process.uptime())} seconds</p>
                     </div>
-                    <a href="http://localhost:5007" class="qr-link" target="_blank">Open QR Code Scanner</a>
+                    <a href="http://0.0.0.0:5007" class="qr-link" target="_blank">Open QR Code Scanner</a>
                 </div>
             </body>
         </html>
@@ -159,6 +159,7 @@ async function startServers() {
                     reject(err);
                 } else {
                     logger.info('Main server running on port 5000');
+                    logger.info('Access the status page at http://0.0.0.0:5000');
                     resolve();
                 }
             });
@@ -172,6 +173,7 @@ async function startServers() {
                     reject(err);
                 } else {
                     logger.info('QR server running on port 5007');
+                    logger.info('Access the QR code at http://0.0.0.0:5007');
                     resolve();
                 }
             });
@@ -237,7 +239,7 @@ async function startConnection() {
                     latestQR = await qrcode.toDataURL(qr);
                     connectionStatus = 'connecting';
                     logger.info('QR code generated successfully');
-                    logger.info('QR code available at http://localhost:5007');
+                    logger.info('QR code available at http://0.0.0.0:5007');
                 } catch (error) {
                     logger.error('Error generating web QR:', error);
                     logger.error('Error stack:', error.stack);
