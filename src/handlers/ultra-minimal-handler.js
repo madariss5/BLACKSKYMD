@@ -17,13 +17,16 @@ async function loadCommands() {
         const files = await getAllFiles(commandsPath);
         let loadedCount = 0;
 
+        logger.log('\nStarting command loading process...');
         logger.log('Loading commands from:', commandsPath);
 
         for (const file of files) {
             if (file.endsWith('.js') && !['index.js'].includes(path.basename(file))) {
                 try {
+                    logger.log(`\nProcessing file: ${path.relative(commandsPath, file)}`);
                     const filePath = file;
                     const moduleData = require(filePath);
+                    const category = path.basename(path.dirname(file));
 
                     // Handle both direct commands and categorized commands
                     if (moduleData.commands) {
@@ -38,7 +41,7 @@ async function loadCommands() {
                                     }
                                 });
                                 loadedCount++;
-                                logger.log(`Loaded command: ${name}`);
+                                logger.log(`✓ Loaded command: ${name} (${category})`);
                             }
                         });
 
@@ -46,7 +49,7 @@ async function loadCommands() {
                         if (typeof moduleData.init === 'function') {
                             try {
                                 await moduleData.init();
-                                logger.log(`Initialized module: ${path.basename(file, '.js')}`);
+                                logger.log(`✓ Initialized module: ${path.basename(file, '.js')}`);
                             } catch (err) {
                                 logger.error(`Error initializing module ${path.basename(file, '.js')}:`, err);
                             }
@@ -64,7 +67,7 @@ async function loadCommands() {
                                     }
                                 });
                                 loadedCount++;
-                                logger.log(`Loaded direct command: ${name}`);
+                                logger.log(`✓ Loaded direct command: ${name} (${category})`);
                             }
                         });
                     }
@@ -74,8 +77,13 @@ async function loadCommands() {
             }
         }
 
-        logger.log(`Successfully loaded ${loadedCount} commands`);
-        logger.log('Available commands:', Array.from(commands.keys()));
+        logger.log('\n✅ Command loading summary:');
+        logger.log(`Total commands loaded: ${loadedCount}`);
+        logger.log('Available commands:', Array.from(commands.keys()).sort().join(', '));
+
+        if (loadedCount === 0) {
+            logger.error('⚠️ Warning: No commands were loaded!');
+        }
     } catch (err) {
         logger.error('Error loading commands:', err);
     }
@@ -98,24 +106,12 @@ function addFallbackCommands() {
             try {
                 const sender = message.key.remoteJid;
                 await sock.sendMessage(sender, { text: '🏓 Pong! Bot is working.' });
+                logger.log('Executed ping command successfully');
             } catch (err) {
                 logger.error('Error in ping command:', err);
             }
         });
-    }
-
-    if (!commands.has('help')) {
-        commands.set('help', async (sock, message) => {
-            try {
-                const sender = message.key.remoteJid;
-                const commandList = Array.from(commands.keys()).join(', ');
-                await sock.sendMessage(sender, { 
-                    text: `*Available Commands*\n${commandList}`
-                });
-            } catch (err) {
-                logger.error('Error in help command:', err);
-            }
-        });
+        logger.log('Added fallback ping command');
     }
 
     if (!commands.has('menu')) {
@@ -127,14 +123,16 @@ function addFallbackCommands() {
                 menuText += `Total Commands: ${commandList.length}\n\n`;
                 menuText += commandList.map(cmd => `• !${cmd}`).join('\n');
                 await sock.sendMessage(sender, { text: menuText });
+                logger.log('Executed menu command successfully');
             } catch (err) {
                 logger.error('Error in menu command:', err);
             }
         });
+        logger.log('Added fallback menu command');
     }
 }
 
-// Message handler with improved error handling
+// Update message handler to provide better logging
 async function messageHandler(sock, message) {
     try {
         // Basic validation
@@ -160,7 +158,7 @@ async function messageHandler(sock, message) {
             const [commandName, ...args] = content.slice(1).trim().split(' ');
             const cmd = commandName.toLowerCase();
 
-            logger.log('Processing command:', cmd, 'with args:', args);
+            logger.log('\nProcessing command:', cmd, 'with args:', args);
 
             // Show typing indicator
             try {
@@ -175,9 +173,8 @@ async function messageHandler(sock, message) {
                     logger.log('Command executed successfully:', cmd);
                 } catch (err) {
                     logger.error('Error executing command:', err);
-                    const errorMessage = err.message || 'Unknown error occurred';
                     await sock.sendMessage(message.key.remoteJid, {
-                        text: `❌ Error executing command: ${errorMessage}. Please try again.`
+                        text: `❌ Error executing command: ${err.message}. Please try again.`
                     });
                 }
             } else {
@@ -209,7 +206,7 @@ async function messageHandler(sock, message) {
 // Initialize handler
 async function init() {
     try {
-        logger.log('Initializing ultra minimal handler');
+        logger.log('\nInitializing ultra minimal handler...');
 
         // Load all commands first
         await loadCommands();
@@ -217,8 +214,16 @@ async function init() {
         // Add fallback commands
         addFallbackCommands();
 
-        logger.log(`Handler initialized with ${commands.size} commands`);
-        logger.log('Available commands:', Array.from(commands.keys()));
+        // Verify commands are loaded
+        const totalCommands = commands.size;
+        const commandList = Array.from(commands.keys()).sort();
+
+        logger.log('\n✅ Handler initialization complete:');
+        logger.log(`Total commands available: ${totalCommands}`);
+        logger.log('Try these basic commands:');
+        logger.log('- !ping (Test bot response)');
+        logger.log('- !menu (Show all commands)');
+
         return true;
     } catch (err) {
         logger.error('Error initializing handler:', err);

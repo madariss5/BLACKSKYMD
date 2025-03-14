@@ -16,6 +16,7 @@ const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info');
 let latestQR = null;
 let connectionStatus = 'disconnected';
 let sock = null;
+let isReconnecting = false;
 
 // Create Express apps
 const mainApp = express();
@@ -30,6 +31,7 @@ mainApp.get('/', (req, res) => {
             <head>
                 <title>WhatsApp Bot - Status</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="refresh" content="30">
                 <style>
                     body { 
                         font-family: Arial, sans-serif; 
@@ -56,6 +58,15 @@ mainApp.get('/', (req, res) => {
                         border-radius: 5px;
                         margin-top: 20px;
                     }
+                    .reconnect-button {
+                        background-color: #34B7F1;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        margin-top: 20px;
+                    }
                 </style>
             </head>
             <body>
@@ -66,10 +77,39 @@ mainApp.get('/', (req, res) => {
                         <p>Uptime: ${Math.floor(process.uptime())} seconds</p>
                     </div>
                     <a href="http://localhost:5007" class="qr-link" target="_blank">Open QR Code Scanner</a>
+                    ${connectionStatus === 'disconnected' ? 
+                        `<br><button onclick="fetch('/reconnect').then(() => location.reload())" class="reconnect-button">
+                            Force Reconnect
+                        </button>` : ''
+                    }
                 </div>
             </body>
         </html>
     `);
+});
+
+// Add reconnect endpoint
+mainApp.get('/reconnect', async (req, res) => {
+    try {
+        logger.info('Manual reconnection requested');
+        // Clear auth state and force new connection
+        await clearAuthState();
+        startConnection();
+        res.json({ status: 'reconnecting' });
+    } catch (err) {
+        logger.error('Reconnection failed:', err);
+        res.status(500).json({ error: 'Reconnection failed' });
+    }
+});
+
+// Add status check endpoint
+mainApp.get('/status', (req, res) => {
+    res.json({
+        status: connectionStatus,
+        hasQR: !!latestQR,
+        isReconnecting,
+        uptime: Math.floor(process.uptime())
+    });
 });
 
 // QR code endpoint
@@ -92,6 +132,7 @@ qrApp.get('/', (req, res) => {
                     align-items: center;
                     justify-content: center;
                     min-height: 100vh;
+                    text-align: center;
                 }
                 .container {
                     background-color: white;
@@ -100,8 +141,9 @@ qrApp.get('/', (req, res) => {
                     padding: 30px;
                     max-width: 500px;
                     width: 100%;
-                    text-align: center;
                 }
+                h1 { color: #128C7E; margin-bottom: 5px; }
+                h2 { color: #075E54; font-size: 1.2em; margin-top: 0; }
                 .qr-container {
                     background-color: white;
                     padding: 20px;
@@ -115,44 +157,101 @@ qrApp.get('/', (req, res) => {
                     border-radius: 5px;
                     margin: 15px 0;
                 }
-                .instructions {
-                    font-size: 0.9em;
-                    color: #666;
-                    margin-top: 20px;
-                    text-align: left;
+                .disconnected { background-color: #ffcccc; color: #d32f2f; }
+                .connecting { background-color: #fff8e1; color: #ff8f00; }
+                .connected { background-color: #e8f5e9; color: #2e7d32; }
+                .refresh-button {
+                    background-color: #128C7E;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-size: 1em;
+                    margin-top: 10px;
                 }
                 img { max-width: 100%; height: auto; }
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>WhatsApp Bot QR Code</h1>
-                <div class="status">
-                    Status: ${connectionStatus}
+                <h1>BLACKSKY-MD</h1>
+                <h2>WhatsApp QR Code Scanner</h2>
+                <div class="status ${connectionStatus}">
+                    Status: ${connectionStatus === 'connected' 
+                            ? 'Connected ✓' 
+                            : connectionStatus === 'connecting' 
+                                ? 'Connecting...' 
+                                : 'Waiting for QR Code...'}
                 </div>
                 <div class="qr-container">
                     ${latestQR 
-                        ? `<img src="${latestQR}" alt="WhatsApp QR Code">`
-                        : '<p>Waiting for QR code...</p>'}
+                        ? `<img src="${latestQR}" alt="WhatsApp QR Code" width="300" height="300">`
+                        : `<p>Generating QR code... ${connectionStatus === 'connected' ? 'Already connected!' : 'Please wait.'}</p>`
+                    }
                 </div>
-                <div class="instructions">
-                    <ol>
-                        <li>Open WhatsApp on your phone</li>
-                        <li>Go to Settings > Linked Devices</li>
-                        <li>Tap on "Link a Device"</li>
-                        <li>Scan the QR code above</li>
-                    </ol>
-                    <p>Page refreshes automatically every 30 seconds.</p>
-                </div>
+                <button class="refresh-button" onclick="location.reload()">Refresh</button>
             </div>
         </body>
         </html>
     `);
 });
 
+// Improve auth state clearing with better error handling
+async function clearAuthState() {
+    try {
+        // Check if directory exists first
+        try {
+            await fs.access(AUTH_DIRECTORY);
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                logger.info('Auth directory does not exist, creating new one');
+                await fs.mkdir(AUTH_DIRECTORY, { recursive: true });
+                return;
+            }
+            throw err;
+        }
+
+        // Clear directory contents
+        const files = await fs.readdir(AUTH_DIRECTORY);
+        for (const file of files) {
+            const filePath = path.join(AUTH_DIRECTORY, file);
+            try {
+                await fs.unlink(filePath);
+                logger.info(`Cleared auth file: ${file}`);
+            } catch (err) {
+                logger.error(`Failed to clear auth file ${file}:`, err);
+            }
+        }
+
+        logger.info('Auth state cleared successfully');
+    } catch (err) {
+        logger.error('Error clearing auth state:', err);
+        // Try to recreate directory as last resort
+        try {
+            await fs.rm(AUTH_DIRECTORY, { recursive: true, force: true });
+            await fs.mkdir(AUTH_DIRECTORY, { recursive: true });
+            logger.info('Auth directory recreated after error');
+        } catch (recreateErr) {
+            logger.error('Failed to recreate auth directory:', recreateErr);
+            throw recreateErr;
+        }
+    }
+}
+
 // Start WhatsApp connection
 async function startConnection() {
     try {
+        if (isReconnecting) {
+            logger.info('Already attempting to reconnect, skipping...');
+            return;
+        }
+
+        isReconnecting = true;
+        logger.info('Starting WhatsApp connection...');
+        logger.info('Current connection status:', connectionStatus);
+        logger.info('QR code available:', latestQR ? 'yes' : 'no');
+
         // Initialize the handler first
         await handler.init();
         logger.info('Command handler initialized');
@@ -161,6 +260,7 @@ async function startConnection() {
         await fs.mkdir(AUTH_DIRECTORY, { recursive: true });
 
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRECTORY);
+        logger.info('Auth state loaded');
 
         sock = makeWASocket({
             auth: state,
@@ -174,38 +274,77 @@ async function startConnection() {
 
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            logger.info('Connection update:', update);
+            logger.info('Connection update:', {
+                connection,
+                hasQR: !!qr,
+                disconnectReason: lastDisconnect?.error?.message
+            });
 
             if (qr) {
                 try {
                     latestQR = await qrcode.toDataURL(qr);
                     connectionStatus = 'connecting';
                     logger.info('New QR code generated');
+                    logger.info('QR code available at http://localhost:5007');
                 } catch (err) {
                     logger.error('QR generation error:', err);
                 }
             }
 
             if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
                 connectionStatus = 'disconnected';
-                logger.info('Connection closed:', lastDisconnect?.error?.message);
+                isReconnecting = false;
+
+                logger.info('Connection closed. Details:', {
+                    statusCode,
+                    shouldReconnect,
+                    error: lastDisconnect?.error?.message
+                });
 
                 if (shouldReconnect) {
-                    logger.info('Attempting reconnection...');
-                    setTimeout(startConnection, 5000);
+                    logger.info('Attempting reconnection in 5 seconds...');
+                    setTimeout(async () => {
+                        try {
+                            // Clear existing state
+                            latestQR = null;
+                            logger.info('Cleared QR code');
+
+                            // Clear auth state
+                            await clearAuthState();
+                            logger.info('Cleared auth state');
+
+                            // Start new connection
+                            await startConnection();
+                        } catch (err) {
+                            logger.error('Reconnection attempt failed:', err);
+                            connectionStatus = 'disconnected';
+                            isReconnecting = false;
+                        }
+                    }, 5000);
+                } else {
+                    logger.info('Not reconnecting - user logged out');
+                    latestQR = null;
+                    await clearAuthState();
                 }
             }
 
             if (connection === 'open') {
                 connectionStatus = 'connected';
+                isReconnecting = false;
                 latestQR = null;
-                logger.info('Connection established');
+                logger.info('Connection established successfully');
 
                 try {
-                    await commandLoader.loadCommandHandlers();
-                    await commandModules.initializeModules(sock);
-                    logger.info('Handlers initialized');
+                    // Initialize command handlers after successful connection
+                    await handler.init();
+                    logger.info('Command handlers reloaded after connection');
+
+                    // Log available commands for debugging
+                    const availableCommands = Array.from(handler.commands.keys());
+                    logger.info('Available commands:', availableCommands);
                 } catch (err) {
                     logger.error('Handler initialization error:', err);
                 }
@@ -228,7 +367,10 @@ async function startConnection() {
         return sock;
     } catch (err) {
         logger.error('Connection error:', err);
-        setTimeout(startConnection, 5000);
+        connectionStatus = 'disconnected';
+        isReconnecting = false;
+        latestQR = null;
+        throw err;
     }
 }
 
