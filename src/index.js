@@ -1,30 +1,37 @@
+/**
+ * Replit-Optimized WhatsApp QR Code Generator
+ */
+
 const express = require('express');
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const handler = require('./handlers/ultra-minimal-handler');
 const logger = require('./utils/logger');
 const fs = require('fs');
-const qrcode = require('qrcode');
+const qrcode = require('qrcode-terminal');
+const qrcodeWeb = require('qrcode');
 const path = require('path');
 const pino = require('pino');
 
 // Constants
-const PORT = 5000;  // Use port 5000 which is open on Replit
+const PORT = 5000;
 const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info');
+const BROWSER_ID = `BLACKSKY-REPLIT-${Date.now().toString().slice(-6)}`;
 
 // Global state
-let qrCode = '';
-let webQR = '';
+let qr = null;
+let webQR = null;
 let connectionStatus = 'disconnected';
 let sock = null;
+let qrGenerationCount = 0;
 
-// Create Express app
-const app = express();
-
-// Create auth directory if it doesn't exist
+// Clean auth directory
 if (fs.existsSync(AUTH_DIRECTORY)) {
     fs.rmSync(AUTH_DIRECTORY, { recursive: true, force: true });
 }
 fs.mkdirSync(AUTH_DIRECTORY, { recursive: true });
+
+// Create Express app
+const app = express();
 
 // Serve QR code via web interface
 app.get('/', (req, res) => {
@@ -41,42 +48,77 @@ app.get('/', (req, res) => {
                     text-align: center;
                     margin: 0;
                     padding: 20px;
-                    background-color: #f5f5f5;
+                    background-color: #f0f2f5;
                 }
-                h1 { color: #128C7E; }
+                h1 { 
+                    color: #128C7E;
+                    font-size: 24px;
+                    margin-bottom: 5px;
+                }
+                h2 {
+                    color: #666;
+                    font-size: 16px;
+                    font-weight: normal;
+                    margin-top: 0;
+                }
                 .qr-container {
-                    margin: 30px auto;
-                    padding: 20px;
-                    background: white;
+                    background-color: white;
                     border-radius: 10px;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                    max-width: 350px;
-                }
-                .qr-code {
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    padding: 20px;
+                    max-width: 500px;
                     margin: 20px auto;
                 }
+                .qr-code {
+                    padding: 20px;
+                    display: flex;
+                    justify-content: center;
+                }
                 .qr-code img {
-                    max-width: 100%;
+                    max-width: 300px;
                     height: auto;
                 }
-                .instructions {
-                    margin-top: 20px;
-                    text-align: left;
-                    padding: 15px;
-                    background: #f9f9f9;
-                    border-radius: 5px;
-                }
-                .refresh-btn {
+                .button {
                     background-color: #128C7E;
                     color: white;
                     border: none;
                     padding: 10px 20px;
                     border-radius: 5px;
-                    margin-top: 20px;
                     cursor: pointer;
+                    margin-top: 10px;
+                    font-size: 14px;
                 }
-                .waiting {
-                    color: #666;
+                .status {
+                    margin: 20px 0;
+                    padding: 10px;
+                    border-radius: 5px;
+                }
+                .status.connecting { background-color: #FFF3CD; color: #856404; }
+                .status.connected { background-color: #D4EDDA; color: #155724; }
+                .status.disconnected { background-color: #F8D7DA; color: #721C24; }
+                .instructions {
+                    background-color: #f8f9fa;
+                    border-radius: 5px;
+                    padding: 15px;
+                    text-align: left;
+                    margin-top: 20px;
+                }
+                .instructions ol { padding-left: 20px; }
+                .instructions li { margin-bottom: 5px; }
+                .loader {
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #128C7E;
+                    border-radius: 50%;
+                    width: 30px;
+                    height: 30px;
+                    animation: spin 1s linear infinite;
+                    margin: 20px auto;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                .pulsing {
                     animation: pulse 2s infinite;
                 }
                 @keyframes pulse {
@@ -87,25 +129,37 @@ app.get('/', (req, res) => {
             </style>
         </head>
         <body>
-            <h1>WhatsApp Bot QR Code</h1>
+            <h1>BLACKSKY-MD WhatsApp Bot</h1>
+            <h2>Replit-Optimized QR Code Scanner</h2>
+
             <div class="qr-container">
+                <div class="status ${connectionStatus}">
+                    Status: ${connectionStatus.toUpperCase()}
+                </div>
+
                 <div class="qr-code">
-                    ${webQR ? 
-                        `<img src="${webQR}" alt="WhatsApp QR Code">` : 
-                        `<p class="waiting">Waiting for QR code... Please wait.</p>`
+                    ${webQR 
+                        ? `<img src="${webQR}" alt="WhatsApp QR Code" />`
+                        : connectionStatus === 'connecting' 
+                            ? '<div class="loader"></div><p class="pulsing">Generating QR code...</p>' 
+                            : connectionStatus === 'connected' 
+                                ? '<p>✅ Successfully connected to WhatsApp!</p>' 
+                                : '<p>Waiting to connect to WhatsApp servers...</p>'
                     }
                 </div>
-                <button class="refresh-btn" onclick="location.reload()">Refresh QR Code</button>
+
+                <button class="button" onclick="location.reload()">Refresh QR Code</button>
             </div>
+
             <div class="instructions">
-                <h3>How to Connect:</h3>
+                <h3>How to connect your WhatsApp:</h3>
                 <ol>
                     <li>Open WhatsApp on your phone</li>
-                    <li>Go to Settings → Linked Devices</li>
+                    <li>Tap on Settings (three dots) → Linked Devices</li>
                     <li>Tap on "Link a Device"</li>
-                    <li>Scan the QR code above with your phone</li>
+                    <li>When the camera opens, point it at this screen to scan the QR code</li>
                 </ol>
-                <p>The page will refresh automatically every 30 seconds.</p>
+                <p><strong>Note:</strong> The QR code refreshes every 30 seconds. If scanning fails, click the Refresh button.</p>
             </div>
         </body>
         </html>
@@ -119,61 +173,75 @@ async function startConnection() {
         await handler.init();
         logger.info('Command handler initialized');
 
-        // Get auth state
+        // Setup authentication state
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRECTORY);
         logger.info('Auth state loaded');
 
-        // Create WhatsApp socket with minimal settings
+        // Create socket with Replit-optimized settings
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            browser: ['BLACKSKY-MD', 'Chrome', '110.0.0'],
+            browser: [BROWSER_ID, 'Chrome', '110.0.0'],
             version: [2, 2323, 4],
             logger: pino({ level: 'silent' }),
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
+            markOnlineOnConnect: false,
+            syncFullHistory: false
         });
-        logger.info('WhatsApp socket created');
 
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-            logger.info('Connection update:', { connection, hasQR: !!qr });
+            const { connection, lastDisconnect, qr: receivedQr } = update;
+            logger.info('📡 CONNECTION UPDATE:', JSON.stringify(update, null, 2));
 
-            if (qr) {
-                logger.info('\nNew QR code received. Displaying in terminal and web...\n');
-                qrCode = qr;
+            if (receivedQr) {
+                qrGenerationCount++;
+                logger.info(`\n[QR] New QR code generated (${qrGenerationCount})`);
+
+                // Show QR in terminal
+                qrcode.generate(receivedQr, { small: true });
+
                 try {
-                    webQR = await qrcode.toDataURL(qr);
-                    logger.info('QR code updated successfully');
-                } catch (error) {
-                    logger.error('Error generating QR:', error);
+                    // Generate QR for web
+                    webQR = await qrcodeWeb.toDataURL(receivedQr);
+                    connectionStatus = 'connecting';
+                    logger.info('✅ QR code updated for web interface');
+                } catch (err) {
+                    logger.error('❌ Error generating web QR:', err.message);
                 }
             }
 
             if (connection === 'open') {
-                logger.info('\nSuccessfully connected to WhatsApp!\n');
+                logger.info('🎉 CONNECTION OPENED SUCCESSFULLY!');
                 connectionStatus = 'connected';
-                webQR = '';
+                webQR = null;
                 await saveCreds();
+                logger.info('💾 Credentials saved successfully');
 
                 try {
                     const user = sock.user;
-                    logger.info('Connected as:', user.name || user.verifiedName || user.id.split(':')[0]);
+                    logger.info('👤 Connected as:', user.name || user.verifiedName || user.id.split(':')[0]);
                 } catch (e) {
-                    logger.error('Could not get user details:', e.message);
+                    logger.error('⚠️ Could not get user details:', e.message);
                 }
             }
 
             if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                logger.info(`\nConnection closed due to ${lastDisconnect?.error?.output?.payload?.message || 'unknown reason'}`);
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+                connectionStatus = 'disconnected';
+                logger.info(`\n🔴 CONNECTION CLOSED:
+- Status Code: ${statusCode}
+- Should Reconnect: ${shouldReconnect ? 'Yes' : 'No'}
+`);
 
                 if (shouldReconnect) {
-                    logger.info('Reconnecting...');
+                    logger.info('🔄 Attempting reconnection in 5 seconds...');
                     setTimeout(startConnection, 5000);
                 } else {
-                    logger.info('Not reconnecting - logged out');
+                    logger.info('⛔ Not reconnecting - logged out');
                     process.exit(1);
                 }
             }
@@ -200,8 +268,9 @@ async function startConnection() {
     }
 }
 
-// Start web server and WhatsApp connection
+// Start the server and connection
 app.listen(PORT, '0.0.0.0', () => {
-    logger.info(`\nQR web server running at http://localhost:${PORT}`);
+    logger.info(`\n✅ QR Web Server running at http://localhost:${PORT}\n`);
+    logger.info('✅ Use this URL to access the WhatsApp QR code scanning interface\n');
     startConnection();
 });
