@@ -4,79 +4,50 @@ const path = require('path');
 const axios = require('axios');
 const { promisify } = require('util');
 const exec = promisify(require('child_process').exec);
-// file-type is now an ESM module, so we'll use dynamic import
-// const FileType = require('file-type');
 const FormData = require('form-data');
 const sharp = require('sharp');
-// node-fetch is now an ESM module, so we'll use axios instead
-// const fetch = require('node-fetch');
 const ffmpeg = require('fluent-ffmpeg');
 const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
 
-// Define temp directory
 const TEMP_DIR = path.join(__dirname, '../../temp/nsfw');
 
-// Helper function to dynamically import file-type (ESM module)
 async function getFileTypeFromBuffer(buffer) {
     try {
-        // Dynamically import the ESM module
         const FileType = await import('file-type');
-        // Use the fromBuffer method
         return await FileType.fileTypeFromBuffer(buffer);
     } catch (error) {
         logger.error('Error importing or using file-type module:', error);
-        // Fallback: Try to determine type based on magic numbers
         return detectFileTypeFromMagicNumbers(buffer);
     }
 }
 
-// Simple utility to detect common file types from buffer magic numbers
 function detectFileTypeFromMagicNumbers(buffer) {
     if (!buffer || buffer.length < 4) return null;
-    
-    // Check for JPEG: Starts with FF D8 FF
     if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
         return { ext: 'jpg', mime: 'image/jpeg' };
     }
-    
-    // Check for PNG: Starts with 89 50 4E 47
     if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
         return { ext: 'png', mime: 'image/png' };
     }
-    
-    // Check for GIF: Starts with 47 49 46 38
     if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
         return { ext: 'gif', mime: 'image/gif' };
     }
-    
-    // Check for WebP: Starts with 52 49 46 46 (RIFF) and has WEBP at offset 8
     if (buffer.length >= 12 && buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
         buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
         return { ext: 'webp', mime: 'image/webp' };
     }
-    
-    // Check for MP4: Starts with 00 00 00 xx 66 74 79 70
     if (buffer.length >= 8 && buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) {
         return { ext: 'mp4', mime: 'video/mp4' };
     }
-    
-    // Default to null if unknown
     return null;
 }
 
-// Import the centralized NSFW image fetching utility
 const { fetchNsfwImage, SUPPORTED_CATEGORIES } = require('../utils/fetchNsfwImage');
 
-// Stored user verifications (in memory)
 const verifiedUsers = new Map();
-// Stored group settings
 const groupNsfwSettings = new Map();
-// User cooldowns
 const userCooldowns = new Map();
 
-/**
- * Initialize required directories
- */
 async function initDirectories() {
     try {
         await fs.mkdir(TEMP_DIR, { recursive: true });
@@ -86,20 +57,10 @@ async function initDirectories() {
     }
 }
 
-/**
- * Check if user is verified for NSFW content
- * @param {string} userId User JID
- * @returns {boolean} Whether user is verified
- */
 function isUserVerified(userId) {
     return verifiedUsers.has(userId);
 }
 
-/**
- * Verify user with age confirmation
- * @param {string} userId User JID
- * @param {boolean} verified Verification status
- */
 function setUserVerification(userId, verified = true) {
     if (verified) {
         verifiedUsers.set(userId, {
@@ -111,16 +72,11 @@ function setUserVerification(userId, verified = true) {
     }
 }
 
-/**
- * Check if NSFW is enabled for a group
- * @param {string} groupId Group JID
- * @returns {Promise<boolean>} Whether NSFW is enabled
- */
 async function isNsfwEnabledForGroup(groupId) {
     if (groupNsfwSettings.has(groupId)) {
         return groupNsfwSettings.get(groupId).enabled;
     }
-    
+
     try {
         const settings = await getGroupSettings(groupId);
         const enabled = settings?.nsfw?.enabled || false;
@@ -132,11 +88,6 @@ async function isNsfwEnabledForGroup(groupId) {
     }
 }
 
-/**
- * Save NSFW settings for a group
- * @param {string} groupId Group JID
- * @param {boolean} enabled Whether NSFW is enabled
- */
 async function saveNsfwSettingsForGroup(groupId, enabled) {
     try {
         const settings = await getGroupSettings(groupId);
@@ -145,7 +96,7 @@ async function saveNsfwSettingsForGroup(groupId, enabled) {
             enabled,
             updatedAt: Date.now()
         };
-        
+
         await saveGroupSettings(groupId, settings);
         groupNsfwSettings.set(groupId, { enabled });
         logger.info(`NSFW settings updated for group ${groupId}: ${enabled ? 'enabled' : 'disabled'}`);
@@ -156,25 +107,20 @@ async function saveNsfwSettingsForGroup(groupId, enabled) {
     }
 }
 
-/**
- * Download media to a temporary file
- * @param {string} url URL to download from
- * @returns {Promise<string|null>} Path to downloaded file or null on failure
- */
 async function downloadMedia(url) {
     try {
         const response = await axios.get(url, { responseType: 'arraybuffer' });
         const buffer = Buffer.from(response.data);
         const fileType = await getFileTypeFromBuffer(buffer);
-        
+
         if (!fileType) {
             logger.error('Could not determine file type');
             return null;
         }
-        
+
         const filename = `${Date.now()}.${fileType.ext}`;
         const filePath = path.join(TEMP_DIR, filename);
-        
+
         await fs.writeFile(filePath, buffer);
         return filePath;
     } catch (err) {
@@ -183,89 +129,95 @@ async function downloadMedia(url) {
     }
 }
 
-/**
- * Fetch from an API with error handling and fallbacks
- * @param {string} url Primary API URL to attempt
- * @param {Array<string>} fallbacks Optional fallback URLs to try if primary fails
- * @returns {Promise<any>} API response object or null if all attempts fail
- */
 async function fetchApi(url, fallbacks = []) {
-    // Try the primary URL first
+    const headers = {
+        'User-Agent': 'WhatsApp-MD-Bot/1.0',
+        'Accept': 'image/gif,image/webp,video/mp4,*/*'
+    };
+
     try {
         const response = await axios.get(url, { 
-            timeout: 5000,  // 5 second timeout
-            headers: { 'User-Agent': 'WhatsApp-MD-Bot/1.0' }
+            timeout: 5000,
+            headers
         });
         return response.data;
     } catch (err) {
         logger.warn(`Primary API fetch error (${url}):`, err.message);
-        
-        // If we have fallbacks, try them in sequence
+
         if (fallbacks && fallbacks.length > 0) {
             logger.info(`Attempting ${fallbacks.length} fallback APIs`);
-            
+
             for (const fallbackUrl of fallbacks) {
                 try {
                     logger.info(`Trying fallback API: ${fallbackUrl}`);
                     const response = await axios.get(fallbackUrl, { 
                         timeout: 5000,
-                        headers: { 'User-Agent': 'WhatsApp-MD-Bot/1.0' }
+                        headers
                     });
                     logger.info(`Fallback API success: ${fallbackUrl}`);
                     return response.data;
                 } catch (fallbackErr) {
                     logger.warn(`Fallback API fetch error (${fallbackUrl}):`, fallbackErr.message);
-                    // Continue to next fallback
                 }
             }
         }
-        
-        // If all attempts failed, return null
-        logger.error(`All API fetch attempts failed for ${url}`);
+
         return null;
     }
 }
 
-/**
- * Apply cooldown to a user
- * @param {string} userId User JID
- * @param {number} seconds Cooldown in seconds
- * @returns {boolean} Whether cooldown was applied or user is in cooldown
- */
 function applyCooldown(userId, seconds = 60) {
     const now = Date.now();
     const cooldownExpiry = userCooldowns.get(userId);
-    
+
     if (cooldownExpiry && cooldownExpiry > now) {
-        return false; // User is in cooldown
+        return false; 
     }
-    
+
     userCooldowns.set(userId, now + (seconds * 1000));
     return true;
 }
 
-/**
- * Get remaining cooldown time
- * @param {string} userId User JID
- * @returns {number} Remaining cooldown in seconds
- */
 function getRemainingCooldown(userId) {
     const now = Date.now();
     const cooldownExpiry = userCooldowns.get(userId);
-    
+
     if (!cooldownExpiry || cooldownExpiry <= now) {
         return 0;
     }
-    
+
     return Math.ceil((cooldownExpiry - now) / 1000);
 }
 
-// Call init
+async function sendNsfwGif(sock, sender, url, caption) {
+    try {
+        await sock.sendMessage(sender, {
+            video: { url },
+            caption: caption,
+            gifPlayback: true,
+            mimetype: 'video/mp4'
+        });
+        logger.info(`NSFW GIF sent successfully to ${sender}`);
+    } catch (err) {
+        logger.error('Error sending NSFW GIF:', err);
+        try {
+            await sock.sendMessage(sender, {
+                image: { url },
+                caption: caption
+            });
+        } catch (imgErr) {
+            logger.error('Failed to send as image:', imgErr);
+            await sock.sendMessage(sender, {
+                text: 'Failed to send media. Please try again.'
+            });
+        }
+    }
+}
+
+
 initDirectories();
 
-// Define the NSFW commands
 const nsfwCommands = {
-    // Original commands
     async toggleNSFW(sock, sender, args) {
         try {
             const [action] = args;
@@ -300,7 +252,6 @@ const nsfwCommands = {
                 return;
             }
 
-            // Basic URL validation
             if (!imageUrl.startsWith('http')) {
                 await sock.sendMessage(sender, {
                     text: 'Please provide a valid image URL'
@@ -312,7 +263,6 @@ const nsfwCommands = {
                 text: 'Analyzing content safety...' 
             });
 
-            // Simple implementation without external API
             await sock.sendMessage(sender, { 
                 text: 'Content appears to be safe. For more accurate detection, an AI service integration is needed.' 
             });
@@ -367,7 +317,6 @@ NSFW Statistics:
         }
     },
 
-    // New NSFW commands
     async verify(sock, sender, args) {
         try {
             const [age] = args;
@@ -450,10 +399,9 @@ NSFW Statistics:
         }
     },
     
-    // NSFW image commands
+
     async waifu(sock, sender) {
         try {
-            // Import language manager for translations
             const { languageManager } = require('../utils/language');
             
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -480,7 +428,6 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: languageManager.getText('media.nsfw.fetching', null) });
             
-            // Use the centralized fetchNsfwImage utility
             const waifuUrl = await fetchNsfwImage('waifu');
             
             if (!waifuUrl) {
@@ -504,7 +451,6 @@ NSFW Statistics:
     
     async neko(sock, sender) {
         try {
-            // Import language manager for translations
             const { languageManager } = require('../utils/language');
             
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -531,7 +477,6 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: languageManager.getText('media.nsfw.fetching', null) });
             
-            // Use the centralized fetchNsfwImage utility
             const nekoUrl = await fetchNsfwImage('neko');
             
             if (!nekoUrl) {
@@ -731,7 +676,6 @@ NSFW Statistics:
     
     async blowjob(sock, sender) {
         try {
-            // Import language manager for translations
             const { languageManager } = require('../utils/language');
             
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -758,7 +702,6 @@ NSFW Statistics:
             
             await sock.sendMessage(sender, { text: languageManager.getText('media.nsfw.fetching', null) });
             
-            // Use the centralized fetchNsfwImage utility
             const blowjobUrl = await fetchNsfwImage('blowjob');
             
             if (!blowjobUrl) {
@@ -868,280 +811,175 @@ NSFW Statistics:
         }
     },
     
-    // GIF commands
+
     async gifboobs(sock, sender) {
-        try {
-            if (!await isNsfwEnabledForGroup(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '❌ NSFW commands are disabled for this group'
-                });
-                return;
-            }
-            
-            if (!isUserVerified(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '⚠️ You need to verify your age first. Use !verify <your_age>'
-                });
-                return;
-            }
-            
-            if (!applyCooldown(sender, 45)) {
-                const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
-                    text: `⏳ Please wait ${remaining} seconds before using this command again.`
-                });
-                return;
-            }
-            
-            await sock.sendMessage(sender, { text: 'Fetching GIF...' });
-            
-            // Primary GIF endpoint
-            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/boobjob`;
-            
-            // Fallback URLs for GIFs
-            const fallbacks = [
-                `${API_ENDPOINTS.HMTAI}/nsfw/tits`, // Alternative endpoint
-                `${API_ENDPOINTS.ANIME_IMAGES}/nsfw/gif` // Generic NSFW GIF source
-            ];
-            
-            // Try primary first, then fallbacks
-            const response = await fetchApi(primaryUrl, fallbacks);
-            
-            if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. All API endpoints are down. Please try again later.' });
-                return;
-            }
-            
-            // Detect if URL ends with gif, mp4, webm, or other video format
-            const isAnimated = /\.(gif|mp4|webm|webp)(\?.*)?$/i.test(response.url);
-            
-            if (isAnimated) {
-                // Send as video for better compatibility
-                await sock.sendMessage(sender, {
-                    video: { url: response.url },
-                    caption: '🔞 Boobs GIF',
-                    gifPlayback: true
-                });
-                logger.info(`NSFW GIF sent to ${sender}`);
-            } else {
-                // Fallback to image if we didn't get a GIF
-                await sock.sendMessage(sender, {
-                    image: { url: response.url },
-                    caption: '🔞 Boobs (Static image - GIF not available)'
-                });
-                logger.info(`NSFW image sent to ${sender} (fallback from GIF)`);
-            }
-        } catch (err) {
-            logger.error('Error in gifboobs:', err);
-            await sock.sendMessage(sender, { text: 'Failed to fetch GIF due to server error.' });
+        if (!await isNsfwEnabledForGroup(sender)) {
+            await sock.sendMessage(sender, {
+                text: '❌ NSFW commands are disabled for this group'
+            });
+            return;
         }
+
+        if (!isUserVerified(sender)) {
+            await sock.sendMessage(sender, {
+                text: '⚠️ You need to verify your age first. Use !verify <your_age>'
+            });
+            return;
+        }
+
+        if (!applyCooldown(sender, 45)) {
+            const remaining = getRemainingCooldown(sender);
+            await sock.sendMessage(sender, {
+                text: `⏳ Please wait ${remaining} seconds before using this command again.`
+            });
+            return;
+        }
+
+        await sock.sendMessage(sender, { text: 'Fetching GIF...' });
+
+        const primaryUrl = 'https://api.waifu.pics/nsfw/boobs';
+        const fallbacks = [
+            'https://api.nekos.fun/api/boobs',
+            'https://api.hmtai.me/nsfw/boobs'
+        ];
+
+        const response = await fetchApi(primaryUrl, fallbacks);
+
+        if (!response || !response.url) {
+            await sock.sendMessage(sender, { 
+                text: 'Failed to fetch GIF. Please try again later.' 
+            });
+            return;
+        }
+
+        await sendNsfwGif(sock, sender, response.url, '🔞 NSFW GIF');
     },
-    
+
     async gifass(sock, sender) {
-        try {
-            if (!await isNsfwEnabledForGroup(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '❌ NSFW commands are disabled for this group'
-                });
-                return;
-            }
-            
-            if (!isUserVerified(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '⚠️ You need to verify your age first. Use !verify <your_age>'
-                });
-                return;
-            }
-            
-            if (!applyCooldown(sender, 45)) {
-                const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
-                    text: `⏳ Please wait ${remaining} seconds before using this command again.`
-                });
-                return;
-            }
-            
-            await sock.sendMessage(sender, { text: 'Fetching GIF...' });
-            
-            // Primary URL for animated content
-            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/pgif`;
-            
-            // Fallback URLs in case primary fails
-            const fallbacks = [
-                `${API_ENDPOINTS.HMTAI}/nsfw/anal`,  // May return GIF
-                `${API_ENDPOINTS.ANIME_IMAGES}/nsfw/ass/gif` // More likely to be animated
-            ];
-            
-            // Try primary first, then fallbacks
-            const response = await fetchApi(primaryUrl, fallbacks);
-            
-            if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. All API endpoints are down. Please try again later.' });
-                return;
-            }
-            
-            // Detect if URL ends with gif, mp4, webm, or other video format
-            const isAnimated = /\.(gif|mp4|webm|webp)(\?.*)?$/i.test(response.url);
-            
-            if (isAnimated) {
-                // Send as video with gifPlayback for better compatibility
-                await sock.sendMessage(sender, {
-                    video: { url: response.url },
-                    caption: '🔞 Ass GIF',
-                    gifPlayback: true
-                });
-                logger.info(`NSFW GIF sent to ${sender}`);
-            } else {
-                // Fallback to image if we didn't get a GIF
-                await sock.sendMessage(sender, {
-                    image: { url: response.url },
-                    caption: '🔞 Ass (Static image - GIF not available)'
-                });
-                logger.info(`NSFW image sent to ${sender} (fallback from GIF)`);
-            }
-        } catch (err) {
-            logger.error('Error in gifass:', err);
-            await sock.sendMessage(sender, { text: 'Failed to fetch GIF due to server error.' });
+        if (!await isNsfwEnabledForGroup(sender)) {
+            await sock.sendMessage(sender, {
+                text: '❌ NSFW commands are disabled for this group'
+            });
+            return;
         }
+
+        if (!isUserVerified(sender)) {
+            await sock.sendMessage(sender, {
+                text: '⚠️ You need to verify your age first. Use !verify <your_age>'
+            });
+            return;
+        }
+
+        if (!applyCooldown(sender, 45)) {
+            const remaining = getRemainingCooldown(sender);
+            await sock.sendMessage(sender, {
+                text: `⏳ Please wait ${remaining} seconds before using this command again.`
+            });
+            return;
+        }
+
+        await sock.sendMessage(sender, { text: 'Fetching GIF...' });
+
+        const primaryUrl = 'https://api.waifu.pics/nsfw/ass'; //Example URL - Replace with actual API endpoint
+        const fallbacks = [
+            'https://api.nekos.fun/api/ass',
+            'https://api.hmtai.me/nsfw/ass' //Example URL - Replace with actual API endpoint
+        ];
+
+        const response = await fetchApi(primaryUrl, fallbacks);
+
+        if (!response || !response.url) {
+            await sock.sendMessage(sender, { text: 'Failed to fetch GIF. Please try again later.' });
+            return;
+        }
+
+        await sendNsfwGif(sock, sender, response.url, '🔞 NSFW GIF');
     },
-    
+
     async gifhentai(sock, sender) {
-        try {
-            if (!await isNsfwEnabledForGroup(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '❌ NSFW commands are disabled for this group'
-                });
-                return;
-            }
-            
-            if (!isUserVerified(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '⚠️ You need to verify your age first. Use !verify <your_age>'
-                });
-                return;
-            }
-            
-            if (!applyCooldown(sender, 45)) {
-                const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
-                    text: `⏳ Please wait ${remaining} seconds before using this command again.`
-                });
-                return;
-            }
-            
-            await sock.sendMessage(sender, { text: 'Fetching GIF...' });
-            
-            // Primary URL for animated content
-            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/gif`;
-            
-            // Fallback URLs in case primary fails
-            const fallbacks = [
-                `${API_ENDPOINTS.HMTAI}/nsfw/classic`,  // May return GIF
-                `${API_ENDPOINTS.ANIME_IMAGES}/nsfw/gif` // Generic GIF endpoint
-            ];
-            
-            // Try primary first, then fallbacks
-            const response = await fetchApi(primaryUrl, fallbacks);
-            
-            if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. All API endpoints are down. Please try again later.' });
-                return;
-            }
-            
-            // Detect if URL ends with gif, mp4, webm, or other video format
-            const isAnimated = /\.(gif|mp4|webm|webp)(\?.*)?$/i.test(response.url);
-            
-            if (isAnimated) {
-                // Send as video with gifPlayback for better compatibility
-                await sock.sendMessage(sender, {
-                    video: { url: response.url },
-                    caption: '🔞 Hentai GIF',
-                    gifPlayback: true
-                });
-                logger.info(`NSFW GIF sent to ${sender}`);
-            } else {
-                // Fallback to image if we didn't get a GIF
-                await sock.sendMessage(sender, {
-                    image: { url: response.url },
-                    caption: '🔞 Hentai (Static image - GIF not available)'
-                });
-                logger.info(`NSFW image sent to ${sender} (fallback from GIF)`);
-            }
-        } catch (err) {
-            logger.error('Error in gifhentai:', err);
-            await sock.sendMessage(sender, { text: 'Failed to fetch GIF due to server error.' });
+        if (!await isNsfwEnabledForGroup(sender)) {
+            await sock.sendMessage(sender, {
+                text: '❌ NSFW commands are disabled for this group'
+            });
+            return;
         }
+
+        if (!isUserVerified(sender)) {
+            await sock.sendMessage(sender, {
+                text: '⚠️ You need to verify your age first. Use !verify <your_age>'
+            });
+            return;
+        }
+
+        if (!applyCooldown(sender, 45)) {
+            const remaining = getRemainingCooldown(sender);
+            await sock.sendMessage(sender, {
+                text: `⏳ Please wait ${remaining} seconds before using this command again.`
+            });
+            return;
+        }
+
+        await sock.sendMessage(sender, { text: 'Fetching GIF...' });
+
+        const primaryUrl = 'https://api.waifu.pics/nsfw/hentai'; //Example URL - Replace with actual API endpoint
+        const fallbacks = [
+            'https://api.nekos.fun/api/hentai',
+            'https://api.hmtai.me/nsfw/hentai' //Example URL - Replace with actual API endpoint
+
+        ];
+
+        const response = await fetchApi(primaryUrl, fallbacks);
+
+        if (!response || !response.url) {
+            await sock.sendMessage(sender, { text: 'Failed to fetch GIF. Please try again later.' });
+            return;
+        }
+
+        await sendNsfwGif(sock, sender, response.url, '🔞 NSFW GIF');
     },
-    
+
     async gifblowjob(sock, sender) {
-        try {
-            if (!await isNsfwEnabledForGroup(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '❌ NSFW commands are disabled for this group'
-                });
-                return;
-            }
-            
-            if (!isUserVerified(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '⚠️ You need to verify your age first. Use !verify <your_age>'
-                });
-                return;
-            }
-            
-            if (!applyCooldown(sender, 45)) {
-                const remaining = getRemainingCooldown(sender);
-                await sock.sendMessage(sender, {
-                    text: `⏳ Please wait ${remaining} seconds before using this command again.`
-                });
-                return;
-            }
-            
-            await sock.sendMessage(sender, { text: 'Fetching GIF...' });
-            
-            // Primary URL for animated content
-            const primaryUrl = `${API_ENDPOINTS.HMTAI}/nsfw/blowjob`;
-            
-            // Fallback URLs in case primary fails
-            const fallbacks = [
-                `${API_ENDPOINTS.WAIFU_IM}/search/?included_tags=oral&is_nsfw=true`,
-                `${API_ENDPOINTS.ANIME_IMAGES}/nsfw/blowjob/gif`
-            ];
-            
-            // Try primary first, then fallbacks
-            const response = await fetchApi(primaryUrl, fallbacks);
-            
-            if (!response || !response.url) {
-                await sock.sendMessage(sender, { text: 'Failed to fetch GIF. All API endpoints are down. Please try again later.' });
-                return;
-            }
-            
-            // Detect if URL ends with gif, mp4, webm, or other video format
-            const isAnimated = /\.(gif|mp4|webm|webp)(\?.*)?$/i.test(response.url);
-            
-            if (isAnimated) {
-                // Send as video with gifPlayback for better compatibility
-                await sock.sendMessage(sender, {
-                    video: { url: response.url },
-                    caption: '🔞 Blowjob GIF',
-                    gifPlayback: true
-                });
-                logger.info(`NSFW GIF sent to ${sender}`);
-            } else {
-                // Send as image if it's not animated
-                await sock.sendMessage(sender, {
-                    image: { url: response.url },
-                    caption: '🔞 Blowjob (Static image - GIF not available)'
-                });
-                logger.info(`NSFW image sent to ${sender} (fallback from GIF)`);
-            }
-        } catch (err) {
-            logger.error('Error in gifblowjob:', err);
-            await sock.sendMessage(sender, { text: 'Failed to fetch GIF due to server error.' });
+        if (!await isNsfwEnabledForGroup(sender)) {
+            await sock.sendMessage(sender, {
+                text: '❌ NSFW commands are disabled for this group'
+            });
+            return;
         }
+
+        if (!isUserVerified(sender)) {
+            await sock.sendMessage(sender, {
+                text: '⚠️ You need to verify your age first. Use !verify <your_age>'
+            });
+            return;
+        }
+
+        if (!applyCooldown(sender, 45)) {
+            const remaining = getRemainingCooldown(sender);
+            await sock.sendMessage(sender, {
+                text:text: `⏳ Please wait ${remaining} seconds before using this command again.`
+            });
+            return;
+        }
+
+        await sock.sendMessage(sender, { text: 'Fetching GIF...' });
+
+        const primaryUrl = 'https://api.waifu.pics/nsfw/blowjob'; //Example URL - Replace with actual API endpoint
+        const fallbacks = [
+            'https://api.nekos.fun/api/blowjob',
+            'https://api.hmtai.me/nsfw/blowjob' //Example URL - Replace with actual API endpoint
+        ];
+
+        const response = await fetchApi(primaryUrl, fallbacks);
+
+        if (!response || !response.url) {
+            await sock.sendMessage(sender, { text: 'Failed to fetch GIF. Please try again later.' });
+            return;
+        }
+
+        await sendNsfwGif(sock, sender, response.url, '🔞 NSFW GIF');
     },
     
-    // Fetish commands
+
     async uniform(sock, sender) {
         try {
             if (!await isNsfwEnabledForGroup(sender)) {
@@ -1408,7 +1246,6 @@ NSFW Statistics:
     
 };
 
-// Export the commands object directly to ensure it's accessible
 const commands = nsfwCommands;
 
 module.exports = {

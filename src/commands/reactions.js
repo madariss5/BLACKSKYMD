@@ -12,23 +12,27 @@ const gifCache = new Map();
 const USER_CACHE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const GIF_CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
-// Direct GIF URLs that are verified to work
+// Direct Tenor GIF URLs that are verified to work
 const DIRECT_GIFS = {
-    hug: 'https://media.tenor.com/images/2d5373cd3a0be4f25345a52d1ada1d1f/tenor.gif',
-    pat: 'https://media.tenor.com/images/1d37a873edfeb81a1f5403f4a3bfa185/tenor.gif',
-    kiss: 'https://media.tenor.com/images/a1f7d43752168b3c1dbdfb925bda8a33/tenor.gif',
-    cuddle: 'https://media.tenor.com/images/5603e24395b61245a08fe0299574f1e3/tenor.gif',
-    smile: 'https://media.tenor.com/images/81c0b8d3c0617d2a8bf42650b181b97e/tenor.gif',
-    happy: 'https://media.tenor.com/images/a5cab07318215c706bbdd819fca2b60d/tenor.gif',
-    wave: 'https://media.tenor.com/images/9c1afcf5f3c9b4a0f336f01a86acb1e3/tenor.gif',
-    dance: 'https://media.tenor.com/images/81c0b8d3c0617d2a8bf42650b181b97e/tenor.gif',
-    cry: 'https://media.tenor.com/images/e69ebde3631408c200777ebe10f84367/tenor.gif',
-    blush: 'https://media.tenor.com/images/cbfd2a06c6d350e13d0a4cc4803c5c82/tenor.gif',
-    laugh: 'https://media.tenor.com/images/9c42c0f3a448561bdb573049e11c6466/tenor.gif',
-    wink: 'https://media.tenor.com/images/4f8e6c925e0c4556b9a4417c6e6d3710/tenor.gif',
-    poke: 'https://media.tenor.com/images/9ea4fb41d066737c0e3f2d626c13f230/tenor.gif',
-    slap: 'https://media.tenor.com/images/d2a955ef051296f5e18c06433cd71a66/tenor.gif',
-    bonk: 'https://media.tenor.com/images/79644a28bfcb95a9c9bd5073235dfa8e/tenor.gif'
+    hug: 'https://media1.tenor.com/m/NwS54VoQH9YAAAAC/anime-love.gif',
+    pat: 'https://media1.tenor.com/m/N41zKEDABuUAAAAC/anime-head-pat-anime-pat.gif',
+    kiss: 'https://media1.tenor.com/m/YFzXN8r2h_sAAAAC/anime-kiss.gif',
+    cuddle: 'https://media1.tenor.com/m/4XGh4v8UYaEAAAAC/anime-cuddle.gif',
+    smile: 'https://media1.tenor.com/m/It6ujwRk4uEAAAAC/happy-anime.gif',
+    happy: 'https://media1.tenor.com/m/6Nc8_5KOabEAAAAC/happy-anime.gif',
+    wave: 'https://media1.tenor.com/m/w1EV9RN07MgAAAAC/wave-anime.gif',
+    dance: 'https://media1.tenor.com/m/mKTS5nbF1zcAAAAC/anime-dance.gif',
+    cry: 'https://media1.tenor.com/m/N2_bZv_A_f4AAAAC/sad-cry.gif',
+    blush: 'https://media1.tenor.com/m/xIuXbMtA38sAAAAC/wheat-embarrassed.gif',
+    laugh: 'https://media1.tenor.com/m/w9h-XaFr8V8AAAAC/laugh-anime.gif',
+    wink: 'https://media1.tenor.com/m/uxO9pxZdyxgAAAAC/anime-wink.gif',
+    poke: 'https://media1.tenor.com/m/3dOqO4vVlXQAAAAC/poke-anime.gif',
+    slap: 'https://media1.tenor.com/m/Ws6Dm1ZW_vMAAAAC/girl-slap.gif',
+    bonk: 'https://media1.tenor.com/m/CrmEU2LjMi8AAAAC/anime-bonk.gif',
+    bite: 'https://media1.tenor.com/m/w4T3GhUB8CIAAAAC/anime-bite.gif',
+    yeet: 'https://media1.tenor.com/m/tJ_Eo6OXOkoAAAAC/throw-yeet.gif',
+    punch: 'https://media1.tenor.com/m/w1N7CXFWUyQAAAAC/anime-punch.gif',
+    highfive: 'https://media1.tenor.com/m/KZmxu5RH0gcAAAAC/high-five-anime.gif'
 };
 
 // Helper function to validate mentions
@@ -134,38 +138,14 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
 
         logger.debug(`Sending ${type} reaction with GIF: ${gifUrl}`);
 
-        try {
-            // Send as video with GIF playback
-            await sock.sendMessage(chatJid, {
-                video: { url: gifUrl },
-                caption: message,
-                mentions: mentions,
-                gifPlayback: true,
-                mimetype: 'video/mp4'
-            });
-            logger.debug(`Successfully sent video message for ${type}`);
-        } catch (videoErr) {
-            logger.warn(`Failed to send as video, trying as image: ${videoErr.message}`);
-
-            try {
-                // Try as image instead
-                await sock.sendMessage(chatJid, {
-                    image: { url: gifUrl },
-                    caption: message,
-                    mentions: mentions
-                });
-                logger.debug(`Successfully sent image message for ${type}`);
-            } catch (imgErr) {
-                logger.error(`Failed to send media message: ${imgErr.message}`);
-
-                // Final fallback to text-only
-                await sock.sendMessage(chatJid, {
-                    text: message,
-                    mentions: mentions
-                });
-                logger.debug(`Sent text-only message for ${type}`);
-            }
-        }
+        // Send as video with GIF playback enabled
+        await sock.sendMessage(chatJid, {
+            video: { url: gifUrl },
+            caption: message,
+            mentions: mentions,
+            gifPlayback: true,
+            mimetype: 'video/mp4'
+        });
 
         logger.debug(`Reaction message sent successfully (${Date.now() - startTime}ms)`);
     } catch (error) {
@@ -253,36 +233,10 @@ const reactionCommands = {
         const target = args[0];
         await sendReactionMessage(sock, sender, target, 'bonk', null, '🔨');
     },
-    async bully(sock, message, args) {
-        const sender = message.key.remoteJid;
-        const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'bully', null, '😈');
-    },
-    async kick(sock, message, args) {
-        const sender = message.key.remoteJid;
-        const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'kick', null, '🦵');
-    },
     async bite(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
         await sendReactionMessage(sock, sender, target, 'bite', null, '😬');
-    },
-    async lick(sock, message, args) {
-        const sender = message.key.remoteJid;
-        const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'lick', null, '👅');
-    },
-    // Social interactions
-    async handhold(sock, message, args) {
-        const sender = message.key.remoteJid;
-        const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'handhold', null, '🤝');
-    },
-    async highfive(sock, message, args) {
-        const sender = message.key.remoteJid;
-        const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'highfive', null, '✋');
     },
     // Fun actions
     async yeet(sock, message, args) {
@@ -290,15 +244,15 @@ const reactionCommands = {
         const target = args[0];
         await sendReactionMessage(sock, sender, target, 'yeet', null, '🚀');
     },
-    async throw(sock, message, args) {
+    async punch(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'throw', null, '🎯');
+        await sendReactionMessage(sock, sender, target, 'punch', null, '👊');
     },
-    async nom(sock, message, args) {
+    async highfive(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'nom', null, '😋');
+        await sendReactionMessage(sock, sender, target, 'highfive', null, '✋');
     }
 };
 
