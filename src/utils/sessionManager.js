@@ -127,10 +127,10 @@ class SessionManager {
                 // If owner number is set, create a safety backup by sending to owner
                 if (process.env.OWNER_NUMBER) {
                     try {
-                        // TODO: Implement sending backup to owner via WhatsApp when needed
-                        logger.info('Backup notification would be sent to owner');
+                        // We'll handle this in the sendCredsToSelf function which is called after connection
+                        logger.info('Backup will be sent to the bot itself after connection');
                     } catch (backupErr) {
-                        logger.error('Failed to send backup to owner:', backupErr);
+                        logger.error('Failed to prepare backup for owner:', backupErr);
                     }
                 }
                 

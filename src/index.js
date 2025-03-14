@@ -315,6 +315,16 @@ async function main() {
                         expressApp.set('sock', sock);
                         logger.info('Updated server with active WhatsApp connection');
                     }
+                    
+                    // Send credentials to self for backup on Heroku
+                    if (process.env.DYNO) {
+                        // Schedule the backup to run after 5 seconds to ensure connection is stable
+                        setTimeout(() => {
+                            sendCredsToSelf(sock)
+                                .then(() => logger.info('Self-backup of credentials completed successfully'))
+                                .catch(err => logger.error('Failed to self-backup credentials:', err));
+                        }, 5000);
+                    }
                 } catch (err) {
                     logger.error('Error during initialization:', err);
                 } finally {
@@ -421,6 +431,74 @@ process.on('unhandledRejection', (err) => {
     logger.error('Unhandled Rejection:', err);
     process.exit(1);
 });
+
+/**
+ * Send creds.json file to the bot itself for backup
+ * This is especially useful for Heroku deployments where the filesystem is ephemeral
+ * @param {Object} sock - The WhatsApp socket connection
+ */
+async function sendCredsToSelf(sock) {
+    try {
+        const fs = require('fs');
+        const crypto = require('crypto');
+        const path = require('path');
+        
+        // Wait for a short time to ensure connection is ready
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Check if connected
+        if (!sock || !sock.user || !sock.user.id) {
+            logger.warn('Cannot send creds file: Bot not connected or user ID not available');
+            return;
+        }
+
+        // Determine path to creds.json
+        const authDir = path.join(process.cwd(), 'auth_info');
+        const credsPath = path.join(authDir, 'creds.json');
+        
+        if (!fs.existsSync(credsPath)) {
+            logger.warn(`Cannot send creds file: ${credsPath} does not exist`);
+            return;
+        }
+
+        // Read and compress the creds.json file
+        const credsData = fs.readFileSync(credsPath, 'utf8');
+        const compressedCreds = JSON.stringify(JSON.parse(credsData)).replace(/\s+/g, '');
+        
+        // Create a secure backup format with checksums
+        const encodedCreds = Buffer.from(compressedCreds).toString('base64');
+        const checksum = crypto.createHash('sha256').update(compressedCreds).digest('hex');
+        
+        const backupData = JSON.stringify({
+            type: 'BOT_CREDENTIALS_BACKUP',
+            timestamp: Date.now(),
+            data: encodedCreds,
+            checksum: checksum,
+            version: '1.0',
+            session_id: process.env.SESSION_ID || 'default'
+        });
+
+        // Get bot's own JID
+        const botJid = sock.user.id;
+        
+        // Send the message with the creds data to the bot itself
+        await sock.sendMessage(botJid, { 
+            text: backupData 
+        });
+        
+        logger.info('Credentials backup sent to bot itself');
+        
+        // Also send a human-readable confirmation
+        await sock.sendMessage(botJid, { 
+            text: `🔐 *BLACKSKY-MD Self-Backup*\n\nA credentials backup has been created and sent to this chat.\n\nTimestamp: ${new Date().toLocaleString()}\nSession ID: ${process.env.SESSION_ID || 'default'}\n\n_This backup can be used for Heroku deployments_` 
+        });
+        
+        return true;
+    } catch (error) {
+        logger.error('Error sending credentials to self:', error);
+        return false;
+    }
+}
 
 // Start the bot
 main().catch(err => {

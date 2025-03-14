@@ -171,12 +171,14 @@ async function startConnection() {
         const authDir = await ensureAuthDir();
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
-        // Create socket with optimized settings
+        // Create socket with enhanced settings to prevent conflicts
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: false,
             logger: pino({ level: 'silent' }),
-            browser: ['BLACKSKY-MD', 'Chrome', '121.0.0'],
+            // Use a unique browser ID for each connection to prevent conflicts
+            browser: ['BLACKSKY-MD', 'Chrome', '121.0.0.' + Date.now()],
+            // Enhanced connection settings to reduce reconnections
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 30000,
@@ -186,12 +188,19 @@ async function startConnection() {
             downloadHistory: false,
             syncFullHistory: false,
             shouldSyncHistoryMessage: false,
-            patchMessageBeforeSending: false,
             markOnlineOnConnect: false,
             version: [2, 2323, 4],
             transactionOpts: { 
                 maxCommitRetries: 10, 
                 delayBetweenTriesMs: 5000 
+            },
+            // Custom options to reduce conflicts
+            fireAndForget: true, // Don't wait for server ack
+            patchMessageBeforeSending: (message) => {
+                // Add timestamp to make messages unique
+                const now = new Date();
+                message.messageTimestamp = now / 1000;
+                return message;
             }
         });
 
@@ -268,8 +277,19 @@ async function startConnection() {
                 clearReconnectTimer();
                 reconnectTimer = setTimeout(async () => {
                     try {
+                        // First, completely clear any session data
+                        await cleanupSession();
+                        
+                        // Make sure we reset flags before reconnecting
                         isConnecting = false;
                         connectionLock = false;
+                        
+                        // Create some delay to ensure WhatsApp servers register the disconnect
+                        logger.info('Cleared session, waiting 5 seconds before reconnecting...');
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        
+                        // Attempt reconnection with fresh session
+                        logger.info('Starting fresh connection after cleanup...');
                         await startConnection();
                     } catch (err) {
                         logger.error('Reconnection attempt failed:', err);
@@ -331,8 +351,19 @@ async function startConnection() {
             clearReconnectTimer();
             reconnectTimer = setTimeout(async () => {
                 try {
+                    // First, completely clear any session data
+                    await cleanupSession();
+                    
+                    // Make sure we reset flags before reconnecting
                     isConnecting = false;
                     connectionLock = false;
+                    
+                    // Create some delay to ensure WhatsApp servers register the disconnect
+                    logger.info('Cleared session, waiting 5 seconds before reconnecting...');
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    
+                    // Attempt reconnection with fresh session
+                    logger.info('Starting fresh connection after cleanup...');
                     await startConnection();
                 } catch (retryErr) {
                     logger.error('Retry failed:', retryErr);

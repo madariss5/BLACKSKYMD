@@ -196,7 +196,16 @@ async function connectToWhatsApp() {
         // Get authentication state
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
-        // Create socket connection with enhanced configuration
+        // Clear any previous sessions to prevent conflict errors
+        try {
+            await fs.promises.rm(SESSION_DIR, { recursive: true, force: true });
+            await fs.promises.mkdir(SESSION_DIR, { recursive: true });
+            console.log('✅ Successfully cleared auth session to prevent conflict errors');
+        } catch (err) {
+            console.error('Error clearing session:', err);
+        }
+        
+        // Create a fresh socket connection with enhanced configuration
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
@@ -206,8 +215,8 @@ async function connectToWhatsApp() {
             keepAliveIntervalMs: 30000, // Less frequent pings
             retryRequestDelayMs: 5000, // More delay between retries
             maxRetries: 3, // Fewer retries to avoid excessive reconnection attempts
-            // Browser profile
-            browser: ['BLACKSKY-MD', 'Chrome', '104.0.0.0'],
+            // Unique browser profile to prevent conflicts
+            browser: ['BLACKSKY-MD', 'Chrome', '104.0.0.0' + Date.now()],
             // Connection behavior
             markOnlineOnConnect: true,
             emitOwnEvents: false,
@@ -220,6 +229,14 @@ async function connectToWhatsApp() {
             // Messages fetch options
             getMessage: async () => {
                 return { conversation: 'Hello' };
+            },
+            // Custom options to reduce conflicts
+            fireAndForget: true, // Don't wait for server ack
+            patchMessageBeforeSending: (message) => {
+                // Add current timestamp to make messages unique
+                const now = new Date();
+                message.messageTimestamp = now / 1000;
+                return message;
             }
         });
 
@@ -311,10 +328,21 @@ async function connectToWhatsApp() {
                         connectionLock = true;
                         
                         // Schedule reconnection with delay
-                        setTimeout(() => {
+                        setTimeout(async () => {
                             if (connectionLock) {
                                 connectionLock = false;
                                 console.log('Executing scheduled reconnection...');
+                                
+                                // Clear session completely before reconnecting
+                                try {
+                                    console.log('Clearing session data before reconnection...');
+                                    await fs.promises.rm(SESSION_DIR, { recursive: true, force: true });
+                                    await fs.promises.mkdir(SESSION_DIR, { recursive: true });
+                                    console.log('✅ Successfully cleared auth session before reconnection');
+                                } catch (err) {
+                                    console.error('Error clearing session before reconnection:', err);
+                                }
+                                
                                 connectToWhatsApp();
                             }
                         }, delay);
