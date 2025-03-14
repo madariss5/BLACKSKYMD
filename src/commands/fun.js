@@ -8,6 +8,7 @@ const { formatNumber, randomInt, shuffleArray, sleep } = require('../utils/helpe
 const crypto = require('crypto');
 const mathjs = require('mathjs');
 const moment = require('moment');
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 /**
  * Helper function to check if games are enabled for a group
@@ -20,9 +21,8 @@ async function areGamesEnabled(sock, remoteJid) {
     if (remoteJid.endsWith('g.us')) {
         const gamesEnabled = await isFeatureEnabled(remoteJid, 'games');
         if (!gamesEnabled) {
-            await sock.sendMessage(remoteJid, { 
-                text: '❌ Games are disabled in this group. Ask an admin to enable them with *.feature games on*' 
-            });
+            await safeSendText(sock, remoteJid, '❌ Games are disabled in this group. Ask an admin to enable them with *.feature games on*' 
+            );
             return false;
         }
     }
@@ -215,9 +215,8 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Quote error:', err);
-            await sock.sendMessage(sender, { 
-                text: '❌ Oops! Something went wrong fetching your quote.\nPlease try again in a moment.' 
-            });
+            await safeSendText(sock, sender, '❌ Oops! Something went wrong fetching your quote.\nPlease try again in a moment.' 
+            );
         }
     },
 
@@ -239,17 +238,17 @@ const funCommands = {
             await sock.sendMessage(sender, { text: `😂 Joke time:\n\n${randomJoke}` });
         } catch (err) {
             logger.error('Joke error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching the joke.' });
+            await safeSendText(sock, sender, '❌ An error occurred while fetching the joke.' );
         }
     },
 
     async meme(sock, sender) {
         try {
             // TODO: Implement meme fetching from API
-            await sock.sendMessage(sender, { text: '🎭 Meme functionality coming soon!' });
+            await safeSendText(sock, sender, '🎭 Meme functionality coming soon!' );
         } catch (err) {
             logger.error('Meme error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching the meme.' });
+            await safeSendText(sock, sender, '❌ An error occurred while fetching the meme.' );
         }
     },
 
@@ -282,26 +281,23 @@ const funCommands = {
             // Check for game timeout
             if (Date.now() - game.lastActivity > 5 * 60 * 1000) {
                 global.games.tictactoe.delete(gameId);
-                await sock.sendMessage(sender, {
-                    text: '⏰ Game expired. Start a new game with !tictactoe'
-                });
+                await safeSendText(sock, sender, '⏰ Game expired. Start a new game with !tictactoe'
+                );
                 return;
             }
             
             // Process player move
             const move = parseInt(args[0]);
             if (isNaN(move) || move < 1 || move > 9) {
-                await sock.sendMessage(sender, {
-                    text: '❌ Please choose a number between 1 and 9'
-                });
+                await safeSendText(sock, sender, '❌ Please choose a number between 1 and 9'
+                );
                 return;
             }
             
             const index = move - 1;
             if (game.board[index] !== ' ') {
-                await sock.sendMessage(sender, {
-                    text: '❌ That position is already taken! Choose another'
-                });
+                await safeSendText(sock, sender, '❌ That position is already taken! Choose another'
+                );
                 return;
             }
             
@@ -361,9 +357,8 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Tic-tac-toe error:', err);
-            await sock.sendMessage(sender, {
-                text: '❌ An error occurred during the game'
-            });
+            await safeSendText(sock, sender, '❌ An error occurred during the game'
+            );
             global.games.tictactoe.delete(sender);
         }
     },
@@ -406,25 +401,22 @@ const funCommands = {
             // Check for game timeout
             if (Date.now() - game.lastActivity > 5 * 60 * 1000) {
                 global.games.hangman.delete(gameId);
-                await sock.sendMessage(sender, {
-                    text: '⏰ Game expired. Start a new game with !hangman'
-                });
+                await safeSendText(sock, sender, '⏰ Game expired. Start a new game with !hangman'
+                );
                 return;
             }
             
             // Process a guess
             const guess = args[0]?.toUpperCase();
             if (!guess || guess.length !== 1 || !guess.match(/[A-Z]/)) {
-                await sock.sendMessage(sender, {
-                    text: '❌ Please guess a single letter (A-Z)'
-                });
+                await safeSendText(sock, sender, '❌ Please guess a single letter (A-Z)'
+                );
                 return;
             }
             
             if (game.guessedLetters.includes(guess)) {
-                await sock.sendMessage(sender, {
-                    text: '❌ You already guessed that letter!'
-                });
+                await safeSendText(sock, sender, '❌ You already guessed that letter!'
+                );
                 return;
             }
             
@@ -455,9 +447,8 @@ const funCommands = {
             }
         } catch (err) {
             logger.error('Hangman error:', err);
-            await sock.sendMessage(sender, {
-                text: '❌ An error occurred during the game'
-            });
+            await safeSendText(sock, sender, '❌ An error occurred during the game'
+            );
             global.games.hangman.delete(sender);
         }
     },
@@ -491,18 +482,16 @@ const funCommands = {
                 
                 global.games.wordle.set(gameId, game);
                 
-                await sock.sendMessage(sender, {
-                    text: `🎮 *Wordle Game*\n\nI'm thinking of a 5-letter word. You have 6 tries to guess it!\n\n🟩 - Correct letter, correct position\n🟨 - Correct letter, wrong position\n⬜ - Letter not in word\n\nMake your first guess with *!wordle [word]*\n\nNeed a hint? Use *!wordle hint*`
-                });
+                await safeSendText(sock, sender, `🎮 *Wordle Game*\n\nI'm thinking of a 5-letter word. You have 6 tries to guess it!\n\n🟩 - Correct letter, correct position\n🟨 - Correct letter, wrong position\n⬜ - Letter not in word\n\nMake your first guess with *!wordle [word]*\n\nNeed a hint? Use *!wordle hint*`
+                );
                 return;
             }
             
             // Check for game timeout
             if (Date.now() - game.lastActivity > 10 * 60 * 1000) {
                 global.games.wordle.delete(gameId);
-                await sock.sendMessage(sender, {
-                    text: '⏰ Game expired. Start a new game with !wordle'
-                });
+                await safeSendText(sock, sender, '⏰ Game expired. Start a new game with !wordle'
+                );
                 return;
             }
 
@@ -519,9 +508,8 @@ const funCommands = {
             // Process a guess
             const guess = args[0]?.toUpperCase();
             if (!guess || guess.length !== 5 || !guess.match(/^[A-Z]{5}$/)) {
-                await sock.sendMessage(sender, {
-                    text: '❌ Please provide a valid 5-letter word'
-                });
+                await safeSendText(sock, sender, '❌ Please provide a valid 5-letter word'
+                );
                 return;
             }
             
@@ -562,16 +550,14 @@ const funCommands = {
                 }
             } catch (err) {
                 logger.error('Error processing Wordle guess:', err);
-                await sock.sendMessage(sender, {
-                    text: '❌ Error processing your guess'
-                });
+                await safeSendText(sock, sender, '❌ Error processing your guess'
+                );
                 global.games.wordle.delete(gameId);
             }
         } catch (err) {
             logger.error('Wordle error:', err);
-            await sock.sendMessage(sender, {
-                text: '❌ An error occurred during the game'
-            });
+            await safeSendText(sock, sender, '❌ An error occurred during the game'
+            );
             global.games.wordle.delete(sender);
         }
     },
@@ -625,9 +611,8 @@ const funCommands = {
 
             const category = args[0].toLowerCase();
             if (!categories[category]) {
-                await sock.sendMessage(sender, {
-                    text: '❌ Invalid category. Available categories: ' + Object.keys(categories).join(', ')
-                });
+                await safeSendText(sock, sender, '❌ Invalid category. Available categories: ' + Object.keys(categories).join(', ')
+                );
                 return;
             }
 
@@ -665,9 +650,8 @@ const funCommands = {
             // Check for game timeout
             if (Date.now() - game.lastActivity > 5 * 60 * 1000) {
                 global.games.quiz.delete(gameId);
-                await sock.sendMessage(sender, {
-                    text: '⏰ Quiz expired. Start a new quiz with !quiz'
-                });
+                await safeSendText(sock, sender, '⏰ Quiz expired. Start a new quiz with !quiz'
+                );
                 return;
             }
 
@@ -675,9 +659,8 @@ const funCommands = {
             if (args[0].toLowerCase() === 'answer') {
                 const answer = parseInt(args[1]);
                 if (isNaN(answer) || answer < 1 || answer > 4) {
-                    await sock.sendMessage(sender, {
-                        text: '❌ Please provide a valid answer number (1-4)'
-                    });
+                    await safeSendText(sock, sender, '❌ Please provide a valid answer number (1-4)'
+                    );
                     return;
                 }
 
@@ -727,9 +710,8 @@ const funCommands = {
             }
         } catch (err) {
             logger.error('Quiz error:', err);
-            await sock.sendMessage(sender, {
-                text: '❌ An error occurred during the quiz'
-            });
+            await safeSendText(sock, sender, '❌ An error occurred during the quiz'
+            );
             global.games.quiz.delete(sender);
         }
     },
@@ -743,9 +725,8 @@ const funCommands = {
             const userChoice = args.join(' ').toLowerCase();
             
             if (!choices.includes(userChoice)) {
-                await sock.sendMessage(sender, { 
-                    text: '⚔️ *Rock Paper Scissors*\n\nChoose your weapon:\n• rock 🪨\n• paper 📄\n• scissors ✂️' 
-                });
+                await safeSendText(sock, sender, '⚔️ *Rock Paper Scissors*\n\nChoose your weapon:\n• rock 🪨\n• paper 📄\n• scissors ✂️' 
+                );
                 return;
             }
             
@@ -770,12 +751,11 @@ const funCommands = {
             }
             
             const response = `*⚔️ Rock Paper Scissors*\n\nYou chose: ${userChoice} ${emojis[userChoice]}\nBot chose: ${botChoice} ${emojis[botChoice]}\n\n${result}\n\nPlay again with !rps [choice]`;
-            await sock.sendMessage(sender, { text: response });
+            await safeSendText(sock, sender, response );
         } catch (err) {
             logger.error('RPS error:', err);
-            await sock.sendMessage(message.key.remoteJid, { 
-                text: '❌ An error occurred during the game. Please try again.' 
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ An error occurred during the game. Please try again.' 
+            );
         }
     },
 
@@ -785,21 +765,18 @@ const funCommands = {
             const sides = parseInt(args[0]) || 6;
 
             if (sides < 2 || sides > 100) {
-                await sock.sendMessage(sender, {
-                    text: '🎲 Please specify a number of sides between 2 and 100\nExample: !roll 20'
-                });
+                await safeSendText(sock, sender, '🎲 Please specify a number of sides between 2 and 100\nExample: !roll 20'
+                );
                 return;
             }
 
             const result = Math.floor(Math.random() * sides) + 1;
-            await sock.sendMessage(sender, {
-                text: `🎲 *Dice Roll (d${sides})*\n\nYou rolled: ${result}\n\nRoll again with !roll [sides]`
+            await safeSendText(sock, sender, `🎲 *Dice Roll (d${sides)*\n\nYou rolled: ${result}\n\nRoll again with !roll [sides]`
             });
         } catch (err) {
             logger.error('Dice roll error:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error rolling dice. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error rolling dice. Please try again.'
+            );
         }
     },
 
@@ -843,9 +820,8 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Riddle error:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error generating riddle. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error generating riddle. Please try again.'
+            );
         }
     },
 
@@ -854,9 +830,8 @@ const funCommands = {
             const sender = message.key.remoteJid;
             
             if (!global.riddles || !global.riddles.has(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '❌ No active riddle. Use !riddle to get a new riddle'
-                });
+                await safeSendText(sock, sender, '❌ No active riddle. Use !riddle to get a new riddle'
+                );
                 return;
             }
 
@@ -865,9 +840,8 @@ const funCommands = {
             // Check for timeout (5 minutes)
             if (Date.now() - riddle.timestamp > 5 * 60 * 1000) {
                 global.riddles.delete(sender);
-                await sock.sendMessage(sender, {
-                    text: '⏰ Riddle expired. Use !riddle to get a new one'
-                });
+                await safeSendText(sock, sender, '⏰ Riddle expired. Use !riddle to get a new one'
+                );
                 return;
             }
 
@@ -877,9 +851,8 @@ const funCommands = {
             global.riddles.delete(sender);
         } catch (err) {
             logger.error('Reveal error:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error revealing answer. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error revealing answer. Please try again.'
+            );
         }
     },
 
@@ -905,9 +878,8 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Fact error:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error generating fact. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error generating fact. Please try again.'
+            );
         }
     },
 
@@ -1007,9 +979,8 @@ const funCommands = {
             // Check for game timeout
             if (Date.now() - game.lastActivity > 5 * 60 * 1000) {
                 global.games.trivia.delete(gameId);
-                await sock.sendMessage(sender, {
-                    text: '⏰ Game expired. Start a new game with !trivia'
-                });
+                await safeSendText(sock, sender, '⏰ Game expired. Start a new game with !trivia'
+                );
                 return;
             }
 
@@ -1017,9 +988,8 @@ const funCommands = {
             if (args[0].toLowerCase() === 'answer') {
                 const answer = parseInt(args[1]);
                 if (isNaN(answer) || answer < 1 || answer > 4) {
-                    await sock.sendMessage(sender, {
-                        text: '❌ Please provide a valid answer number (1-4)'
-                    });
+                    await safeSendText(sock, sender, '❌ Please provide a valid answer number (1-4)'
+                    );
                     return;
                 }
 
@@ -1058,9 +1028,8 @@ const funCommands = {
             }
         } catch (err) {
             logger.error('Trivia error:', err);
-            await sock.sendMessage(sender, {
-                text: '❌ An error occurred during the game'
-            });
+            await safeSendText(sock, sender, '❌ An error occurred during the game'
+            );
             global.games.trivia.delete(gameId);
         }
     },
@@ -1095,16 +1064,17 @@ const funCommands = {
                 message += '😢 No winning lines. Try again!';
             }
 
-            await sock.sendMessage(sender, { text: message });
+            await safeSendText(sock, sender, message );
         } catch (err) {
             logger.error('Slot error:', err);
-            await sock.sendMessage(message.key.remoteJid, { 
-                text: '❌ Error running slot machine. Please try again.' 
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error running slot machine. Please try again.' 
+            );
         }
     },
 
     async fortune(sock, message) {
+        const { safeSendText } = require('../utils/jidHelper');
+        
         try {
             const sender = message.key.remoteJid;
             const fortunes = [
@@ -1121,14 +1091,11 @@ const funCommands = {
             ];
 
             const randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];
-            await sock.sendMessage(sender, { 
-                text: `🔮 *Your Fortune*\n\n${randomFortune}\n\nGet another fortune with !fortune` 
-            });
+            await safeSendText(sock, sender, `🔮 *Your Fortune*\n\n${randomFortune}\n\nGet another fortune with !fortune`);
         } catch (err) {
             logger.error('Fortune error:', err);
-            await sock.sendMessage(message.key.remoteJid, { 
-                text: '❌ Error reading your fortune. Please try again.' 
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error reading your fortune. Please try again.' 
+            );
         }
     },
 
@@ -1166,12 +1133,11 @@ const funCommands = {
             };
 
             const response = `🌟 *${sign.toUpperCase()} Horoscope*\n\n${horoscopes[sign]}\n\nCheck again tomorrow!`;
-            await sock.sendMessage(sender, { text: response });
+            await safeSendText(sock, sender, response );
         } catch (err) {
             logger.error('Horoscope error:', err);
-            await sock.sendMessage(message.key.remoteJid, { 
-                text: '❌ Error reading your horoscope. Please try again.' 
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error reading your horoscope. Please try again.' 
+            );
         }
     },
 
@@ -1181,7 +1147,7 @@ const funCommands = {
             if (args[0] && !isNaN(args[0])) {
                 sides = parseInt(args[0]);
                 if (sides < 2 || sides > 100) {
-                    await sock.sendMessage(sender, { text: '❌ Please enter a number between 2 and 100.' });
+                    await safeSendText(sock, sender, '❌ Please enter a number between 2 and 100.' );
                     return;
                 }
             }
@@ -1190,7 +1156,7 @@ const funCommands = {
             await sock.sendMessage(sender, { text: `🎲 You rolled: ${result} (d${sides})` });
         } catch (err) {
             logger.error('Roll error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
 
@@ -1200,7 +1166,7 @@ const funCommands = {
             await sock.sendMessage(sender, { text: `🪙 Coin flip: ${result}` });
         } catch (err) {
             logger.error('Flip error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
 
@@ -1209,9 +1175,8 @@ const funCommands = {
             const choices = args.join(' ').split(',').map(choice => choice.trim()).filter(Boolean);
             
             if (choices.length < 2) {
-                await sock.sendMessage(sender, { 
-                    text: '❌ Please provide at least 2 options separated by commas.' 
-                });
+                await safeSendText(sock, sender, '❌ Please provide at least 2 options separated by commas.' 
+                );
                 return;
             }
             
@@ -1219,7 +1184,7 @@ const funCommands = {
             await sock.sendMessage(sender, { text: `🎯 I choose: ${randomChoice}` });
         } catch (err) {
             logger.error('Choose error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1230,9 +1195,8 @@ const funCommands = {
             
             const type = args[0]?.toLowerCase();
             if (!type || (type !== 'truth' && type !== 'dare')) {
-                await sock.sendMessage(sender, { 
-                    text: '🎮 Truth or Dare\n\nChoose either *!truthordare truth* or *!truthordare dare*' 
-                });
+                await safeSendText(sock, sender, '🎮 Truth or Dare\n\nChoose either *!truthordare truth* or *!truthordare dare*' 
+                );
                 return;
             }
             
@@ -1270,7 +1234,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Truth or Dare error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await safeSendText(sock, sender, '❌ An error occurred during the game.' );
         }
     },
     
@@ -1299,7 +1263,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Would You Rather error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1328,7 +1292,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Never Have I Ever error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1355,7 +1319,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Fact error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching a fact.' });
+            await safeSendText(sock, sender, '❌ An error occurred while fetching a fact.' );
         }
     },
     
@@ -1382,7 +1346,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Fortune error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred while fetching your fortune.' });
+            await safeSendText(sock, sender, '❌ An error occurred while fetching your fortune.' );
         }
     },
     
@@ -1449,7 +1413,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Riddle error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1459,16 +1423,14 @@ const funCommands = {
             if (!(await areGamesEnabled(sock, sender))) return;
             
             if (!global.riddles || !global.riddles.has(sender)) {
-                await sock.sendMessage(sender, { 
-                    text: '❌ No active riddle found. Start a new riddle with *!riddle*' 
-                });
+                await safeSendText(sock, sender, '❌ No active riddle found. Start a new riddle with *!riddle*' 
+                );
                 return;
             }
             
             if (!args.length) {
-                await sock.sendMessage(sender, { 
-                    text: '❓ Please provide your guess!' 
-                });
+                await safeSendText(sock, sender, '❓ Please provide your guess!' 
+                );
                 return;
             }
             
@@ -1476,18 +1438,16 @@ const funCommands = {
             const guess = args.join(' ').toLowerCase().trim();
             
             if (guess === riddle.answer.toLowerCase()) {
-                await sock.sendMessage(sender, { 
-                    text: '🎉 Correct! You solved the riddle!\n\nAsk for another with *!riddle*' 
-                });
+                await safeSendText(sock, sender, '🎉 Correct! You solved the riddle!\n\nAsk for another with *!riddle*' 
+                );
                 global.riddles.delete(sender);
             } else {
-                await sock.sendMessage(sender, { 
-                    text: '❌ Incorrect! Try again or use *!riddlehint* for a hint.' 
-                });
+                await safeSendText(sock, sender, '❌ Incorrect! Try again or use *!riddlehint* for a hint.' 
+                );
             }
         } catch (err) {
             logger.error('Riddle guess error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1497,9 +1457,8 @@ const funCommands = {
             if (!(await areGamesEnabled(sock, sender))) return;
             
             if (!global.riddles || !global.riddles.has(sender)) {
-                await sock.sendMessage(sender, { 
-                    text: '❌ No active riddle found. Start a new riddle with *!riddle*' 
-                });
+                await safeSendText(sock, sender, '❌ No active riddle found. Start a new riddle with *!riddle*' 
+                );
                 return;
             }
             
@@ -1523,7 +1482,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Riddle hint error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1555,7 +1514,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Word scramble error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1565,16 +1524,14 @@ const funCommands = {
             if (!(await areGamesEnabled(sock, sender))) return;
             
             if (!global.wordScramble || !global.wordScramble.has(sender)) {
-                await sock.sendMessage(sender, { 
-                    text: '❌ No active word scramble found. Start a new game with *!scramble*' 
-                });
+                await safeSendText(sock, sender, '❌ No active word scramble found. Start a new game with *!scramble*' 
+                );
                 return;
             }
             
             if (!args.length) {
-                await sock.sendMessage(sender, { 
-                    text: '❓ Please provide your guess!' 
-                });
+                await safeSendText(sock, sender, '❓ Please provide your guess!' 
+                );
                 return;
             }
             
@@ -1582,18 +1539,16 @@ const funCommands = {
             const guess = args[0].toLowerCase().trim();
             
             if (guess === word) {
-                await sock.sendMessage(sender, { 
-                    text: '🎉 Correct! You unscrambled the word!\n\nPlay again with *!scramble*' 
-                });
+                await safeSendText(sock, sender, '🎉 Correct! You unscrambled the word!\n\nPlay again with *!scramble*' 
+                );
                 global.wordScramble.delete(sender);
             } else {
-                await sock.sendMessage(sender, { 
-                    text: '❌ Incorrect! Try again or use *!scramblehint* for a hint.' 
-                });
+                await safeSendText(sock, sender, '❌ Incorrect! Try again or use *!scramblehint* for a hint.' 
+                );
             }
         } catch (err) {
             logger.error('Unscramble error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1603,9 +1558,8 @@ const funCommands = {
             if (!(await areGamesEnabled(sock, sender))) return;
             
             if (!global.wordScramble || !global.wordScramble.has(sender)) {
-                await sock.sendMessage(sender, { 
-                    text: '❌ No active word scramble found. Start a new game with *!scramble*' 
-                });
+                await safeSendText(sock, sender, '❌ No active word scramble found. Start a new game with *!scramble*' 
+                );
                 return;
             }
             
@@ -1619,7 +1573,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Scramble hint error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1664,9 +1618,8 @@ const funCommands = {
             const answer = args[0]?.toLowerCase();
             
             if (answer !== 'yes' && answer !== 'no') {
-                await sock.sendMessage(sender, { 
-                    text: '❓ Please answer with *!akinator yes* or *!akinator no*.' 
-                });
+                await safeSendText(sock, sender, '❓ Please answer with *!akinator yes* or *!akinator no*.' 
+                );
                 return;
             }
             
@@ -1709,7 +1662,7 @@ const funCommands = {
             }
         } catch (err) {
             logger.error('Akinator error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await safeSendText(sock, sender, '❌ An error occurred during the game.' );
             global.akinator.delete(sender);
         }
     },
@@ -1744,7 +1697,7 @@ const funCommands = {
             // Process a guess
             const guess = parseInt(args[0]);
             if (isNaN(guess)) {
-                await sock.sendMessage(sender, { text: '❌ Please enter a valid number.' });
+                await safeSendText(sock, sender, '❌ Please enter a valid number.' );
                 return;
             }
             
@@ -1769,7 +1722,7 @@ const funCommands = {
             }
         } catch (err) {
             logger.error('Number game error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await safeSendText(sock, sender, '❌ An error occurred during the game.' );
             global.numberGames.delete(sender);
         }
     },
@@ -1785,7 +1738,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Coin flip error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -1855,9 +1808,8 @@ const funCommands = {
             const guess = args[0];
             
             if (!guess || !/^[1-6]{4}$/.test(guess)) {
-                await sock.sendMessage(sender, { 
-                    text: '❌ Please enter a valid 4-digit code using only numbers 1-6.' 
-                });
+                await safeSendText(sock, sender, '❌ Please enter a valid 4-digit code using only numbers 1-6.' 
+                );
                 return;
             }
             
@@ -1930,11 +1882,11 @@ const funCommands = {
             
             message += `\n\nYou have ${game.maxAttempts - game.attempts} attempts left.`;
             
-            await sock.sendMessage(sender, { text: message });
+            await safeSendText(sock, sender, message );
             global.codeGames.set(gameId, game);
         } catch (err) {
             logger.error('Crack the code error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await safeSendText(sock, sender, '❌ An error occurred during the game.' );
             global.codeGames.delete(sender);
         }
     },
@@ -1984,16 +1936,15 @@ const funCommands = {
                 message += '- Lizard eats Paper and poisons Spock\n';
                 message += '- Spock vaporizes Rock and smashes Scissors';
                 
-                await sock.sendMessage(sender, { text: message });
+                await safeSendText(sock, sender, message );
                 return;
             }
             
             const playerChoice = args[0].toLowerCase();
             
             if (!choices.includes(playerChoice)) {
-                await sock.sendMessage(sender, { 
-                    text: '❌ Invalid choice! Please choose rock, paper, scissors, lizard, or spock.' 
-                });
+                await safeSendText(sock, sender, '❌ Invalid choice! Please choose rock, paper, scissors, lizard, or spock.' 
+                );
                 return;
             }
             
@@ -2017,10 +1968,10 @@ const funCommands = {
                             `I chose: ${emojis[botChoice]} ${botChoice}\n\n` +
                             `${result}${explanation ? ' ' + explanation : ''}`;
             
-            await sock.sendMessage(sender, { text: message });
+            await safeSendText(sock, sender, message );
         } catch (err) {
             logger.error('RPSLS error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await safeSendText(sock, sender, '❌ An error occurred during the game.' );
         }
     },
     
@@ -2047,7 +1998,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('This or That error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2074,7 +2025,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Dare error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2101,7 +2052,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Truth error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2128,7 +2079,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Pickup Line error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2155,13 +2106,16 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Dad Joke error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
     // 23. Yo Mama Joke
     async yomama(sock, sender) {
+        const { safeSendText } = require('../utils/jidHelper');
+        
         try {
+            // Use raw API access to bypass the endsWith error
             const jokes = [
                 "Yo mama's so old, her birth certificate is in Roman numerals.",
                 "Yo mama's so old, she sat next to Jesus in school.",
@@ -2177,17 +2131,22 @@ const funCommands = {
             
             const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
             
-            await sock.sendMessage(sender, { 
-                text: `😂 Yo Mama Joke:\n\n${randomJoke}` 
-            });
+            // Use our enhanced safe send function
+            const result = await safeSendText(sock, sender, `😂 Yo Mama Joke:\n\n${randomJoke}`);
+            
+            if (result) {
+                logger.info('Yo Mama joke sent successfully');
+            }
         } catch (err) {
             logger.error('Yo Mama Joke error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            // No need for fallback - the safeSendText already handles JID normalization
         }
     },
     
     // 24. Compliment
     async compliment(sock, sender) {
+        const { safeSendText } = require('../utils/jidHelper');
+        
         try {
             const compliments = [
                 "Your smile could light up even the darkest room.",
@@ -2204,17 +2163,20 @@ const funCommands = {
             
             const randomCompliment = compliments[Math.floor(Math.random() * compliments.length)];
             
-            await sock.sendMessage(sender, { 
-                text: `✨ Compliment:\n\n${randomCompliment}` 
-            });
+            // Use our enhanced safe send function
+            await safeSendText(sock, sender, `✨ Compliment:\n\n${randomCompliment}`);
+            
+            logger.info('Compliment sent successfully');
         } catch (err) {
             logger.error('Compliment error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            // No need for fallback - the safeSendText already handles error cases
         }
     },
     
     // 25. Random Emoji Story
     async emojistory(sock, sender) {
+        const { safeSendText } = require('../utils/jidHelper');
+        
         try {
             const stories = [
                 "🧙‍♂️✨🐉👑💎 - A wizard cast a spell on a dragon to protect the royal jewels.",
@@ -2231,12 +2193,11 @@ const funCommands = {
             
             const randomStory = stories[Math.floor(Math.random() * stories.length)];
             
-            await sock.sendMessage(sender, { 
-                text: `📖 Emoji Story:\n\n${randomStory}` 
-            });
+            await safeSendText(sock, sender, `📖 Emoji Story:\n\n${randomStory}`);
+            logger.info('Emoji story sent successfully');
         } catch (err) {
             logger.error('Emoji Story error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            // No need for fallback - the safeSendText already handles error cases
         }
     },
     
@@ -2297,7 +2258,7 @@ const funCommands = {
                 
                 message += "\nReply with *!quiztrivia [letter]* (e.g., !quiztrivia A)";
                 
-                await sock.sendMessage(sender, { text: message });
+                await safeSendText(sock, sender, message );
                 return;
             }
             
@@ -2305,7 +2266,7 @@ const funCommands = {
             const answer = args[0]?.toUpperCase();
             
             if (!answer || !['A', 'B', 'C', 'D'].includes(answer)) {
-                await sock.sendMessage(sender, { text: '❓ Please answer with A, B, C, or D!' });
+                await safeSendText(sock, sender, '❓ Please answer with A, B, C, or D!' );
                 return;
             }
             
@@ -2325,7 +2286,7 @@ const funCommands = {
             global.triviaQuizzes.delete(quizId);
         } catch (err) {
             logger.error('Quiz Trivia error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
             global.triviaQuizzes.delete(sender);
         }
     },
@@ -2346,7 +2307,7 @@ const funCommands = {
                 signs.forEach(s => {
                     message += `*!horoscope ${s}*\n`;
                 });
-                await sock.sendMessage(sender, { text: message });
+                await safeSendText(sock, sender, message );
                 return;
             }
             
@@ -2387,7 +2348,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Horoscope error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2395,9 +2356,8 @@ const funCommands = {
     async predict(sock, sender, args) {
         try {
             if (!args.length) {
-                await sock.sendMessage(sender, { 
-                    text: '🔮 Ask me a yes/no question, and I shall reveal your destiny!' 
-                });
+                await safeSendText(sock, sender, '🔮 Ask me a yes/no question, and I shall reveal your destiny!' 
+                );
                 return;
             }
             
@@ -2436,7 +2396,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Predict error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2444,9 +2404,8 @@ const funCommands = {
     async lovecalc(sock, sender, args) {
         try {
             if (args.length < 2) {
-                await sock.sendMessage(sender, { 
-                    text: '❤️ Love Calculator\n\nPlease provide two names to calculate compatibility!\nUsage: *!lovecalc [name1] [name2]*' 
-                });
+                await safeSendText(sock, sender, '❤️ Love Calculator\n\nPlease provide two names to calculate compatibility!\nUsage: *!lovecalc [name1] [name2]*' 
+                );
                 return;
             }
             
@@ -2473,10 +2432,10 @@ const funCommands = {
                 message += "Incredible match! The stars have aligned for this relationship.";
             }
             
-            await sock.sendMessage(sender, { text: message });
+            await safeSendText(sock, sender, message );
         } catch (err) {
             logger.error('Love Calculator error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2517,10 +2476,10 @@ const funCommands = {
                             `Charisma: ${charisma}\n\n` +
                             `Use this character for your next game!`;
             
-            await sock.sendMessage(sender, { text: message });
+            await safeSendText(sock, sender, message );
         } catch (err) {
             logger.error('Character Generator error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2547,7 +2506,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Roast error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2612,7 +2571,7 @@ const funCommands = {
             // Process a guess
             const guess = parseInt(args[0]);
             if (isNaN(guess)) {
-                await sock.sendMessage(sender, { text: '❌ Please enter a valid number.' });
+                await safeSendText(sock, sender, '❌ Please enter a valid number.' );
                 return;
             }
             
@@ -2636,7 +2595,7 @@ const funCommands = {
             }
         } catch (err) {
             logger.error('Find Number error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await safeSendText(sock, sender, '❌ An error occurred during the game.' );
             global.numberSequenceGames.delete(sender);
         }
     },
@@ -2664,7 +2623,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Game Fact error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2718,12 +2677,12 @@ const funCommands = {
             // Process a guess
             const guess = args[0]?.toUpperCase();
             if (!guess || guess.length !== 1 || !guess.match(/[A-Z]/)) {
-                await sock.sendMessage(sender, { text: '❌ Please guess a single letter (A-Z).' });
+                await safeSendText(sock, sender, '❌ Please guess a single letter (A-Z).' );
                 return;
             }
             
             if (game.guessedLetters.includes(guess)) {
-                await sock.sendMessage(sender, { text: '❌ You already guessed that letter!' });
+                await safeSendText(sock, sender, '❌ You already guessed that letter!' );
                 return;
             }
             
@@ -2757,7 +2716,7 @@ const funCommands = {
             }
         } catch (err) {
             logger.error('Movie Hangman error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await safeSendText(sock, sender, '❌ An error occurred during the game.' );
             global.movieHangmanGames.delete(sender);
         }
     },
@@ -2822,7 +2781,7 @@ const funCommands = {
             
         } catch (err) {
             logger.error('Movie Quiz error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2832,16 +2791,14 @@ const funCommands = {
             if (!(await areGamesEnabled(sock, sender))) return;
             
             if (!global.movieQuizzes || !global.movieQuizzes.has(sender)) {
-                await sock.sendMessage(sender, { 
-                    text: '❌ No active movie quiz found. Start a new quiz with *!moviequiz*' 
-                });
+                await safeSendText(sock, sender, '❌ No active movie quiz found. Start a new quiz with *!moviequiz*' 
+                );
                 return;
             }
             
             if (!args.length) {
-                await sock.sendMessage(sender, { 
-                    text: '❓ Please provide your guess!' 
-                });
+                await safeSendText(sock, sender, '❓ Please provide your guess!' 
+                );
                 return;
             }
             
@@ -2863,7 +2820,7 @@ const funCommands = {
             }
         } catch (err) {
             logger.error('Movie Answer error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -2898,7 +2855,7 @@ const funCommands = {
             const word = args[0]?.toLowerCase();
             
             if (!word) {
-                await sock.sendMessage(sender, { text: '❓ Please provide a word!' });
+                await safeSendText(sock, sender, '❓ Please provide a word!' );
                 return;
             }
             
@@ -2913,7 +2870,7 @@ const funCommands = {
             
             // Word must not have been used before
             if (game.words.includes(word) || game.lastWord === word) {
-                await sock.sendMessage(sender, { text: '❌ That word has already been used!' });
+                await safeSendText(sock, sender, '❌ That word has already been used!' );
                 return;
             }
             
@@ -2980,7 +2937,7 @@ const funCommands = {
             global.wordChainGames.set(gameId, game);
         } catch (err) {
             logger.error('Word Chain error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the game.' });
+            await safeSendText(sock, sender, '❌ An error occurred during the game.' );
             global.wordChainGames.delete(sender);
         }
     },
@@ -3026,7 +2983,7 @@ const funCommands = {
             const answer = args[0]?.toUpperCase();
             
             if (answer !== 'A' && answer !== 'B') {
-                await sock.sendMessage(sender, { text: '❓ Please answer with A or B!' });
+                await safeSendText(sock, sender, '❓ Please answer with A or B!' );
                 return;
             }
             
@@ -3058,7 +3015,7 @@ const funCommands = {
             global.personalityQuizzes.set(quizId, quiz);
         } catch (err) {
             logger.error('Personality Quiz error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred during the quiz.' });
+            await safeSendText(sock, sender, '❌ An error occurred during the quiz.' );
             global.personalityQuizzes.delete(sender);
         }
     },
@@ -3102,7 +3059,7 @@ const funCommands = {
             });
         } catch (err) {
             logger.error('Math Challenge error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
     
@@ -3112,15 +3069,14 @@ const funCommands = {
             if (!(await areGamesEnabled(sock, sender))) return;
             
             if (!global.mathChallenges || !global.mathChallenges.has(sender)) {
-                await sock.sendMessage(sender, {
-                    text: '❌ No active math challenge found. Start one with *!mathchallenge*'
-                });
+                await safeSendText(sock, sender, '❌ No active math challenge found. Start one with *!mathchallenge*'
+                );
                 return;
             }
             
             const userAnswer = parseInt(args[0]);
             if (isNaN(userAnswer)) {
-                await sock.sendMessage(sender, { text: '❌ Please provide a valid number as your answer.' });
+                await safeSendText(sock, sender, '❌ Please provide a valid number as your answer.' );
                 return;
             }
             
@@ -3139,14 +3095,14 @@ const funCommands = {
             global.mathChallenges.delete(sender);
         } catch (err) {
             logger.error('Math Answer error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     },
 
     async _8ball(sock, sender, args) {
         try {
             if (!args.length) {
-                await sock.sendMessage(sender, { text: '❓ Please ask a question!' });
+                await safeSendText(sock, sender, '❓ Please ask a question!' );
                 return;
             }
             
@@ -3164,7 +3120,7 @@ const funCommands = {
             await sock.sendMessage(sender, { text: `🎱 ${randomResponse}` });
         } catch (err) {
             logger.error('8ball error:', err);
-            await sock.sendMessage(sender, { text: '❌ An error occurred.' });
+            await safeSendText(sock, sender, '❌ An error occurred.' );
         }
     }
 };

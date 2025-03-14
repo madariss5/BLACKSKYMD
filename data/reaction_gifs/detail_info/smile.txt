@@ -1,0 +1,4 @@
+Reaction: smile
+File: smile.gif
+Size: 881K
+Source: Anime/Other

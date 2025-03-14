@@ -32,6 +32,7 @@ const initializeDirectories = async () => {
 
 // Initialize module
 const init = async () => {
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     try {
         return await initializeDirectories();
     } catch (err) {
@@ -51,9 +52,8 @@ async function areMediaCommandsEnabled(sock, remoteJid) {
     if (remoteJid.endsWith('g.us')) {
         const mediaEnabled = await isFeatureEnabled(remoteJid, 'media');
         if (!mediaEnabled) {
-            await sock.sendMessage(remoteJid, { 
-                text: '❌ Media commands are disabled in this group. Ask an admin to enable them with *.feature media on*' 
-            });
+            await safeSendText(sock, remoteJid, '❌ Media commands are disabled in this group. Ask an admin to enable them with *.feature media on*' 
+            );
             return false;
         }
     }
@@ -74,7 +74,7 @@ const playNextInQueue = async (sock, sender) => {
             }
         } catch (err) {
             logger.error('Error playing audio:', err);
-            await sock.sendMessage(sender, { text: '*❌ Error:* Failed to play audio. Please try again.' });
+            await safeSendText(sock, sender, '*❌ Error:* Failed to play audio. Please try again.' );
         }
     }
 };
@@ -91,11 +91,11 @@ const mediaCommands = {
             }
             
             if (!args.length) {
-                await sock.sendMessage(remoteJid, { text: '*📝 Usage:* Reply with audio or provide a YouTube URL/search term' });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply with audio or provide a YouTube URL/search term' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*🔍 Searching:* Looking for your requested audio...' });
+            await safeSendText(sock, remoteJid, '*🔍 Searching:* Looking for your requested audio...' );
 
             let audioUrl;
             if (args[0].startsWith('http')) {
@@ -105,7 +105,7 @@ const mediaCommands = {
                 // Search YouTube
                 const searchResults = await yts(args.join(' '));
                 if (!searchResults.videos.length) {
-                    await sock.sendMessage(remoteJid, { text: '*❌ Error:* No results found' });
+                    await safeSendText(sock, remoteJid, '*❌ Error:* No results found' );
                     return;
                 }
                 audioUrl = searchResults.videos[0].url;
@@ -125,7 +125,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in play command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to play audio' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to play audio' );
         }
     },
 
@@ -139,11 +139,11 @@ const mediaCommands = {
             }
             
             if (!message.message?.imageMessage && !message.message?.videoMessage) {
-                await sock.sendMessage(remoteJid, { text: '*📝 Usage:* Reply to an image/video with .sticker' });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image/video with .sticker' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Creating sticker...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Creating sticker...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -173,7 +173,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in sticker command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to create sticker' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to create sticker' );
         }
     },
 
@@ -187,11 +187,11 @@ const mediaCommands = {
             }
             
             if (!message.message?.stickerMessage) {
-                await sock.sendMessage(remoteJid, { text: '*📝 Usage:* Reply to a sticker with .toimg' });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to a sticker with .toimg' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Converting sticker to image...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Converting sticker to image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -212,7 +212,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in toimg command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to convert sticker to image' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to convert sticker to image' );
         }
     },
 
@@ -226,11 +226,11 @@ const mediaCommands = {
             }
             
             if (!args[0]) {
-                await sock.sendMessage(remoteJid, { text: '*📝 Usage:* .ytmp3 [YouTube URL]' });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .ytmp3 [YouTube URL]' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Downloading audio...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Downloading audio...' );
 
             const stream = ytdl(args[0], { filter: 'audioonly' });
             const chunks = [];
@@ -246,7 +246,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in ytmp3 command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to download audio' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to download audio' );
         }
     },
 
@@ -260,11 +260,11 @@ const mediaCommands = {
             }
             
             if (!args[0]) {
-                await sock.sendMessage(remoteJid, { text: '*📝 Usage:* .ytmp4 [YouTube URL]' });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .ytmp4 [YouTube URL]' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Downloading video...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Downloading video...' );
 
             const stream = ytdl(args[0], { filter: 'videoandaudio' });
             const chunks = [];
@@ -279,7 +279,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in ytmp4 command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to download video' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to download video' );
         }
     },
 
@@ -293,13 +293,12 @@ const mediaCommands = {
             }
             
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* Reply to an image with .enhance'
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .enhance'
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Enhancing image quality...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Enhancing image quality...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -334,9 +333,8 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in enhance command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to enhance image. Please try again later.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to enhance image. Please try again later.'
+            );
         }
     },
 
@@ -350,21 +348,19 @@ const mediaCommands = {
             }
             
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* .sharpen [level]\n\n*Example:* .sharpen 5'
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .sharpen [level]\n\n*Example:* .sharpen 5'
+                );
                 return;
             }
 
             const level = parseInt(args[0]) || 5;
             if (level < 1 || level > 10) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*❌ Error:* Sharpening level must be between 1 and 10'
-                });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Sharpening level must be between 1 and 10'
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Sharpening image...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Sharpening image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -394,9 +390,8 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in sharpen command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to sharpen image. Please try again later.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to sharpen image. Please try again later.'
+            );
         }
     },
 
@@ -410,13 +405,12 @@ const mediaCommands = {
             }
             
             if (!message.message?.videoMessage) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* Reply to a video with .reverse'
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to a video with .reverse'
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Reversing video...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Reversing video...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -450,9 +444,8 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in reverse command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to reverse video. Please try again later.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to reverse video. Please try again later.'
+            );
         }
     },
 
@@ -467,11 +460,11 @@ const mediaCommands = {
             
             const text = args.join(' ');
             if (!text) {
-                await sock.sendMessage(remoteJid, { text: '*📝 Usage:* .ttp [text]' });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .ttp [text]' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Creating text sticker...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Creating text sticker...' );
 
             const tempDir = path.join(__dirname, '../../temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
@@ -506,7 +499,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in ttp command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to create text sticker' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to create text sticker' );
         }
     },
 
@@ -521,11 +514,11 @@ const mediaCommands = {
             
             const text = args.join(' ');
             if (!text) {
-                await sock.sendMessage(remoteJid, { text: '*📝 Usage:* .attp [text]' });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .attp [text]' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Creating animated text sticker...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Creating animated text sticker...' );
 
             const tempDir = path.join(__dirname, '../../temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
@@ -577,7 +570,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in attp command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to create animated text sticker' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to create animated text sticker' );
         }
     },
 
@@ -593,13 +586,12 @@ const mediaCommands = {
             const emojis = args.join('').split('+');
 
             if (emojis.length !== 2) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* .emojimix [emoji1]+[emoji2]\nExample: .emojimix 😀+😭' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .emojimix [emoji1]+[emoji2]\nExample: .emojimix 😀+😭' 
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Mixing emojis...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Mixing emojis...' );
 
             // Use Emoji Kitchen API
             const emojiUrl = `https://www.gstatic.com/android/keyboard/emojikitchen/20201001/${encodeURIComponent(emojis[0])}/${encodeURIComponent(emojis[0])}_${encodeURIComponent(emojis[1])}.png`;
@@ -628,7 +620,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in emojimix command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to mix emojis' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to mix emojis' );
         }
     },
 
@@ -642,11 +634,11 @@ const mediaCommands = {
             }
             
             if (!message.message?.stickerMessage || !message.message.stickerMessage.isAnimated) {
-                await sock.sendMessage(remoteJid, { text: '*📝 Usage:* Reply to an animated sticker with .tovideo' });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an animated sticker with .tovideo' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Converting sticker to video...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Converting sticker to video...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -680,7 +672,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in tovideo command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to convert sticker to video' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to convert sticker to video' );
         }
     },
 
@@ -694,14 +686,13 @@ const mediaCommands = {
             }
             
             if (!message.message?.videoMessage || args.length !== 2) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to a video with .trim [start_time] [end_time]\nExample: .trim 0:10 0:30' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to a video with .trim [start_time] [end_time]\nExample: .trim 0:10 0:30' 
+                );
                 return;
             }
 
             const [startTime, endTime] = args;
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Trimming video...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Trimming video...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -737,7 +728,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in trim command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to trim video' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to trim video' );
         }
     },
 
@@ -751,19 +742,18 @@ const mediaCommands = {
             }
             
             if (!message.message?.videoMessage || !args[0]) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to a video with .speed [factor]\nExample: .speed 2 (2x faster) or .speed 0.5 (2x slower)' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to a video with .speed [factor]\nExample: .speed 2 (2x faster) or .speed 0.5 (2x slower)' 
+                );
                 return;
             }
 
             const speed = parseFloat(args[0]);
             if (isNaN(speed) || speed <= 0 || speed > 4) {
-                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Speed factor must be between 0.1 and 4' });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Speed factor must be between 0.1 and 4' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Adjusting video speed...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Adjusting video speed...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -799,26 +789,25 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in speed command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to adjust video speed' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to adjust video speed' );
         }
     },
     async brightness(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage || !args[0]) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to an image with .brightness [level]\nExample: .brightness 1.5' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .brightness [level]\nExample: .brightness 1.5' 
+                );
                 return;
             }
 
             const level = parseFloat(args[0]);
             if (isNaN(level) || level < 0.1 || level > 2.0) {
-                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Brightness level must be between 0.1 and 2.0' });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Brightness level must be between 0.1 and 2.0' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Adjusting image brightness...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Adjusting image brightness...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -841,7 +830,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in brightness command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to adjust brightness' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to adjust brightness' );
         }
     },
 
@@ -849,19 +838,18 @@ const mediaCommands = {
         try {
             const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage || !args[0]) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to an image with .contrast [level]\nExample: .contrast 1.5' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .contrast [level]\nExample: .contrast 1.5' 
+                );
                 return;
             }
 
             const level = parseFloat(args[0]);
             if (isNaN(level) || level < 0.1 || level > 2.0) {
-                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Contrast level must be between 0.1 and 2.0' });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Contrast level must be between 0.1 and 2.0' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Adjusting image contrast...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Adjusting image contrast...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -884,7 +872,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in contrast command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to adjust contrast' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to adjust contrast' );
         }
     },
 
@@ -892,19 +880,18 @@ const mediaCommands = {
         try {
             const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage || !args[0]) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to an image with .blur [sigma]\nExample: .blur 5' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .blur [sigma]\nExample: .blur 5' 
+                );
                 return;
             }
 
             const sigma = parseFloat(args[0]) || 5;
             if (isNaN(sigma) || sigma < 0.3 || sigma > 20) {
-                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Blur sigma must be between 0.3 and 20' });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Blur sigma must be between 0.3 and 20' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Applying blur effect...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Applying blur effect...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -925,7 +912,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in blur command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to apply blur effect' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to apply blur effect' );
         }
     },
 
@@ -933,19 +920,18 @@ const mediaCommands = {
         try {
             const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage || !args[0]) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to an image with .rotate [degrees]\nExample: .rotate 90' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .rotate [degrees]\nExample: .rotate 90' 
+                );
                 return;
             }
 
             const angle = parseInt(args[0]);
             if (isNaN(angle) || angle < -360 || angle > 360) {
-                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Rotation angle must be between -360 and 360 degrees' });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Rotation angle must be between -360 and 360 degrees' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Rotating image...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Rotating image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -966,7 +952,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in rotate command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to rotate image' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to rotate image' );
         }
     },
 
@@ -974,19 +960,18 @@ const mediaCommands = {
         try {
             const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage || !args[0]) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to an image with .flip [horizontal|vertical]\nExample: .flip horizontal' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .flip [horizontal|vertical]\nExample: .flip horizontal' 
+                );
                 return;
             }
 
             const direction = args[0].toLowerCase();
             if (!['horizontal', 'vertical'].includes(direction)) {
-                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Direction must be either "horizontal" or "vertical"' });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Direction must be either "horizontal" or "vertical"' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Flipping image...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Flipping image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1008,7 +993,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in flip command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to flip image' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to flip image' );
         }
     },
 
@@ -1016,19 +1001,18 @@ const mediaCommands = {
         try {
             const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage || args.length !== 3) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to an image with .tint [red] [green] [blue]\nExample: .tint 255 0 0 for red tint' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .tint [red] [green] [blue]\nExample: .tint 255 0 0 for red tint' 
+                );
                 return;
             }
 
             const [r, g, b] = args.map(n => parseInt(n));
             if ([r, g, b].some(n => isNaN(n) || n < 0 || n > 255)) {
-                await sock.sendMessage(remoteJid, { text: '*❌ Error:* Color values must be between 0 and 255' });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Color values must be between 0 and 255' );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Applying color tint...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Applying color tint...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1049,7 +1033,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in tint command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to apply color tint' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to apply color tint' );
         }
     },
 
@@ -1057,13 +1041,12 @@ const mediaCommands = {
         try {
             const remoteJid = message.key.remoteJid;
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, { 
-                    text: '*📝 Usage:* Reply to an image with .negate' 
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .negate' 
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Inverting image colors...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Inverting image colors...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1084,7 +1067,7 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in negate command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '*❌ Error:* Failed to invert image colors' });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to invert image colors' );
         }
     },
 
@@ -1098,13 +1081,12 @@ const mediaCommands = {
             }
 
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* Reply to an image with .grayscale'
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .grayscale'
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Converting image to grayscale...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Converting image to grayscale...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1125,9 +1107,8 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in grayscale command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to convert image to grayscale'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to convert image to grayscale'
+            );
         }
     },
 
@@ -1141,21 +1122,19 @@ const mediaCommands = {
             }
 
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* .rotate [degrees]\nExample: .rotate 90'
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .rotate [degrees]\nExample: .rotate 90'
+                );
                 return;
             }
 
             const degrees = parseInt(args[0]) || 90;
             if (![90, 180, 270].includes(degrees)) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*❌ Error:* Rotation degrees must be 90, 180, or 270'
-                });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Rotation degrees must be 90, 180, or 270'
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Rotating image...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Rotating image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1176,9 +1155,8 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in rotate command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to rotate image'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to rotate image'
+            );
         }
     },
 
@@ -1192,21 +1170,19 @@ const mediaCommands = {
             }
 
             if (!message.message?.imageMessage || !args[0]) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* .flip [horizontal|vertical]'
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .flip [horizontal|vertical]'
+                );
                 return;
             }
 
             const direction = args[0].toLowerCase();
             if (!['horizontal', 'vertical'].includes(direction)) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*❌ Error:* Direction must be "horizontal" or "vertical"'
-                });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Direction must be "horizontal" or "vertical"'
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Flipping image...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Flipping image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1228,9 +1204,8 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in flip command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to flip image'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to flip image'
+            );
         }
     },
 
@@ -1244,13 +1219,12 @@ const mediaCommands = {
             }
 
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* Reply to an image with .negate'
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* Reply to an image with .negate'
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Inverting image colors...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Inverting image colors...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1271,9 +1245,8 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in negate command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to invert image colors'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to invert image colors'
+            );
         }
     },
 
@@ -1287,21 +1260,19 @@ const mediaCommands = {
             }
 
             if (!message.message?.imageMessage) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* .blur [sigma]\nExample: .blur 5'
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .blur [sigma]\nExample: .blur 5'
+                );
                 return;
             }
 
             const sigma = parseFloat(args[0]) || 5;
             if (sigma < 0.3 || sigma > 20) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*❌ Error:* Blur sigma must be between 0.3 and 20'
-                });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Blur sigma must be between 0.3 and 20'
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Applying blur effect...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Applying blur effect...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1322,9 +1293,8 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in blur command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to blur image'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to blur image'
+            );
         }
     },
 
@@ -1338,21 +1308,19 @@ const mediaCommands = {
             }
 
             if (!message.message?.imageMessage || args.length !== 3) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*📝 Usage:* .tint [red] [green] [blue]\nExample: .tint 255 0 0'
-                });
+                await safeSendText(sock, remoteJid, '*📝 Usage:* .tint [red] [green] [blue]\nExample: .tint 255 0 0'
+                );
                 return;
             }
 
             const [r, g, b] = args.map(Number);
             if ([r, g, b].some(v => isNaN(v) || v < 0 || v > 255)) {
-                await sock.sendMessage(remoteJid, {
-                    text: '*❌ Error:* Color values must be between 0 and 255'
-                });
+                await safeSendText(sock, remoteJid, '*❌ Error:* Color values must be between 0 and 255'
+                );
                 return;
             }
 
-            await sock.sendMessage(remoteJid, { text: '*⏳ Processing:* Applying color tint...' });
+            await safeSendText(sock, remoteJid, '*⏳ Processing:* Applying color tint...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
             const tempDir = path.join(__dirname, '../../temp');
@@ -1373,9 +1341,8 @@ const mediaCommands = {
 
         } catch (err) {
             logger.error('Error in tint command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to tint image'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to tint image'
+            );
         }
     }
 

@@ -1,0 +1,4 @@
+Reaction: punch
+File: punch.gif
+Size: 234K
+Source: Walking Dead

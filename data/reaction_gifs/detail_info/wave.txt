@@ -1,0 +1,4 @@
+Reaction: wave
+File: wave.gif
+Size: 998K
+Source: Anime/Other

@@ -7,6 +7,7 @@ const logger = require('../utils/logger');
 
 // Bot configuration
 const config = {
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     prefix: process.env.BOT_PREFIX || '!',
     owner: process.env.OWNER_NUMBER || ''
 };
@@ -46,9 +47,8 @@ async function messageHandler(sock, message) {
             const hasPermission = await commandLoader.hasPermission(sender, command.config.permissions);
 
             if (!hasPermission) {
-                await sock.sendMessage(sender, {
-                    text: '❌ You do not have permission to use this command.'
-                });
+                await safeSendText(sock, sender, '❌ You do not have permission to use this command.'
+                );
                 return;
             }
 
@@ -56,9 +56,8 @@ async function messageHandler(sock, message) {
                 await command.execute(sock, message, args);
             } catch (err) {
                 logger.error(`Error executing command ${commandName}:`, err);
-                await sock.sendMessage(sender, {
-                    text: '❌ Error executing command. Please try again.'
-                });
+                await safeSendText(sock, sender, '❌ Error executing command. Please try again.'
+                );
             }
         }
     } catch (err) {

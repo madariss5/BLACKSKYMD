@@ -4,18 +4,19 @@ const { languageManager } = require('../utils/language');
 const axios = require('axios');
 
 const utilityCommands = {
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     async weather(sock, sender, args) {
         try {
             const city = args.join(' ');
             if (!city) {
-                await sock.sendMessage(sender, { text: 'Please provide a city name' });
+                await safeSendText(sock, sender, 'Please provide a city name' );
                 return;
             }
 
             const API_KEY = process.env.OPENWEATHER_API_KEY;
             if (!API_KEY) {
                 logger.error('OpenWeather API key not found');
-                await sock.sendMessage(sender, { text: 'Weather service is currently unavailable' });
+                await safeSendText(sock, sender, 'Weather service is currently unavailable' );
                 return;
             }
 
@@ -30,10 +31,10 @@ const utilityCommands = {
 🌪️ Wind: ${weather.wind.speed} m/s
 ☁️ Conditions: ${weather.weather[0].description}`;
 
-            await sock.sendMessage(sender, { text: message });
+            await safeSendText(sock, sender, message );
         } catch (err) {
             logger.error('Weather command error:', err);
-            await sock.sendMessage(sender, { text: 'Error fetching weather data. Please try again later.' });
+            await safeSendText(sock, sender, 'Error fetching weather data. Please try again later.' );
         }
     },
 
@@ -41,25 +42,24 @@ const utilityCommands = {
         try {
             const [from, to, ...text] = args;
             if (!from || !to || text.length === 0) {
-                await sock.sendMessage(sender, { 
-                    text: 'Usage: !translate [from] [to] [text]\nExample: !translate en es Hello' 
-                });
+                await safeSendText(sock, sender, 'Usage: !translate [from] [to] [text]\nExample: !translate en es Hello' 
+                );
                 return;
             }
 
             const API_KEY = process.env.TRANSLATION_API_KEY;
             if (!API_KEY) {
                 logger.error('Translation API key not found');
-                await sock.sendMessage(sender, { text: 'Translation service is currently unavailable' });
+                await safeSendText(sock, sender, 'Translation service is currently unavailable' );
                 return;
             }
 
             // Using a mock translation for now - implement actual API later
             const translatedText = `Translated text will appear here (${from} -> ${to}): ${text.join(' ')}`;
-            await sock.sendMessage(sender, { text: translatedText });
+            await safeSendText(sock, sender, translatedText );
         } catch (err) {
             logger.error('Translation error:', err);
-            await sock.sendMessage(sender, { text: 'Error during translation. Please try again later.' });
+            await safeSendText(sock, sender, 'Error during translation. Please try again later.' );
         }
     },
 
@@ -67,13 +67,13 @@ const utilityCommands = {
         try {
             const expression = args.join(' ');
             if (!expression) {
-                await sock.sendMessage(sender, { text: '⚠️ Please provide a mathematical expression\nExample: .calculate 2 + 2 * 3' });
+                await safeSendText(sock, sender, '⚠️ Please provide a mathematical expression\nExample: .calculate 2 + 2 * 3' );
                 return;
             }
 
             // Enhanced sanitization and validation
             if (expression.length > 100) {
-                await sock.sendMessage(sender, { text: '❌ Expression too long. Maximum 100 characters allowed.' });
+                await safeSendText(sock, sender, '❌ Expression too long. Maximum 100 characters allowed.' );
                 return;
             }
 
@@ -84,7 +84,7 @@ const utilityCommands = {
             ];
 
             if (blockedPatterns.some(pattern => expression.toLowerCase().includes(pattern))) {
-                await sock.sendMessage(sender, { text: '❌ Invalid expression. Only mathematical operations are allowed.' });
+                await safeSendText(sock, sender, '❌ Invalid expression. Only mathematical operations are allowed.' );
                 return;
             }
 
@@ -101,7 +101,7 @@ const utilityCommands = {
             const result = new Function(`return ${sanitized}`)();
 
             if (isNaN(result) || !isFinite(result)) {
-                await sock.sendMessage(sender, { text: '❌ Invalid result. Please check your expression.' });
+                await safeSendText(sock, sender, '❌ Invalid result. Please check your expression.' );
                 return;
             }
 
@@ -110,9 +110,8 @@ const utilityCommands = {
             });
         } catch (err) {
             logger.error('Calculate command error:', err);
-            await sock.sendMessage(sender, { 
-                text: '❌ Invalid expression. Please provide a valid mathematical expression.' 
-            });
+            await safeSendText(sock, sender, '❌ Invalid expression. Please provide a valid mathematical expression.' 
+            );
         }
     },
 
@@ -120,23 +119,23 @@ const utilityCommands = {
         try {
             const word = args[0];
             if (!word) {
-                await sock.sendMessage(sender, { text: 'Please provide a word to look up' });
+                await safeSendText(sock, sender, 'Please provide a word to look up' );
                 return;
             }
 
             const API_KEY = process.env.DICTIONARY_API_KEY;
             if (!API_KEY) {
                 logger.error('Dictionary API key not found');
-                await sock.sendMessage(sender, { text: 'Dictionary service is currently unavailable' });
+                await safeSendText(sock, sender, 'Dictionary service is currently unavailable' );
                 return;
             }
 
             // Mock dictionary response - implement actual API later
             const definition = `Definition for ${word} will appear here`;
-            await sock.sendMessage(sender, { text: definition });
+            await safeSendText(sock, sender, definition );
         } catch (err) {
             logger.error('Dictionary lookup error:', err);
-            await sock.sendMessage(sender, { text: 'Error looking up word. Please try again later.' });
+            await safeSendText(sock, sender, 'Error looking up word. Please try again later.' );
         }
     },
     async covid(sock, sender, args) {
@@ -148,29 +147,28 @@ const utilityCommands = {
     async currency(sock, sender, args) {
         const [amount, from, to] = args;
         if (!amount || !from || !to) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !currency [amount] [from] [to]\nExample: !currency 100 USD EUR' 
-            });
+            await safeSendText(sock, sender, 'Usage: !currency [amount] [from] [to]\nExample: !currency 100 USD EUR' 
+            );
             return;
         }
         // TODO: Implement currency conversion
-        await sock.sendMessage(sender, { text: 'Converting currency...' });
+        await safeSendText(sock, sender, 'Converting currency...' );
     },
 
     async shortlink(sock, sender, args) {
         const url = args[0];
         if (!url) {
-            await sock.sendMessage(sender, { text: 'Please provide a URL to shorten' });
+            await safeSendText(sock, sender, 'Please provide a URL to shorten' );
             return;
         }
         // TODO: Implement URL shortening
-        await sock.sendMessage(sender, { text: 'Shortening URL...' });
+        await safeSendText(sock, sender, 'Shortening URL...' );
     },
 
     async wiki(sock, sender, args) {
         const query = args.join(' ');
         if (!query) {
-            await sock.sendMessage(sender, { text: 'Please provide a search term' });
+            await safeSendText(sock, sender, 'Please provide a search term' );
             return;
         }
         // TODO: Implement Wikipedia API integration
@@ -180,13 +178,12 @@ const utilityCommands = {
     async poll(sock, sender, args) {
         const [question, ...options] = args.join(' ').split('|').map(item => item.trim());
         if (!question || options.length < 2) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !poll Question | Option1 | Option2 | ...' 
-            });
+            await safeSendText(sock, sender, 'Usage: !poll Question | Option1 | Option2 | ...' 
+            );
             return;
         }
         const pollText = `📊 Poll: ${question}\n\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`;
-        await sock.sendMessage(sender, { text: pollText });
+        await safeSendText(sock, sender, pollText );
     },
 
     async news(sock, sender, args) {
@@ -198,7 +195,7 @@ const utilityCommands = {
     async timezone(sock, sender, args) {
         const location = args.join(' ');
         if (!location) {
-            await sock.sendMessage(sender, { text: 'Please provide a city or country' });
+            await safeSendText(sock, sender, 'Please provide a city or country' );
             return;
         }
         // TODO: Implement timezone API integration
@@ -209,15 +206,14 @@ const utilityCommands = {
         try {
             const [type, ...text] = args;
             if (!type || text.length === 0) {
-                await sock.sendMessage(sender, { 
-                    text: '⚠️ Usage: .encode [type] [text]\nTypes: base64, hex, binary\nExample: .encode base64 Hello World' 
-                });
+                await safeSendText(sock, sender, '⚠️ Usage: .encode [type] [text]\nTypes: base64, hex, binary\nExample: .encode base64 Hello World' 
+                );
                 return;
             }
 
             const input = text.join(' ');
             if (input.length > 1000) {
-                await sock.sendMessage(sender, { text: '❌ Text too long. Maximum 1000 characters allowed.' });
+                await safeSendText(sock, sender, '❌ Text too long. Maximum 1000 characters allowed.' );
                 return;
             }
 
@@ -235,16 +231,15 @@ const utilityCommands = {
                     ).join(' ');
                     break;
                 default:
-                    await sock.sendMessage(sender, { 
-                        text: '❌ Invalid encoding type. Available types: base64, hex, binary' 
-                    });
+                    await safeSendText(sock, sender, '❌ Invalid encoding type. Available types: base64, hex, binary' 
+                    );
                     return;
             }
 
-            await sock.sendMessage(sender, { text: `🔄 Encoded (${type}):\n${result}` });
+            await safeSendText(sock, sender, `🔄 Encoded (${type):\n${result}` });
         } catch (err) {
             logger.error('Encode command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error encoding text. Please try again.' });
+            await safeSendText(sock, sender, '❌ Error encoding text. Please try again.' );
         }
     },
 
@@ -252,15 +247,14 @@ const utilityCommands = {
         try {
             const [type, ...text] = args;
             if (!type || text.length === 0) {
-                await sock.sendMessage(sender, { 
-                    text: '⚠️ Usage: .decode [type] [text]\nTypes: base64, hex, binary\nExample: .decode base64 SGVsbG8gV29ybGQ=' 
-                });
+                await safeSendText(sock, sender, '⚠️ Usage: .decode [type] [text]\nTypes: base64, hex, binary\nExample: .decode base64 SGVsbG8gV29ybGQ=' 
+                );
                 return;
             }
 
             const input = text.join(' ');
             if (input.length > 1000) {
-                await sock.sendMessage(sender, { text: '❌ Text too long. Maximum 1000 characters allowed.' });
+                await safeSendText(sock, sender, '❌ Text too long. Maximum 1000 characters allowed.' );
                 return;
             }
 
@@ -287,30 +281,28 @@ const utilityCommands = {
                         .join('');
                     break;
                 default:
-                    await sock.sendMessage(sender, { 
-                        text: '❌ Invalid decoding type. Available types: base64, hex, binary' 
-                    });
+                    await safeSendText(sock, sender, '❌ Invalid decoding type. Available types: base64, hex, binary' 
+                    );
                     return;
             }
 
             await sock.sendMessage(sender, { text: `🔄 Decoded: ${result}` });
         } catch (err) {
             logger.error('Decode command error:', err);
-            await sock.sendMessage(sender, { 
-                text: '❌ Invalid input for decoding. Please check your input format and try again.' 
-            });
+            await safeSendText(sock, sender, '❌ Invalid input for decoding. Please check your input format and try again.' 
+            );
         }
     },
 
     async qrread(sock, sender) {
         // TODO: Implement QR code reading from image
-        await sock.sendMessage(sender, { text: 'QR code reading feature coming soon!' });
+        await safeSendText(sock, sender, 'QR code reading feature coming soon!' );
     },
 
     async wolfram(sock, sender, args) {
         const query = args.join(' ');
         if (!query) {
-            await sock.sendMessage(sender, { text: 'Please provide a query' });
+            await safeSendText(sock, sender, 'Please provide a query' );
             return;
         }
         // TODO: Implement Wolfram Alpha API integration
@@ -320,7 +312,7 @@ const utilityCommands = {
     async github(sock, sender, args) {
         const query = args.join(' ');
         if (!query) {
-            await sock.sendMessage(sender, { text: 'Please provide a search term' });
+            await safeSendText(sock, sender, 'Please provide a search term' );
             return;
         }
         // TODO: Implement GitHub API integration
@@ -330,7 +322,7 @@ const utilityCommands = {
     async npm(sock, sender, args) {
         const packageName = args[0];
         if (!packageName) {
-            await sock.sendMessage(sender, { text: 'Please provide a package name' });
+            await safeSendText(sock, sender, 'Please provide a package name' );
             return;
         }
         // TODO: Implement NPM API integration
@@ -346,7 +338,7 @@ const utilityCommands = {
     async whois(sock, sender, args) {
         const domain = args[0];
         if (!domain) {
-            await sock.sendMessage(sender, { text: 'Please provide a domain name' });
+            await safeSendText(sock, sender, 'Please provide a domain name' );
             return;
         }
         // TODO: Implement WHOIS lookup
@@ -354,87 +346,87 @@ const utilityCommands = {
     },
     async ocr(sock, sender) {
         // TODO: Implement optical character recognition
-        await sock.sendMessage(sender, { text: 'OCR feature coming soon!' });
+        await safeSendText(sock, sender, 'OCR feature coming soon!' );
     },
 
     async qrgen(sock, sender, args) {
         const text = args.join(' ');
         if (!text) {
-            await sock.sendMessage(sender, { text: 'Please provide text to generate QR code' });
+            await safeSendText(sock, sender, 'Please provide text to generate QR code' );
             return;
         }
         // TODO: Implement QR code generation
-        await sock.sendMessage(sender, { text: 'Generating QR code...' });
+        await safeSendText(sock, sender, 'Generating QR code...' );
     },
 
     async screenshot(sock, sender, args) {
         const url = args[0];
         if (!url) {
-            await sock.sendMessage(sender, { text: 'Please provide a URL to screenshot' });
+            await safeSendText(sock, sender, 'Please provide a URL to screenshot' );
             return;
         }
         // TODO: Implement website screenshot
-        await sock.sendMessage(sender, { text: 'Taking screenshot...' });
+        await safeSendText(sock, sender, 'Taking screenshot...' );
     },
 
     async color(sock, sender, args) {
         const colorCode = args[0];
         if (!colorCode) {
-            await sock.sendMessage(sender, { text: 'Please provide a color code (hex/rgb)' });
+            await safeSendText(sock, sender, 'Please provide a color code (hex/rgb)' );
             return;
         }
         // TODO: Implement color information
-        await sock.sendMessage(sender, { text: 'Getting color information...' });
+        await safeSendText(sock, sender, 'Getting color information...' );
     },
 
     async lyrics(sock, sender, args) {
         const song = args.join(' ');
         if (!song) {
-            await sock.sendMessage(sender, { text: 'Please provide a song name' });
+            await safeSendText(sock, sender, 'Please provide a song name' );
             return;
         }
         // TODO: Implement lyrics search
-        await sock.sendMessage(sender, { text: 'Searching lyrics...' });
+        await safeSendText(sock, sender, 'Searching lyrics...' );
     },
 
     async movie(sock, sender, args) {
         const title = args.join(' ');
         if (!title) {
-            await sock.sendMessage(sender, { text: 'Please provide a movie title' });
+            await safeSendText(sock, sender, 'Please provide a movie title' );
             return;
         }
         // TODO: Implement movie information search
-        await sock.sendMessage(sender, { text: 'Searching movie info...' });
+        await safeSendText(sock, sender, 'Searching movie info...' );
     },
 
     async anime(sock, sender, args) {
         const title = args.join(' ');
         if (!title) {
-            await sock.sendMessage(sender, { text: 'Please provide an anime title' });
+            await safeSendText(sock, sender, 'Please provide an anime title' );
             return;
         }
         // TODO: Implement anime information search
-        await sock.sendMessage(sender, { text: 'Searching anime info...' });
+        await safeSendText(sock, sender, 'Searching anime info...' );
     },
 
     async spotify(sock, sender, args) {
         const track = args.join(' ');
         if (!track) {
-            await sock.sendMessage(sender, { text: 'Please provide a track name' });
+            await safeSendText(sock, sender, 'Please provide a track name' );
             return;
         }
         // TODO: Implement Spotify track search
-        await sock.sendMessage(sender, { text: 'Searching Spotify...' });
+        await safeSendText(sock, sender, 'Searching Spotify...' );
     },
 
     async urban(sock, sender, args) {
         const term = args.join(' ');
         if (!term) {
-            await sock.sendMessage(sender, { text: 'Please provide a term to look up' });
+            await safeSendText(sock, sender, 'Please provide a term to look up' );
             return;
         }
         // TODO: Implement Urban Dictionary lookup
-        await sock.sendMessage(sender, { text: 'Searching Urban Dictionary...' });
+        await safeSendText(sock, sender, 'Searching Urban Dictionary...' );
     },
 
     async crypto(sock, sender, args) {
@@ -446,7 +438,7 @@ const utilityCommands = {
     async stocks(sock, sender, args) {
         const symbol = args[0]?.toUpperCase();
         if (!symbol) {
-            await sock.sendMessage(sender, { text: 'Please provide a stock symbol' });
+            await safeSendText(sock, sender, 'Please provide a stock symbol' );
             return;
         }
         // TODO: Implement stock price check
@@ -455,66 +447,62 @@ const utilityCommands = {
 
     async reminder(sock, sender, args) {
         if (args.length < 2) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !reminder [time] [message]\nExample: !reminder 30m Check laundry' 
-            });
+            await safeSendText(sock, sender, 'Usage: !reminder [time] [message]\nExample: !reminder 30m Check laundry' 
+            );
             return;
         }
         // TODO: Implement reminder system
-        await sock.sendMessage(sender, { text: 'Setting reminder...' });
+        await safeSendText(sock, sender, 'Setting reminder...' );
     },
 
     async countdown(sock, sender, args) {
         const event = args.join(' ');
         if (!event) {
-            await sock.sendMessage(sender, { text: 'Please provide an event name and date' });
+            await safeSendText(sock, sender, 'Please provide an event name and date' );
             return;
         }
         // TODO: Implement countdown timer
-        await sock.sendMessage(sender, { text: 'Starting countdown...' });
+        await safeSendText(sock, sender, 'Starting countdown...' );
     },
 
     async poll2(sock, sender, args) {
         const [question, ...options] = args.join(' ').split('|');
         if (!question || options.length < 2) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !poll Question | Option1 | Option2 | ...' 
-            });
+            await safeSendText(sock, sender, 'Usage: !poll Question | Option1 | Option2 | ...' 
+            );
             return;
         }
         // TODO: Implement poll creation
-        await sock.sendMessage(sender, { text: 'Creating poll...' });
+        await safeSendText(sock, sender, 'Creating poll...' );
     },
 
     async todo(sock, sender, args) {
         const [action, ...item] = args;
         if (!action || !['add', 'remove', 'list'].includes(action)) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !todo <add|remove|list> [item]' 
-            });
+            await safeSendText(sock, sender, 'Usage: !todo <add|remove|list> [item]' 
+            );
             return;
         }
         // TODO: Implement todo list
-        await sock.sendMessage(sender, { text: 'Managing todo list...' });
+        await safeSendText(sock, sender, 'Managing todo list...' );
     },
 
     async notes(sock, sender, args) {
         const [action, ...content] = args;
         if (!action || !['add', 'view', 'delete'].includes(action)) {
-            await sock.sendMessage(sender, { 
-                text: 'Usage: !notes <add|view|delete> [content]' 
-            });
+            await safeSendText(sock, sender, 'Usage: !notes <add|view|delete> [content]' 
+            );
             return;
         }
         // TODO: Implement notes system
-        await sock.sendMessage(sender, { text: 'Managing notes...' });
+        await safeSendText(sock, sender, 'Managing notes...' );
     },
 
     async reverse(sock, sender, args) {
         try {
             const text = args.join(' ');
             if (!text) {
-                await sock.sendMessage(sender, { text: '⚠️ Please provide text to reverse' });
+                await safeSendText(sock, sender, '⚠️ Please provide text to reverse' );
                 return;
             }
 
@@ -522,7 +510,7 @@ const utilityCommands = {
             await sock.sendMessage(sender, { text: `🔄 ${reversed}` });
         } catch (err) {
             logger.error('Reverse command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error reversing text' });
+            await safeSendText(sock, sender, '❌ Error reversing text' );
         }
     },
 
@@ -530,7 +518,7 @@ const utilityCommands = {
         try {
             const text = args.join(' ');
             if (!text) {
-                await sock.sendMessage(sender, { text: '⚠️ Please provide text to mock' });
+                await safeSendText(sock, sender, '⚠️ Please provide text to mock' );
                 return;
             }
 
@@ -543,7 +531,7 @@ const utilityCommands = {
             await sock.sendMessage(sender, { text: `🔡 ${mocked}` });
         } catch (err) {
             logger.error('Mock command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error mocking text' });
+            await safeSendText(sock, sender, '❌ Error mocking text' );
         }
     },
 
@@ -551,9 +539,8 @@ const utilityCommands = {
         try {
             const sides = parseInt(args[0]) || 6;
             if (sides < 2 || sides > 100) {
-                await sock.sendMessage(sender, { 
-                    text: '⚠️ Please specify a number of sides between 2 and 100' 
-                });
+                await safeSendText(sock, sender, '⚠️ Please specify a number of sides between 2 and 100' 
+                );
                 return;
             }
 
@@ -563,7 +550,7 @@ const utilityCommands = {
             });
         } catch (err) {
             logger.error('Roll command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error rolling dice' });
+            await safeSendText(sock, sender, '❌ Error rolling dice' );
         }
     },
 
@@ -576,7 +563,7 @@ const utilityCommands = {
             });
         } catch (err) {
             logger.error('Flip command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error flipping coin' });
+            await safeSendText(sock, sender, '❌ Error flipping coin' );
         }
     },
 
@@ -584,9 +571,8 @@ const utilityCommands = {
         try {
             const options = args.join(' ').split('|').map(opt => opt.trim()).filter(Boolean);
             if (options.length < 2) {
-                await sock.sendMessage(sender, { 
-                    text: '⚠️ Please provide at least 2 options separated by |\nExample: .choose pizza | burger | salad' 
-                });
+                await safeSendText(sock, sender, '⚠️ Please provide at least 2 options separated by |\nExample: .choose pizza | burger | salad' 
+                );
                 return;
             }
 
@@ -596,7 +582,7 @@ const utilityCommands = {
             });
         } catch (err) {
             logger.error('Choose command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error making a choice' });
+            await safeSendText(sock, sender, '❌ Error making a choice' );
         }
     },
 
@@ -604,7 +590,7 @@ const utilityCommands = {
         try {
             const text = args.join(' ');
             if (!text) {
-                await sock.sendMessage(sender, { text: '⚠️ Please provide text to count' });
+                await safeSendText(sock, sender, '⚠️ Please provide text to count' );
                 return;
             }
 
@@ -617,10 +603,10 @@ const utilityCommands = {
 • Characters (with spaces): ${chars}
 • Characters (no spaces): ${chars_no_space}`;
 
-            await sock.sendMessage(sender, { text: message });
+            await safeSendText(sock, sender, message );
         } catch (err) {
             logger.error('Word count command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error counting words' });
+            await safeSendText(sock, sender, '❌ Error counting words' );
         }
     },
 
@@ -629,9 +615,8 @@ const utilityCommands = {
             let [min = 1, max = 100] = args.map(Number);
 
             if (isNaN(min) || isNaN(max) || min >= max || min < -1000000 || max > 1000000) {
-                await sock.sendMessage(sender, { 
-                    text: '⚠️ Please provide valid numbers between -1000000 and 1000000\nExample: .random 1 100' 
-                });
+                await safeSendText(sock, sender, '⚠️ Please provide valid numbers between -1000000 and 1000000\nExample: .random 1 100' 
+                );
                 return;
             }
 
@@ -645,7 +630,7 @@ const utilityCommands = {
             });
         } catch (err) {
             logger.error('Random command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error generating random number' });
+            await safeSendText(sock, sender, '❌ Error generating random number' );
         }
     },
 
@@ -666,10 +651,10 @@ const utilityCommands = {
 • Week Day: ${now.toLocaleDateString('en-US', { weekday: 'long' })}
 • Week Number: ${Math.ceil((((now - new Date(now.getFullYear(), 0, 1)) / 86400000) + 1) / 7)}`;
 
-            await sock.sendMessage(sender, { text: message });
+            await safeSendText(sock, sender, message );
         } catch (err) {
             logger.error('Time command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error getting current time' });
+            await safeSendText(sock, sender, '❌ Error getting current time' );
         }
     },
 
@@ -677,9 +662,8 @@ const utilityCommands = {
         try {
             const [type, ...text] = args;
             if (!type || !text.length) {
-                await sock.sendMessage(sender, { 
-                    text: '⚠️ Usage: .case <upper|lower> [text]' 
-                });
+                await safeSendText(sock, sender, '⚠️ Usage: .case <upper|lower> [text]' 
+                );
                 return;
             }
 
@@ -694,14 +678,14 @@ const utilityCommands = {
                     result = input.toLowerCase();
                     break;
                 default:
-                    await sock.sendMessage(sender, { text: '❌ Invalid case type. Use "upper" or "lower"' });
+                    await safeSendText(sock, sender, '❌ Invalid case type. Use "upper" or "lower"' );
                     return;
             }
 
             await sock.sendMessage(sender, { text: `🔡 ${result}` });
         } catch (err) {
             logger.error('Case command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error converting case' });
+            await safeSendText(sock, sender, '❌ Error converting case' );
         }
     },
     
@@ -780,11 +764,11 @@ const utilityCommands = {
                 console.log(`Using fallback message: "${responseText}"`);
             }
             
-            await sock.sendMessage(sender, { text: responseText });
+            await safeSendText(sock, sender, responseText );
             console.log(`User ${sender} changed language to: ${lang}`);
         } catch (err) {
             console.error('Language command error:', err);
-            await sock.sendMessage(sender, { text: '❌ Error changing language. Please try again.' });
+            await safeSendText(sock, sender, '❌ Error changing language. Please try again.' );
         }
     }
 

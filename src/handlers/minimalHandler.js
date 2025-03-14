@@ -10,7 +10,7 @@ const commands = new Map();
 commands.set('ping', async (sock, message) => {
     try {
         const sender = message.key.remoteJid;
-        await sock.sendMessage(sender, { text: '🏓 Pong! Bot is running (minimal handler).' });
+        await safeSendText(sock, sender, '🏓 Pong! Bot is running (minimal handler).' );
     } catch (err) {
         console.error('Error in ping command:', err);
     }
@@ -20,9 +20,9 @@ commands.set('ping', async (sock, message) => {
 commands.set('help', async (sock, message) => {
     try {
         const sender = message.key.remoteJid;
-        await sock.sendMessage(sender, { 
-            text: '*Available Commands:*\n!ping - Check if bot is running\n!help - Show this help message' 
-        });
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+        await safeSendText(sock, sender, '*Available Commands:*\n!ping - Check if bot is running\n!help - Show this help message' 
+        );
     } catch (err) {
         console.error('Error in help command:', err);
     }

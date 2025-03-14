@@ -4,6 +4,7 @@ const path = require('path');
 
 // Command storage
 const commands = new Map();
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 // Load all commands from the commands directory
 async function loadCommands() {
@@ -105,9 +106,8 @@ async function loadCommands() {
                 execute: async (sock, message, args, options = {}) => {
                     try {
                         const sender = message.key.remoteJid;
-                        await sock.sendMessage(sender, { 
-                            text: '🏓 Pong! Bot is active and responding.' 
-                        });
+                        await safeSendText(sock, sender, '🏓 Pong! Bot is active and responding.' 
+                        );
                     } catch (err) {
                         logger.error('Error executing ping command:', err);
                         throw err;
@@ -169,9 +169,8 @@ async function loadCommands() {
                 execute: async (sock, message, args, options = {}) => {
                     try {
                         const sender = message.key.remoteJid;
-                        await sock.sendMessage(sender, { 
-                            text: '🏓 Pong! Bot is active and responding.' 
-                        });
+                        await safeSendText(sock, sender, '🏓 Pong! Bot is active and responding.' 
+                        );
                     } catch (err) {
                         logger.error('Error executing ping command:', err);
                         throw err;
@@ -185,9 +184,8 @@ async function loadCommands() {
                 execute: async (sock, message, args, options = {}) => {
                     try {
                         const sender = message.key.remoteJid;
-                        await sock.sendMessage(sender, {
-                            text: `*Available Commands:*\n\n!ping - Bot status check\n!help - Show this help message`
-                        });
+                        await safeSendText(sock, sender, `*Available Commands:*\n\n!ping - Bot status check\n!help - Show this help message`
+                        );
                     } catch (err) {
                         logger.error('Error executing help command:', err);
                         throw err;
@@ -267,9 +265,8 @@ async function processCommand(sock, message, commandText, options = {}) {
 
         // Check group-only commands
         if (command.groupOnly && !options.isGroup) {
-            await sock.sendMessage(sender, {
-                text: '❌ This command can only be used in groups.'
-            });
+            await safeSendText(sock, sender, '❌ This command can only be used in groups.'
+            );
             return;
         }
 
@@ -286,9 +283,8 @@ async function processCommand(sock, message, commandText, options = {}) {
         });
         
         try {
-            await sock.sendMessage(sender, {
-                text: '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
-            });
+            await safeSendText(sock, sender, '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
+            );
         } catch (sendErr) {
             logger.error('Error sending error message:', sendErr);
         }

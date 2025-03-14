@@ -9,6 +9,7 @@ const logger = console;
 
 // Commands storage
 const commands = new Map();
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 // Helper function to calculate Levenshtein distance between two strings
 // Used for suggesting similar commands when a command is not found
@@ -127,7 +128,7 @@ function addFallbackCommands() {
         commands.set('ping', async (sock, message) => {
             try {
                 const sender = message.key.remoteJid;
-                await sock.sendMessage(sender, { text: '🏓 Pong! Bot is working.' });
+                await safeSendText(sock, sender, '🏓 Pong! Bot is working.' );
                 logger.log('Executed ping command successfully');
             } catch (err) {
                 logger.error('Error in ping command:', err);
@@ -144,7 +145,7 @@ function addFallbackCommands() {
                 let menuText = `*📋 Command Menu*\n\n`;
                 menuText += `Total Commands: ${commandList.length}\n\n`;
                 menuText += commandList.map(cmd => `• !${cmd}`).join('\n');
-                await sock.sendMessage(sender, { text: menuText });
+                await safeSendText(sock, sender, menuText );
                 logger.log('Executed menu command successfully');
             } catch (err) {
                 logger.error('Error in menu command:', err);
@@ -259,9 +260,8 @@ async function messageHandler(sock, message) {
     } catch (err) {
         logger.error('Error in message handler:', err);
         try {
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ An error occurred while processing your message.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ An error occurred while processing your message.'
+            );
         } catch (sendErr) {
             logger.error('Failed to send error message:', sendErr);
         }

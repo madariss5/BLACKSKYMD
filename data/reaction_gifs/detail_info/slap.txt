@@ -1,0 +1,4 @@
+Reaction: slap
+File: slap.gif
+Size: 2.1M
+Source: Anime/Other

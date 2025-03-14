@@ -3,6 +3,7 @@ const os = require('os');
 const { proto } = require('@whiskeysockets/baileys');
 
 const basicCommands = {
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     async help(sock, message, args) {
         try {
             // If specific command help is requested, forward to menu.js help
@@ -34,22 +35,20 @@ Welcome to 𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻! Here are some commands to g
 
 Type ${prefix}help [command] for detailed help on any command.`.trim();
 
-            await sock.sendMessage(message.key.remoteJid, {
-                text: helpText,
+            await safeSendText(sock, message.key.remoteJid, helpText,
                 mentions: message.mentions || []
-            });
+            );
         } catch (err) {
             logger.error('Error in help command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error executing help command'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error executing help command'
+            );
         }
     },
 
     async ping(sock, message) {
         try {
             const start = Date.now();
-            await sock.sendMessage(message.key.remoteJid, { text: 'Pinging... 🏓' });
+            await safeSendText(sock, message.key.remoteJid, 'Pinging... 🏓' );
             const ping = Date.now() - start;
 
             await sock.sendMessage(message.key.remoteJid, {
@@ -57,9 +56,8 @@ Type ${prefix}help [command] for detailed help on any command.`.trim();
             });
         } catch (err) {
             logger.error('Error in ping command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error checking ping'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error checking ping'
+            );
         }
     },
 
@@ -77,14 +75,12 @@ Type ${prefix}help [command] for detailed help on any command.`.trim();
 *Status:* Online ✅
 *Commands:* ${Object.keys(basicCommands).length} basic commands`.trim();
 
-            await sock.sendMessage(message.key.remoteJid, {
-                text: info
-            });
+            await safeSendText(sock, message.key.remoteJid, info
+            );
         } catch (err) {
             logger.error('Error in info command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error fetching bot info'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error fetching bot info'
+            );
         }
     },
 
@@ -105,14 +101,12 @@ Type ${prefix}help [command] for detailed help on any command.`.trim();
 *Uptime:* ${Math.floor(status.uptime / 3600)}h ${Math.floor((status.uptime % 3600) / 60)}m
 *Connection:* Stable 🟢`.trim();
 
-            await sock.sendMessage(message.key.remoteJid, {
-                text: statusText
-            });
+            await safeSendText(sock, message.key.remoteJid, statusText
+            );
         } catch (err) {
             logger.error('Error in status command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error fetching status'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error fetching status'
+            );
         }
     },
 
@@ -138,14 +132,12 @@ A powerful WhatsApp bot with useful features and commands.
 
 For support, contact the bot owner.`.trim();
 
-            await sock.sendMessage(message.key.remoteJid, {
-                text: about
-            });
+            await safeSendText(sock, message.key.remoteJid, about
+            );
         } catch (err) {
             logger.error('Error in about command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '❌ Error showing about info'
-            });
+            await safeSendText(sock, message.key.remoteJid, '❌ Error showing about info'
+            );
         }
     },
     async botinfo(sock, sender) {
@@ -168,7 +160,7 @@ For support, contact the bot owner.`.trim();
         • CPU Usage: ${Math.round(process.cpuUsage().user / 1000000)}%
                 `.trim();
 
-        await sock.sendMessage(sender, { text: info });
+        await safeSendText(sock, sender, info );
     },
 
     async dashboard(sock, sender) {
@@ -183,7 +175,7 @@ For support, contact the bot owner.`.trim();
         • Last Restart: ${new Date().toLocaleString()}
                 `.trim();
 
-        await sock.sendMessage(sender, { text: dashboard });
+        await safeSendText(sock, sender, dashboard );
     },
     async changelog(sock, sender) {
         const changelog = `
@@ -203,7 +195,7 @@ For support, contact the bot owner.`.trim();
         • Simple commands
                 `.trim();
 
-        await sock.sendMessage(sender, { text: changelog });
+        await safeSendText(sock, sender, changelog );
     },
 
     async faq(sock, sender) {
@@ -225,7 +217,7 @@ For support, contact the bot owner.`.trim();
         A: Premium gives extra features
                 `.trim();
 
-        await sock.sendMessage(sender, { text: faq });
+        await safeSendText(sock, sender, faq );
     },
     async privacy(sock, sender) {
         const privacy = `
@@ -249,7 +241,7 @@ For support, contact the bot owner.`.trim();
            • Secure transmission
                 `.trim();
 
-        await sock.sendMessage(sender, { text: privacy });
+        await safeSendText(sock, sender, privacy );
     },
 
     async terms(sock, sender) {
@@ -275,12 +267,12 @@ For support, contact the bot owner.`.trim();
         Terms may change without notice
                 `.trim();
 
-        await sock.sendMessage(sender, { text: terms });
+        await safeSendText(sock, sender, terms );
     },
 
     async speed(sock, sender) {
         const start = Date.now();
-        await sock.sendMessage(sender, { text: 'Testing speed...' });
+        await safeSendText(sock, sender, 'Testing speed...' );
         const end = Date.now();
         const speed = end - start;
 
@@ -292,7 +284,7 @@ For support, contact the bot owner.`.trim();
         • Database Query: ~${Math.round(speed * 0.3)}ms
                 `.trim();
 
-        await sock.sendMessage(sender, { text: speedTest });
+        await safeSendText(sock, sender, speedTest );
     },
     async system(sock, sender) {
         const systemInfo = `
@@ -307,7 +299,7 @@ For support, contact the bot owner.`.trim();
         • Kernel: ${os.version()}
                 `.trim();
 
-        await sock.sendMessage(sender, { text: systemInfo });
+        await safeSendText(sock, sender, systemInfo );
     },
 
     async owner(sock, sender) {
@@ -322,7 +314,7 @@ For support, contact the bot owner.`.trim();
         Please contact the owner directly.
                 `.trim();
 
-        await sock.sendMessage(sender, { text: ownerInfo });
+        await safeSendText(sock, sender, ownerInfo );
     },
 
     async donate(sock, sender) {
@@ -335,37 +327,33 @@ For support, contact the bot owner.`.trim();
         Your support helps keep the bot running and improving!
                 `.trim();
 
-        await sock.sendMessage(sender, { text: donateInfo });
+        await safeSendText(sock, sender, donateInfo );
     },
 
     async report(sock, sender, args) {
         if (!args.length) {
-            return await sock.sendMessage(sender, {
-                text: '⚠️ Please provide a bug report or feature request description!'
-            });
+            return await safeSendText(sock, sender, '⚠️ Please provide a bug report or feature request description!'
+            );
         }
 
         const report = args.join(' ');
         logger.info(`New report from ${sender}: ${report}`);
 
-        await sock.sendMessage(sender, {
-            text: '✅ Thank you for your report! The bot owner will review it.'
-        });
+        await safeSendText(sock, sender, '✅ Thank you for your report! The bot owner will review it.'
+        );
     },
 
     async feedback(sock, sender, args) {
         if (!args.length) {
-            return await sock.sendMessage(sender, {
-                text: '⚠️ Please provide your feedback!'
-            });
+            return await safeSendText(sock, sender, '⚠️ Please provide your feedback!'
+            );
         }
 
         const feedback = args.join(' ');
         logger.info(`New feedback from ${sender}: ${feedback}`);
 
-        await sock.sendMessage(sender, {
-            text: '✅ Thank you for your feedback! We appreciate your input.'
-        });
+        await safeSendText(sock, sender, '✅ Thank you for your feedback! We appreciate your input.'
+        );
     },
 
     async source(sock, sender) {
@@ -380,7 +368,7 @@ For support, contact the bot owner.`.trim();
         Want to contribute? Contact the owner!
                 `.trim();
 
-        await sock.sendMessage(sender, { text: sourceInfo });
+        await safeSendText(sock, sender, sourceInfo );
     },
 
     async runtime(sock, sender) {
@@ -400,7 +388,7 @@ For support, contact the bot owner.`.trim();
         Total Uptime: ${days}d ${hours}h ${minutes}m ${seconds}s
                 `.trim();
 
-        await sock.sendMessage(sender, { text: runtimeInfo });
+        await safeSendText(sock, sender, runtimeInfo );
     },
 
     async premium(sock, sender) {
@@ -416,7 +404,7 @@ For support, contact the bot owner.`.trim();
         Contact owner to upgrade!
                 `.trim();
 
-        await sock.sendMessage(sender, { text: premiumInfo });
+        await safeSendText(sock, sender, premiumInfo );
     },
 
     async support(sock, sender) {
@@ -429,7 +417,7 @@ For support, contact the bot owner.`.trim();
         • Contact owner: .owner
                 `.trim();
 
-        await sock.sendMessage(sender, { text: supportInfo });
+        await safeSendText(sock, sender, supportInfo );
     },
 
     async credits(sock, sender) {
@@ -446,7 +434,7 @@ For support, contact the bot owner.`.trim();
         Special thanks to everyone who helped make this bot possible!
                 `.trim();
 
-        await sock.sendMessage(sender, { text: creditsInfo });
+        await safeSendText(sock, sender, creditsInfo );
     }
 };
 

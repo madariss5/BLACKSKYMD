@@ -94,6 +94,7 @@ const achievementsList = [
 
 // Level thresholds
 const levelThresholds = [0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600, 4500, 5500, 6600, 7800, 9100, 10500, 12000, 13600, 15300, 17100, 19000];
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 /**
  * Create temp directories if they don't exist
@@ -121,9 +122,8 @@ async function getUserProfile(sock, userId, sendError = true) {
     const profile = userProfiles.get(userId);
     
     if (!profile && sendError) {
-        await sock.sendMessage(userId, {
-            text: '*❌ Error:* You need to register first! Use .register to create a profile.'
-        });
+        await safeSendText(sock, userId, '*❌ Error:* You need to register first! Use .register to create a profile.'
+        );
         return null;
     }
     
@@ -455,25 +455,22 @@ const userCommands = {
             const age = args[args.length - 1];
 
             if (!name || !age || isNaN(age)) {
-                await sock.sendMessage(sender, { 
-                    text: '*📝 Registration Usage:*\n.register [name] [age]\n\n*Examples:*\n.register John 25\n.register John Doe 25' 
-                });
+                await safeSendText(sock, sender, '*📝 Registration Usage:*\n.register [name] [age]\n\n*Examples:*\n.register John 25\n.register John Doe 25' 
+                );
                 return;
             }
 
             if (userProfiles.has(sender)) {
-                await sock.sendMessage(sender, { 
-                    text: '*❌ Error:* You are already registered!' 
-                });
+                await safeSendText(sock, sender, '*❌ Error:* You are already registered!' 
+                );
                 return;
             }
 
             // Validate age
             const ageInt = parseInt(age);
             if (ageInt < 13 || ageInt > 120) {
-                await sock.sendMessage(sender, { 
-                    text: '*❌ Error:* Please enter a valid age between 13 and 120.' 
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Please enter a valid age between 13 and 120.' 
+                );
                 return;
             }
 
@@ -512,9 +509,8 @@ const userCommands = {
 • .daily - Claim daily rewards
 • .level - Check your level progress`;
 
-            await sock.sendMessage(sender, { 
-                text: welcomeMsg
-            });
+            await safeSendText(sock, sender, welcomeMsg
+            );
             
             // Generate and send a profile card
             try {
@@ -533,9 +529,8 @@ const userCommands = {
             logger.info(`New user registered: ${sender} (${name}, ${ageInt})`);
         } catch (err) {
             logger.error('Error in register command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to register. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to register. Please try again.'
+            );
         }
     },
 
@@ -546,11 +541,10 @@ const userCommands = {
             const profile = userDatabase.getUserProfile(targetUser);
 
             if (!profile) {
-                await sock.sendMessage(sender, { 
-                    text: targetUser === sender ? 
+                await safeSendText(sock, sender, targetUser === sender ? 
                         '*❌ Error:* You are not registered! Use .register [name] [age] to create a profile.' :
                         '*❌ Error:* User not found!'
-                });
+                );
                 return;
             }
 
@@ -581,7 +575,7 @@ ${rankText}
 *🕒 Registered:* ${new Date(profile.registeredAt).toLocaleDateString()}`;
 
             // Send profile text
-            await sock.sendMessage(sender, { text: profileText.trim() });
+            await safeSendText(sock, sender, profileText.trim() );
             
             // Generate and send profile card
             try {
@@ -609,9 +603,8 @@ ${rankText}
             }
         } catch (err) {
             logger.error('Error in profile command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to fetch profile. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to fetch profile. Please try again.'
+            );
         }
     },
 
@@ -621,54 +614,49 @@ ${rankText}
             const profile = userProfiles.get(sender);
 
             if (!profile) {
-                await sock.sendMessage(sender, { 
-                    text: '*❌ Error:* You need to register first!' 
-                });
+                await safeSendText(sock, sender, '*❌ Error:* You need to register first!' 
+                );
                 return;
             }
 
             const bio = args.join(' ');
             if (!bio) {
-                await sock.sendMessage(sender, { 
-                    text: '*📝 Usage:* .setbio [text]\n\n*Example:* .setbio Hello, I love coding!' 
-                });
+                await safeSendText(sock, sender, '*📝 Usage:* .setbio [text]\n\n*Example:* .setbio Hello, I love coding!' 
+                );
                 return;
             }
 
             if (bio.length > 100) {
-                await sock.sendMessage(sender, { 
-                    text: '*❌ Error:* Bio must be less than 100 characters!' 
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Bio must be less than 100 characters!' 
+                );
                 return;
             }
 
             profile.bio = bio;
-            await sock.sendMessage(sender, { 
-                text: '*✅ Success:* Bio updated successfully!' 
-            });
+            await safeSendText(sock, sender, '*✅ Success:* Bio updated successfully!' 
+            );
         } catch (err) {
             logger.error('Error in setbio command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to update bio. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to update bio. Please try again.'
+            );
         }
     },
 
     async settitle(sock, sender, args) {
         const profile = userProfiles.get(sender);
         if (!profile) {
-            await sock.sendMessage(sender, { text: '❌ You need to register first!' });
+            await safeSendText(sock, sender, '❌ You need to register first!' );
             return;
         }
 
         const title = args.join(' ');
         if (!title) {
-            await sock.sendMessage(sender, { text: '👑 Please provide a title' });
+            await safeSendText(sock, sender, '👑 Please provide a title' );
             return;
         }
 
         profile.customTitle = title;
-        await sock.sendMessage(sender, { text: '✅ Title updated successfully!' });
+        await safeSendText(sock, sender, '✅ Title updated successfully!' );
     },
     
     async settheme(sock, message, args) {
@@ -677,9 +665,8 @@ ${rankText}
             const profile = userDatabase.getUserProfile(sender);
             
             if (!profile) {
-                await sock.sendMessage(sender, { 
-                    text: '*❌ Error:* You need to register first! Use .register [name] [age]' 
-                });
+                await safeSendText(sock, sender, '*❌ Error:* You need to register first! Use .register [name] [age]' 
+                );
                 return;
             }
             
@@ -727,9 +714,8 @@ ${rankText}
             }
         } catch (err) {
             logger.error('Error in settheme command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to set theme. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to set theme. Please try again.'
+            );
         }
     },
     
@@ -739,9 +725,8 @@ ${rankText}
             const profile = userDatabase.getUserProfile(sender);
             
             if (!profile) {
-                await sock.sendMessage(sender, { 
-                    text: '*❌ Error:* You need to register first! Use .register [name] [age]' 
-                });
+                await safeSendText(sock, sender, '*❌ Error:* You need to register first! Use .register [name] [age]' 
+                );
                 return;
             }
             
@@ -750,9 +735,8 @@ ${rankText}
                            message.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
             
             if (!quoted) {
-                await sock.sendMessage(sender, { 
-                    text: '*📝 Usage:* Send or reply to an image with .setprofilepic\n\n*Example:* Reply to an image with .setprofilepic' 
-                });
+                await safeSendText(sock, sender, '*📝 Usage:* Send or reply to an image with .setprofilepic\n\n*Example:* Reply to an image with .setprofilepic' 
+                );
                 return;
             }
             
@@ -768,9 +752,8 @@ ${rankText}
                 userDatabase.updateUserProfile(sender, { profilePic: media });
                 
                 // Send success message
-                await sock.sendMessage(sender, { 
-                    text: '*✅ Success:* Profile picture updated successfully!' 
-                });
+                await safeSendText(sock, sender, '*✅ Success:* Profile picture updated successfully!' 
+                );
                 
                 // Generate and send a new profile card with the picture
                 try {
@@ -788,15 +771,13 @@ ${rankText}
                 
             } catch (err) {
                 logger.error('Error downloading profile picture:', err);
-                await sock.sendMessage(sender, { 
-                    text: '*❌ Error:* Failed to download and save profile picture. Please try again.' 
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Failed to download and save profile picture. Please try again.' 
+                );
             }
         } catch (err) {
             logger.error('Error in setprofilepic command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to update profile picture. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to update profile picture. Please try again.'
+            );
         }
     },
 
@@ -805,7 +786,7 @@ ${rankText}
             // Use our userDatabase and levelingSystem
             const profile = userDatabase.getUserProfile(sender);
             if (!profile) {
-                await sock.sendMessage(sender, { text: '❌ You need to register first! Use .register to create a profile.' });
+                await safeSendText(sock, sender, '❌ You need to register first! Use .register to create a profile.' );
                 return;
             }
 
@@ -821,7 +802,7 @@ ${rankText}
 📉 Progress: ${progress.progressBar}
             `.trim();
 
-            await sock.sendMessage(sender, { text: levelText });
+            await safeSendText(sock, sender, levelText );
             
             // Generate and send level card image
             try {
@@ -838,7 +819,7 @@ ${rankText}
             }
         } catch (err) {
             logger.error('Error in level command:', err);
-            await sock.sendMessage(sender, { text: '❌ Error fetching level information.' });
+            await safeSendText(sock, sender, '❌ Error fetching level information.' );
         }
     },
 
@@ -848,9 +829,8 @@ ${rankText}
             const profile = userDatabase.getUserProfile(sender);
 
             if (!profile) {
-                await sock.sendMessage(sender, { 
-                    text: '*❌ Error:* You need to register first! Use .register to create a profile.' 
-                });
+                await safeSendText(sock, sender, '*❌ Error:* You need to register first! Use .register to create a profile.' 
+                );
                 return;
             }
 
@@ -932,7 +912,7 @@ ${rankText}
                 rewardText += `\n\n*🎉 Level Up!*\nYou are now level ${levelUpData.newLevel}!`;
             }
 
-            await sock.sendMessage(sender, { text: rewardText });
+            await safeSendText(sock, sender, rewardText );
             
             // Award achievements for streaks
             if (streak >= 7) {
@@ -941,9 +921,8 @@ ${rankText}
                     profile.achievements.push('Weekly Streak');
                     userDatabase.updateUserProfile(sender, { achievements: profile.achievements });
                     
-                    await sock.sendMessage(sender, { 
-                        text: `*🏆 Achievement Unlocked:* Weekly Streak\n\nYou've claimed daily rewards for 7 days in a row!` 
-                    });
+                    await safeSendText(sock, sender, `*🏆 Achievement Unlocked:* Weekly Streak\n\nYou've claimed daily rewards for 7 days in a row!` 
+                    );
                 }
             }
             
@@ -953,16 +932,14 @@ ${rankText}
                     profile.achievements.push('Monthly Dedication');
                     userDatabase.updateUserProfile(sender, { achievements: profile.achievements });
                     
-                    await sock.sendMessage(sender, { 
-                        text: `*🏆 Achievement Unlocked:* Monthly Dedication\n\nYou've claimed daily rewards for 30 days in a row!` 
-                    });
+                    await safeSendText(sock, sender, `*🏆 Achievement Unlocked:* Monthly Dedication\n\nYou've claimed daily rewards for 30 days in a row!` 
+                    );
                 }
             }
         } catch (err) {
             logger.error('Error in daily command:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: '*❌ Error:* Failed to claim daily reward. Please try again.'
-            });
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to claim daily reward. Please try again.'
+            );
         }
     },
     async leaderboard(sock, sender, args) {
@@ -1001,7 +978,7 @@ ${rankText}
 ${users.map((user, i) => `${i + 1}. *${user.name}*: ${formatNumber(user.value)} ${type === 'xp' ? 'XP' : type === 'coins' ? '💰' : '📊'}`).join('\n')}
             `.trim();
 
-            await sock.sendMessage(sender, { text: leaderboardText });
+            await safeSendText(sock, sender, leaderboardText );
             
             // Send top user card if it's XP leaderboard
             if (type === 'xp' && users.length > 0) {
@@ -1025,16 +1002,15 @@ ${users.map((user, i) => `${i + 1}. *${user.name}*: ${formatNumber(user.value)} 
             }
         } catch (err) {
             logger.error('Error in leaderboard command:', err);
-            await sock.sendMessage(sender, { 
-                text: '❌ Error fetching leaderboard data. Please try again.' 
-            });
+            await safeSendText(sock, sender, '❌ Error fetching leaderboard data. Please try again.' 
+            );
         }
     },
 
     async achievements(sock, sender) {
         const profile = userProfiles.get(sender);
         if (!profile) {
-            await sock.sendMessage(sender, { text: '❌ You need to register first!' });
+            await safeSendText(sock, sender, '❌ You need to register first!' );
             return;
         }
 
@@ -1045,13 +1021,13 @@ Total: ${profile.achievements.length}
 ${profile.achievements.map(a => `• ${a}`).join('\n') || 'No achievements yet'}
         `.trim();
 
-        await sock.sendMessage(sender, { text: achievementsText });
+        await safeSendText(sock, sender, achievementsText );
     },
 
     async inventory(sock, sender) {
         const profile = userProfiles.get(sender);
         if (!profile) {
-            await sock.sendMessage(sender, { text: '❌ You need to register first!' });
+            await safeSendText(sock, sender, '❌ You need to register first!' );
             return;
         }
 
@@ -1062,15 +1038,14 @@ Total Items: ${profile.inventory.length}
 ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty'}
         `.trim();
 
-        await sock.sendMessage(sender, { text: inventoryText });
+        await safeSendText(sock, sender, inventoryText );
     },
 
     async transfer(sock, sender, args) {
         const [target, amount] = args;
         if (!target || !amount || isNaN(amount)) {
-            await sock.sendMessage(sender, { 
-                text: '💰 Usage: !transfer @user [amount]' 
-            });
+            await safeSendText(sock, sender, '💰 Usage: !transfer @user [amount]' 
+            );
             return;
         }
 
@@ -1078,18 +1053,18 @@ ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty
         const targetProfile = userProfiles.get(target);
 
         if (!profile || !targetProfile) {
-            await sock.sendMessage(sender, { text: '❌ Invalid user!' });
+            await safeSendText(sock, sender, '❌ Invalid user!' );
             return;
         }
 
         const transferAmount = parseInt(amount);
         if (transferAmount <= 0) {
-            await sock.sendMessage(sender, { text: '❌ Invalid amount!' });
+            await safeSendText(sock, sender, '❌ Invalid amount!' );
             return;
         }
 
         if (profile.coins < transferAmount) {
-            await sock.sendMessage(sender, { text: '❌ Insufficient coins!' });
+            await safeSendText(sock, sender, '❌ Insufficient coins!' );
             return;
         }
 

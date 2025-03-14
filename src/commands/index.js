@@ -13,6 +13,8 @@ const userExtendedCommands = require('./user_extended'); // Added extended user 
 const basicCommands = require('./basic');
 const funCommands = require('./fun');
 const mediaCommands = require('./media');
+// Educational commands are loaded from educational.js, which imports from educational/commands.js
+// This prevents double loading of the same commands
 const educationalCommands = require('./educational');
 // NSFW module now fixed with ESM compatibility for file-type package
 const nsfwCommands = require('./nsfw');

@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 async function handleGroupParticipantsUpdate(sock, { id, participants, action }) {
     try {
@@ -20,9 +21,8 @@ async function handleGroupParticipantsUpdate(sock, { id, participants, action })
 
                 // Remove the users
                 await sock.groupParticipantsUpdate(id, participants, 'remove');
-                await sock.sendMessage(id, {
-                    text: '🛡️ Anti-raid protection: Join requests temporarily blocked'
-                });
+                await safeSendText(sock, id, '🛡️ Anti-raid protection: Join requests temporarily blocked'
+                );
                 return;
             }
 
@@ -40,10 +40,9 @@ async function handleGroupParticipantsUpdate(sock, { id, participants, action })
                             .replace('{group}', groupMetadata.subject)
                             .replace('{memberCount}', groupMetadata.participants.length);
 
-                        await sock.sendMessage(id, {
-                            text: welcomeMsg,
+                        await safeSendText(sock, id, welcomeMsg,
                             mentions: [participant]
-                        });
+                        );
                     }
                 }
                 break;
@@ -57,10 +56,9 @@ async function handleGroupParticipantsUpdate(sock, { id, participants, action })
                             .replace('{group}', groupMetadata.subject)
                             .replace('{memberCount}', groupMetadata.participants.length);
 
-                        await sock.sendMessage(id, {
-                            text: goodbyeMsg,
+                        await safeSendText(sock, id, goodbyeMsg,
                             mentions: [participant]
-                        });
+                        );
                     }
                 }
                 break;

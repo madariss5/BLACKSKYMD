@@ -1,0 +1,4 @@
+Reaction: poke
+File: poke.gif
+Size: 1.4M
+Source: Walking Dead

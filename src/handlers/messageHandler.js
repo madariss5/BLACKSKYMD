@@ -17,6 +17,7 @@ const typingStates = new Map();
 
 // Store command handler reference
 let commandProcessor = null;
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 /**
  * Initialize message handler
@@ -83,9 +84,8 @@ async function init() {
                 logger.warn('Initializing fallback command processor');
                 commandProcessor = async (sock, message, commandText) => {
                     logger.warn(`Using fallback processor for command: ${commandText}`);
-                    await sock.sendMessage(message.key.remoteJid, { 
-                        text: 'Command processing is currently limited. Please try again later.' 
-                    });
+                    await safeSendText(sock, message.key.remoteJid, 'Command processing is currently limited. Please try again later.' 
+                    );
                 };
             }
             
@@ -277,9 +277,8 @@ async function messageHandler(sock, message) {
                     command: commandText,
                     sender: sender
                 });
-                await sock.sendMessage(sender, {
-                    text: '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
-                });
+                await safeSendText(sock, sender, '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
+                );
             }
         }
     } catch (err) {

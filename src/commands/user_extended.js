@@ -28,6 +28,7 @@ const {
 
 // Create necessary directories
 const TEMP_DIR = path.join(process.cwd(), 'temp', 'user_extended');
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 
 /**
  * Create temp directories if they don't exist
@@ -55,9 +56,8 @@ async function getUserProfile(sock, userId, sendError = true) {
     const profile = userProfiles.get(userId);
     
     if (!profile && sendError) {
-        await sock.sendMessage(userId, {
-            text: '*❌ Error:* You need to register first! Use .register to create a profile.'
-        });
+        await safeSendText(sock, userId, '*❌ Error:* You need to register first! Use .register to create a profile.'
+        );
         return null;
     }
     
@@ -418,9 +418,8 @@ const commands = {
             
             // Add achievement if first crime
             if (addAchievement(profile, 'crime')) {
-                await sock.sendMessage(sender, {
-                    text: '*🏆 Achievement Unlocked:* Criminal\nYou committed your first crime!'
-                });
+                await safeSendText(sock, sender, '*🏆 Achievement Unlocked:* Criminal\nYou committed your first crime!'
+                );
             }
             
             await sock.sendMessage(sender, {
@@ -528,9 +527,8 @@ const commands = {
         
         // Add achievement if it's their first job
         if (addAchievement(profile, 'job')) {
-            await sock.sendMessage(sender, {
-                text: '*🏆 Achievement Unlocked:* Employed\nYou got your first job!'
-            });
+            await safeSendText(sock, sender, '*🏆 Achievement Unlocked:* Employed\nYou got your first job!'
+            );
         }
         
         // Save profile
@@ -547,9 +545,8 @@ const commands = {
         
         const job = userJobs.get(sender);
         if (!job) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* You don\'t have a job to resign from.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* You don\'t have a job to resign from.'
+            );
             return;
         }
         
@@ -589,9 +586,8 @@ const commands = {
         
         // Check if user is AFK
         if (!userAfk.get(sender)?.status) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* You are not currently AFK.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* You are not currently AFK.'
+            );
             return;
         }
         
@@ -614,27 +610,24 @@ const commands = {
         if (!profile) return;
         
         if (args.length < 1) {
-            await sock.sendMessage(sender, {
-                text: '*⚠️ Usage:* .rep @user'
-            });
+            await safeSendText(sock, sender, '*⚠️ Usage:* .rep @user'
+            );
             return;
         }
         
         const targetId = args[0].replace('@', '') + '@s.whatsapp.net';
         
         if (targetId === sender) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* You cannot give reputation to yourself!'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* You cannot give reputation to yourself!'
+            );
             return;
         }
         
         // Check target profile
         const targetProfile = userProfiles.get(targetId);
         if (!targetProfile) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* That user doesn\'t have a profile yet.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* That user doesn\'t have a profile yet.'
+            );
             return;
         }
         
@@ -679,9 +672,8 @@ const commands = {
         
         // Check if player has a fishing rod
         if (!profile.inventory?.fishingRod) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* You need a fishing rod to fish! Buy one at the shop with .shop items'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* You need a fishing rod to fish! Buy one at the shop with .shop items'
+            );
             return;
         }
         
@@ -723,9 +715,8 @@ const commands = {
             profile.lastFishing = Date.now();
             userProfiles.set(sender, profile);
             
-            await sock.sendMessage(sender, {
-                text: '*🎣 Fishing:* You didn\'t catch anything this time. Try again later!'
-            });
+            await safeSendText(sock, sender, '*🎣 Fishing:* You didn\'t catch anything this time. Try again later!'
+            );
             return;
         }
         
@@ -754,9 +745,8 @@ const commands = {
         
         // Add achievement if first fish
         if (addAchievement(profile, 'fishing')) {
-            await sock.sendMessage(sender, {
-                text: '*🏆 Achievement Unlocked:* Fisherman\nYou caught your first fish!'
-            });
+            await safeSendText(sock, sender, '*🏆 Achievement Unlocked:* Fisherman\nYou caught your first fish!'
+            );
         }
         
         // Save profile
@@ -773,9 +763,8 @@ const commands = {
         
         // Check if player has a pickaxe
         if (!profile.inventory?.pickaxe) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* You need a pickaxe to mine! Buy one at the shop with .shop items'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* You need a pickaxe to mine! Buy one at the shop with .shop items'
+            );
             return;
         }
         
@@ -838,9 +827,8 @@ const commands = {
         
         // Add achievement if first mining
         if (addAchievement(profile, 'mining')) {
-            await sock.sendMessage(sender, {
-                text: '*🏆 Achievement Unlocked:* Miner\nYou mined your first resource!'
-            });
+            await safeSendText(sock, sender, '*🏆 Achievement Unlocked:* Miner\nYou mined your first resource!'
+            );
         }
         
         // Save profile
@@ -857,9 +845,8 @@ const commands = {
         if (!profile) return;
         
         if (args.length < 2) {
-            await sock.sendMessage(sender, {
-                text: '*⚠️ Usage:* !sell [type] [name|all]\n\nTypes: fish, mineral'
-            });
+            await safeSendText(sock, sender, '*⚠️ Usage:* !sell [type] [name|all]\n\nTypes: fish, mineral'
+            );
             return;
         }
         
@@ -875,9 +862,8 @@ const commands = {
         const itemName = args.slice(1).join(' ').toLowerCase();
         
         if (type !== 'fish' && type !== 'mineral') {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* Invalid type. Use "fish" or "mineral".'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* Invalid type. Use "fish" or "mineral".'
+            );
             return;
         }
         
@@ -970,9 +956,8 @@ const commands = {
             if (type === 'fish') {
                 const fishInventory = profile.inventory.fish || {};
                 if (Object.keys(fishInventory).length === 0) {
-                    await sock.sendMessage(sender, {
-                        text: '*🐟 Fish Inventory:* You don\'t have any fish yet. Use .fish to catch some!'
-                    });
+                    await safeSendText(sock, sender, '*🐟 Fish Inventory:* You don\'t have any fish yet. Use .fish to catch some!'
+                    );
                     return;
                 }
                 
@@ -981,16 +966,15 @@ const commands = {
                     fishText += `${fish}: ${quantity}\n`;
                 }
                 
-                await sock.sendMessage(sender, { text: fishText });
+                await safeSendText(sock, sender, fishText );
                 return;
             }
             
             if (type === 'mineral' || type === 'minerals') {
                 const mineralInventory = profile.inventory.minerals || {};
                 if (Object.keys(mineralInventory).length === 0) {
-                    await sock.sendMessage(sender, {
-                        text: '*⛏️ Mineral Inventory:* You don\'t have any minerals yet. Use .mine to mine some!'
-                    });
+                    await safeSendText(sock, sender, '*⛏️ Mineral Inventory:* You don\'t have any minerals yet. Use .mine to mine some!'
+                    );
                     return;
                 }
                 
@@ -999,7 +983,7 @@ const commands = {
                     mineralText += `${mineral}: ${quantity}\n`;
                 }
                 
-                await sock.sendMessage(sender, { text: mineralText });
+                await safeSendText(sock, sender, mineralText );
                 return;
             }
         }
@@ -1039,7 +1023,7 @@ const commands = {
             }
         }
         
-        await sock.sendMessage(sender, { text: inventoryText });
+        await safeSendText(sock, sender, inventoryText );
     },
     
     // 4. Crafting System
@@ -1094,7 +1078,7 @@ const commands = {
             
             recipeText += 'Use .craft [item] to craft an item';
             
-            await sock.sendMessage(sender, { text: recipeText });
+            await safeSendText(sock, sender, recipeText );
             return;
         }
         
@@ -1103,9 +1087,8 @@ const commands = {
         const recipe = recipes[requestedItem];
         
         if (!recipe) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* Invalid crafting recipe. Use .craft to see available recipes.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* Invalid crafting recipe. Use .craft to see available recipes.'
+            );
             return;
         }
         
@@ -1158,9 +1141,8 @@ const commands = {
         
         // Add achievement if first craft
         if (addAchievement(profile, 'crafting')) {
-            await sock.sendMessage(sender, {
-                text: '*🏆 Achievement Unlocked:* Craftsman\nYou crafted your first item!'
-            });
+            await safeSendText(sock, sender, '*🏆 Achievement Unlocked:* Craftsman\nYou crafted your first item!'
+            );
         }
         
         // Save profile
@@ -1184,9 +1166,8 @@ const commands = {
         // Show current investments if no args
         if (args.length === 0) {
             if (profile.investments.length === 0) {
-                await sock.sendMessage(sender, {
-                    text: '*📊 Investments:* You don\'t have any active investments. Use .invest [amount] [duration] to invest.'
-                });
+                await safeSendText(sock, sender, '*📊 Investments:* You don\'t have any active investments. Use .invest [amount] [duration] to invest.'
+                );
                 return;
             }
             
@@ -1225,15 +1206,14 @@ const commands = {
             // Save profile after processing matured investments
             userProfiles.set(sender, profile);
             
-            await sock.sendMessage(sender, { text: investmentText });
+            await safeSendText(sock, sender, investmentText );
             return;
         }
         
         // Check args
         if (args.length < 2) {
-            await sock.sendMessage(sender, {
-                text: '*⚠️ Usage:* .invest [amount] [duration in days (1-30)]'
-            });
+            await safeSendText(sock, sender, '*⚠️ Usage:* .invest [amount] [duration in days (1-30)]'
+            );
             return;
         }
         
@@ -1246,9 +1226,8 @@ const commands = {
         }
         
         if (!amount || amount <= 0 || isNaN(amount)) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* Please provide a valid positive amount to invest.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* Please provide a valid positive amount to invest.'
+            );
             return;
         }
         
@@ -1263,9 +1242,8 @@ const commands = {
         const duration = parseInt(args[1]);
         
         if (!duration || duration < 1 || duration > 30 || isNaN(duration)) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* Duration must be between 1 and 30 days.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* Duration must be between 1 and 30 days.'
+            );
             return;
         }
         
@@ -1287,9 +1265,8 @@ const commands = {
         
         // Add achievement if first investment
         if (addAchievement(profile, 'investor')) {
-            await sock.sendMessage(sender, {
-                text: '*🏆 Achievement Unlocked:* Investor\nYou made your first investment!'
-            });
+            await safeSendText(sock, sender, '*🏆 Achievement Unlocked:* Investor\nYou made your first investment!'
+            );
         }
         
         // Save profile
@@ -1321,9 +1298,8 @@ const commands = {
         // Show inbox
         if (args.length === 0 || args[0].toLowerCase() === 'inbox') {
             if (mailbox.inbox.length === 0) {
-                await sock.sendMessage(sender, {
-                    text: '*📬 Inbox:* Your inbox is empty.'
-                });
+                await safeSendText(sock, sender, '*📬 Inbox:* Your inbox is empty.'
+                );
                 return;
             }
             
@@ -1341,25 +1317,23 @@ const commands = {
             
             inboxText += 'Use .mail read [number] to read a mail.';
             
-            await sock.sendMessage(sender, { text: inboxText });
+            await safeSendText(sock, sender, inboxText );
             return;
         }
         
         // Read a specific mail
         if (args[0].toLowerCase() === 'read') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .mail read [mail number]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .mail read [mail number]'
+                );
                 return;
             }
             
             const mailNumber = parseInt(args[1]);
             
             if (isNaN(mailNumber) || mailNumber < 1 || mailNumber > mailbox.inbox.length) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Invalid mail number.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Invalid mail number.'
+                );
                 return;
             }
             
@@ -1376,34 +1350,31 @@ const commands = {
                 mailText += `Use .mail claim ${mailNumber} to claim the attachment.`;
             }
             
-            await sock.sendMessage(sender, { text: mailText });
+            await safeSendText(sock, sender, mailText );
             return;
         }
         
         // Claim attachment
         if (args[0].toLowerCase() === 'claim') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .mail claim [mail number]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .mail claim [mail number]'
+                );
                 return;
             }
             
             const mailNumber = parseInt(args[1]);
             
             if (isNaN(mailNumber) || mailNumber < 1 || mailNumber > mailbox.inbox.length) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Invalid mail number.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Invalid mail number.'
+                );
                 return;
             }
             
             const mail = mailbox.inbox[mailNumber - 1];
             
             if (!mail.attachment) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* This mail has no attachment to claim.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* This mail has no attachment to claim.'
+                );
                 return;
             }
             
@@ -1441,9 +1412,8 @@ const commands = {
         // Send mail
         if (args[0].toLowerCase() === 'send') {
             if (args.length < 4) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .mail send @user "subject" message'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .mail send @user "subject" message'
+                );
                 return;
             }
             
@@ -1453,9 +1423,8 @@ const commands = {
             // Check target profile
             const targetProfile = userProfiles.get(targetId);
             if (!targetProfile) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* That user doesn\'t have a profile yet.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* That user doesn\'t have a profile yet.'
+                );
                 return;
             }
             
@@ -1463,9 +1432,8 @@ const commands = {
             let subjectMatch = args.slice(2).join(' ').match(/"([^"]+)"/);
             
             if (!subjectMatch) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Subject must be enclosed in quotes, e.g., "Hello there"'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Subject must be enclosed in quotes, e.g., "Hello there"'
+                );
                 return;
             }
             
@@ -1475,9 +1443,8 @@ const commands = {
             const content = args.slice(2).join(' ').replace(/"([^"]+)"/, '').trim();
             
             if (!content) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Mail content cannot be empty.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Mail content cannot be empty.'
+                );
                 return;
             }
             
@@ -1522,9 +1489,8 @@ const commands = {
         // Delete mail
         if (args[0].toLowerCase() === 'delete') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .mail delete [mail number|all]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .mail delete [mail number|all]'
+                );
                 return;
             }
             
@@ -1535,18 +1501,16 @@ const commands = {
                 // Save mailbox
                 global.mailSystem.mailboxes.set(sender, mailbox);
                 
-                await sock.sendMessage(sender, {
-                    text: '*🗑️ Inbox Cleared:* All mails have been deleted.'
-                });
+                await safeSendText(sock, sender, '*🗑️ Inbox Cleared:* All mails have been deleted.'
+                );
                 return;
             }
             
             const mailNumber = parseInt(args[1]);
             
             if (isNaN(mailNumber) || mailNumber < 1 || mailNumber > mailbox.inbox.length) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Invalid mail number.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Invalid mail number.'
+                );
                 return;
             }
             
@@ -1556,16 +1520,14 @@ const commands = {
             // Save mailbox
             global.mailSystem.mailboxes.set(sender, mailbox);
             
-            await sock.sendMessage(sender, {
-                text: '*🗑️ Mail Deleted:* The mail has been deleted.'
-            });
+            await safeSendText(sock, sender, '*🗑️ Mail Deleted:* The mail has been deleted.'
+            );
             return;
         }
         
         // Unknown command
-        await sock.sendMessage(sender, {
-            text: '*⚠️ Usage:* .mail [inbox|read|claim|send|delete]'
-        });
+        await safeSendText(sock, sender, '*⚠️ Usage:* .mail [inbox|read|claim|send|delete]'
+        );
     },
     
     // 7. Daily Reward System
@@ -1665,7 +1627,7 @@ const commands = {
         rewardText += `Monthly Check-ins: ${checkin.count} day${checkin.count !== 1 ? 's' : ''}\n\n`;
         rewardText += `Your Balance: ${formatNumber(profile.coins)} coins`;
         
-        await sock.sendMessage(sender, { text: rewardText });
+        await safeSendText(sock, sender, rewardText );
     },
     
     // 8. Passive Income with Idle Game Mechanics
@@ -1694,9 +1656,8 @@ const commands = {
         // Showing business info
         if (args.length === 0) {
             if (profile.business.level === 0) {
-                await sock.sendMessage(sender, {
-                    text: '*🏭 Business:* You don\'t have a business yet. Use .business start to set up a business for 5,000 coins.'
-                });
+                await safeSendText(sock, sender, '*🏭 Business:* You don\'t have a business yet. Use .business start to set up a business for 5,000 coins.'
+                );
                 return;
             }
             
@@ -1725,16 +1686,15 @@ const commands = {
             businessText += '.business upgrade - Upgrade your business\n';
             businessText += '.business automate - Make collection automatic (50,000 coins)';
             
-            await sock.sendMessage(sender, { text: businessText });
+            await safeSendText(sock, sender, businessText );
             return;
         }
         
         // Starting a business
         if (args[0].toLowerCase() === 'start') {
             if (profile.business.level > 0) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* You already have a business! Use .business to see your stats.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* You already have a business! Use .business to see your stats.'
+                );
                 return;
             }
             
@@ -1769,9 +1729,8 @@ const commands = {
         
         // Make sure they have a business for other commands
         if (profile.business.level === 0) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* You don\'t have a business yet. Use .business start to set up a business.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* You don\'t have a business yet. Use .business start to set up a business.'
+            );
             return;
         }
         
@@ -1788,9 +1747,8 @@ const commands = {
             }
             
             if (pendingIncome <= 0) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* There are no earnings to collect yet. Wait a bit longer.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* There are no earnings to collect yet. Wait a bit longer.'
+                );
                 return;
             }
             
@@ -1840,9 +1798,8 @@ const commands = {
         // Automating business
         if (args[0].toLowerCase() === 'automate') {
             if (profile.business.automated) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Your business is already automated!'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Your business is already automated!'
+                );
                 return;
             }
             
@@ -1871,9 +1828,8 @@ const commands = {
         }
         
         // Unknown command
-        await sock.sendMessage(sender, {
-            text: '*⚠️ Usage:* .business [start|collect|upgrade|automate]'
-        });
+        await safeSendText(sock, sender, '*⚠️ Usage:* .business [start|collect|upgrade|automate]'
+        );
     },
     
     // 9. Bounty hunting system
@@ -1968,16 +1924,15 @@ const commands = {
             
             bountyText += 'Use .bounty hunt [id] to accept a bounty.';
             
-            await sock.sendMessage(sender, { text: bountyText });
+            await safeSendText(sock, sender, bountyText );
             return;
         }
         
         // Hunt/complete a bounty
         if (args[0].toLowerCase() === 'hunt') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .bounty hunt [bounty id]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .bounty hunt [bounty id]'
+                );
                 return;
             }
             
@@ -1998,9 +1953,8 @@ const commands = {
             const bounty = global.bountySystem.activeBounties.find(b => b.id === bountyId);
             
             if (!bounty) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Bounty not found or expired. Use .bounty list to see active bounties.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Bounty not found or expired. Use .bounty list to see active bounties.'
+                );
                 return;
             }
             
@@ -2096,14 +2050,13 @@ const commands = {
                 statsText += `\nRank: Novice Bounty Hunter`;
             }
             
-            await sock.sendMessage(sender, { text: statsText });
+            await safeSendText(sock, sender, statsText );
             return;
         }
         
         // Unknown command
-        await sock.sendMessage(sender, {
-            text: '*⚠️ Usage:* .bounty [list|hunt|stats]'
-        });
+        await safeSendText(sock, sender, '*⚠️ Usage:* .bounty [list|hunt|stats]'
+        );
     },
     
     // 10. Clans/guilds system
@@ -2174,14 +2127,13 @@ const commands = {
                     clanText += '\n.clan promote @user - Promote to officer\n.clan demote @user - Demote an officer\n.clan setdesc [text] - Set clan description';
                 }
                 
-                await sock.sendMessage(sender, { text: clanText });
+                await safeSendText(sock, sender, clanText );
                 return;
             } else if (args[0]?.toLowerCase() === 'list') {
                 // Show list of all clans
                 if (global.clanSystem.clans.size === 0) {
-                    await sock.sendMessage(sender, {
-                        text: '*👥 Clans:* No clans have been created yet. Use .clan create [name] to create one!'
-                    });
+                    await safeSendText(sock, sender, '*👥 Clans:* No clans have been created yet. Use .clan create [name] to create one!'
+                    );
                     return;
                 }
                 
@@ -2199,13 +2151,12 @@ const commands = {
                 
                 clanListText += 'Use .clan join [name] to join a clan or .clan create [name] to create your own.';
                 
-                await sock.sendMessage(sender, { text: clanListText });
+                await safeSendText(sock, sender, clanListText );
                 return;
             } else {
                 // User not in a clan
-                await sock.sendMessage(sender, {
-                    text: '*👥 Clan:* You are not in a clan.\n\nUse .clan list to see available clans, .clan join [name] to join one, or .clan create [name] to create your own.'
-                });
+                await safeSendText(sock, sender, '*👥 Clan:* You are not in a clan.\n\nUse .clan list to see available clans, .clan join [name] to join one, or .clan create [name] to create your own.'
+                );
                 return;
             }
         }
@@ -2213,18 +2164,16 @@ const commands = {
         // Create a new clan
         if (args[0].toLowerCase() === 'create') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .clan create [name]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .clan create [name]'
+                );
                 return;
             }
             
             // Check if user is already in a clan
             for (const [clanName, clan] of global.clanSystem.clans.entries()) {
                 if (clan.leader === sender || clan.officers.includes(sender) || clan.members.includes(sender)) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You are already in a clan. Leave your current clan first with .clan leave.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You are already in a clan. Leave your current clan first with .clan leave.'
+                    );
                     return;
                 }
             }
@@ -2233,16 +2182,14 @@ const commands = {
             const clanName = args.slice(1).join(' ');
             
             if (clanName.length > 20) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Clan name must be 20 characters or less.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Clan name must be 20 characters or less.'
+                );
                 return;
             }
             
             if (global.clanSystem.clans.has(clanName.toLowerCase())) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* A clan with this name already exists. Choose a different name.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* A clan with this name already exists. Choose a different name.'
+                );
                 return;
             }
             
@@ -2285,18 +2232,16 @@ const commands = {
         // Join a clan
         if (args[0].toLowerCase() === 'join') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .clan join [name]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .clan join [name]'
+                );
                 return;
             }
             
             // Check if user is already in a clan
             for (const [clanName, clan] of global.clanSystem.clans.entries()) {
                 if (clan.leader === sender || clan.officers.includes(sender) || clan.members.includes(sender)) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You are already in a clan. Leave your current clan first with .clan leave.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You are already in a clan. Leave your current clan first with .clan leave.'
+                    );
                     return;
                 }
             }
@@ -2306,18 +2251,16 @@ const commands = {
             const clan = global.clanSystem.clans.get(clanName);
             
             if (!clan) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Clan not found. Use .clan list to see available clans.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Clan not found. Use .clan list to see available clans.'
+                );
                 return;
             }
             
             // Check if clan is full
             const memberCount = clan.members.length + clan.officers.length + 1;
             if (memberCount >= 50) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* This clan is already at maximum capacity (50 members).'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* This clan is already at maximum capacity (50 members).'
+                );
                 return;
             }
             
@@ -2361,9 +2304,8 @@ const commands = {
             }
             
             if (!userClan) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* You are not in a clan.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* You are not in a clan.'
+                );
                 return;
             }
             
@@ -2461,18 +2403,16 @@ const commands = {
         }
         
         if (!userClan) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* You are not in a clan. Use .clan list to see available clans or .clan create to create one.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* You are not in a clan. Use .clan list to see available clans or .clan create to create one.'
+            );
             return;
         }
         
         // Clan chat
         if (args[0].toLowerCase() === 'chat') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .clan chat [message]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .clan chat [message]'
+                );
                 return;
             }
             
@@ -2483,44 +2423,41 @@ const commands = {
             
             // Send to leader
             if (userClan.leader !== sender) {
-                await sock.sendMessage(userClan.leader, { text: chatMessage });
+                await safeSendText(sock, userClan.leader, chatMessage );
             }
             
             // Send to officers
             for (const officerId of userClan.officers) {
                 if (officerId !== sender) {
-                    await sock.sendMessage(officerId, { text: chatMessage });
+                    await safeSendText(sock, officerId, chatMessage );
                 }
             }
             
             // Send to members
             for (const memberId of userClan.members) {
                 if (memberId !== sender) {
-                    await sock.sendMessage(memberId, { text: chatMessage });
+                    await safeSendText(sock, memberId, chatMessage );
                 }
             }
             
             // Confirmation to sender
-            await sock.sendMessage(sender, {
-                text: `*👥 Message Sent:* Your message has been sent to all clan members.`
-            });
+            await safeSendText(sock, sender, `*👥 Message Sent:* Your message has been sent to all clan members.`
+            );
             return;
         }
         
         // Leader/officer commands
         if (userRole !== 'leader' && userRole !== 'officer') {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* You must be a clan leader or officer to use this command.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* You must be a clan leader or officer to use this command.'
+            );
             return;
         }
         
         // Invite a user
         if (args[0].toLowerCase() === 'invite') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .clan invite @user'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .clan invite @user'
+                );
                 return;
             }
             
@@ -2529,26 +2466,23 @@ const commands = {
             // Check if target has a profile
             const targetProfile = userProfiles.get(targetId);
             if (!targetProfile) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* That user doesn\'t have a profile yet.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* That user doesn\'t have a profile yet.'
+                );
                 return;
             }
             
             // Check if clan is full
             const memberCount = userClan.members.length + userClan.officers.length + 1;
             if (memberCount >= 50) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Your clan is already at maximum capacity (50 members).'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Your clan is already at maximum capacity (50 members).'
+                );
                 return;
             }
             
             // Check if user is already in the clan
             if (userClan.leader === targetId || userClan.officers.includes(targetId) || userClan.members.includes(targetId)) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* That user is already in your clan.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* That user is already in your clan.'
+                );
                 return;
             }
             
@@ -2562,9 +2496,8 @@ const commands = {
             }
             
             if (targetInClan) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* That user is already in another clan.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* That user is already in another clan.'
+                );
                 return;
             }
             
@@ -2582,9 +2515,8 @@ const commands = {
         // Kick a member
         if (args[0].toLowerCase() === 'kick') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .clan kick @user'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .clan kick @user'
+                );
                 return;
             }
             
@@ -2592,16 +2524,14 @@ const commands = {
             
             // Check permissions
             if (userRole === 'officer' && userClan.leader === targetId) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* You cannot kick the clan leader.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* You cannot kick the clan leader.'
+                );
                 return;
             }
             
             if (userRole === 'officer' && userClan.officers.includes(targetId)) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Officers cannot kick other officers.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Officers cannot kick other officers.'
+                );
                 return;
             }
             
@@ -2616,9 +2546,8 @@ const commands = {
             }
             
             if (!targetRole) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* That user is not in your clan.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* That user is not in your clan.'
+                );
                 return;
             }
             
@@ -2646,18 +2575,16 @@ const commands = {
         
         // Leader-only commands
         if (userRole !== 'leader') {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* You must be the clan leader to use this command.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* You must be the clan leader to use this command.'
+            );
             return;
         }
         
         // Promote a member to officer
         if (args[0].toLowerCase() === 'promote') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .clan promote @user'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .clan promote @user'
+                );
                 return;
             }
             
@@ -2665,9 +2592,8 @@ const commands = {
             
             // Check if target is a member
             if (!userClan.members.includes(targetId)) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* That user is not a member of your clan or is already an officer.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* That user is not a member of your clan or is already an officer.'
+                );
                 return;
             }
             
@@ -2693,9 +2619,8 @@ const commands = {
         // Demote an officer to member
         if (args[0].toLowerCase() === 'demote') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .clan demote @user'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .clan demote @user'
+                );
                 return;
             }
             
@@ -2703,9 +2628,8 @@ const commands = {
             
             // Check if target is an officer
             if (!userClan.officers.includes(targetId)) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* That user is not an officer in your clan.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* That user is not an officer in your clan.'
+                );
                 return;
             }
             
@@ -2731,34 +2655,30 @@ const commands = {
         // Set clan description
         if (args[0].toLowerCase() === 'setdesc') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .clan setdesc [description]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .clan setdesc [description]'
+                );
                 return;
             }
             
             const description = args.slice(1).join(' ');
             
             if (description.length > 200) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Clan description must be 200 characters or less.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Clan description must be 200 characters or less.'
+                );
                 return;
             }
             
             // Set description
             userClan.description = description;
             
-            await sock.sendMessage(sender, {
-                text: `*👥 Description Updated:* You have updated your clan's description.`
-            });
+            await safeSendText(sock, sender, `*👥 Description Updated:* You have updated your clan's description.`
+            );
             return;
         }
         
         // Unknown command
-        await sock.sendMessage(sender, {
-            text: '*⚠️ Usage:* .clan [list|create|join|leave|chat|invite|kick|promote|demote|setdesc]'
-        });
+        await safeSendText(sock, sender, '*⚠️ Usage:* .clan [list|create|join|leave|chat|invite|kick|promote|demote|setdesc]'
+        );
     },
     
     category: 'user',
@@ -2879,7 +2799,7 @@ const commands = {
                     }
                 }
                 
-                await sock.sendMessage(sender, { text: farmStatus });
+                await safeSendText(sock, sender, farmStatus );
                 break;
                 
             case 'plant':
@@ -2899,17 +2819,15 @@ const commands = {
                 const cropInfo = crops.find(c => c.name.toLowerCase() === cropName);
                 
                 if (!cropInfo) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* Invalid crop name. Use .farm plant to see available crops.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* Invalid crop name. Use .farm plant to see available crops.'
+                    );
                     return;
                 }
                 
                 // Check if there's an available plot
                 if (profile.farm.crops.length >= profile.farm.plots) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* All plots are occupied. Harvest crops or buy more plots.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* All plots are occupied. Harvest crops or buy more plots.'
+                    );
                     return;
                 }
                 
@@ -2935,9 +2853,8 @@ const commands = {
                 
             case 'harvest':
                 if (profile.farm.crops.length === 0) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You don\'t have any crops to harvest.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You don\'t have any crops to harvest.'
+                    );
                     return;
                 }
                 
@@ -2971,9 +2888,8 @@ const commands = {
                 }
                 
                 if (harvestedCrops.length === 0) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* None of your crops are ready to harvest yet.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* None of your crops are ready to harvest yet.'
+                    );
                     return;
                 }
                 
@@ -2983,9 +2899,8 @@ const commands = {
                 
                 harvestMessage += `\n*Total harvest value:* ${formatNumber(totalValue)} coins\n*Current balance:* ${formatNumber(profile.coins)} coins`;
                 
-                await sock.sendMessage(sender, {
-                    text: harvestMessage
-                });
+                await safeSendText(sock, sender, harvestMessage
+                );
                 break;
                 
             case 'upgrade':
@@ -3018,9 +2933,8 @@ const commands = {
                 break;
                 
             default:
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .farm [status|plant|harvest|upgrade]\n\n• status - View your farm\n• plant [crop] - Plant seeds\n• harvest - Harvest ready crops\n• upgrade - Buy more plots'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .farm [status|plant|harvest|upgrade]\n\n• status - View your farm\n• plant [crop] - Plant seeds\n• harvest - Harvest ready crops\n• upgrade - Buy more plots'
+                );
         }
         
         // Save profile
@@ -3053,16 +2967,15 @@ const commands = {
             });
             locationList += 'Use .adventure [location] to start an adventure!';
             
-            await sock.sendMessage(sender, { text: locationList });
+            await safeSendText(sock, sender, locationList );
             return;
         } else {
             const locationName = args.join(' ');
             location = adventureLocations.find(l => l.name.toLowerCase() === locationName.toLowerCase());
             
             if (!location) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Invalid location. Use .adventure to see available locations.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Invalid location. Use .adventure to see available locations.'
+                );
                 return;
             }
         }
@@ -3248,16 +3161,15 @@ const commands = {
             
             questList += 'Use .quest claim [quest_id] to claim rewards when requirements are met.';
             
-            await sock.sendMessage(sender, { text: questList });
+            await safeSendText(sock, sender, questList );
             return;
         }
         
         // Claim quest rewards
         if (args[0].toLowerCase() === 'claim') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .quest claim [quest_id]\n\nUse .quest to see available quests.'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .quest claim [quest_id]\n\nUse .quest to see available quests.'
+                );
                 return;
             }
             
@@ -3265,17 +3177,15 @@ const commands = {
             const quest = quests.find(q => q.id.toLowerCase() === questId);
             
             if (!quest) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Invalid quest ID. Use .quest to see available quests.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Invalid quest ID. Use .quest to see available quests.'
+                );
                 return;
             }
             
             // Check if already completed
             if (profile.completedQuests.includes(quest.id)) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* You have already completed this quest.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* You have already completed this quest.'
+                );
                 return;
             }
             
@@ -3369,16 +3279,15 @@ const commands = {
             
             shopList += '\nUse .shop buy [item] to purchase an item.';
             
-            await sock.sendMessage(sender, { text: shopList });
+            await safeSendText(sock, sender, shopList );
             return;
         }
         
         // Buy command
         if (args[0].toLowerCase() === 'buy') {
             if (args.length < 2) {
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .shop buy [item]\n\nUse .shop to see available items.'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .shop buy [item]\n\nUse .shop to see available items.'
+                );
                 return;
             }
             
@@ -3386,9 +3295,8 @@ const commands = {
             const item = shopItems.find(i => i.id.toLowerCase() === itemId);
             
             if (!item) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Invalid item. Use .shop to see available items.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Invalid item. Use .shop to see available items.'
+                );
                 return;
             }
             
@@ -3512,9 +3420,8 @@ const commands = {
             // Check if user exists
             const targetProfile = userProfiles.get(mentionedUser);
             if (!targetProfile) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* User not found or not registered.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* User not found or not registered.'
+                );
                 return;
             }
             
@@ -3557,7 +3464,7 @@ const commands = {
         statsMessage += `*Crimes:* ${targetProfile.crimeCount || 0}\n`;
         statsMessage += `*Quests Completed:* ${targetProfile.completedQuests ? targetProfile.completedQuests.length : 0}\n`;
         
-        await sock.sendMessage(sender, { text: statsMessage });
+        await safeSendText(sock, sender, statsMessage );
     },
     
     async hourly(sock, sender) {
@@ -3683,9 +3590,8 @@ const commands = {
             const count = args.length > 1 && !isNaN(parseInt(args[1])) ? parseInt(args[1]) : 1;
             
             if (count < 1) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Please specify a valid number of tickets to buy.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Please specify a valid number of tickets to buy.'
+                );
                 return;
             }
             
@@ -3761,7 +3667,7 @@ const commands = {
             
             recipeList += 'Use .recipe [item] to see detailed information about a specific recipe.';
             
-            await sock.sendMessage(sender, { text: recipeList });
+            await safeSendText(sock, sender, recipeList );
             return;
         }
         
@@ -3771,9 +3677,8 @@ const commands = {
             .find(([id, _]) => id.toLowerCase() === itemId);
         
         if (!itemInfo || !itemInfo[1].recipe) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* Recipe not found. Use .recipe to see available recipes.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* Recipe not found. Use .recipe to see available recipes.'
+            );
             return;
         }
         
@@ -3808,9 +3713,8 @@ const commands = {
         if (!profile) return;
         
         if (args.length < 2) {
-            await sock.sendMessage(sender, {
-                text: '*⚠️ Usage:* .dicebet [amount] [number 1-6]\n\nPlace a bet on a dice roll. If you guess correctly, you win 5x your bet!'
-            });
+            await safeSendText(sock, sender, '*⚠️ Usage:* .dicebet [amount] [number 1-6]\n\nPlace a bet on a dice roll. If you guess correctly, you win 5x your bet!'
+            );
             return;
         }
         
@@ -3820,9 +3724,8 @@ const commands = {
         
         // Validate bet amount
         if (isNaN(betAmount) || betAmount < 10) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* Minimum bet amount is 10 coins.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* Minimum bet amount is 10 coins.'
+            );
             return;
         }
         
@@ -3835,9 +3738,8 @@ const commands = {
         
         // Validate bet number
         if (isNaN(betNumber) || betNumber < 1 || betNumber > 6) {
-            await sock.sendMessage(sender, {
-                text: '*❌ Error:* Please bet on a number between 1 and 6.'
-            });
+            await safeSendText(sock, sender, '*❌ Error:* Please bet on a number between 1 and 6.'
+            );
             return;
         }
         
@@ -3892,7 +3794,7 @@ const commands = {
                 
                 petsList += '\nUse .pets adopt [pet name] to adopt a pet!';
                 
-                await sock.sendMessage(sender, { text: petsList });
+                await safeSendText(sock, sender, petsList );
                 return;
             }
             
@@ -3900,9 +3802,8 @@ const commands = {
             const petType = petTypes.find(p => p.name.toLowerCase() === pet.type.toLowerCase());
             
             if (!petType) {
-                await sock.sendMessage(sender, {
-                    text: '*❌ Error:* Your pet data is corrupted. Please contact an administrator.'
-                });
+                await safeSendText(sock, sender, '*❌ Error:* Your pet data is corrupted. Please contact an administrator.'
+                );
                 return;
             }
             
@@ -3951,17 +3852,15 @@ const commands = {
             case 'adopt':
                 // Adopt a pet
                 if (args.length < 2) {
-                    await sock.sendMessage(sender, {
-                        text: '*⚠️ Usage:* .pets adopt [pet name]\n\nUse .pets to see available pets.'
-                    });
+                    await safeSendText(sock, sender, '*⚠️ Usage:* .pets adopt [pet name]\n\nUse .pets to see available pets.'
+                    );
                     return;
                 }
                 
                 // Check if user already has a pet
                 if (petData.get(sender)) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You already have a pet! You can\'t adopt another one.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You already have a pet! You can\'t adopt another one.'
+                    );
                     return;
                 }
                 
@@ -3970,9 +3869,8 @@ const commands = {
                 const petType = petTypes.find(p => p.name.toLowerCase() === petName.toLowerCase());
                 
                 if (!petType) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* Invalid pet type. Use .pets to see available pets.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* Invalid pet type. Use .pets to see available pets.'
+                    );
                     return;
                 }
                 
@@ -4004,9 +3902,8 @@ const commands = {
                 
                 // Add achievement
                 if (addAchievement(profile, 'pet')) {
-                    await sock.sendMessage(sender, {
-                        text: '*🏆 Achievement Unlocked:* Pet Lover\nYou adopted your first pet!'
-                    });
+                    await safeSendText(sock, sender, '*🏆 Achievement Unlocked:* Pet Lover\nYou adopted your first pet!'
+                    );
                 }
                 
                 // Save profile
@@ -4021,9 +3918,8 @@ const commands = {
                 // Feed pet
                 const pet = petData.get(sender);
                 if (!pet) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You don\'t have a pet to feed. Use .pets adopt [pet name] to adopt one.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You don\'t have a pet to feed. Use .pets adopt [pet name] to adopt one.'
+                    );
                     return;
                 }
                 
@@ -4068,9 +3964,8 @@ const commands = {
                 // Play with pet
                 const playPet = petData.get(sender);
                 if (!playPet) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You don\'t have a pet to play with. Use .pets adopt [pet name] to adopt one.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You don\'t have a pet to play with. Use .pets adopt [pet name] to adopt one.'
+                    );
                     return;
                 }
                 
@@ -4094,9 +3989,8 @@ const commands = {
                 // Heal pet
                 const healPet = petData.get(sender);
                 if (!healPet) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You don\'t have a pet to heal. Use .pets adopt [pet name] to adopt one.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You don\'t have a pet to heal. Use .pets adopt [pet name] to adopt one.'
+                    );
                     return;
                 }
                 
@@ -4131,16 +4025,14 @@ const commands = {
                 // Rename pet
                 const renamePet = petData.get(sender);
                 if (!renamePet) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You don\'t have a pet to rename. Use .pets adopt [pet name] to adopt one.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You don\'t have a pet to rename. Use .pets adopt [pet name] to adopt one.'
+                    );
                     return;
                 }
                 
                 if (args.length < 2) {
-                    await sock.sendMessage(sender, {
-                        text: '*⚠️ Usage:* .pets rename [new name]'
-                    });
+                    await safeSendText(sock, sender, '*⚠️ Usage:* .pets rename [new name]'
+                    );
                     return;
                 }
                 
@@ -4149,9 +4041,8 @@ const commands = {
                 
                 // Check length
                 if (newName.length < 2 || newName.length > 20) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* Pet name must be between 2 and 20 characters long.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* Pet name must be between 2 and 20 characters long.'
+                    );
                     return;
                 }
                 
@@ -4171,9 +4062,8 @@ const commands = {
                 break;
                 
             default:
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .pets [adopt|feed|play|heal|rename]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .pets [adopt|feed|play|heal|rename]'
+                );
         }
     },
     
@@ -4186,9 +4076,8 @@ const commands = {
             const marriage = marriageData.get(sender);
             
             if (!marriage) {
-                await sock.sendMessage(sender, {
-                    text: '*❤️ Marriage System:*\n\nYou are not currently married.\n\nUse .marriage propose @user to propose to someone!'
-                });
+                await safeSendText(sock, sender, '*❤️ Marriage System:*\n\nYou are not currently married.\n\nUse .marriage propose @user to propose to someone!'
+                );
                 return;
             }
             
@@ -4214,17 +4103,15 @@ const commands = {
             case 'propose':
                 // Marriage proposal
                 if (args.length < 2 || !args[1].startsWith('@')) {
-                    await sock.sendMessage(sender, {
-                        text: '*⚠️ Usage:* .marriage propose @user'
-                    });
+                    await safeSendText(sock, sender, '*⚠️ Usage:* .marriage propose @user'
+                    );
                     return;
                 }
                 
                 // Check if already married
                 if (marriageData.get(sender)) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You are already married! You must divorce first.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You are already married! You must divorce first.'
+                    );
                     return;
                 }
                 
@@ -4234,17 +4121,15 @@ const commands = {
                 // Check if target is valid user
                 const targetProfile = userProfiles.get(targetUser);
                 if (!targetProfile) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* User not found or not registered.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* User not found or not registered.'
+                    );
                     return;
                 }
                 
                 // Check if target is already married
                 if (marriageData.get(targetUser)) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* That user is already married to someone else!'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* That user is already married to someone else!'
+                    );
                     return;
                 }
                 
@@ -4271,27 +4156,24 @@ const commands = {
                 const proposal = global.marriageProposals.get(sender);
                 
                 if (!proposal) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You don\'t have any pending marriage proposals.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You don\'t have any pending marriage proposals.'
+                    );
                     return;
                 }
                 
                 // Check if proposal is expired (24 hours)
                 if (Date.now() - proposal.time > 24 * 60 * 60 * 1000) {
                     global.marriageProposals.delete(sender);
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* The marriage proposal has expired.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* The marriage proposal has expired.'
+                    );
                     return;
                 }
                 
                 // Check if either user is now married
                 if (marriageData.get(sender) || marriageData.get(proposal.proposer)) {
                     global.marriageProposals.delete(sender);
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* Either you or the proposer is already married.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* Either you or the proposer is already married.'
+                    );
                     return;
                 }
                 
@@ -4319,15 +4201,13 @@ const commands = {
                 
                 // Add achievement for both
                 if (addAchievement(profile, 'married')) {
-                    await sock.sendMessage(sender, {
-                        text: '*🏆 Achievement Unlocked:* Soul Bound\nYou got married!'
-                    });
+                    await safeSendText(sock, sender, '*🏆 Achievement Unlocked:* Soul Bound\nYou got married!'
+                    );
                 }
                 
                 if (proposerProfile && addAchievement(proposerProfile, 'married')) {
-                    await sock.sendMessage(proposal.proposer, {
-                        text: '*🏆 Achievement Unlocked:* Soul Bound\nYou got married!'
-                    });
+                    await safeSendText(sock, proposal.proposer, '*🏆 Achievement Unlocked:* Soul Bound\nYou got married!'
+                    );
                 }
                 
                 // Save profiles
@@ -4350,9 +4230,8 @@ const commands = {
                 const rejectProposal = global.marriageProposals.get(sender);
                 
                 if (!rejectProposal) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You don\'t have any pending marriage proposals.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You don\'t have any pending marriage proposals.'
+                    );
                     return;
                 }
                 
@@ -4362,9 +4241,8 @@ const commands = {
                 // Remove proposal
                 global.marriageProposals.delete(sender);
                 
-                await sock.sendMessage(sender, {
-                    text: '*❤️ Proposal Rejected*\n\nYou have rejected the marriage proposal.'
-                });
+                await safeSendText(sock, sender, '*❤️ Proposal Rejected*\n\nYou have rejected the marriage proposal.'
+                );
                 
                 await sock.sendMessage(rejectProposer, {
                     text: `*❤️ Proposal Rejected*\n\n${profile.name} has rejected your marriage proposal.`
@@ -4376,17 +4254,15 @@ const commands = {
                 const divorceMarriage = marriageData.get(sender);
                 
                 if (!divorceMarriage) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You are not currently married.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You are not currently married.'
+                    );
                     return;
                 }
                 
                 // Confirm divorce
                 if (args.length < 2 || args[1].toLowerCase() !== 'confirm') {
-                    await sock.sendMessage(sender, {
-                        text: '*⚠️ Divorce Confirmation:*\n\nAre you sure you want to divorce? This cannot be undone.\n\nType .marriage divorce confirm to proceed.'
-                    });
+                    await safeSendText(sock, sender, '*⚠️ Divorce Confirmation:*\n\nAre you sure you want to divorce? This cannot be undone.\n\nType .marriage divorce confirm to proceed.'
+                    );
                     return;
                 }
                 
@@ -4416,16 +4292,14 @@ const commands = {
                 const giftMarriage = marriageData.get(sender);
                 
                 if (!giftMarriage) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* You are not currently married.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* You are not currently married.'
+                    );
                     return;
                 }
                 
                 if (args.length < 2) {
-                    await sock.sendMessage(sender, {
-                        text: '*⚠️ Usage:* .marriage gift [coins/item] [amount/item_name]'
-                    });
+                    await safeSendText(sock, sender, '*⚠️ Usage:* .marriage gift [coins/item] [amount/item_name]'
+                    );
                     return;
                 }
                 
@@ -4434,27 +4308,24 @@ const commands = {
                 const partnerProfile2 = userProfiles.get(partner2);
                 
                 if (!partnerProfile2) {
-                    await sock.sendMessage(sender, {
-                        text: '*❌ Error:* Your spouse\'s profile could not be found.'
-                    });
+                    await safeSendText(sock, sender, '*❌ Error:* Your spouse\'s profile could not be found.'
+                    );
                     return;
                 }
                 
                 if (giftType === 'coins') {
                     // Gift coins
                     if (args.length < 3 || isNaN(parseInt(args[2]))) {
-                        await sock.sendMessage(sender, {
-                            text: '*⚠️ Usage:* .marriage gift coins [amount]'
-                        });
+                        await safeSendText(sock, sender, '*⚠️ Usage:* .marriage gift coins [amount]'
+                        );
                         return;
                     }
                     
                     const amount = parseInt(args[2]);
                     
                     if (amount < 10) {
-                        await sock.sendMessage(sender, {
-                            text: '*❌ Error:* Minimum gift amount is 10 coins.'
-                        });
+                        await safeSendText(sock, sender, '*❌ Error:* Minimum gift amount is 10 coins.'
+                        );
                         return;
                     }
                     
@@ -4483,9 +4354,8 @@ const commands = {
                 } else if (giftType === 'item') {
                     // Gift item
                     if (args.length < 4 || isNaN(parseInt(args[2]))) {
-                        await sock.sendMessage(sender, {
-                            text: '*⚠️ Usage:* .marriage gift item [amount] [item_name]'
-                        });
+                        await safeSendText(sock, sender, '*⚠️ Usage:* .marriage gift item [amount] [item_name]'
+                        );
                         return;
                     }
                     
@@ -4494,9 +4364,8 @@ const commands = {
                     
                     // Check if item exists in inventory
                     if (!profile.inventory || !profile.inventory[itemName] || profile.inventory[itemName] < amount) {
-                        await sock.sendMessage(sender, {
-                            text: `*❌ Error:* You don't have enough of that item. Check your inventory with .inventory.`
-                        });
+                        await safeSendText(sock, sender, `*❌ Error:* You don't have enough of that item. Check your inventory with .inventory.`
+                        );
                         return;
                     }
                     
@@ -4519,16 +4388,14 @@ const commands = {
                         text: `*❤️ Gift Received!*\n\nYour spouse ${profile.name} sent you ${amount}x ${itemName}!`
                     });
                 } else {
-                    await sock.sendMessage(sender, {
-                        text: '*⚠️ Usage:* .marriage gift [coins/item] [amount/item_name]'
-                    });
+                    await safeSendText(sock, sender, '*⚠️ Usage:* .marriage gift [coins/item] [amount/item_name]'
+                    );
                 }
                 break;
                 
             default:
-                await sock.sendMessage(sender, {
-                    text: '*⚠️ Usage:* .marriage [propose|accept|reject|divorce|gift]'
-                });
+                await safeSendText(sock, sender, '*⚠️ Usage:* .marriage [propose|accept|reject|divorce|gift]'
+                );
         }
     },
     

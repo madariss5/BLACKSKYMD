@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#f8eeff"/>
+  <text x="50%" y="50%" font-family="Arial" font-size="48" text-anchor="middle" fill="#9966cc">
+    *HUG*
+  </text>
+  <circle cx="200" cy="120" r="50" fill="none" stroke="#ff6699" stroke-width="3"/>
+  <circle cx="230" cy="110" r="5" fill="#000"/>
+  <circle cx="170" cy="110" r="5" fill="#000"/>
+  <path d="M 160 140 Q 200 180 240 140" fill="none" stroke="#000" stroke-width="3"/>
+  <g transform="translate(120, 200)">
+    <path d="M 0,0 Q 40,-40 80,0" fill="none" stroke="#9966cc" stroke-width="5"/>
+    <path d="M 80,0 Q 120,-40 160,0" fill="none" stroke="#9966cc" stroke-width="5"/>
+  </g>
+</svg>

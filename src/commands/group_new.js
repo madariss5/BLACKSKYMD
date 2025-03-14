@@ -8,26 +8,27 @@ const fsPromises = fs.promises;
 
 // Extended group command handlers
 const groupNewCommands = {
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     async pin(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
 
             if (!remoteJid.endsWith('@g.us')) {
-                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                await safeSendText(sock, remoteJid, '❌ This command can only be used in groups' );
                 return;
             }
 
             const sender = message.key.participant || message.key.remoteJid;
             const isUserAdmin = await isAdmin(sock, remoteJid, sender);
             if (!isUserAdmin) {
-                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                await safeSendText(sock, remoteJid, '❌ This command can only be used by admins' );
                 return;
             }
 
             // Get the message to pin
             const quoted = message.message.extendedTextMessage?.contextInfo?.quotedMessage;
             if (!quoted) {
-                await sock.sendMessage(remoteJid, { text: '❌ Please reply to a message to pin it' });
+                await safeSendText(sock, remoteJid, '❌ Please reply to a message to pin it' );
                 return;
             }
 
@@ -42,11 +43,11 @@ const groupNewCommands = {
             });
 
             await saveGroupSettings(remoteJid, settings);
-            await sock.sendMessage(remoteJid, { text: '📌 Message has been pinned' });
+            await safeSendText(sock, remoteJid, '📌 Message has been pinned' );
 
         } catch (err) {
             logger.error('Error in pin command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to pin message' });
+            await safeSendText(sock, message.key.remoteJid, '❌ Failed to pin message' );
         }
     },
 
@@ -55,20 +56,20 @@ const groupNewCommands = {
             const remoteJid = message.key.remoteJid;
 
             if (!remoteJid.endsWith('@g.us')) {
-                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                await safeSendText(sock, remoteJid, '❌ This command can only be used in groups' );
                 return;
             }
 
             const sender = message.key.participant || message.key.remoteJid;
             const isUserAdmin = await isAdmin(sock, remoteJid, sender);
             if (!isUserAdmin) {
-                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used by admins' });
+                await safeSendText(sock, remoteJid, '❌ This command can only be used by admins' );
                 return;
             }
 
             const settings = await getGroupSettings(remoteJid);
             if (!settings.pinnedMessages || settings.pinnedMessages.length === 0) {
-                await sock.sendMessage(remoteJid, { text: '❌ No pinned messages found' });
+                await safeSendText(sock, remoteJid, '❌ No pinned messages found' );
                 return;
             }
 
@@ -76,11 +77,11 @@ const groupNewCommands = {
             settings.pinnedMessages.pop();
             await saveGroupSettings(remoteJid, settings);
 
-            await sock.sendMessage(remoteJid, { text: '📌 Last pinned message has been removed' });
+            await safeSendText(sock, remoteJid, '📌 Last pinned message has been removed' );
 
         } catch (err) {
             logger.error('Error in unpin command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to unpin message' });
+            await safeSendText(sock, message.key.remoteJid, '❌ Failed to unpin message' );
         }
     },
 
@@ -89,13 +90,13 @@ const groupNewCommands = {
             const remoteJid = message.key.remoteJid;
 
             if (!remoteJid.endsWith('@g.us')) {
-                await sock.sendMessage(remoteJid, { text: '❌ This command can only be used in groups' });
+                await safeSendText(sock, remoteJid, '❌ This command can only be used in groups' );
                 return;
             }
 
             const settings = await getGroupSettings(remoteJid);
             if (!settings.pinnedMessages || settings.pinnedMessages.length === 0) {
-                await sock.sendMessage(remoteJid, { text: '📌 No pinned messages' });
+                await safeSendText(sock, remoteJid, '📌 No pinned messages' );
                 return;
             }
 
@@ -111,7 +112,7 @@ const groupNewCommands = {
 
         } catch (err) {
             logger.error('Error in pins command:', err);
-            await sock.sendMessage(message.key.remoteJid, { text: '❌ Failed to list pinned messages' });
+            await safeSendText(sock, message.key.remoteJid, '❌ Failed to list pinned messages' );
         }
     }
 };

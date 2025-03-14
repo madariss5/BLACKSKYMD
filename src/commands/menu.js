@@ -46,6 +46,7 @@ const categoryNames = {
 
 // Menu command handlers
 const menuCommands = {
+const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
     async menu(sock, message, args) {
         try {
             const sender = message.key.remoteJid;
@@ -65,7 +66,8 @@ const menuCommands = {
             const orderedCategories = [
                 'basic', 'utility', 'group', 'media', 'fun',
                 'reactions', 'user', 'user_extended', 'educational',
-                'nsfw', 'owner', 'menu'
+                'nsfw', 'menu'
+                // 'owner' is hidden from normal menu as it's admin-only
             ].filter(cat => allCommands[cat] && allCommands[cat].length > 0);
 
             // Add any remaining categories
@@ -116,14 +118,13 @@ const menuCommands = {
                 });
             } catch (imgErr) {
                 logger.warn('Failed to send menu with image, sending text-only', imgErr);
-                await sock.sendMessage(sender, { text: menuText });
+                await safeSendText(sock, sender, menuText );
             }
 
         } catch (err) {
             logger.error('Menu command error:', err);
-            await sock.sendMessage(message.key.remoteJid, {
-                text: `❌ Error generating menu. Please try again.`
-            });
+            await safeSendText(sock, message.key.remoteJid, `❌ Error generating menu. Please try again.`
+            );
         }
     },
     async help(sock, message, args) {
@@ -157,7 +158,7 @@ const menuCommands = {
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
         
-                await sock.sendMessage(sender, { text: helpText });
+                await safeSendText(sock, sender, helpText );
                 return;
             }
         
@@ -224,11 +225,10 @@ const menuCommands = {
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
         
-                await sock.sendMessage(sender, { text: helpText });
+                await safeSendText(sock, sender, helpText );
             } else {
-                await sock.sendMessage(sender, { 
-                    text: languageManager.getText('menu.command_not_found', userLang, commandName, prefix)
-                });
+                await safeSendText(sock, sender, languageManager.getText('menu.command_not_found', userLang, commandName, prefix)
+                );
             }
         
         } catch (err) {
