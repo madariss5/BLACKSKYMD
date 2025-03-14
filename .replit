@@ -4,12 +4,40 @@ modules = ["nodejs-20", "python-3.11"]
 channel = "stable-24_05"
 
 [workflows]
-runButton = "Project"
+runButton = "Run Bot"
 
 [[workflows.workflow]]
 name = "Project"
 mode = "parallel"
 author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "QR Web Server"
+
+[[workflows.workflow]]
+name = "QR Web Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node src/qr-web-server.js"
+waitForPort = 5006
+
+[[workflows.workflow]]
+name = "Run Bot"
+author = 40502297
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node src/index.js"
 
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
