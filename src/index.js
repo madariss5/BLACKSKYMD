@@ -65,7 +65,7 @@ mainApp.get('/', (req, res) => {
                         <p>Status: ${connectionStatus}</p>
                         <p>Uptime: ${Math.floor(process.uptime())} seconds</p>
                     </div>
-                    <a href="http://0.0.0.0:5007" class="qr-link" target="_blank">Open QR Code Scanner</a>
+                    <a href="http://localhost:5007" class="qr-link" target="_blank">Open QR Code Scanner</a>
                 </div>
             </body>
         </html>
@@ -159,7 +159,7 @@ async function startServers() {
                     reject(err);
                 } else {
                     logger.info('Main server running on port 5000');
-                    logger.info('Access the status page at http://0.0.0.0:5000');
+                    logger.info('Access the status page at http://localhost:5000');
                     resolve();
                 }
             });
@@ -173,7 +173,7 @@ async function startServers() {
                     reject(err);
                 } else {
                     logger.info('QR server running on port 5007');
-                    logger.info('Access the QR code at http://0.0.0.0:5007');
+                    logger.info('Access the QR code at http://localhost:5007');
                     resolve();
                 }
             });
@@ -211,15 +211,11 @@ async function startConnection() {
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            browser: ['BLACKSKY-MD', 'Safari', '117.0.0'],
-            version: [2, 2408, 2],
+            browser: ['BLACKSKY-MD', 'Chrome', '110.0.0'],
+            version: [2, 2323, 4],
             logger: pino({ level: 'silent' }),
             defaultQueryTimeoutMs: 60000,
-            connectTimeoutMs: 60000,
-            qrTimeout: 40000,
-            markOnlineOnConnect: false,
-            // Prevent connection issues
-            retryRequestDelayMs: 1000
+            connectTimeoutMs: 60000
         });
         logger.info('WhatsApp socket created');
 
@@ -229,8 +225,7 @@ async function startConnection() {
             logger.info('Connection update received:', {
                 connection,
                 hasQR: !!qr,
-                disconnectReason: lastDisconnect?.error?.message,
-                errorStack: lastDisconnect?.error?.stack
+                disconnectReason: lastDisconnect?.error?.message
             });
 
             if (qr) {
@@ -239,7 +234,7 @@ async function startConnection() {
                     latestQR = await qrcode.toDataURL(qr);
                     connectionStatus = 'connecting';
                     logger.info('QR code generated successfully');
-                    logger.info('QR code available at http://0.0.0.0:5007');
+                    logger.info('QR code available at http://localhost:5007');
                 } catch (error) {
                     logger.error('Error generating web QR:', error);
                     logger.error('Error stack:', error.stack);
@@ -273,8 +268,7 @@ async function startConnection() {
                 logger.info('Connection closed:', {
                     statusCode,
                     shouldReconnect,
-                    error: lastDisconnect?.error?.message,
-                    stack: lastDisconnect?.error?.stack
+                    error: lastDisconnect?.error?.message
                 });
 
                 if (shouldReconnect) {
