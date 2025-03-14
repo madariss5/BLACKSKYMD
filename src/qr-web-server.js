@@ -14,7 +14,7 @@ const pino = require('pino');
 // Create Express app
 const app = express();
 const server = http.createServer(app);
-const PORT = 5001; // Use a different port to avoid conflicts
+const PORT = 5007; // Changed to port 5007 to avoid conflicts
 
 // QR code state
 let latestQR = null;
@@ -38,6 +38,7 @@ app.get('/', (req, res) => {
     <head>
         <title>WhatsApp Bot QR Code</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="refresh" content="30">
         <style>
             body {
                 font-family: Arial, sans-serif;
@@ -60,7 +61,7 @@ app.get('/', (req, res) => {
                 width: 100%;
             }
             h1 {
-                color: #128C7E; /* WhatsApp green */
+                color: #128C7E;
                 margin-bottom: 5px;
             }
             h2 {
@@ -113,9 +114,9 @@ app.get('/', (req, res) => {
     </head>
     <body>
         <div class="container">
-            <h1>WhatsApp Bot</h1>
-            <h2>QR Code Connection</h2>
-            
+            <h1>BLACKSKY-MD</h1>
+            <h2>WhatsApp QR Code Connection</h2>
+
             <div class="status ${connectionStatus}">
                 Status: ${connectionStatus === 'connected' 
                         ? 'Connected ✓' 
@@ -123,16 +124,16 @@ app.get('/', (req, res) => {
                             ? 'Connecting...' 
                             : 'Waiting for QR Code...'}
             </div>
-            
+
             <div class="qr-container">
                 ${latestQR 
                     ? `<img src="${latestQR}" alt="WhatsApp QR Code" width="300" height="300">`
                     : `<p>Generating QR code... Please wait.</p><p>If no QR appears after 15 seconds, click refresh.</p>`
                 }
             </div>
-            
+
             <button class="refresh-button" onclick="location.reload()">Refresh</button>
-            
+
             <div class="instructions">
                 <strong>Instructions:</strong>
                 <ol>
@@ -141,28 +142,13 @@ app.get('/', (req, res) => {
                     <li>Tap on "Link a Device"</li>
                     <li>Point your phone camera at this QR code to scan</li>
                 </ol>
-                <p>Once connected, this page will update automatically.</p>
+                <p><strong>Note:</strong> Page refreshes automatically every 30 seconds.</p>
             </div>
         </div>
-        
-        <script>
-            // Auto-refresh if no QR code appears
-            const hasQR = ${latestQR ? 'true' : 'false'};
-            const status = "${connectionStatus}";
-            
-            if (!hasQR && status !== 'connected') {
-                setTimeout(() => location.reload(), 10000);
-            }
-            
-            // Auto-refresh every 30 seconds while waiting for connection
-            if (status !== 'connected') {
-                setTimeout(() => location.reload(), 30000);
-            }
-        </script>
     </body>
     </html>
     `;
-    
+
     res.send(html);
 });
 
@@ -182,7 +168,7 @@ async function displayQR(qr) {
 async function startConnection() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRECTORY);
-        
+
         // Create WhatsApp socket connection
         sock = makeWASocket({
             auth: state,
@@ -192,29 +178,29 @@ async function startConnection() {
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000
         });
-        
+
         // Handle connection events
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            
+
             if (qr) {
                 await displayQR(qr);
             }
-            
+
             if (connection === 'open') {
                 connectionStatus = 'connected';
                 latestQR = null; // Clear QR code once connected
                 await saveCreds();
                 console.log('\nConnection established successfully!\n');
             }
-            
+
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                
+
                 connectionStatus = 'disconnected';
                 console.log(`\nConnection closed due to ${lastDisconnect?.error?.message}\n`);
-                
+
                 if (shouldReconnect) {
                     console.log('Reconnecting...');
                     setTimeout(startConnection, 5000);
@@ -223,9 +209,9 @@ async function startConnection() {
                 }
             }
         });
-        
+
         sock.ev.on('creds.update', saveCreds);
-        
+
     } catch (err) {
         console.error('Error starting connection:', err);
         connectionStatus = 'disconnected';
@@ -235,9 +221,14 @@ async function startConnection() {
 
 // Start the server
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`\nSimple QR Web Server running at http://localhost:${PORT}\n`);
+    console.log(`\nQR Web Server running at http://localhost:${PORT}\n`);
     console.log('Use this URL to access the WhatsApp QR code scanning interface\n');
-    
-    // Start WhatsApp connection
     startConnection();
 });
+
+module.exports = {
+    displayQR,
+    updateConnectionStatus: (status) => {
+        connectionStatus = status;
+    }
+};

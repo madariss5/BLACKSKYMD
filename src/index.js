@@ -1,521 +1,271 @@
-const path = require('node:path');
 const express = require('express');
-const { startConnection } = require('./connection');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { messageHandler } = require('./handlers/messageHandler');
 const { commandLoader } = require('./utils/commandLoader');
 const commandModules = require('./commands/index');
 const logger = require('./utils/logger');
 const config = require('./config/config');
-const fs = require('node:fs');
-const { DisconnectReason } = require('@whiskeysockets/baileys');
+const fs = require('fs').promises;
+const qrcode = require('qrcode');
+const path = require('path');
 
-// Global state management
-let isConnecting = false;
-let connectionTimeout = null;
-let reconnectTimer = null;
-let sessionInvalidated = false;
+// Session directory
+const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info');
 
-// Enhanced reconnection manager
-const reconnectManager = {
-    attempts: 0,
-    maxAttempts: 5,
-    baseDelay: 10000,
-    maxDelay: 300000,
-    isReconnecting: false,
-    connectionLock: false,
+// Global state
+let latestQR = null;
+let connectionStatus = 'disconnected';
+let sock = null;
 
-    async handleReconnect(error, lastDisconnect) {
-        if (this.isReconnecting || this.connectionLock) {
-            logger.info('Connection attempt already in progress, skipping...');
-            return false;
-        }
+// Create Express apps
+const mainApp = express();
+const qrApp = express();
 
-        const statusCode = lastDisconnect?.error?.output?.statusCode;
-        logger.info(`Handling disconnect with status code: ${statusCode}`);
+mainApp.use(express.json());
 
-        this.connectionLock = true;
-        this.isReconnecting = true;
-
-        try {
-            // Clear session and exit on critical errors
-            if (statusCode === DisconnectReason.loggedOut || 
-                statusCode === DisconnectReason.connectionReplaced ||
-                statusCode === DisconnectReason.connectionClosed ||
-                statusCode === DisconnectReason.timedOut ||
-                statusCode === DisconnectReason.connectionLost) {
-
-                logger.info('Critical connection error, clearing session...');
-                await this.clearSession();
-
-                // Force restart on critical errors
-                process.exit(1);
-                return false;
-            }
-
-            // Handle stream conflicts (440)
-            if (statusCode === 440) {
-                logger.info('Stream conflict detected, clearing session and restarting...');
-                await this.clearSession();
-                process.exit(1);
-                return false;
-            }
-
-            if (this.attempts >= this.maxAttempts) {
-                logger.error('Max reconnection attempts reached, clearing session and restarting...');
-                await this.clearSession();
-                process.exit(1);
-                return false;
-            }
-
-            const delay = Math.min(
-                this.baseDelay * Math.pow(2, this.attempts),
-                this.maxDelay
-            );
-
-            this.attempts++;
-            logger.info(`Reconnection attempt ${this.attempts}/${this.maxAttempts} in ${delay}ms`);
-
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return true;
-
-        } catch (err) {
-            logger.error('Error during reconnection:', err);
-            return false;
-        } finally {
-            this.isReconnecting = false;
-            this.connectionLock = false;
-        }
-    },
-
-    async clearSession() {
-        try {
-            const sessionFiles = [
-                'auth_info_multi.json',
-                'auth_info_baileys.json',
-                'auth_info.json',
-                'auth_info_qr.json'
-            ];
-
-            for (const file of sessionFiles) {
-                try {
-                    if (fs.existsSync(file)) {
-                        fs.unlinkSync(file);
-                        logger.info(`Cleared session file: ${file}`);
+// Main app status endpoint
+mainApp.get('/', (req, res) => {
+    res.send(`
+        <html>
+            <head>
+                <title>WhatsApp Bot - Status</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        text-align: center;
+                        margin-top: 50px;
                     }
-                } catch (err) {
-                    logger.error(`Error clearing session file ${file}:`, err);
+                    .container {
+                        max-width: 600px;
+                        margin: 0 auto;
+                        padding: 20px;
+                    }
+                    .status-box {
+                        background-color: #f5f5f5;
+                        border-radius: 8px;
+                        padding: 15px;
+                        margin: 20px 0;
+                    }
+                    .qr-link {
+                        display: inline-block;
+                        background-color: #128C7E;
+                        color: white;
+                        padding: 10px 20px;
+                        text-decoration: none;
+                        border-radius: 5px;
+                        margin-top: 20px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>WhatsApp Bot Status</h1>
+                    <div class="status-box">
+                        <p>Status: ${connectionStatus}</p>
+                        <p>Uptime: ${Math.floor(process.uptime())} seconds</p>
+                    </div>
+                    <a href="http://localhost:5007" class="qr-link" target="_blank">Open QR Code Scanner</a>
+                </div>
+            </body>
+        </html>
+    `);
+});
+
+// QR code endpoint
+qrApp.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>WhatsApp Bot QR Code</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="refresh" content="30">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    background-color: #f0f4f7;
+                    margin: 0;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 100vh;
                 }
-            }
-
-            // Also clear the auth_info directory
-            const authDirs = ['auth_info', 'auth_info_baileys', 'auth_info_multi'];
-            for (const dir of authDirs) {
-                const dirPath = path.join(process.cwd(), dir);
-                if (fs.existsSync(dirPath)) {
-                    await fs.promises.rm(dirPath, { recursive: true, force: true });
-                    logger.info(`Cleared directory: ${dirPath}`);
+                .container {
+                    background-color: white;
+                    border-radius: 15px;
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                    padding: 30px;
+                    max-width: 500px;
+                    width: 100%;
+                    text-align: center;
                 }
-            }
+                .qr-container {
+                    background-color: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    margin: 20px auto;
+                    display: inline-block;
+                }
+                .status {
+                    font-weight: bold;
+                    padding: 10px;
+                    border-radius: 5px;
+                    margin: 15px 0;
+                }
+                .instructions {
+                    font-size: 0.9em;
+                    color: #666;
+                    margin-top: 20px;
+                    text-align: left;
+                }
+                img { max-width: 100%; height: auto; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>WhatsApp Bot QR Code</h1>
+                <div class="status">
+                    Status: ${connectionStatus}
+                </div>
+                <div class="qr-container">
+                    ${latestQR 
+                        ? `<img src="${latestQR}" alt="WhatsApp QR Code">`
+                        : '<p>Waiting for QR code...</p>'}
+                </div>
+                <div class="instructions">
+                    <ol>
+                        <li>Open WhatsApp on your phone</li>
+                        <li>Go to Settings > Linked Devices</li>
+                        <li>Tap on "Link a Device"</li>
+                        <li>Scan the QR code above</li>
+                    </ol>
+                    <p>Page refreshes automatically every 30 seconds.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+    `);
+});
 
-            sessionInvalidated = true;
-            logger.info('Session cleanup completed');
-        } catch (err) {
-            logger.error('Error in clearSession:', err);
-        }
-    },
-
-    reset() {
-        this.attempts = 0;
-        this.isReconnecting = false;
-        this.connectionLock = false;
-        sessionInvalidated = false;
-        if (reconnectTimer) {
-            clearTimeout(reconnectTimer);
-            reconnectTimer = null;
-        }
-        if (connectionTimeout) {
-            clearTimeout(connectionTimeout);
-            connectionTimeout = null;
-        }
-        logger.info('Reset reconnection manager state');
-    }
-};
-
-// Start WhatsApp connection with improved error handling
-async function startWhatsAppConnection() {
-    if (isConnecting) {
-        logger.info('Connection attempt already in progress, skipping...');
-        return;
-    }
-
-    isConnecting = true;
+// Start WhatsApp connection
+async function startConnection() {
     try {
-        const sock = await startConnection();
+        // Ensure auth directory exists
+        await fs.mkdir(AUTH_DIRECTORY, { recursive: true });
 
-        // Set connection timeout
-        if (connectionTimeout) {
-            clearTimeout(connectionTimeout);
-        }
-        connectionTimeout = setTimeout(() => {
-            logger.error('Connection timeout reached, restarting...');
-            process.exit(1);
-        }, 300000); // 5 minutes timeout
+        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRECTORY);
 
-        return sock;
-    } catch (err) {
-        logger.error('Fatal error establishing WhatsApp connection:', err);
-        throw err;
-    } finally {
-        isConnecting = false;
-    }
-}
-
-async function startServer(sock) {
-    const app = express();
-    app.use(express.json());
-
-    if (sock) {
-        app.set('sock', sock);
-    }
-
-    // Health check endpoint
-    app.get('/', (req, res) => {
-        const currentSock = app.get('sock') || sock;
-        let commandCount = 0;
-
-        try {
-            commandCount = commandLoader.getAllCommands().length;
-        } catch (err) {
-            // Commands not loaded yet
-        }
-
-        if (!currentSock) {
-            res.send(`
-                <html>
-                    <head>
-                        <title>WhatsApp Bot - Initializing</title>
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <style>
-                            body { 
-                                font-family: Arial, sans-serif; 
-                                text-align: center;
-                                margin-top: 50px;
-                                background-color: #f5f5f5;
-                            }
-                            h1 { color: #128C7E; }
-                            .container {
-                                max-width: 600px;
-                                margin: 0 auto;
-                                padding: 20px;
-                                background-color: white;
-                                border-radius: 10px;
-                                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                            }
-                            a.qr-button {
-                                display: inline-block;
-                                background-color: #128C7E;
-                                color: white;
-                                padding: 10px 20px;
-                                border-radius: 5px;
-                                text-decoration: none;
-                                font-weight: bold;
-                                margin-top: 20px;
-                            }
-                            .status-info {
-                                margin-top: 20px;
-                                color: #666;
-                                font-size: 0.9em;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="container">
-                            <h1>WhatsApp Bot Initializing</h1>
-                            <p>The WhatsApp bot is starting up. To connect, you need to scan the QR code.</p>
-                            <a href="http://${req.headers.host.split(':')[0]}:5006" class="qr-button" target="_blank">View QR Code</a>
-                            <div class="status-info">
-                                <p>Status: Initializing<br>
-                                Uptime: ${Math.floor(process.uptime())} seconds</p>
-                            </div>
-                        </div>
-                    </body>
-                </html>
-            `);
-        } else {
-            res.json({
-                status: 'connected',
-                message: 'WhatsApp Bot is active',
-                commands: commandCount,
-                uptime: process.uptime()
-            });
-        }
-    });
-
-    const PORT = 5000;
-    const server = app.listen(PORT, '0.0.0.0')
-        .on('error', (err) => {
-            logger.error('Failed to start HTTP server:', err);
-            process.exit(1);
+        sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: true,
+            browser: ['BLACKSKY-MD', 'Chrome', '108.0.0.0'],
+            logger: logger,
+            connectTimeoutMs: 60000,
+            qrTimeout: 60000,
+            defaultQueryTimeoutMs: 60000
         });
 
-    return server;
-}
-
-async function main() {
-    let server = null;
-    let sock = null;
-
-    try {
-        process.stdout.write('\x1Bc');
-        logger.info('Starting API server first...');
-        server = await startServer(null);
-        logger.info('API server started on port 5000');
-
-        try {
-            sock = await startWhatsAppConnection();
-        } catch (err) {
-            logger.error('Initial connection failed:', err);
-            process.exit(1);
-        }
-
-        // Handle connection updates with improved error handling
         sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect } = update;
+            const { connection, lastDisconnect, qr } = update;
+            logger.info('Connection update:', update);
+
+            if (qr) {
+                try {
+                    latestQR = await qrcode.toDataURL(qr);
+                    connectionStatus = 'connecting';
+                    logger.info('New QR code generated');
+                } catch (err) {
+                    logger.error('QR generation error:', err);
+                }
+            }
 
             if (connection === 'close') {
-                logger.info('Connection closed, checking reconnection possibility...');
-
-                const shouldReconnect = await reconnectManager.handleReconnect(
-                    lastDisconnect?.error,
-                    lastDisconnect
-                );
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                connectionStatus = 'disconnected';
+                logger.info('Connection closed:', lastDisconnect?.error?.message);
 
                 if (shouldReconnect) {
-                    try {
-                        logger.info('Attempting to establish new connection...');
-                        sock = await startWhatsAppConnection();
-                    } catch (err) {
-                        logger.error('Failed to establish new connection:', err);
-                    }
+                    logger.info('Attempting reconnection...');
+                    setTimeout(startConnection, 5000);
                 }
-            } else if (connection === 'open') {
-                logger.info('Connection established successfully');
-                reconnectManager.reset();
+            }
 
-                // Initialize command handlers with error protection
-                const originalLevel = logger.level;
-                logger.level = 'silent';
+            if (connection === 'open') {
+                connectionStatus = 'connected';
+                latestQR = null;
+                logger.info('Connection established');
 
                 try {
                     await commandLoader.loadCommandHandlers();
                     await commandModules.initializeModules(sock);
-
-                    const expressApp = server._events.request;
-                    if (expressApp && typeof expressApp.set === 'function') {
-                        expressApp.set('sock', sock);
-                        logger.info('Updated server with active WhatsApp connection');
-                    }
-                    
-                    // Send credentials to self for backup on Heroku
-                    if (process.env.DYNO) {
-                        // Schedule the backup to run after 5 seconds to ensure connection is stable
-                        setTimeout(() => {
-                            sendCredsToSelf(sock)
-                                .then(() => logger.info('Self-backup of credentials completed successfully'))
-                                .catch(err => logger.error('Failed to self-backup credentials:', err));
-                        }, 5000);
-                        
-                        // Set up scheduled self-backups (sending to the bot itself) for ultimate persistence
-                        const selfBackupIntervalMinutes = parseInt(process.env.SELF_BACKUP_INTERVAL || '60', 10);
-                        const selfBackupIntervalMs = selfBackupIntervalMinutes * 60 * 1000;
-                        logger.info(`Scheduling Heroku self-backups every ${selfBackupIntervalMinutes} minutes`);
-                        
-                        // Regular self-backups
-                        setInterval(() => {
-                            sendCredsToSelf(sock)
-                                .then(() => logger.debug('Scheduled Heroku self-backup complete'))
-                                .catch(err => logger.error('Scheduled Heroku self-backup failed:', err));
-                        }, selfBackupIntervalMs);
-                    }
+                    logger.info('Handlers initialized');
                 } catch (err) {
-                    logger.error('Error during initialization:', err);
-                } finally {
-                    logger.level = originalLevel;
+                    logger.error('Handler initialization error:', err);
                 }
             }
         });
 
-        // Implement periodic memory cleanup
-        const MEMORY_CLEANUP_INTERVAL = 3600000; // 1 hour
-        setInterval(() => {
-            try {
-                if (global.gc) {
-                    global.gc();
-                    logger.info('Performed garbage collection');
+        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('messages.upsert', async (m) => {
+            if (m.type === 'notify') {
+                try {
+                    await messageHandler(sock, m.messages[0]);
+                } catch (err) {
+                    logger.error('Message handling error:', err);
                 }
+            }
+        });
 
-                const memoryUsage = process.memoryUsage();
-                if (memoryUsage.heapUsed > 1024 * 1024 * 500) { // 500MB threshold
-                    logger.warn('High memory usage detected, performing additional cleanup');
-                    commandLoader.reloadCommands();
+        return sock;
+    } catch (err) {
+        logger.error('Connection error:', err);
+        setTimeout(startConnection, 5000);
+    }
+}
+
+// Start servers and initialize connection
+async function startApplication() {
+    try {
+        // Start main API server
+        await new Promise((resolve, reject) => {
+            mainApp.listen(5000, '0.0.0.0', (err) => {
+                if (err) {
+                    logger.error('Main server error:', err);
+                    reject(err);
+                } else {
+                    logger.info('Main server running on port 5000');
+                    resolve();
                 }
-            } catch (err) {
-                logger.error('Memory cleanup error:', err);
-            }
-        }, MEMORY_CLEANUP_INTERVAL);
+            });
+        });
 
-        // Implement Heroku keep-alive mechanism
-        if (process.env.DYNO) {
-            logger.info('Running on Heroku, setting up session management');
+        // Start QR server
+        await new Promise((resolve, reject) => {
+            qrApp.listen(5007, '0.0.0.0', (err) => {
+                if (err) {
+                    logger.error('QR server error:', err);
+                    reject(err);
+                } else {
+                    logger.info('QR server running on port 5007');
+                    resolve();
+                }
+            });
+        });
 
-            // Ensure we have a SESSION_ID for Heroku - generate one if not provided
-            if (!process.env.SESSION_ID) {
-                process.env.SESSION_ID = `heroku_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 5)}`;
-                logger.warn(`No SESSION_ID provided, generated temporary ID: ${process.env.SESSION_ID}`);
-                logger.warn('This ID will change on restart. Set SESSION_ID in config vars for persistence.');
-            } else {
-                logger.info(`Using configured SESSION_ID: ${process.env.SESSION_ID}`);
-            }
-
-            // Check if keep-alive is enabled (default: true)
-            const keepAliveEnabled = process.env.KEEP_ALIVE !== 'false';
-
-            if (keepAliveEnabled && process.env.HEROKU_APP_NAME) {
-                logger.info('Keep-alive ping enabled for Heroku');
-
-                // Set up a self-ping every 25 minutes to prevent Heroku from sleeping
-                // Only needed for free dynos, but harmless on paid ones
-                const KEEP_ALIVE_INTERVAL = 25 * 60 * 1000; // 25 minutes
-
-                const appUrl = process.env.APP_URL || `https://${process.env.HEROKU_APP_NAME}.herokuapp.com`;
-                logger.info(`Keep-alive URL set to: ${appUrl}`);
-
-                setInterval(() => {
-                    try {
-                        // Use the built-in http module to avoid adding dependencies
-                        const https = require('https');
-                        https.get(appUrl, (res) => {
-                            logger.debug(`Keep-alive ping sent. Status: ${res.statusCode}`);
-                        }).on('error', (err) => {
-                            logger.error('Keep-alive ping failed:', err.message);
-                        });
-                    } catch (pingErr) {
-                        logger.error('Error sending keep-alive ping:', pingErr);
-                    }
-                }, KEEP_ALIVE_INTERVAL);
-            } else {
-                logger.info('Keep-alive ping disabled or HEROKU_APP_NAME not set');
-            }
-
-            // Also implement session backup on Heroku dyno cycling
-            const { sessionManager } = require('./utils/sessionManager');
-
-            // First backup on startup
-            sessionManager.backupCredentials()
-                .then(() => logger.info('Initial Heroku session backup complete'))
-                .catch(err => logger.error('Initial Heroku backup failed:', err));
-
-            // Schedule regular backups to filesystem
-            const backupIntervalMinutes = parseInt(process.env.BACKUP_INTERVAL || '15', 10);
-            const backupIntervalMs = backupIntervalMinutes * 60 * 1000;
-            logger.info(`Scheduling Heroku filesystem backups every ${backupIntervalMinutes} minutes`);
-
-            setInterval(() => {
-                sessionManager.backupCredentials()
-                    .then(() => logger.debug('Scheduled Heroku filesystem backup complete'))
-                    .catch(err => logger.error('Scheduled Heroku filesystem backup failed:', err));
-            }, backupIntervalMs);
-            
-            // Note: Self-backups are scheduled when the connection is established in the connection.open event
-        }
+        // Start WhatsApp connection
+        await startConnection();
 
     } catch (err) {
-        logger.error('Fatal error starting bot:', err);
+        logger.error('Fatal error:', err);
         process.exit(1);
     }
 }
 
-// Handle uncaught errors
-process.on('uncaughtException', (err) => {
-    logger.error('Uncaught Exception:', err);
-    process.exit(1);
-});
-
-process.on('unhandledRejection', (err) => {
-    logger.error('Unhandled Rejection:', err);
-    process.exit(1);
-});
-
-/**
- * Send creds.json file to the bot itself for backup
- * This is especially useful for Heroku deployments where the filesystem is ephemeral
- * @param {Object} sock - The WhatsApp socket connection
- */
-async function sendCredsToSelf(sock) {
-    try {
-        const fs = require('fs');
-        const crypto = require('crypto');
-        const path = require('path');
-        
-        // Wait for a short time to ensure connection is ready
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Check if connected
-        if (!sock || !sock.user || !sock.user.id) {
-            logger.warn('Cannot send creds file: Bot not connected or user ID not available');
-            return;
-        }
-
-        // Determine path to creds.json
-        const authDir = path.join(process.cwd(), 'auth_info');
-        const credsPath = path.join(authDir, 'creds.json');
-        
-        if (!fs.existsSync(credsPath)) {
-            logger.warn(`Cannot send creds file: ${credsPath} does not exist`);
-            return;
-        }
-
-        // Read and compress the creds.json file
-        const credsData = fs.readFileSync(credsPath, 'utf8');
-        const compressedCreds = JSON.stringify(JSON.parse(credsData)).replace(/\s+/g, '');
-        
-        // Create a secure backup format with checksums
-        const encodedCreds = Buffer.from(compressedCreds).toString('base64');
-        const checksum = crypto.createHash('sha256').update(compressedCreds).digest('hex');
-        
-        const backupData = JSON.stringify({
-            type: 'BOT_CREDENTIALS_BACKUP',
-            timestamp: Date.now(),
-            data: encodedCreds,
-            checksum: checksum,
-            version: '1.0',
-            session_id: process.env.SESSION_ID || 'default'
-        });
-
-        // Get bot's own JID
-        const botJid = sock.user.id;
-        
-        // Send the message with the creds data to the bot itself
-        await sock.sendMessage(botJid, { 
-            text: backupData 
-        });
-        
-        logger.info('Credentials backup sent to bot itself');
-        
-        // Also send a human-readable confirmation
-        await sock.sendMessage(botJid, { 
-            text: `🔐 *BLACKSKY-MD Self-Backup*\n\nA credentials backup has been created and sent to this chat.\n\nTimestamp: ${new Date().toLocaleString()}\nSession ID: ${process.env.SESSION_ID || 'default'}\n\n_This backup can be used for Heroku deployments_` 
-        });
-        
-        return true;
-    } catch (error) {
-        logger.error('Error sending credentials to self:', error);
-        return false;
-    }
-}
-
-// Start the bot
-main().catch(err => {
-    logger.error('Fatal error starting bot:', err);
+// Start the application
+startApplication().catch(err => {
+    logger.error('Startup error:', err);
     process.exit(1);
 });
