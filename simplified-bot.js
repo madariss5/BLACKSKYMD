@@ -6,15 +6,27 @@
 // External modules
 const path = require('path');
 const handler = require(path.join(__dirname, 'src/handlers/ultra-minimal-handler'));
-const { DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const fs = require('fs');
 const express = require('express');
+const pino = require('pino');
 const app = express();
 
 // Constants
 const PORT = process.env.PORT || 5000;
 const SESSION_DIR = './auth_info_qr';
+
+// Configure logger
+const logger = pino({ 
+    level: 'info',
+    transport: {
+        target: 'pino-pretty',
+        options: {
+            colorize: true
+        }
+    }
+});
 
 // Track bot statistics
 const botStats = {
@@ -188,7 +200,7 @@ async function connectToWhatsApp() {
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            logger: console.log,
+            logger: logger, // Use pino logger instead of console.log
             // More reliable connection settings
             connectTimeoutMs: 30000,
             keepAliveIntervalMs: 15000,
