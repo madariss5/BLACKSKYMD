@@ -4,7 +4,7 @@ modules = ["nodejs-20", "python-3.11"]
 channel = "stable-24_05"
 
 [workflows]
-runButton = "Run Bot"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
@@ -14,6 +14,10 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "QR Web Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "WhatsApp Bot"
 
 [[workflows.workflow]]
 name = "QR Web Server"
@@ -38,6 +42,21 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node src/index.js"
+
+[[workflows.workflow]]
+name = "WhatsApp Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node --no-warnings src/index.js"
+waitForPort = 5000
 
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
