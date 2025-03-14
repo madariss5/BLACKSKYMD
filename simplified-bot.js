@@ -201,17 +201,26 @@ async function connectToWhatsApp() {
             auth: state,
             printQRInTerminal: true,
             logger: logger, // Use pino logger instead of console.log
-            // More reliable connection settings
-            connectTimeoutMs: 30000,
-            keepAliveIntervalMs: 15000,
-            retryRequestDelayMs: 3000,
-            maxRetries: 5,
+            // Enhanced connection settings to reduce reconnections
+            connectTimeoutMs: 60000, // Increased timeout
+            keepAliveIntervalMs: 30000, // Less frequent pings
+            retryRequestDelayMs: 5000, // More delay between retries
+            maxRetries: 3, // Fewer retries to avoid excessive reconnection attempts
             // Browser profile
             browser: ['BLACKSKY-MD', 'Chrome', '104.0.0.0'],
             // Connection behavior
             markOnlineOnConnect: true,
             emitOwnEvents: false,
-            syncFullHistory: false
+            syncFullHistory: false,
+            // Baileys transaction options
+            transactionOpts: {
+                maxCommitRetries: 2,
+                delayBetweenTriesMs: 1000
+            },
+            // Messages fetch options
+            getMessage: async () => {
+                return { conversation: 'Hello' };
+            }
         });
 
         // Track connection state
@@ -220,7 +229,7 @@ async function connectToWhatsApp() {
         let connectionLock = false;
         let messageHandlerInitialized = false;
 
-        // Connection update handler with enhanced logging
+        // Connection update handler with improved reconnection logic
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             console.log('Connection update:', update); // Log all updates
@@ -233,6 +242,10 @@ async function connectToWhatsApp() {
 
             if (connection === 'open') {
                 console.log('🟢 Connected to WhatsApp');
+                // Reset connection tracking
+                isConnected = true;
+                reconnectAttempt = 0;
+                connectionLock = false;
 
                 try {
                     // Initialize message handler if not already initialized
@@ -242,16 +255,14 @@ async function connectToWhatsApp() {
                         messageHandlerInitialized = true;
                     }
 
-                    // Clear any existing message handlers
+                    // Clear any existing message handlers to prevent duplicates
                     sock.ev.removeAllListeners('messages.upsert');
 
                     // Register new message handler
                     sock.ev.on('messages.upsert', async (m) => {
-                        console.log('Received message update:', m.type);
                         if (m.type === 'notify') {
                             for (const msg of m.messages) {
                                 try {
-                                    console.log('Processing message:', msg.key.id);
                                     await handler.messageHandler(sock, msg);
                                 } catch (err) {
                                     console.error('Error processing message:', err);
@@ -269,6 +280,7 @@ async function connectToWhatsApp() {
                         console.log('Test message sent successfully');
                     } catch (err) {
                         console.error('Failed to send test message:', err);
+                        // Don't attempt reconnection for test message failures
                         botStats.errors++;
                         botStats.lastError = err.message;
                     }
@@ -279,12 +291,38 @@ async function connectToWhatsApp() {
                     botStats.lastError = err.message;
                 }
             } else if (connection === 'close') {
-                console.log('🔴 Connection closed');
-                // Handle reconnection
-                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                if (shouldReconnect) {
-                    console.log('Attempting to reconnect...');
-                    connectToWhatsApp();
+                // Only attempt reconnection if not already locked
+                if (!connectionLock) {
+                    console.log('🔴 Connection closed');
+                    
+                    // Check if we should reconnect based on error code
+                    const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+                    const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                    
+                    // Log detailed disconnect reason
+                    console.log(`Disconnect reason: ${statusCode} (${getErrorDescription(statusCode)})`);
+                    
+                    if (shouldReconnect) {
+                        // Use exponential backoff for reconnection attempts
+                        reconnectAttempt++;
+                        const delay = Math.min(30000, Math.pow(2, reconnectAttempt) * 1000); // Max 30s delay
+                        
+                        console.log(`Reconnecting after ${delay}ms (attempt ${reconnectAttempt})...`);
+                        connectionLock = true;
+                        
+                        // Schedule reconnection with delay
+                        setTimeout(() => {
+                            if (connectionLock) {
+                                connectionLock = false;
+                                console.log('Executing scheduled reconnection...');
+                                connectToWhatsApp();
+                            }
+                        }, delay);
+                    } else {
+                        console.log('Not reconnecting - user logged out');
+                    }
+                } else {
+                    console.log('Connection attempt already in progress, ignoring close event');
                 }
             } else if (connection === 'connecting') {
                 console.log('Connecting to WhatsApp...');
@@ -295,6 +333,21 @@ async function connectToWhatsApp() {
                 console.log('New QR code received');
             }
         });
+        
+        // Helper function to get error descriptions
+        function getErrorDescription(code) {
+            const errorMap = {
+                401: 'Unauthorized',
+                403: 'Forbidden',
+                408: 'Request Timeout',
+                429: 'Too Many Requests',
+                440: 'Session Expired',
+                500: 'Server Error',
+                515: 'Registration Failed',
+                428: 'Challenge Failed'
+            };
+            return errorMap[code] || 'Unknown Error';
+        }
         
 
         // Handle credentials update
