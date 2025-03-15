@@ -2,7 +2,7 @@
  * Safari-based WhatsApp Connection
  * Advanced connection system optimized for cloud environments
  * Features automatic credential backup and enhanced error recovery
- * Version: 1.2.2
+ * Version: 1.2.3
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
@@ -20,12 +20,13 @@ const port = process.env.PORT || 5000;
 
 // Configuration
 const AUTH_FOLDER = process.env.AUTH_DIR || './auth_info_safari';
-const VERSION = '1.2.2';
+const VERSION = '1.2.3';
 const MAX_RETRIES = 10;
 const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const RECONNECT_INTERVAL = 60000; // 1 minute base interval
 const QR_TIMEOUT = 60000; // 1 minute QR timeout
+const QR_REFRESH_INTERVAL = 10000; // 10 seconds between QR attempts
 
 // Environment detection
 const IS_CLOUD_ENV = process.env.REPLIT_ID || process.env.HEROKU_APP_ID;
@@ -52,6 +53,7 @@ let reconnectTimer = null;
 let heartbeatTimer = null;
 let cleanupTimer = null;
 let qrDisplayTimer = null;
+let qrRefreshTimer = null;
 let qrGenerated = false;
 let connectionState = 'disconnected';
 let lastDisconnectCode = null;
@@ -61,7 +63,7 @@ let lastConnectTime = null;
 let connectionUptime = 0;
 let qrRetryCount = 0;
 
-// Safari fingerprint (optimized for reliability)
+// Safari fingerprint (optimized for stability)
 const SAFARI_FINGERPRINT = {
   device: 'Safari on MacOS',
   platform: 'darwin',
@@ -103,21 +105,19 @@ app.get('/status', (req, res) => {
 function displayQRCode(qr) {
   LOGGER.info(`Generating QR code (Attempt ${qrRetryCount + 1}/${MAX_RETRIES})`);
 
-  console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
-  console.log('█                   SCAN QR CODE TO CONNECT                      █');
-  console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
-
   try {
-    // Generate QR with error handling
+    // Generate QR with error handling and callback
     qrcode.generate(qr, { small: true }, (err, qrout) => {
       if (err) {
         LOGGER.error('Error generating QR:', err);
-        // Attempt fallback QR display
-        if (sock) {
-          sock.ev.emit('connection.update', { qr });
-        }
+        LOGGER.info('Falling back to direct QR data output');
+        console.log('\nQR Code Data:', qr);
         return;
       }
+
+      console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
+      console.log('█                   SCAN QR CODE TO CONNECT                      █');
+      console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
 
       console.log(qrout);
       LOGGER.info('QR code generated successfully');
@@ -126,6 +126,17 @@ function displayQRCode(qr) {
       console.log(`█  Scan within ${QR_TIMEOUT/1000} seconds. Attempt ${qrRetryCount + 1} of ${MAX_RETRIES}   █`);
       console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
     });
+
+    // Set up QR refresh timer
+    if (qrRefreshTimer) clearTimeout(qrRefreshTimer);
+    qrRefreshTimer = setTimeout(() => {
+      if (connectionState === 'awaiting_scan') {
+        LOGGER.info('Refreshing QR code...');
+        if (sock) {
+          sock.ev.emit('connection.update', { qr });
+        }
+      }
+    }, QR_REFRESH_INTERVAL);
 
     // Set QR timeout
     if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
@@ -186,6 +197,7 @@ async function initializeConnection() {
     qrRetryCount = 0;
     lastQRCode = null;
     if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
+    if (qrRefreshTimer) clearTimeout(qrRefreshTimer);
   } catch (err) {
     LOGGER.error('Error initializing connection:', err);
     throw err;
@@ -264,10 +276,14 @@ async function handleConnectionUpdate(update) {
     connectionRetries = 0;
     lastConnectTime = Date.now();
 
-    // Clear QR timeout
+    // Clear QR timers
     if (qrDisplayTimer) {
       clearTimeout(qrDisplayTimer);
       qrDisplayTimer = null;
+    }
+    if (qrRefreshTimer) {
+      clearTimeout(qrRefreshTimer);
+      qrRefreshTimer = null;
     }
 
     LOGGER.info('✅ SUCCESSFULLY CONNECTED TO WHATSAPP!');
@@ -288,6 +304,50 @@ async function handleConnectionUpdate(update) {
       LOGGER.error('Error sending welcome message:', err);
     }
   }
+}
+
+// Handle reconnection with improved error handling
+async function handleReconnection(reason) {
+  if (isReconnecting) {
+    LOGGER.info('Reconnection already in progress, skipping...');
+    return;
+  }
+
+  isReconnecting = true;
+  connectionState = 'reconnecting';
+
+  try {
+    LOGGER.info(`Initiating reconnection due to: ${reason}`);
+
+    // Clear existing timers
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (cleanupTimer) clearInterval(cleanupTimer);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
+    if (qrRefreshTimer) clearTimeout(qrRefreshTimer);
+
+    // Wait before attempting reconnection
+    const delay = Math.min(Math.pow(2, connectionRetries) * 1000, RECONNECT_INTERVAL);
+    LOGGER.info(`Waiting ${delay/1000}s before reconnection attempt...`);
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    // Initialize fresh connection
+    await initializeConnection();
+    await startConnection();
+  } catch (err) {
+    LOGGER.error('Error during reconnection:', err);
+    connectionState = 'error';
+  } finally {
+    isReconnecting = false;
+  }
+}
+
+// Generate unique device ID
+function generateDeviceId() {
+  const randomString = Math.random().toString(36).substring(2, 7);
+  const timestamp = Date.now().toString().slice(-6);
+  return `BLACKSKY-MD-${timestamp}-${randomString}`;
 }
 
 // Start connection with enhanced error handling
@@ -356,13 +416,6 @@ async function startConnection() {
   }
 }
 
-// Generate unique device ID
-function generateDeviceId() {
-  const randomString = Math.random().toString(36).substring(2, 7);
-  const timestamp = Date.now().toString().slice(-6);
-  return `BLACKSKY-MD-${timestamp}-${randomString}`;
-}
-
 // Start Express server first, then initialize connection
 const server = app.listen(port, '0.0.0.0', () => {
   LOGGER.info(`Status monitor running on port ${port}`);
@@ -383,6 +436,7 @@ process.on('SIGINT', () => {
   if (cleanupTimer) clearInterval(cleanupTimer);
   if (reconnectTimer) clearTimeout(reconnectTimer);
   if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
+  if (qrRefreshTimer) clearTimeout(qrRefreshTimer);
   if (sock) {
     sock.end();
   }
