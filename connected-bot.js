@@ -284,11 +284,19 @@ app.get('/pairing', (req, res) => {
                         
                         <div class="form-group">
                             <label for="phone_number">Phone Number (with country code):</label>
-                            <input type="tel" id="phone_number" name="phone_number" value="${phoneNumber}" placeholder="e.g., +19876543210">
+                            <input type="tel" id="phone_number" name="phone_number" value="${phoneNumber}" placeholder="e.g., 19876543210">
                         </div>
                         
                         <div class="note">
-                            <p><strong>Note:</strong> Enter your full phone number with country code (e.g., +1 for USA). After saving, please restart the connection for changes to take effect.</p>
+                            <p><strong>Phone Number Format:</strong></p>
+                            <ul style="margin-top: 5px; text-align: left;">
+                                <li>Enter your full phone number with country code</li>
+                                <li>Include the country code: 1 (USA/Canada), 44 (UK), 91 (India), etc.</li>
+                                <li>Do not include spaces, dashes, or parentheses</li>
+                                <li>The + symbol is optional (it will be removed automatically)</li>
+                                <li>Examples: <code>19876543210</code> or <code>+19876543210</code> for a US number</li>
+                            </ul>
+                            <p style="margin-top: 10px;"><strong>Important:</strong> After saving, reset the connection for changes to take effect.</p>
                         </div>
                         
                         <button type="submit" class="button">Save Configuration</button>
@@ -395,20 +403,30 @@ async function connectToWhatsApp(retryCount = 0) {
         }
         
         // Initialize socket with different options based on pairing mode
-        sock = makeWASocket({
+        const socketOptions = {
             auth: state,
-            printQRInTerminal: !usePairingCode, // Only print QR if not using pairing code
+            printQRInTerminal: true, // Always print QR in terminal for debugging
             browser: [deviceId, browser[0], browser[1]],
             syncFullHistory: false,
             connectTimeoutMs: 60000,
-            // Add mobile device fingerprint if using pairing code
-            ...(usePairingCode ? {
+            qrTimeout: 40000, // Increase QR timeout to give users more time
+            markOnlineOnConnect: true,
+            retryRequestDelayMs: 2000
+        };
+        
+        // Add pairing code specific options if enabled
+        if (usePairingCode) {
+            console.log('Using mobile device fingerprint for pairing code mode');
+            Object.assign(socketOptions, {
                 mobile: true,
                 browser: ['BLACKSKY-MD', 'Safari', '1.0.0'],
-                logger: pino({ level: 'trace' }),
-                defaultQueryTimeoutMs: undefined
-            } : {})
-        });
+                logger: pino({ level: 'debug' }),
+                defaultQueryTimeoutMs: undefined,
+                patchMessageBeforeSending: true
+            });
+        }
+        
+        sock = makeWASocket(socketOptions);
         
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
@@ -424,27 +442,97 @@ async function connectToWhatsApp(retryCount = 0) {
             const usePairingCode = process.env.USE_PAIRING_CODE === 'true';
             const phoneNumber = process.env.PAIRING_NUMBER || '';
             
-            if (usePairingCode && phoneNumber && !sock.authState.creds.registered && !qr) {
-                // Format the phone number (remove any non-numeric chars)
-                const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+            // Request pairing code when we have a valid connection without QR
+            if (usePairingCode && phoneNumber && !qr && (!sock.authState?.creds?.registered)) {
+                // Wait for the connection to be ready before requesting the pairing code
+                console.log('Connection ready for pairing code request');
+                
+                // Format the phone number properly for WhatsApp
+                // 1. Remove all non-numeric characters including +
+                let formattedNumber = phoneNumber.replace(/\D/g, '');
+                
+                // 2. Log original and formatted number for debugging
+                console.log(`Original phone number: ${phoneNumber}`);
+                console.log(`Formatted number (digits only): ${formattedNumber}`);
+                
+                // 3. Add country code if not present (default to 1 for US/Canada if none provided)
+                if (!formattedNumber.startsWith('1') && !formattedNumber.startsWith('2') && 
+                    !formattedNumber.startsWith('3') && !formattedNumber.startsWith('4') && 
+                    !formattedNumber.startsWith('5') && !formattedNumber.startsWith('6') && 
+                    !formattedNumber.startsWith('7') && !formattedNumber.startsWith('8') && 
+                    !formattedNumber.startsWith('9')) {
+                    console.log('Adding default country code 1 to phone number');
+                    formattedNumber = '1' + formattedNumber;
+                }
+                
+                // 4. Ensure number doesn't start with any plus signs
+                if (formattedNumber.startsWith('+')) {
+                    formattedNumber = formattedNumber.substring(1);
+                    console.log('Removed + prefix from number');
+                }
+                
+                console.log(`Final formatted number for pairing: ${formattedNumber}`);
+                
                 if (formattedNumber) {
                     try {
                         console.log(`Requesting pairing code for ${formattedNumber}...`);
-                        // Request a pairing code
-                        setTimeout(async () => {
-                            const code = await sock.requestPairingCode(formattedNumber);
-                            console.log(`\n💻 Pairing Code: ${code}\n`);
-                            // Display the code on the web interface
-                            const pairingCodeHTML = `
-                            <div style="text-align:center; padding: 20px; font-family: monospace; background: #000; color: #0f0; border-radius: 10px; margin: 20px 0;">
-                                <h2>📱 WhatsApp Pairing Code</h2>
-                                <div style="font-size: 32px; letter-spacing: 5px; padding: 20px; font-weight: bold;">${code}</div>
-                                <p>Enter this code in your WhatsApp app to connect your device (${formattedNumber})</p>
-                            </div>`;
-                            qrCodeDataURL = `data:text/html,${encodeURIComponent(pairingCodeHTML)}`;
-                        }, 3000);
+                        // Request a pairing code with retry mechanism
+                        const requestPairingCodeWithRetry = async (retries = 3) => {
+                            try {
+                                const code = await sock.requestPairingCode(formattedNumber);
+                                console.log(`\n💻 Pairing Code: ${code}\n`);
+                                
+                                // Display the code on the web interface with enhanced UI
+                                const pairingCodeHTML = `
+                                <div style="text-align:center; padding: 20px; font-family: monospace; background: #000; color: #0f0; border-radius: 10px; margin: 20px 0; box-shadow: 0 0 20px rgba(0,255,0,0.3);">
+                                    <h2>📱 WhatsApp Pairing Code</h2>
+                                    <div style="font-size: 38px; letter-spacing: 8px; padding: 25px; font-weight: bold; background: #111; border-radius: 8px;">${code}</div>
+                                    <p>Enter this code in your WhatsApp app to connect your device</p>
+                                    <p>Phone: ${formattedNumber}</p>
+                                    <p style="font-size: 12px; margin-top: 15px;">Code will expire in 60 seconds</p>
+                                </div>`;
+                                qrCodeDataURL = `data:text/html,${encodeURIComponent(pairingCodeHTML)}`;
+                                
+                                // Set a timer to update the UI when the code expires
+                                setTimeout(() => {
+                                    if (connectionStatus !== 'connected') {
+                                        const expiredHTML = `
+                                        <div style="text-align:center; padding: 20px; font-family: monospace; background: #300; color: #f77; border-radius: 10px; margin: 20px 0;">
+                                            <h2>⚠️ Pairing Code Expired</h2>
+                                            <p>Please reset the connection to request a new code</p>
+                                            <button onclick="window.location.href='/reset'" style="background: #900; color: white; border: none; padding: 10px 20px; margin-top: 15px; border-radius: 5px; cursor: pointer;">Reset Connection</button>
+                                        </div>`;
+                                        qrCodeDataURL = `data:text/html,${encodeURIComponent(expiredHTML)}`;
+                                    }
+                                }, 60000); // 60 seconds
+                                
+                            } catch (error) {
+                                console.error(`Failed to request pairing code (attempt ${4-retries}/3):`, error);
+                                lastError = `Pairing code request failed: ${error.message}`;
+                                
+                                if (retries > 0) {
+                                    console.log(`Retrying pairing code request in 5 seconds... (${retries} attempts left)`);
+                                    setTimeout(() => requestPairingCodeWithRetry(retries - 1), 5000);
+                                } else {
+                                    console.error('All pairing code request attempts failed');
+                                    // Show error on the web interface
+                                    const errorHTML = `
+                                    <div style="text-align:center; padding: 20px; font-family: monospace; background: #300; color: #f77; border-radius: 10px; margin: 20px 0;">
+                                        <h2>❌ Pairing Code Error</h2>
+                                        <p>${error.message}</p>
+                                        <p>Please check your phone number format and try again</p>
+                                        <button onclick="window.location.href='/pairing'" style="background: #900; color: white; border: none; padding: 10px 20px; margin-top: 15px; border-radius: 5px; cursor: pointer;">Configure Pairing</button>
+                                    </div>`;
+                                    qrCodeDataURL = `data:text/html,${encodeURIComponent(errorHTML)}`;
+                                }
+                            }
+                        };
+                        
+                        // Start the pairing code request with a slight delay to ensure connection is fully ready
+                        setTimeout(() => requestPairingCodeWithRetry(), 3000);
+                        
                     } catch (error) {
-                        console.error('Failed to request pairing code:', error);
+                        console.error('Failed to initiate pairing code request:', error);
                         lastError = `Pairing code request failed: ${error.message}`;
                     }
                 }
