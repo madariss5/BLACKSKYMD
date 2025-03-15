@@ -10,7 +10,7 @@
       "value": "!"
     },
     "OWNER_NUMBER": {
-      "description": "Your WhatsApp number without + or country code (e.g., 1234567890)",
+      "description": "Your WhatsApp number WITH country code but WITHOUT + symbol (e.g., 491234567890 for Germany, 14155552671 for US). The country code is required for proper functioning.",
       "value": "",
       "required": true
     },
