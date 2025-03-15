@@ -71,7 +71,8 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node use-terminal-qr.js"
+args = "node src/terminal-qr.js"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Web QR"
@@ -101,6 +102,7 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node safari-connect.js"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Connected Bot"
