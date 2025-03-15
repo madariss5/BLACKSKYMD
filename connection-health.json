@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "2025-03-15T22:32:34.308Z",
+  "lastUpdated": "2025-03-15T22:33:05.128Z",
   "status": "reconnecting",
   "healthScore": 30,
   "reconnectAttempts": 1,
   "diagnosticResults": {
-    "timestamp": "2025-03-15T22:32:34.308Z",
+    "timestamp": "2025-03-15T22:33:05.124Z",
     "webWhatsappReachable": false,
     "authFilesExist": false,
     "dnsResolution": false,
@@ -321,6 +321,30 @@
     },
     {
       "timestamp": "2025-03-15T22:32:34.308Z",
+      "message": "Diagnostic warning: Authentication files missing or incomplete",
+      "status": "reconnecting",
+      "healthScore": 30
+    },
+    {
+      "timestamp": "2025-03-15T22:32:55.653Z",
+      "message": "Diagnostic warning: Network connectivity issues detected",
+      "status": "reconnecting",
+      "healthScore": 40
+    },
+    {
+      "timestamp": "2025-03-15T22:32:55.653Z",
+      "message": "Diagnostic warning: Authentication files missing or incomplete",
+      "status": "reconnecting",
+      "healthScore": 30
+    },
+    {
+      "timestamp": "2025-03-15T22:33:05.124Z",
+      "message": "Diagnostic warning: Network connectivity issues detected",
+      "status": "reconnecting",
+      "healthScore": 40
+    },
+    {
+      "timestamp": "2025-03-15T22:33:05.128Z",
       "message": "Diagnostic warning: Authentication files missing or incomplete",
       "status": "reconnecting",
       "healthScore": 30
