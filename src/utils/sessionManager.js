@@ -495,5 +495,4 @@ class SessionManager {
     }
 }
 
-const sessionManager = new SessionManager();
-module.exports = { sessionManager };
+module.exports = SessionManager;
