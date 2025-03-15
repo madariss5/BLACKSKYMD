@@ -107,24 +107,24 @@ function startConnectionMonitor() {
 
 // Improved connection configuration
 const connectionConfig = {
-    version: [2, 2308, 7], // Stable WhatsApp Web version
-    browser: ['Chrome (Linux)', 'Chrome', '108.0.0'],
+    version: [2, 2246, 10], // Recent stable WhatsApp Web version
+    browser: ['WhatsApp Bot', 'Chrome', '116.0.0'], // Standard browser identification
     printQRInTerminal: true,
-    logger: logger.child({ level: 'silent' }),
+    logger: logger.child({ level: 'debug' }),
     connectTimeoutMs: 60000,
     qrTimeout: 40000,
     defaultQueryTimeoutMs: 20000,
     emitOwnEvents: false,
     markOnlineOnConnect: false,
-    keepAliveIntervalMs: 15000,
-    retryRequestDelayMs: 2000,
-    fireInitQueries: true,
-    auth: undefined,
-    browser: ['WhatsApp-Bot', 'Chrome', '110.0.0'],
-    waWebSocketUrl: 'wss://web.whatsapp.com/ws/chat',
-    shouldSyncHistoryMessage: false,
     syncFullHistory: false,
-    patchMessageBeforeSending: msg => msg,
+    fireInitQueries: true,
+    userAgent: 'WhatsApp/2.2246.10 Chrome/116.0.0', // Explicit user agent
+    auth: undefined, // Will be set during connection
+    agent: undefined, // Let the library handle the agent
+    fetchAgent: undefined, // Let the library handle fetch agent
+    proxyAgent: undefined, // No proxy needed
+    getMessage: async () => undefined,
+    shouldSyncHistoryMessage: false
 };
 
 async function startWhatsAppConnection() {
@@ -187,16 +187,13 @@ async function startWhatsAppConnection() {
                 isConnecting = false;
                 connectionState = 'disconnected';
 
-                // Handle different disconnect scenarios
-                if (statusCode === DisconnectReason.loggedOut || 
-                    statusCode === DisconnectReason.multideviceMismatch) {
-                    logger.info('Session invalid, clearing auth state...');
+                if (statusCode === DisconnectReason.loggedOut) {
+                    logger.info('Session expired, clearing auth state...');
                     await clearAuthState();
                     retryCount = 0;
                     setTimeout(startWhatsAppConnection, 5000);
                 } else if (statusCode === DisconnectReason.connectionClosed || 
-                         statusCode === DisconnectReason.connectionLost ||
-                         statusCode === DisconnectReason.connectionReplaced) {
+                         statusCode === DisconnectReason.connectionLost) {
                     if (retryCount < MAX_RETRIES) {
                         retryCount++;
                         const delay = getRetryDelay();
@@ -209,11 +206,11 @@ async function startWhatsAppConnection() {
                         setTimeout(startWhatsAppConnection, 5000);
                     }
                 } else {
-                    // Unknown error, attempt retry
+                    // Handle other errors
                     if (retryCount < MAX_RETRIES) {
                         retryCount++;
                         const delay = getRetryDelay();
-                        logger.info(`Unknown error, retrying in ${delay/1000}s (Attempt ${retryCount}/${MAX_RETRIES})`);
+                        logger.info(`Retrying connection in ${delay/1000}s (Attempt ${retryCount}/${MAX_RETRIES})`);
                         setTimeout(startWhatsAppConnection, delay);
                     } else {
                         logger.error('Max retries reached, clearing session');
