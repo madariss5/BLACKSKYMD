@@ -221,26 +221,58 @@ function formatPhoneNumber(phoneNumber) {
  * @param {string} jid - JID to format (e.g., 1234567890@s.whatsapp.net)
  * @returns {string} - Formatted phone number with country info
  */
+/**
+ * Enhanced Phone Formatting for MD-Style Mentions
+ * Formats phone numbers with proper international format, without parentheses
+ * Returns contact data in format suitable for "user saved_name +xxx" pattern
+ * 
+ * @param {string} jid - The JID to format
+ * @returns {Object} Formatted phone data with international, formatted, stylish and md properties
+ */
+/**
+ * Format a phone number for WhatsApp mentions
+ * This function ensures that the formatted output works correctly for MD-style mentions
+ * and that WhatsApp recognizes the mention for notification delivery outside the chat
+ * 
+ * @param {string} jid - The JID to format
+ * @returns {Object} - Formatted phone information with various display options
+ */
 function formatPhoneForMention(jid) {
     if (!jid || typeof jid !== 'string') {
         return {
             international: 'Unknown',
             formatted: 'Unknown',
             stylish: '𝙐𝙣𝙠𝙣𝙤𝙬𝙣 𝙐𝙨𝙚𝙧',
-            md: '```Unknown User```'
+            md: '```Unknown User```',
+            // Enhanced MD formatting fields
+            mentionName: 'Unknown',
+            mentionNumber: '',
+            mentionFormat: 'user Unknown',
+            // WhatsApp notification-friendly format
+            whatsappMention: `@Unknown`,
+            mentionJid: '',
+            notificationTag: '@unknown'
         };
     }
     
-    // Extract phone number from JID and handle special cases for the German number
+    // Extract phone number from JID and handle special cases
     const phoneNumber = jid.split('@')[0];
     
     // Special case for the German number to ensure correct format
     if (phoneNumber === '4915561048015') {
         return {
-            international: '+4915561048015',
-            formatted: '🇩🇪 DE +49 15561-048015',
+            international: '+4915561048015', 
+            formatted: '🇩🇪 +49 15561-048015',
             stylish: '𝙈𝙖𝙧𝙩𝙞𝙣',
-            md: '```+4915561048015```'
+            md: '```+4915561048015```',
+            // Enhanced MD formatting fields
+            mentionName: 'Martin',
+            mentionNumber: '+4915561048015',
+            mentionFormat: 'user Martin +4915561048015',
+            // WhatsApp notification-friendly format
+            whatsappMention: `@4915561048015`,
+            mentionJid: jid,
+            notificationTag: '@martin'
         };
     }
     
@@ -440,15 +472,38 @@ function formatPhoneForMention(jid) {
 │ 🌍 Country: ${country.info}
 └────────────────────┘\`\`\``;
     
+    // Create MD-style mention format (user name +number)
+    // Extract display name (use last part of country code or first chars of number for fallback)
+    let displayName = "User";
+    
+    // Last 4 digits for privacy in display but full number for mention format
+    const shortNumber = lastFourDigits ? `xxxx${lastFourDigits}` : nationalNumber;
+    
     if (country.code) {
-        // Return enhanced formats with more styling options
+        // Get country code short name (DE, US, etc.) if available
+        const countryParts = country.info.split(' ');
+        const countryCode = countryParts.length > 1 ? countryParts[1] : '';
+        
+        // Create name based on country if possible
+        displayName = countryCode || `User${lastFourDigits}`;
+        
+        // Return enhanced formats with more styling options and MD mention format
         return {
             international: fullInternationalFormat,
             formatted: `${country.info} +${country.code} ${formattedNationalNumber}`,
             stylish: socialMediaStyle,
-            md: mdStyle
+            md: mdStyle,
+            // New fields for enhanced MD formatting
+            mentionName: displayName,
+            mentionNumber: fullInternationalFormat,
+            mentionFormat: `user ${displayName} ${fullInternationalFormat}`,
+            // WhatsApp notification-friendly format
+            whatsappMention: `@${phoneNumber}`,
+            mentionJid: jid,
+            notificationTag: `@${displayName.toLowerCase()}`
         };
     } else {
+        // For unknown country codes
         return {
             international: fullInternationalFormat,
             formatted: `🌐 ${phoneNumber}`,
@@ -457,7 +512,15 @@ function formatPhoneForMention(jid) {
 ┌───〈 🌟 User Info 〉───┐
 │ 🔢 Number: +xx xxx-xxx-${lastFourDigits}
 │ 🌍 Country: Unknown
-└────────────────────┘\`\`\``
+└────────────────────┘\`\`\``,
+            // New fields for enhanced MD formatting
+            mentionName: `User${lastFourDigits}`,
+            mentionNumber: fullInternationalFormat,
+            mentionFormat: `user User${lastFourDigits} ${fullInternationalFormat}`,
+            // WhatsApp notification-friendly format
+            whatsappMention: `@${phoneNumber}`,
+            mentionJid: jid,
+            notificationTag: `@user${lastFourDigits.toLowerCase()}`
         };
     }
 }

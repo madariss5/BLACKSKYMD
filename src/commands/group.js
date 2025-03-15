@@ -92,12 +92,13 @@ const groupCommands = {
             
             // Add each participant with arrow pointer - with simplified display
             for (const participant of participants) {
-                // Instead of showing the full phone number, just use the last 4 digits with a name format
+                // Use proper phone number formatting with country code
                 const phoneNumber = participant.id.split('@')[0];
-                // Use full phone number with country code
+                // Format the phone number
+                const formattedPhone = formatPhoneForMention(participant.id);
                 
-                // Format with full phone number
-                formattedText += `┃➤ @${phoneNumber}\n`;
+                // Format with full international phone number for consistent display
+                formattedText += `┃➤ @${formattedPhone.international}\n`;
             }
             
             // Add footer
@@ -149,8 +150,10 @@ const groupCommands = {
             for (const participant of participants) {
                 // Extract the full phone number from participant's JID
                 const phoneNumber = participant.id.split('@')[0];
+                // Format the phone number with proper international format
+                const formattedPhone = formatPhoneForMention(participant.id);
                 
-                formattedText += `➤ @${phoneNumber}\n`;
+                formattedText += `➤ @${formattedPhone.international}\n`;
             }
             
             // Send the formatted message with mentions
@@ -202,8 +205,10 @@ const groupCommands = {
             participants.forEach(participant => {
                 // Extract the full phone number from participant's JID
                 const phoneNumber = participant.id.split('@')[0];
+                // Format the phone number with proper international format
+                const formattedPhone = formatPhoneForMention(participant.id);
                 
-                formattedText += `@${phoneNumber}\n`;
+                formattedText += `@${formattedPhone.international}\n`;
             });
             
             // Send the formatted message with mentions
