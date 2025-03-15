@@ -8,7 +8,6 @@
 |------|-------------|------------|
 | `basic.ping_response` | Pong! | Pong! |
 | `basic.ping_status` | Status | Status |
-| `basic.status` | Status | Status |
 | `basic.hostname` | Hostname | Hostname |
 | `basic.kernel` | Kernel | Kernel |
 | `basic.paypal` | PayPal | PayPal |
@@ -19,6 +18,7 @@
 | `basic.name` | Name | Name |
 | `basic.nodejs` | Node.js | Node.js |
 | `basic.cache` | Cache | Cache |
+| `basic.language` | Language | Language |
 
 ## reactions (1 missing)
 

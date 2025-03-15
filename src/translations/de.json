@@ -103,11 +103,9 @@
     "commands": "Befehle",
     "uptime": "Laufzeit",
     "memory_usage": "Speicherverbrauch",
-    "platform": "Plattform",
     "nodejs": "Node.js",
     "cpu_usage": "CPU-Auslastung",
     "bot_dashboard": "Bot-Dashboard",
-    "status": "Status",
     "performance": "Leistung",
     "error_rate": "Fehlerrate",
     "api_status": "API-Status",
@@ -121,9 +119,6 @@
     "privacy_policy": "Datenschutzrichtlinie",
     "terms_of_service": "Nutzungsbedingungen",
     "about_description": "Ein leistungsstarker WhatsApp-Bot mit nützlichen Funktionen und Befehlen.",
-    "creator": "Entwickler",
-    "framework": "Framework",
-    "language": "Sprache",
     "features": "Funktionen",
     "group_management": "Gruppenverwaltung",
     "fun_commands": "Spaßbefehle",
@@ -131,8 +126,7 @@
     "educational_tools": "Lernwerkzeuge",
     "and_more": "Und vieles mehr!",
     "support_contact": "Für Unterstützung kontaktieren Sie den Bot-Besitzer.",
-    "category": "Kategorie",
-    "commands": "Befehle"
+    "category": "Grundlegende Befehle"
   },
   "group": {
     "admin_only": "Dieser Befehl ist nur für Administratoren",
