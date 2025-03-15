@@ -226,7 +226,7 @@ function toRoman(num) {
 }
 
 // Create a visually appealing profile card image
-async function createProfileCard(profile, theme = null) {
+async function createProfileCard(profile, theme = null, jid = null) {
     try {
         // Use provided theme, user's preferred theme, or default
         const selectedTheme = theme || profile.theme || 'default';
@@ -301,7 +301,7 @@ async function createProfileCard(profile, theme = null) {
                 ctx.stroke();
                 
             } catch (err) {
-                logger.error('Error loading profile picture:', err);
+                logger.error(`Error loading profile picture for ${formatJidForLogging(sender)}:`, err);
                 // If there's an error loading the image, fall back to the placeholder
                 drawPlaceholderAvatar();
             }
@@ -420,7 +420,7 @@ async function createProfileCard(profile, theme = null) {
         
         return outputPath;
     } catch (err) {
-        logger.error('Error creating profile card:', err);
+        logger.error(`Error creating profile card${jid ? ` for ${formatJidForLogging(jid)}` : ''}:`, err);
         return null;
     }
 }
@@ -514,7 +514,7 @@ const userCommands = {
             
             // Generate and send a profile card
             try {
-                const cardPath = await createProfileCard(newProfile);
+                const cardPath = await createProfileCard(newProfile, null, sender);
                 if (cardPath) {
                     await safeSendMessage(sock, sender, {
                         image: { url: cardPath },
@@ -522,13 +522,13 @@ const userCommands = {
                     });
                 }
             } catch (err) {
-                logger.error('Error generating new profile card:', err);
+                logger.error(`Error generating new profile card for ${formatJidForLogging(sender)}:`, err);
                 // Continue even if card generation fails
             }
 
             logger.info(`New user registered: ${formatJidForLogging(sender)} (${name}, ${ageInt})`);
         } catch (err) {
-            logger.error('Error in register command:', err);
+            logger.error(`Error in register command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
             await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to register. Please try again.'
             );
         }
@@ -580,7 +580,7 @@ ${rankText}
             // Generate and send profile card
             try {
                 // First try to generate a custom profile card
-                let cardPath = await createProfileCard(profile);
+                let cardPath = await createProfileCard(profile, null, sender);
                 
                 // If that fails, fall back to level card
                 if (!cardPath) {
@@ -598,11 +598,11 @@ ${rankText}
                     });
                 }
             } catch (err) {
-                logger.error('Error generating profile card:', err);
+                logger.error(`Error generating profile card for ${formatJidForLogging(sender)}:`, err);
                 // Continue execution even if card generation fails
             }
         } catch (err) {
-            logger.error('Error in profile command:', err);
+            logger.error(`Error in profile command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
             await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to fetch profile. Please try again.'
             );
         }
@@ -636,7 +636,7 @@ ${rankText}
             await safeSendText(sock, sender, '*✅ Success:* Bio updated successfully!' 
             );
         } catch (err) {
-            logger.error('Error in setbio command:', err);
+            logger.error(`Error in setbio command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
             await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to update bio. Please try again.'
             );
         }
@@ -701,7 +701,7 @@ ${rankText}
             
             // Generate and send a preview of the profile card with the new theme
             try {
-                const cardPath = await createProfileCard(profile, theme);
+                const cardPath = await createProfileCard(profile, theme, sender);
                 if (cardPath) {
                     await safeSendMessage(sock, sender, {
                         image: { url: cardPath },
@@ -709,11 +709,11 @@ ${rankText}
                     });
                 }
             } catch (err) {
-                logger.error('Error generating theme preview:', err);
+                logger.error(`Error generating theme preview for ${formatJidForLogging(sender)}:`, err);
                 // Continue execution even if preview generation fails
             }
         } catch (err) {
-            logger.error('Error in settheme command:', err);
+            logger.error(`Error in settheme command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
             await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to set theme. Please try again.'
             );
         }
@@ -757,7 +757,7 @@ ${rankText}
                 
                 // Generate and send a new profile card with the picture
                 try {
-                    const cardPath = await createProfileCard(profile);
+                    const cardPath = await createProfileCard(profile, null, sender);
                     if (cardPath) {
                         await safeSendMessage(sock, sender, {
                             image: { url: cardPath },
@@ -765,17 +765,17 @@ ${rankText}
                         });
                     }
                 } catch (err) {
-                    logger.error('Error generating profile card:', err);
+                    logger.error(`Error generating profile card for ${formatJidForLogging(sender)}:`, err);
                     // Continue execution even if card generation fails
                 }
                 
             } catch (err) {
-                logger.error('Error downloading profile picture:', err);
+                logger.error(`Error downloading profile picture for ${formatJidForLogging(sender)}:`, err);
                 await safeSendText(sock, sender, '*❌ Error:* Failed to download and save profile picture. Please try again.' 
                 );
             }
         } catch (err) {
-            logger.error('Error in setprofilepic command:', err);
+            logger.error(`Error in setprofilepic command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
             await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to update profile picture. Please try again.'
             );
         }
@@ -814,11 +814,11 @@ ${rankText}
                     });
                 }
             } catch (err) {
-                logger.error('Error generating level card in level command:', err);
+                logger.error(`Error generating level card in level command for ${formatJidForLogging(sender)}:`, err);
                 // Continue execution even if card generation fails
             }
         } catch (err) {
-            logger.error('Error in level command:', err);
+            logger.error(`Error in level command for ${formatJidForLogging(sender)}:`, err);
             await safeSendText(sock, sender, '❌ Error fetching level information.' );
         }
     },
@@ -937,7 +937,7 @@ ${rankText}
                 }
             }
         } catch (err) {
-            logger.error('Error in daily command:', err);
+            logger.error(`Error in daily command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
             await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to claim daily reward. Please try again.'
             );
         }
@@ -996,12 +996,12 @@ ${users.map((user, i) => `${i + 1}. *${user.name}*: ${formatNumber(user.value)} 
                         }
                     }
                 } catch (err) {
-                    logger.error('Error generating top user card:', err);
+                    logger.error(`Error generating top user card for ${formatJidForLogging(sender)}:`, err);
                     // Continue execution even if card generation fails
                 }
             }
         } catch (err) {
-            logger.error('Error in leaderboard command:', err);
+            logger.error(`Error in leaderboard command for ${formatJidForLogging(sender)}:`, err);
             await safeSendText(sock, sender, '❌ Error fetching leaderboard data. Please try again.' 
             );
         }
