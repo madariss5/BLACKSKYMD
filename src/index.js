@@ -32,7 +32,6 @@ const logger = pino({
 const AUTH_DIR = './auth_info_baileys';
 const MAX_RETRIES = 5;
 const BASE_RETRY_INTERVAL = 3000;
-const MAX_RETRY_INTERVAL = 30000;
 
 // Global state
 let sock = null;
@@ -59,41 +58,19 @@ async function clearAuthState() {
     }
 }
 
-// Calculate retry delay with exponential backoff and jitter
-function getRetryDelay() {
-    const exponentialDelay = BASE_RETRY_INTERVAL * Math.pow(2, retryCount);
-    const withJitter = exponentialDelay + (Math.random() * 1000);
-    return Math.min(withJitter, MAX_RETRY_INTERVAL);
-}
-
-// Cleanup connection
-async function cleanupConnection() {
-    if (sock) {
-        try {
-            sock.ev.removeAllListeners();
-            await sock.logout();
-            sock = null;
-        } catch (err) {
-            logger.error('Error during connection cleanup:', err);
-        }
-    }
-}
-
-// WhatsApp connection configuration
+// Minimal WhatsApp connection configuration
 const connectionConfig = {
-    version: [2, 2204, 13], // Older stable version
+    version: [2, 2140, 12], // Much older stable version
     browser: ['Chrome', 'Windows', '10'],
     printQRInTerminal: true,
-    logger: logger.child({ level: 'debug' }),
-    auth: undefined,
-    defaultQueryTimeoutMs: 30000,
-    connectTimeoutMs: 30000,
-    qrTimeout: 30000,
+    logger: logger.child({ level: 'silent' }),
+    connectTimeoutMs: 60000,
+    qrTimeout: 60000,
+    defaultQueryTimeoutMs: 60000,
     emitOwnEvents: false,
     markOnlineOnConnect: false,
     syncFullHistory: false,
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36',
-    customUploadHosts: ['web.whatsapp.com']
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'
 };
 
 async function startWhatsAppConnection() {
@@ -103,19 +80,16 @@ async function startWhatsAppConnection() {
     }
 
     try {
-        await cleanupConnection();
         isConnecting = true;
         connectionState = 'connecting';
         logger.info('Starting WhatsApp connection attempt...');
 
-        // Clear existing auth state
+        // Clear auth state and initialize new session
         await clearAuthState();
-
-        // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
         connectionConfig.auth = state;
 
-        // Create socket with enhanced config
+        // Create socket
         sock = makeWASocket(connectionConfig);
         logger.info('Socket created, waiting for connection...');
 
@@ -151,28 +125,21 @@ async function startWhatsAppConnection() {
             }
 
             if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+                logger.info('Connection closed due to:', lastDisconnect?.error?.message);
                 isConnecting = false;
                 connectionState = 'disconnected';
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const errorMessage = lastDisconnect?.error?.message || 'Unknown error';
-                logger.warn(`Connection closed. Status: ${statusCode}, Error: ${errorMessage}`);
 
-                // Handle different disconnect scenarios
-                if (statusCode === DisconnectReason.loggedOut || 
-                    statusCode === DisconnectReason.multideviceMismatch ||
-                    statusCode === 405) {
-                    logger.info('Session expired or invalid, clearing auth state...');
-                    await cleanupConnection();
-                    retryCount = 0;
-                    setTimeout(startWhatsAppConnection, 5000);
-                } else if (retryCount < MAX_RETRIES) {
+                if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
-                    const delay = getRetryDelay();
+                    const delay = BASE_RETRY_INTERVAL * Math.pow(2, retryCount - 1);
                     logger.info(`Retrying connection in ${delay/1000}s (Attempt ${retryCount}/${MAX_RETRIES})`);
                     setTimeout(startWhatsAppConnection, delay);
                 } else {
-                    logger.error('Max retries reached, clearing session');
-                    await cleanupConnection();
+                    logger.info('Not reconnecting - clearing auth state');
+                    await clearAuthState();
                     retryCount = 0;
                     setTimeout(startWhatsAppConnection, 5000);
                 }
@@ -189,15 +156,15 @@ async function startWhatsAppConnection() {
 
         if (retryCount < MAX_RETRIES) {
             retryCount++;
-            const delay = getRetryDelay();
+            const delay = BASE_RETRY_INTERVAL * Math.pow(2, retryCount - 1);
             setTimeout(startWhatsAppConnection, delay);
         } else {
-            await cleanupConnection();
+            await clearAuthState();
         }
     }
 }
 
-// Create simple HTML page
+// Express route for QR code page
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -270,15 +237,8 @@ app.get('/', (req, res) => {
                     <div id="status" class="status disconnected">
                         Waiting for connection...
                     </div>
-                    <div id="error" style="color: red; margin-top: 10px;"></div>
                 </div>
                 <script>
-                    function showError(message) {
-                        const errorDiv = document.getElementById('error');
-                        errorDiv.textContent = message;
-                        setTimeout(() => errorDiv.textContent = '', 5000);
-                    }
-
                     function updateQR() {
                         fetch('/status')
                             .then(res => res.json())
@@ -291,32 +251,30 @@ app.get('/', (req, res) => {
                                 status.className = 'status ' + data.state;
 
                                 if (data.state === 'qr_ready') {
-                                    const qrUrl = '/qr?' + new Date().getTime();
-                                    qrImage.src = qrUrl;
+                                    qrImage.src = '/qr?' + new Date().getTime();
                                     qrImage.onload = () => {
                                         qrImage.style.display = 'block';
                                         loading.style.display = 'none';
+                                        setTimeout(updateQR, 20000);
                                     };
                                     qrImage.onerror = () => {
                                         qrImage.style.display = 'none';
                                         loading.style.display = 'block';
-                                        showError('Failed to load QR code, retrying...');
+                                        setTimeout(updateQR, 3000);
                                     };
                                 } else {
                                     qrImage.style.display = 'none';
                                     loading.style.display = 'block';
+                                    setTimeout(updateQR, 3000);
                                 }
                             })
                             .catch(err => {
                                 console.error('Error:', err);
-                                showError('Connection error, retrying...');
                                 setTimeout(updateQR, 3000);
                             });
                     }
 
-                    // Initial check
                     updateQR();
-                    // Regular updates
                     setInterval(updateQR, 3000);
                 </script>
             </body>
@@ -324,16 +282,14 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Handle QR code requests
+// QR code endpoint
 app.get('/qr', async (req, res) => {
     try {
         if (!qrCode) {
-            logger.debug('QR code requested but not available');
             res.status(503).send('QR code not yet available');
             return;
         }
 
-        logger.debug('Generating QR code image');
         const qrImage = await qrcode.toBuffer(qrCode, {
             errorCorrectionLevel: 'H',
             margin: 1,
@@ -351,8 +307,7 @@ app.get('/qr', async (req, res) => {
 app.get('/status', (req, res) => {
     res.json({
         state: connectionState,
-        message: getStatusMessage(),
-        hasQR: !!qrCode
+        message: getStatusMessage()
     });
 });
 
@@ -381,13 +336,11 @@ app.listen(PORT, '0.0.0.0', async () => {
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
     logger.info('Shutting down...');
-    await cleanupConnection();
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
     logger.info('Shutting down...');
-    await cleanupConnection();
     process.exit(0);
 });
 
