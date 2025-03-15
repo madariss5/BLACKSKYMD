@@ -146,7 +146,7 @@ function generateHTML() {
     <div id="pairing-section">
       <div class="form-group">
         <label for="phoneNumber">Phone Number (with country code, no + symbol)</label>
-        <input type="text" id="phoneNumber" placeholder="e.g., 19876543210" value="${process.env.PAIRING_NUMBER || ''}">
+        <input type="text" id="phoneNumber" placeholder="e.g., 19876543210" value="${process.env.PAIRING_NUMBER || '4915561048015'}">
       </div>
       <button class="btn" onclick="requestPairingCode()">Get Pairing Code</button>
       
