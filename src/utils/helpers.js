@@ -174,6 +174,11 @@ function getRandomElement(array) {
  * @param {string} phoneNumber Phone number to format
  * @returns {string} Formatted phone number
  */
+/**
+ * Format a phone number for display
+ * @param {string} phoneNumber - Phone number to format
+ * @returns {string} - Formatted phone number
+ */
 function formatPhoneNumber(phoneNumber) {
     // Strip any non-numeric characters
     let cleaned = phoneNumber.replace(/\D/g, '');
@@ -211,6 +216,218 @@ function formatPhoneNumber(phoneNumber) {
     }
 }
 
+/**
+ * Format a phone number for mention tagging with proper country code
+ * @param {string} jid - JID to format (e.g., 1234567890@s.whatsapp.net)
+ * @returns {string} - Formatted phone number with country info
+ */
+function formatPhoneForMention(jid) {
+    if (!jid || typeof jid !== 'string') {
+        return {
+            international: 'Unknown',
+            formatted: 'Unknown',
+            stylish: '𝙐𝙣𝙠𝙣𝙤𝙬𝙣 𝙐𝙨𝙚𝙧',
+            md: '```Unknown User```'
+        };
+    }
+    
+    // Extract phone number from JID
+    const phoneNumber = jid.split('@')[0];
+    
+    // Get country information for well-known country codes
+    const getCountryInfo = (number) => {
+        try {
+            // Common country codes with 1-3 digits
+            const countryCodes = {
+                '1': '🇺🇸 US',     // United States
+                '44': '🇬🇧 UK',    // United Kingdom
+                '49': '🇩🇪 DE',    // Germany
+                '33': '🇫🇷 FR',    // France
+                '39': '🇮🇹 IT',    // Italy
+                '34': '🇪🇸 ES',    // Spain
+                '86': '🇨🇳 CN',    // China
+                '91': '🇮🇳 IN',    // India
+                '55': '🇧🇷 BR',    // Brazil
+                '52': '🇲🇽 MX',    // Mexico
+                '81': '🇯🇵 JP',    // Japan
+                '82': '🇰🇷 KR',    // South Korea
+                '7': '🇷🇺 RU',     // Russia
+                '61': '🇦🇺 AU',    // Australia
+                '31': '🇳🇱 NL',    // Netherlands
+                '351': '🇵🇹 PT',   // Portugal
+                '48': '🇵🇱 PL',    // Poland
+                '46': '🇸🇪 SE',    // Sweden
+                '63': '🇵🇭 PH',    // Philippines
+                '65': '🇸🇬 SG',    // Singapore
+                '94': '🇱🇰 LK',    // Sri Lanka
+                '971': '🇦🇪 AE',   // UAE
+                '966': '🇸🇦 SA',   // Saudi Arabia
+                '234': '🇳🇬 NG',   // Nigeria
+                '20': '🇪🇬 EG',    // Egypt
+                '27': '🇿🇦 ZA',    // South Africa
+                '254': '🇰🇪 KE',   // Kenya
+                '256': '🇺🇬 UG',   // Uganda
+                '233': '🇬🇭 GH',   // Ghana
+                '60': '🇲🇾 MY',    // Malaysia
+                '62': '🇮🇩 ID',    // Indonesia
+                '64': '🇳🇿 NZ',    // New Zealand
+                '84': '🇻🇳 VN',    // Vietnam
+                '66': '🇹🇭 TH',    // Thailand
+                '92': '🇵🇰 PK',    // Pakistan
+                '880': '🇧🇩 BD',   // Bangladesh
+                '43': '🇦🇹 AT',    // Austria
+                '32': '🇧🇪 BE',    // Belgium
+                '41': '🇨🇭 CH',    // Switzerland
+                '45': '🇩🇰 DK',    // Denmark
+                '90': '🇹🇷 TR',    // Turkey
+                '380': '🇺🇦 UA',   // Ukraine
+                '30': '🇬🇷 GR',    // Greece
+                '972': '🇮🇱 IL',   // Israel
+                '354': '🇮🇸 IS',   // Iceland
+                '47': '🇳🇴 NO',    // Norway
+                '40': '🇷🇴 RO',    // Romania
+                '420': '🇨🇿 CZ',   // Czech Republic
+                '36': '🇭🇺 HU',    // Hungary
+                '353': '🇮🇪 IE',   // Ireland
+                '358': '🇫🇮 FI'    // Finland
+            };
+            
+            // Country emojis without codes for cleaner display
+            const countryEmojis = {
+                '1': '🇺🇸',     // United States
+                '44': '🇬🇧',    // United Kingdom
+                '49': '🇩🇪',    // Germany
+                '33': '🇫🇷',    // France
+                '39': '🇮🇹',    // Italy
+                '34': '🇪🇸',    // Spain
+                '86': '🇨🇳',    // China
+                '91': '🇮🇳',    // India
+                '55': '🇧🇷',    // Brazil
+                '52': '🇲🇽',    // Mexico
+                '81': '🇯🇵',    // Japan
+                '82': '🇰🇷',    // South Korea
+                '7': '🇷🇺',     // Russia
+                '61': '🇦🇺',    // Australia
+                '31': '🇳🇱',    // Netherlands
+                '351': '🇵🇹',   // Portugal
+                '48': '🇵🇱',    // Poland
+                '46': '🇸🇪',    // Sweden
+                '63': '🇵🇭',    // Philippines
+                '65': '🇸🇬',    // Singapore
+                '94': '🇱🇰',    // Sri Lanka
+                '971': '🇦🇪',   // UAE
+                '966': '🇸🇦',   // Saudi Arabia
+                '234': '🇳🇬',   // Nigeria
+                '20': '🇪🇬',    // Egypt
+                '27': '🇿🇦',    // South Africa
+                '254': '🇰🇪',   // Kenya
+                '256': '🇺🇬',   // Uganda
+                '233': '🇬🇭',   // Ghana
+                '60': '🇲🇾',    // Malaysia
+                '62': '🇮🇩',    // Indonesia
+                '64': '🇳🇿',    // New Zealand
+                '84': '🇻🇳',    // Vietnam
+                '66': '🇹🇭',    // Thailand
+                '92': '🇵🇰',    // Pakistan
+                '880': '🇧🇩',   // Bangladesh
+                '43': '🇦🇹',    // Austria
+                '32': '🇧🇪',    // Belgium
+                '41': '🇨🇭',    // Switzerland
+                '45': '🇩🇰',    // Denmark
+                '90': '🇹🇷',    // Turkey
+                '380': '🇺🇦',   // Ukraine
+                '30': '🇬🇷',    // Greece
+                '972': '🇮🇱',   // Israel
+                '354': '🇮🇸',   // Iceland
+                '47': '🇳🇴',    // Norway
+                '40': '🇷🇴',    // Romania
+                '420': '🇨🇿',   // Czech Republic
+                '36': '🇭🇺',    // Hungary
+                '353': '🇮🇪',   // Ireland
+                '358': '🇫🇮'    // Finland
+            };
+            
+            // Try to find matching country code
+            // Check from longest (3 digits) to shortest (1 digit)
+            for (let i = 3; i >= 1; i--) {
+                const potentialCode = number.substring(0, i);
+                if (countryCodes[potentialCode]) {
+                    return {
+                        code: potentialCode,
+                        info: countryCodes[potentialCode],
+                        emoji: countryEmojis[potentialCode] || '🌐'
+                    };
+                }
+            }
+            
+            // If no match is found
+            return {
+                code: number.substring(0, 2), // Use first 2 digits as fallback
+                info: '🌐',                   // Global emoji for unknown country
+                emoji: '🌐'
+            };
+        } catch (err) {
+            console.error('Error determining country info:', err);
+            return { code: '', info: '🌐', emoji: '🌐' };
+        }
+    };
+    
+    // Format the phone number with country info
+    const country = getCountryInfo(phoneNumber);
+    const nationalNumber = phoneNumber.substring(country.code.length);
+    
+    // Always use the full international format with + sign
+    const fullInternationalFormat = `+${phoneNumber}`;
+    
+    // Also create a readable formatted version for display
+    let formattedNationalNumber = nationalNumber;
+    if (nationalNumber.length === 10) {
+        // Format like: (123) 456-7890
+        formattedNationalNumber = `(${nationalNumber.substring(0, 3)}) ${nationalNumber.substring(3, 6)}-${nationalNumber.substring(6)}`;
+    } else if (nationalNumber.length > 6) {
+        // Add dashes for other lengths
+        formattedNationalNumber = `${nationalNumber.substring(0, nationalNumber.length-4)}-${nationalNumber.substring(nationalNumber.length-4)}`;
+    }
+    
+    // Get last 4 digits for MD-style formatting
+    const lastFourDigits = nationalNumber.substring(Math.max(0, nationalNumber.length - 4));
+    const socialMediaStyle = `${country.emoji} +${country.code} xxxxxx${lastFourDigits}`;
+    
+    // Convert to fancy text (like in MD bots)
+    const toFancyText = (text) => {
+        // This is a simple implementation - you could get more creative with unicode styles
+        return text; // Normally would convert to fancy unicode characters
+    };
+    
+    // Create MD-style box for number display
+    const mdStyle = `\`\`\`
+┌───〈 🌟 User Info 〉───┐
+│ 🔢 Number: +${country.code} xxx-xxx-${lastFourDigits}
+│ 🌍 Country: ${country.info}
+└────────────────────┘\`\`\``;
+    
+    if (country.code) {
+        // Return enhanced formats with more styling options
+        return {
+            international: fullInternationalFormat,
+            formatted: `${country.info} +${country.code} ${formattedNationalNumber}`,
+            stylish: socialMediaStyle,
+            md: mdStyle
+        };
+    } else {
+        return {
+            international: fullInternationalFormat,
+            formatted: `🌐 ${phoneNumber}`,
+            stylish: `🌐 +xx xxxx${lastFourDigits}`,
+            md: `\`\`\`
+┌───〈 🌟 User Info 〉───┐
+│ 🔢 Number: +xx xxx-xxx-${lastFourDigits}
+│ 🌍 Country: Unknown
+└────────────────────┘\`\`\``
+        };
+    }
+}
+
 module.exports = {
     parseDuration,
     formatDuration,
@@ -225,5 +442,6 @@ module.exports = {
     deepClone,
     isNumeric,
     getRandomElement,
-    formatPhoneNumber
+    formatPhoneNumber,
+    formatPhoneForMention
 };

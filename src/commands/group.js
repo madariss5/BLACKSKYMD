@@ -1,6 +1,6 @@
 const logger = require('../utils/logger');
 const { isAdmin, isBotAdmin } = require('../utils/permissions');
-const { downloadMediaMessage, formatPhoneNumber, formatNumber } = require('../utils/helpers');
+const { downloadMediaMessage, formatPhoneNumber, formatPhoneForMention, formatNumber } = require('../utils/helpers');
 const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
 const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 const path = require('path');
@@ -875,36 +875,84 @@ const groupCommands = {
                 }
             }
             
-            // Build header with custom message or group name
+            // Get custom message if provided
             const customMessage = args.length > 0 ? args.join(' ') : null;
-            const header = customMessage ? 
-                `*${customMessage}*\n\n` : 
-                `*📢 Mentioning all members of ${subject}*\n\n`;
             
-            // Format the admins section
-            let formattedText = header;
+            // Generate timestamp and random tag ID for professional look
+            const timestamp = new Date().toLocaleTimeString();
+            const tagId = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
             
-            // Add admins section if there are admins
+            // Create a stylish header with border
+            let formattedText = `┏━━━━━『 *TAG ALL* 』━━━━━┓\n`;
+            
+            // Add group name and announcement
+            formattedText += `┃ *Group:* ${subject}\n`;
+            formattedText += `┃ *Time:* ${timestamp}\n`;
+            formattedText += `┃ *Tag ID:* #${tagId}\n`;
+            if (customMessage) {
+                formattedText += `┃ *Message:* ${customMessage}\n`;
+            }
+            formattedText += `┗━━━━━━━━━━━━━━━━━━━━━┛\n\n`;
+            
+            // Create a stylish admin section with sparkles
             if (admins.length > 0) {
-                formattedText += '👑 *Group Admins:*\n';
-                admins.forEach(admin => {
+                formattedText += `┏━━━『 *👑 ADMINS* 』━━━┓\n`;
+                let count = 1;
+                for (const admin of admins) {
                     const phoneNumber = admin.split('@')[0];
-                    formattedText += `👤 @${phoneNumber}\n`;
-                });
-                formattedText += '\n';
+                    // Format with numbering and sparkling crown for admins
+                    formattedText += `┃ ${count}. ✨ @${phoneNumber}\n`;
+                    count++;
+                }
+                formattedText += `┗━━━━━━━━━━━━━━━━━━┛\n\n`;
             }
             
-            // Add members section
+            // Create a stylish members section
             if (members.length > 0) {
-                formattedText += '👥 *Group Members:*\n';
-                members.forEach(member => {
+                formattedText += `┏━━━『 *👥 MEMBERS* 』━━━┓\n`;
+                
+                // Create a grid layout for members (3 columns if many members)
+                const useGrid = members.length > 15;
+                let count = 1;
+                let gridRow = '';
+                
+                for (const member of members) {
                     const phoneNumber = member.split('@')[0];
-                    formattedText += `👤 @${phoneNumber}\n`;
-                });
+                    
+                    if (useGrid) {
+                        // For grid layout, put 3 members per row
+                        gridRow += `${count}.@${phoneNumber} `;
+                        
+                        if (count % 3 === 0) {
+                            formattedText += `┃ ${gridRow}\n`;
+                            gridRow = '';
+                        }
+                    } else {
+                        // For smaller groups, list vertically
+                        formattedText += `┃ ${count}. @${phoneNumber}\n`;
+                    }
+                    count++;
+                }
+                
+                // Add any remaining members in the last row
+                if (useGrid && gridRow !== '') {
+                    formattedText += `┃ ${gridRow}\n`;
+                }
+                
+                formattedText += `┗━━━━━━━━━━━━━━━━━━┛\n\n`;
             }
             
-            // Add footer with statistics
-            formattedText += `\n*Total:* ${participants.length} members (${admins.length} admins)`;
+            // Add stylish footer with statistics
+            formattedText += `┏━━━『 *📊 STATS* 』━━━┓\n`;
+            formattedText += `┃ *Total:* ${participants.length} members\n`;
+            formattedText += `┃ *Admins:* ${admins.length}\n`;
+            formattedText += `┃ *Regular:* ${members.length}\n`;
+            formattedText += `┗━━━━━━━━━━━━━━━━━━┛\n\n`;
+            
+            // Add powered by footer
+            formattedText += `╔═══『 *BLACKSKY-MD* 』═══╗\n`;
+            formattedText += `║ _Professional WhatsApp Bot_ ║\n`;
+            formattedText += `╚═════════════════════╝`;
             
             // Send the formatted message with mentions
             await safeSendMessage(sock, remoteJid, {
@@ -937,7 +985,7 @@ const groupCommands = {
 
             // Get group metadata and participants
             const metadata = await sock.groupMetadata(remoteJid);
-            const { participants } = metadata;
+            const { participants, subject } = metadata;
             
             // Create mentions array for everyone
             const mentions = participants.map(p => p.id);
@@ -945,44 +993,111 @@ const groupCommands = {
             // Get custom message if provided
             const customMessage = args.length > 0 ? args.join(' ') : '📣 Attention everyone!';
             
+            // Generate timestamp and random tag ID for professional look
+            const timestamp = new Date().toLocaleTimeString();
+            const mentionId = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+            
             // Create a simpler format with formatted phone numbers
             const formattedParticipants = participants.map(participant => {
                 const numberStr = participant.id.split('@')[0];
-                const formattedNumber = formatPhoneNumber(numberStr);
+                const formatResult = formatPhoneForMention(participant.id);
                 // Use different emoji for admin vs member
                 const emoji = participant.admin ? '👑' : '👤';
                 return {
                     id: participant.id,
                     number: numberStr,
-                    formatted: formattedNumber,
-                    emoji: emoji
+                    formatted: formatResult.formatted,
+                    international: formatResult.international,
+                    stylish: formatResult.stylish,
+                    md: formatResult.md,
+                    emoji: emoji,
+                    isAdmin: participant.admin
                 };
             });
             
-            // Build the message with 5 participants per line
-            let mentionText = `*${customMessage}*\n\n`;
-            let currentLine = '';
+            // Separate admins from regular members
+            const admins = formattedParticipants.filter(p => p.isAdmin);
+            const members = formattedParticipants.filter(p => !p.isAdmin);
+            
+            // Build fancy MD-style message with border frames
+            let mentionText = `┏━━━━━『 *MENTION ALL* 』━━━━━┓\n`;
+            mentionText += `┃ *Group:* ${subject}\n`;
+            mentionText += `┃ *Message:* ${customMessage}\n`;
+            mentionText += `┃ *Time:* ${timestamp}\n`;
+            mentionText += `┃ *ID:* #${mentionId}\n`;
+            mentionText += `┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n`;
+            
+            // Add styled mention section
+            mentionText += `┏━━━━『 *MENTIONS* 』━━━━┓\n`;
+            
+            // Create a grid layout for better visual appearance
+            let currentLine = '┃ ';
             let count = 0;
             
             for (const participant of formattedParticipants) {
-                currentLine += `${participant.emoji}@${participant.number} `;
+                // Show crown for admins in the group mention
+                const displayEmoji = participant.isAdmin ? '👑' : '👤';
+                currentLine += `${displayEmoji}@${participant.number} `;
                 count++;
                 
-                // Start a new line every 5 participants
-                if (count % 5 === 0) {
-                    mentionText += currentLine + '\n';
-                    currentLine = '';
+                // Start a new line after every 3 participants for cleaner look
+                if (count % 3 === 0) {
+                    mentionText += `${currentLine}\n`;
+                    currentLine = '┃ ';
                 }
             }
             
             // Add any remaining participants
-            if (currentLine) {
-                mentionText += currentLine;
+            if (currentLine !== '┃ ') {
+                mentionText += currentLine + '\n';
             }
             
-            // Add footer with total count
-            mentionText += `\n\n*Total members:* ${formatNumber(participants.length)}`;
-
+            mentionText += `┗━━━━━━━━━━━━━━━━━━━━┛\n\n`;
+            
+            // Add admins section with MD-style formatting
+            if (admins.length > 0) {
+                mentionText += `┏━━━━『 *👑 ADMINS* 』━━━━┓\n`;
+                admins.forEach((admin, index) => {
+                    // Use the stylish format from our enhanced phone formatter
+                    mentionText += `┃ ${index + 1}. ${admin.stylish}\n`;
+                });
+                mentionText += `┗━━━━━━━━━━━━━━━━━━━━┛\n\n`;
+            }
+            
+            // Add country info section with MD-style formatting
+            mentionText += `┏━━━━『 *📱 COUNTRIES* 』━━━━┓\n`;
+            
+            // Group users by country for cleaner display
+            const countryGroups = {};
+            formattedParticipants.forEach(p => {
+                // Extract country from formatted text (e.g., "🇩🇪 DE +49 123456789")
+                const countryCode = p.formatted.split(' ')[0]; // Get flag emoji
+                if (!countryGroups[countryCode]) {
+                    countryGroups[countryCode] = [];
+                }
+                countryGroups[countryCode].push(p);
+            });
+            
+            // Display countries with member counts
+            Object.entries(countryGroups).forEach(([country, users]) => {
+                mentionText += `┃ ${country}: ${users.length} member${users.length > 1 ? 's' : ''}\n`;
+            });
+            
+            mentionText += `┗━━━━━━━━━━━━━━━━━━━━┛\n\n`;
+            
+            // Add stats section
+            mentionText += `┏━━━━『 *📊 STATS* 』━━━━┓\n`;
+            mentionText += `┃ *Total:* ${formatNumber(participants.length)} members\n`;
+            mentionText += `┃ *Admins:* ${formatNumber(admins.length)}\n`;
+            mentionText += `┃ *Regular:* ${formatNumber(members.length)}\n`;
+            mentionText += `┃ *Countries:* ${Object.keys(countryGroups).length}\n`;
+            mentionText += `┗━━━━━━━━━━━━━━━━━━━━┛\n\n`;
+            
+            // Add powered by footer
+            mentionText += `╔════『 *BLACKSKY-MD* 』════╗\n`;
+            mentionText += `║  _Professional WhatsApp Bot_  ║\n`;
+            mentionText += `╚══════════════════════╝`;
+            
             // Send the mention message
             await safeSendMessage(sock, remoteJid, {
                 text: mentionText,

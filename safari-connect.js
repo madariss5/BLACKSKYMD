@@ -8,10 +8,12 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const fs = require('fs');
+const fsPromises = fs.promises;
 const path = require('path');
 const pino = require('pino');
 const { exec } = require('child_process');
 const os = require('os');
+const { promisify } = require('util');
 
 // Configuration
 const AUTH_FOLDER = './auth_info_safari';
@@ -359,16 +361,24 @@ function setupMessageHandler() {
     
     for (const message of messages) {
       try {
-        // Skip messages from self
-        if (message.key.fromMe) {
-          LOGGER.info('Skipping message from self');
-          continue;
-        }
-        
         // Check if message is valid
         if (!message.message) {
           LOGGER.info('Received message without content, skipping');
           continue;
+        }
+        
+        // Skip non-command messages from self to avoid unnecessary processing
+        if (message.key.fromMe) {
+          const messageText = message.message?.conversation || 
+                             message.message?.extendedTextMessage?.text || 
+                             message.message?.imageMessage?.caption || '';
+          
+          if (!messageText.startsWith('!')) {
+            LOGGER.info('Skipping non-command message from self');
+            continue;
+          }
+          // Only process our own commands
+          LOGGER.info('Processing command from self');
         }
         
         // Extract JID and message content with safer extraction
@@ -401,130 +411,181 @@ function setupMessageHandler() {
           
           LOGGER.info(`Processing command: ${command} with args: ${args.join(' ')}`);
           
-          // Basic command handler
-          switch(command) {
-            case 'ping':
-              // Show typing indicator and send response
-              await showTypingIndicator(sock, remoteJid, 1000);
-              await sock.sendMessage(remoteJid, { text: 'Pong! 🏓 Bot is working properly.' });
-              LOGGER.info('Responded to ping command');
-              break;
+          // First try to process command through command modules
+          try {
+            // Check if command exists in loaded modules
+            if (Object.keys(cachedCommands).length > 0) {
+              const commandHandled = await processModuleCommand(sock, message, command, args);
               
-            case 'help':
-              // Show typing indicator for a longer help message
-              await showTypingIndicator(sock, remoteJid, 2000);
-              
-              // Send help message
-              await sock.sendMessage(remoteJid, { 
-                text: `📋 *BLACKSKY-MD Commands*\n\n` +
-                      `!ping - Check if bot is online\n` +
-                      `!info - Show bot information\n` +
-                      `!help - Show this help message\n` +
-                      `!test - Test the bot's response\n` +
-                      `!backup - Create credentials backup for Heroku deployment`
-              });
-              
-              LOGGER.info('Responded to help command');
-              break;
-              
-            case 'info':
-              // Show typing indicator for info message (takes a bit to calculate)
-              await showTypingIndicator(sock, remoteJid, 1500);
-              
-              // Calculate uptime for display
-              const uptime = process.uptime();
-              const uptimeStr = Math.floor(uptime / 3600) + 'h ' + 
-                               Math.floor((uptime % 3600) / 60) + 'm ' + 
-                               Math.floor(uptime % 60) + 's';
-              
-              // Send info message
-              await sock.sendMessage(remoteJid, { 
-                text: `🤖 *Bot Information*\n\n` +
-                      `• *Name:* BLACKSKY-MD\n` +
-                      `• *Status:* Online\n` +
-                      `• *Uptime:* ${uptimeStr}\n` +
-                      `• *Version:* ${VERSION}\n` +
-                      `• *Connection:* Safari\n` +
-                      `• *Environment:* ${IS_CLOUD_ENV ? 'Cloud' : 'Local'}\n` +
-                      `• *Connected:* ${new Date(Date.now()).toLocaleString()}\n` +
-                      `• *User ID:* ${sock.user.id.split('@')[0]}\n` +
-                      `• *Heroku Ready:* ✅`
-              });
-              
-              LOGGER.info('Responded to info command');
-              break;
-              
-            case 'test':
-              // Show typing indicator
-              await showTypingIndicator(sock, remoteJid, 800);
-              
-              // Send test message
-              await sock.sendMessage(remoteJid, { text: '✅ Test successful! The bot is working correctly.' });
-              LOGGER.info('Responded to test command');
-              break;
-              
-            case 'backup':
-              LOGGER.info('Manual backup requested by user');
-              
-              // Show typing indicator while processing request
-              await showTypingIndicator(sock, remoteJid, 1000);
-              
-              // Initial backup message with status
-              await sock.sendMessage(remoteJid, { text: '🔄 Creating a credentials backup for Heroku deployment...' });
-              
-              // Check if user is requesting backup to their own number
-              const isOwn = remoteJid === sock.user.id;
-              
-              if (isOwn) {
-                // Show typing indicator for processing backup
+              // If the command was handled by modules, continue to next message
+              if (commandHandled) {
+                LOGGER.info(`Command ${command} was handled by command modules`);
+                continue;
+              }
+            }
+            
+            // If command modules didn't handle it, use built-in commands
+            LOGGER.info(`Command ${command} not found in modules, using built-in commands`);
+            
+            // Basic command handler for built-in commands
+            switch(command) {
+              case 'ping':
+                // Show typing indicator and send response
+                await showTypingIndicator(sock, remoteJid, 1000);
+                await safeSendText(sock, remoteJid, 'Pong! 🏓 Bot is working properly.');
+                LOGGER.info('Responded to ping command');
+                break;
+                
+              case 'help':
+                // Show typing indicator for a longer help message
                 await showTypingIndicator(sock, remoteJid, 2000);
                 
-                // Send backup directly
-                const backupSuccess = await sendCredsBackup(sock);
-                if (backupSuccess) {
-                  await sock.sendMessage(remoteJid, { 
-                    text: '✅ Credentials backup complete! You can use these files for Heroku deployment.' 
-                  });
+                // Get command count from modules
+                const totalModuleCommands = Object.keys(cachedCommands).length;
+                const moduleCommandsInfo = totalModuleCommands > 0 
+                  ? `\n\n📚 *${totalModuleCommands} Additional Commands*\nType !help <category> to see more commands.` 
+                  : '';
+                
+                // Send help message
+                await safeSendMessage(sock, remoteJid, { 
+                  text: `📋 *BLACKSKY-MD Commands*\n\n` +
+                        `!ping - Check if bot is online\n` +
+                        `!info - Show bot information\n` +
+                        `!help - Show this help message\n` +
+                        `!test - Test the bot's response\n` +
+                        `!backup - Create credentials backup for Heroku deployment${moduleCommandsInfo}`
+                });
+                
+                LOGGER.info('Responded to help command');
+                break;
+                
+              case 'info':
+                // Show typing indicator for info message (takes a bit to calculate)
+                await showTypingIndicator(sock, remoteJid, 1500);
+                
+                // Calculate uptime for display
+                const uptime = process.uptime();
+                const uptimeStr = Math.floor(uptime / 3600) + 'h ' + 
+                                 Math.floor((uptime % 3600) / 60) + 'm ' + 
+                                 Math.floor(uptime % 60) + 's';
+                
+                // Get module stats
+                const moduleCount = Object.keys(commandModules).length;
+                const commandCount = Object.keys(cachedCommands).length;
+                
+                // Send info message
+                await safeSendMessage(sock, remoteJid, { 
+                  text: `🤖 *Bot Information*\n\n` +
+                        `• *Name:* BLACKSKY-MD\n` +
+                        `• *Status:* Online\n` +
+                        `• *Uptime:* ${uptimeStr}\n` +
+                        `• *Version:* ${VERSION}\n` +
+                        `• *Connection:* Safari\n` +
+                        `• *Environment:* ${IS_CLOUD_ENV ? 'Cloud' : 'Local'}\n` +
+                        `• *Connected:* ${new Date(Date.now()).toLocaleString()}\n` +
+                        `• *User ID:* ${sock.user.id.split('@')[0]}\n` +
+                        `• *Heroku Ready:* ✅\n` +
+                        `• *Modules Loaded:* ${moduleCount}\n` +
+                        `• *Commands Available:* ${commandCount + 5}`
+                });
+                
+                LOGGER.info('Responded to info command');
+                break;
+                
+              case 'test':
+                // Show typing indicator
+                await showTypingIndicator(sock, remoteJid, 800);
+                
+                // Send test message
+                await safeSendText(sock, remoteJid, '✅ Test successful! The bot is working correctly.');
+                LOGGER.info('Responded to test command');
+                break;
+                
+              case 'modules':
+                // Show typing indicator
+                await showTypingIndicator(sock, remoteJid, 1000);
+                
+                // Generate list of loaded modules
+                const modules = Object.keys(commandModules);
+                if (modules.length > 0) {
+                  const moduleList = modules.map(m => `• ${m}`).join('\n');
+                  await safeSendText(sock, remoteJid, `📚 *Loaded Modules (${modules.length})*\n\n${moduleList}`);
                 } else {
-                  await sock.sendMessage(remoteJid, { 
-                    text: '❌ Error creating credentials backup. Please try again later or check logs.' 
-                  });
+                  await safeSendText(sock, remoteJid, '❌ No command modules loaded.');
                 }
-              } else {
-                // Send to user's number and owner number
-                try {
-                  // Notify the owner about the request
-                  await showTypingIndicator(sock, sock.user.id, 1000);
-                  await sock.sendMessage(sock.user.id, {
-                    text: `🔔 User ${remoteJid.replace(/@.+/, '')} requested a credentials backup.`
-                  });
+                LOGGER.info('Responded to modules command');
+                break;
+                
+              case 'backup':
+                LOGGER.info('Manual backup requested by user');
+                
+                // Show typing indicator while processing request
+                await showTypingIndicator(sock, remoteJid, 1000);
+                
+                // Initial backup message with status
+                await safeSendText(sock, remoteJid, '🔄 Creating a credentials backup for Heroku deployment...');
+                
+                // Check if user is requesting backup to their own number
+                const isOwn = remoteJid === sock.user.id;
+                
+                if (isOwn) {
+                  // Show typing indicator for processing backup
+                  await showTypingIndicator(sock, remoteJid, 2000);
                   
-                  // Process backup request
+                  // Send backup directly
                   const backupSuccess = await sendCredsBackup(sock);
-                  
-                  // Notify the user
-                  await sock.sendMessage(remoteJid, { 
-                    text: '✅ Credentials backup sent to bot owner. Only the bot owner can receive the actual credential files for security reasons.' 
-                  });
-                } catch (backupErr) {
-                  LOGGER.error('Error in manual backup process:', backupErr);
-                  await sock.sendMessage(remoteJid, { 
-                    text: '❌ Error creating credentials backup. Please try again later.' 
-                  });
+                  if (backupSuccess) {
+                    await safeSendText(sock, remoteJid, '✅ Credentials backup complete! You can use these files for Heroku deployment.');
+                  } else {
+                    await safeSendText(sock, remoteJid, '❌ Error creating credentials backup. Please try again later or check logs.');
+                  }
+                } else {
+                  // Send to user's number and owner number
+                  try {
+                    // Notify the owner about the request
+                    await showTypingIndicator(sock, sock.user.id, 1000);
+                    await safeSendText(sock, sock.user.id, `🔔 User ${remoteJid.replace(/@.+/, '')} requested a credentials backup.`);
+                    
+                    // Process backup request
+                    const backupSuccess = await sendCredsBackup(sock);
+                    
+                    // Notify the user
+                    await safeSendText(sock, remoteJid, '✅ Credentials backup sent to bot owner. Only the bot owner can receive the actual credential files for security reasons.');
+                  } catch (backupErr) {
+                    LOGGER.error('Error in manual backup process:', backupErr);
+                    await safeSendText(sock, remoteJid, '❌ Error creating credentials backup. Please try again later.');
+                  }
                 }
-              }
-              break;
-              
-            default:
-              // Show typing indicator for unknown command
-              await showTypingIndicator(sock, remoteJid, 500);
-              
-              // Send unknown command message
-              await sock.sendMessage(remoteJid, { 
-                text: `⚠️ Unknown command: ${command}\nType !help to see available commands.` 
-              });
-              LOGGER.info(`Responded to unknown command: ${command}`);
-              break;
+                break;
+                
+              default:
+                // Check for command lists from modules
+                if (command === 'cmds' || command === 'commands') {
+                  // Show list of all available commands from modules
+                  await showTypingIndicator(sock, remoteJid, 1000);
+                  
+                  const commandsList = Object.keys(cachedCommands).sort().join(', ');
+                  await safeSendText(sock, remoteJid, `📋 *Available Commands*\n\n${commandsList || 'No commands loaded.'}`);
+                  LOGGER.info('Responded to commands list request');
+                } else {
+                  // Show typing indicator for unknown command
+                  await showTypingIndicator(sock, remoteJid, 500);
+                  
+                  // Send unknown command message
+                  await safeSendText(sock, remoteJid, `⚠️ Unknown command: ${command}\nType !help to see available commands.`);
+                  LOGGER.info(`Responded to unknown command: ${command}`);
+                }
+                break;
+            }
+          } catch (cmdError) {
+            LOGGER.error(`Error processing command ${command}:`, cmdError);
+            
+            // Send error message to user
+            try {
+              await safeSendText(sock, remoteJid, `❌ Error processing command: ${cmdError.message}`);
+            } catch (notifyErr) {
+              LOGGER.error('Error sending error notification:', notifyErr);
+            }
           }
         }
       } catch (err) {
@@ -551,6 +612,166 @@ function setupMessageHandler() {
   sock.ev.on('group-participants.update', async (update) => {
     LOGGER.info(`Group participants update in ${update.id}: ${update.action} for ${update.participants.length} participants`);
   });
+}
+
+// Command module storage
+const commandModules = {};
+const cachedCommands = {};
+
+// Load all command modules from the src/commands directory
+async function loadCommandModules() {
+  try {
+    const commandsPath = path.join(process.cwd(), 'src', 'commands');
+    
+    // Check if directory exists
+    if (!fs.existsSync(commandsPath)) {
+      LOGGER.warn(`Commands directory not found: ${commandsPath}`);
+      return false;
+    }
+    
+    // Function to recursively get all command files
+    async function getAllCommandFiles(dir) {
+      const entries = await fsPromises.readdir(dir, { withFileTypes: true });
+      const files = await Promise.all(entries.map(async entry => {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          return getAllCommandFiles(fullPath);
+        } else if (entry.name.endsWith('.js') && entry.name !== 'index.js') {
+          return fullPath;
+        }
+        return [];
+      }));
+      return files.flat();
+    }
+    
+    // Get all command files
+    const commandFiles = await getAllCommandFiles(commandsPath);
+    LOGGER.info(`Found ${commandFiles.length} command files to load`);
+    
+    // Load each command file
+    for (const filePath of commandFiles) {
+      try {
+        // Clear cache to ensure fresh module
+        delete require.cache[require.resolve(filePath)];
+        
+        // Load the module
+        const module = require(filePath);
+        
+        // Skip invalid modules
+        if (!module || typeof module !== 'object') {
+          LOGGER.warn(`Invalid module format in ${filePath}`);
+          continue;
+        }
+        
+        // Determine module name based on file path
+        const relativePath = path.relative(commandsPath, filePath);
+        const moduleName = relativePath.replace(/\.js$/, '');
+        
+        // Check if module has .commands property or is direct command map
+        const commands = module.commands || module;
+        
+        // Skip modules without commands
+        if (!commands || typeof commands !== 'object') {
+          LOGGER.warn(`No commands found in ${filePath}`);
+          continue;
+        }
+        
+        // Store commands in our registry
+        commandModules[moduleName] = module;
+        
+        // Cache flattened command list for quick lookup
+        Object.keys(commands).forEach(cmdName => {
+          const handler = commands[cmdName];
+          
+          // Only add valid handlers
+          if (typeof handler === 'function') {
+            // Store with both normal and prefixed versions to handle different command styles
+            cachedCommands[cmdName.toLowerCase()] = {
+              handler,
+              module: moduleName,
+              name: cmdName 
+            };
+          }
+        });
+        
+        // Initialize module if it has init function
+        if (typeof module.init === 'function') {
+          try {
+            await module.init();
+            LOGGER.info(`Initialized module: ${moduleName}`);
+          } catch (initError) {
+            LOGGER.error(`Error initializing module ${moduleName}:`, initError);
+          }
+        }
+        
+        LOGGER.info(`Loaded module ${moduleName} with ${Object.keys(commands).length} commands`);
+      } catch (moduleError) {
+        LOGGER.error(`Error loading module ${filePath}:`, moduleError);
+      }
+    }
+    
+    const totalCommands = Object.keys(cachedCommands).length;
+    if (totalCommands > 0) {
+      LOGGER.info(`Successfully loaded ${totalCommands} commands from ${Object.keys(commandModules).length} modules`);
+      return true;
+    } else {
+      LOGGER.warn('No commands were loaded!');
+      return false;
+    }
+  } catch (error) {
+    LOGGER.error('Error loading command modules:', error);
+    return false;
+  }
+}
+
+// Safely send a message with proper JID validation
+async function safeSendMessage(sock, jid, content) {
+  try {
+    if (!jid || typeof jid !== 'string') {
+      LOGGER.error('Invalid JID provided to safeSendMessage:', jid);
+      return null;
+    }
+    
+    return await sock.sendMessage(jid, content);
+  } catch (error) {
+    LOGGER.error(`Error in safeSendMessage to ${jid?.replace?.(/@.+/, '@...')}:`, error.message);
+    return null;
+  }
+}
+
+// Safely send text with proper JID validation
+async function safeSendText(sock, jid, text) {
+  return safeSendMessage(sock, jid, { text });
+}
+
+// Process command from command modules
+async function processModuleCommand(sock, message, command, args) {
+  try {
+    const commandData = cachedCommands[command.toLowerCase()];
+    if (!commandData) {
+      // Command not found in modules
+      return false;
+    }
+    
+    const { handler, module: moduleName, name: cmdName } = commandData;
+    LOGGER.info(`Executing command ${cmdName} from module ${moduleName}`);
+    
+    // Execute the command handler
+    await handler(sock, message, args);
+    return true;
+  } catch (error) {
+    LOGGER.error(`Error executing command ${command}:`, error);
+    
+    // Try to send error message
+    try {
+      const jid = message.key.remoteJid;
+      await safeSendText(sock, jid, `❌ Error executing command: ${error.message}`);
+    } catch (notifyError) {
+      LOGGER.error('Error sending error notification:', notifyError);
+    }
+    
+    return true; // Mark as handled to prevent fallback
+  }
 }
 
 // Start connection
@@ -625,6 +846,10 @@ async function startConnection() {
     
     // Setup message handler
     setupMessageHandler();
+    
+    // Load command modules
+    LOGGER.info('Loading command modules...');
+    await loadCommandModules();
     
   } catch (error) {
     LOGGER.error('Error starting connection:', error);

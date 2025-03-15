@@ -230,14 +230,58 @@ async function getUserName(sock, jid) {
 }
 
 // Enhanced reaction message function that uses local GIF files
-async function sendReactionMessage(sock, sender, target, type, customGifUrl, emoji) {
+async function sendReactionMessage(sock, sender, target, type, customGifUrl, emoji, message) {
     try {
-        // Skip confirmation message to avoid spam - go straight to the result
-        const targetJid = target ? (target.includes('@') ? target : `${target.replace('@', '')}@s.whatsapp.net`) : null;
-
-        // Validate target if provided
-        if (target && !validateMention(target)) {
-            await safeSendMessage(sock, sender, { text: `❌ Invalid target mention for ${type} command` });
+        // Improved target handling with better mention detection
+        let targetJid = null;
+        
+        // Get mentioned JIDs from the original message
+        const mentionedJids = message?.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        
+        if (target) {
+            // Handle different mention patterns
+            if (target.includes('@s.whatsapp.net') || target.includes('@g.us')) {
+                // Already a valid JID
+                targetJid = target;
+            } else if (target.startsWith('@')) {
+                // Handle @mention format from message mentions
+                if (mentionedJids.length > 0) {
+                    // Take the first mentioned user
+                    targetJid = mentionedJids[0];
+                    console.log(`Using mentioned JID: ${targetJid}`);
+                } else {
+                    // Try to extract from bare @mention by removing the @
+                    targetJid = `${target.substring(1)}@s.whatsapp.net`;
+                    console.log(`Extracted JID from @mention: ${targetJid}`);
+                }
+            } else if (/^\d+$/.test(target)) {
+                // Plain phone number with no formatting
+                targetJid = `${target}@s.whatsapp.net`;
+                console.log(`Converted number to JID: ${targetJid}`);
+            } else {
+                // Handle other potential formats
+                let processed = target;
+                // Remove any non-alphanumeric chars except @ (handle special chars in mentions)
+                processed = processed.replace(/[^\w@]/g, '');
+                
+                if (processed.includes('@')) {
+                    targetJid = processed.includes('@s.whatsapp.net') ? processed : `${processed.split('@')[0]}@s.whatsapp.net`;
+                } else {
+                    targetJid = `${processed}@s.whatsapp.net`;
+                }
+                console.log(`Processed target to JID: ${targetJid}`);
+            }
+        } else if (mentionedJids.length > 0) {
+            // If no target provided but there are mentions, use the first mention
+            targetJid = mentionedJids[0];
+            console.log(`No explicit target, using mentioned JID: ${targetJid}`);
+        }
+        
+        // Extra validation with detailed error
+        if (target && !targetJid) {
+            await safeSendMessage(sock, sender, { 
+                text: `❌ Could not process the target mention for ${type} command.\n\nValid formats:\n• @user\n• phone number\n• User's JID` 
+            });
             return;
         }
 
@@ -737,140 +781,98 @@ const reactionCommands = {
     async hug(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'hug', null, '🤗');
+        await sendReactionMessage(sock, sender, target, 'hug', null, '🤗', message);
     },
     async pat(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'pat', null, '👋');
+        await sendReactionMessage(sock, sender, target, 'pat', null, '👋', message);
     },
     async kiss(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'kiss', null, '💋');
+        await sendReactionMessage(sock, sender, target, 'kiss', null, '💋', message);
     },
     async cuddle(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'cuddle', null, '🤗');
+        await sendReactionMessage(sock, sender, target, 'cuddle', null, '🤗', message);
     },
     async smile(sock, message, args) {
         const sender = message.key.remoteJid;
-        await sendReactionMessage(sock, sender, null, 'smile', null, '😊');
+        await sendReactionMessage(sock, sender, null, 'smile', null, '😊', message);
     },
     async happy(sock, message, args) {
         const sender = message.key.remoteJid;
-        await sendReactionMessage(sock, sender, null, 'happy', null, '😊');
+        await sendReactionMessage(sock, sender, null, 'happy', null, '😊', message);
     },
     async wave(sock, message, args) {
         const sender = message.key.remoteJid;
-        await sendReactionMessage(sock, sender, null, 'wave', null, '👋');
+        await sendReactionMessage(sock, sender, null, 'wave', null, '👋', message);
     },
     async dance(sock, message, args) {
         const sender = message.key.remoteJid;
-        await sendReactionMessage(sock, sender, null, 'dance', null, '💃');
+        await sendReactionMessage(sock, sender, null, 'dance', null, '💃', message);
     },
     async cry(sock, message, args) {
         const sender = message.key.remoteJid;
-        await sendReactionMessage(sock, sender, null, 'cry', null, '😢');
+        await sendReactionMessage(sock, sender, null, 'cry', null, '😢', message);
     },
     async blush(sock, message, args) {
         const sender = message.key.remoteJid;
-        await sendReactionMessage(sock, sender, null, 'blush', null, '😊');
+        await sendReactionMessage(sock, sender, null, 'blush', null, '😊', message);
     },
     async laugh(sock, message, args) {
         const sender = message.key.remoteJid;
-        await sendReactionMessage(sock, sender, null, 'laugh', null, '😂');
+        await sendReactionMessage(sock, sender, null, 'laugh', null, '😂', message);
     },
     async wink(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'wink', null, '😉');
+        await sendReactionMessage(sock, sender, target, 'wink', null, '😉', message);
     },
     async poke(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'poke', null, '👉');
+        await sendReactionMessage(sock, sender, target, 'poke', null, '👉', message);
     },
     async slap(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'slap', null, '👋');
+        await sendReactionMessage(sock, sender, target, 'slap', null, '👋', message);
     },
     async bonk(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'bonk', null, '🔨');
+        await sendReactionMessage(sock, sender, target, 'bonk', null, '🔨', message);
     },
     async bite(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'bite', null, '😬');
+        await sendReactionMessage(sock, sender, target, 'bite', null, '😬', message);
     },
     async yeet(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'yeet', null, '🚀');
+        await sendReactionMessage(sock, sender, target, 'yeet', null, '🚀', message);
     },
     async punch(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'punch', null, '👊');
+        await sendReactionMessage(sock, sender, target, 'punch', null, '👊', message);
     },
     async highfive(sock, message, args) {
         const sender = message.key.remoteJid;
         const target = args[0];
-        await sendReactionMessage(sock, sender, target, 'highfive', null, '✋');
+        await sendReactionMessage(sock, sender, target, 'highfive', null, '✋', message);
     }
 };
 
 // We're using the singleton language manager instance imported at the top of the file
 
-// Initialize function
-async function init() {
-    try {
-        logger.info('Initializing reactions module...');
-        
-        // Ensure reaction GIFs directory exists
-        if (!fs.existsSync(REACTIONS_DIR)) {
-            logger.warn(`Reaction GIFs directory not found at ${REACTIONS_DIR}. Creating directory...`);
-            try {
-                fs.mkdirSync(REACTIONS_DIR, { recursive: true });
-                logger.info(`Created reaction GIFs directory at ${REACTIONS_DIR}`);
-            } catch (dirError) {
-                logger.error(`Failed to create reaction GIFs directory: ${dirError.message}`);
-            }
-        }
-        
-        // Validate GIF files
-        const missingGifs = [];
-        const validGifs = [];
-        
-        for (const [type, gifPath] of Object.entries(REACTION_GIFS)) {
-            if (fs.existsSync(gifPath) && fs.statSync(gifPath).size > 1000) {
-                validGifs.push(type);
-                logger.info(`✅ Found valid GIF for ${type}: ${gifPath}`);
-            } else {
-                missingGifs.push(type);
-                logger.warn(`❌ Missing or invalid GIF for ${type}: ${gifPath}`);
-            }
-        }
-        
-        logger.info(`Reaction GIFs validation complete. Valid: ${validGifs.length}, Missing: ${missingGifs.length}`);
-        
-        // Language manager is already initialized by the singleton
-        logger.info('Using global language manager for reactions module');
-        
-        return true;
-    } catch (error) {
-        logger.error('Failed to initialize reactions module:', error);
-        return false;
-    }
-}
-
 /**
  * Initialize the module and validate all reaction GIFs
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>} Whether initialization was successful
  */
 async function init() {
     logger.info('Initializing reactions module...');
