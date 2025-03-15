@@ -66,24 +66,177 @@ function getRetryDelay() {
     return Math.min(withJitter, MAX_RETRY_INTERVAL);
 }
 
-// Standard WhatsApp Web configuration
+// Create simple HTML page
+app.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <title>WhatsApp Bot QR Code</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body { 
+                        font-family: Arial, sans-serif;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 100vh;
+                        margin: 0;
+                        background: #f0f2f5;
+                        padding: 20px;
+                    }
+                    .container {
+                        background: white;
+                        padding: 30px;
+                        border-radius: 10px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        max-width: 500px;
+                        width: 100%;
+                        text-align: center;
+                    }
+                    h1 { color: #128C7E; }
+                    .qr-container {
+                        margin: 20px 0;
+                        padding: 20px;
+                        border: 2px dashed #ddd;
+                        display: inline-block;
+                    }
+                    #qr-image {
+                        max-width: 300px;
+                        height: auto;
+                    }
+                    .status {
+                        margin: 20px 0;
+                        padding: 10px;
+                        border-radius: 5px;
+                        font-weight: bold;
+                    }
+                    .connected { background: #e8f5e9; color: #2e7d32; }
+                    .disconnected { background: #fff3e0; color: #ef6c00; }
+                    .error { background: #ffebee; color: #c62828; }
+                    .loading { 
+                        font-size: 1.2em;
+                        color: #666;
+                        margin: 20px 0;
+                        animation: pulse 1.5s infinite;
+                    }
+                    @keyframes pulse {
+                        0% { opacity: 1; }
+                        50% { opacity: 0.5; }
+                        100% { opacity: 1; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>WhatsApp Bot QR Code</h1>
+                    <div class="qr-container">
+                        <div id="loading" class="loading">Generating QR code...</div>
+                        <img id="qr-image" style="display: none;" alt="QR Code">
+                    </div>
+                    <div id="status" class="status disconnected">
+                        Waiting for connection...
+                    </div>
+                </div>
+                <script>
+                    function updateQR() {
+                        fetch('/status')
+                            .then(res => res.json())
+                            .then(data => {
+                                const status = document.getElementById('status');
+                                const loading = document.getElementById('loading');
+                                const qrImage = document.getElementById('qr-image');
+
+                                status.textContent = data.message || 'Checking connection status...';
+                                status.className = 'status ' + data.state;
+
+                                if (data.state === 'qr_ready') {
+                                    qrImage.src = '/qr?' + new Date().getTime();
+                                    qrImage.style.display = 'block';
+                                    loading.style.display = 'none';
+                                } else {
+                                    qrImage.style.display = 'none';
+                                    loading.style.display = 'block';
+                                }
+                            })
+                            .catch(err => {
+                                console.error('Error:', err);
+                                setTimeout(updateQR, 3000);
+                            });
+                    }
+
+                    // Initial check
+                    updateQR();
+                    // Regular updates
+                    setInterval(updateQR, 3000);
+                </script>
+            </body>
+        </html>
+    `);
+});
+
+// Handle QR code requests
+app.get('/qr', async (req, res) => {
+    try {
+        if (!qrCode) {
+            logger.debug('QR code requested but not available');
+            res.status(503).send('QR code not yet available');
+            return;
+        }
+
+        logger.debug('Generating QR code image');
+        const qrImage = await qrcode.toBuffer(qrCode, {
+            errorCorrectionLevel: 'H',
+            margin: 2,
+            scale: 8
+        });
+        res.type('png').send(qrImage);
+    } catch (err) {
+        logger.error('Error generating QR code:', err);
+        res.status(500).send('Error generating QR code');
+    }
+});
+
+// Status endpoint
+app.get('/status', (req, res) => {
+    res.json({
+        state: connectionState,
+        message: getStatusMessage(),
+        hasQR: !!qrCode
+    });
+});
+
+function getStatusMessage() {
+    switch (connectionState) {
+        case 'connected':
+            return 'Connected to WhatsApp! You can close this window.';
+        case 'disconnected':
+            return 'Disconnected. Waiting for connection...';
+        case 'connecting':
+            return 'Connecting to WhatsApp...';
+        case 'qr_ready':
+            return 'Please scan the QR code with WhatsApp';
+        default:
+            return 'Initializing...';
+    }
+}
+
+// WhatsApp connection configuration
 const connectionConfig = {
     version: [2, 2323, 4],
     browser: ['Chrome', 'Windows', '10'],
     printQRInTerminal: true,
     logger: logger.child({ level: 'debug' }),
+    auth: undefined,
+    defaultQueryTimeoutMs: 60000,
     connectTimeoutMs: 60000,
     qrTimeout: 40000,
-    defaultQueryTimeoutMs: 20000,
     emitOwnEvents: true,
     markOnlineOnConnect: false,
     generateHighQualityLinkPreview: false,
     syncFullHistory: false,
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    customUploadHosts: ['web.whatsapp.com'],
-    auth: undefined,
-    browser: ['Chrome', 'Windows', '10'],
-    getMessage: async () => undefined
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 };
 
 async function startWhatsAppConnection() {
@@ -97,7 +250,7 @@ async function startWhatsAppConnection() {
         connectionState = 'connecting';
         logger.info('Starting WhatsApp connection attempt...');
 
-        // Clear auth state for fresh start
+        // Clear existing auth state
         await clearAuthState();
 
         // Initialize auth state
@@ -111,7 +264,7 @@ async function startWhatsAppConnection() {
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            logger.debug('Connection update received:', update);
+            logger.debug('Connection update:', update);
 
             if (qr) {
                 logger.info('New QR code received');
@@ -146,7 +299,7 @@ async function startWhatsAppConnection() {
                 const errorMessage = lastDisconnect?.error?.message || 'Unknown error';
                 logger.warn(`Connection closed. Status: ${statusCode}, Error: ${errorMessage}`);
 
-                // Handle specific disconnect scenarios
+                // Handle different disconnect scenarios
                 if (statusCode === DisconnectReason.loggedOut || 
                     statusCode === DisconnectReason.multideviceMismatch ||
                     statusCode === 405) {
@@ -185,138 +338,6 @@ async function startWhatsAppConnection() {
         }
     }
 }
-
-// Express routes for QR display
-app.get('/', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>WhatsApp Bot QR Code</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    body { 
-                        display: flex; 
-                        flex-direction: column;
-                        align-items: center; 
-                        justify-content: center; 
-                        min-height: 100vh; 
-                        margin: 0;
-                        font-family: Arial, sans-serif;
-                        background: #f0f2f5;
-                        padding: 20px;
-                    }
-                    .container {
-                        background: white;
-                        padding: 30px;
-                        border-radius: 10px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                        max-width: 500px;
-                        width: 100%;
-                        text-align: center;
-                    }
-                    h1 { color: #128C7E; }
-                    .qr-container {
-                        margin: 20px 0;
-                        padding: 20px;
-                        border: 2px dashed #ddd;
-                        display: inline-block;
-                    }
-                    .status {
-                        margin: 20px 0;
-                        padding: 10px;
-                        border-radius: 5px;
-                        font-weight: bold;
-                    }
-                    .connected { background: #e8f5e9; color: #2e7d32; }
-                    .disconnected { background: #fff3e0; color: #ef6c00; }
-                    .error { background: #ffebee; color: #c62828; }
-                    .loading { 
-                        font-size: 1.2em;
-                        color: #666;
-                        margin: 20px 0;
-                        animation: pulse 1.5s infinite;
-                    }
-                    @keyframes pulse {
-                        0% { opacity: 1; }
-                        50% { opacity: 0.5; }
-                        100% { opacity: 1; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1>WhatsApp Bot QR Code</h1>
-                    <div class="qr-container">
-                        <div id="qr-placeholder" class="loading">Generating QR code...</div>
-                        <img id="qr" src="" alt="QR Code" style="max-width: 300px; display: none">
-                    </div>
-                    <div id="status" class="status disconnected">
-                        Status: Waiting for QR code...
-                    </div>
-                </div>
-                <script>
-                    function updateQR() {
-                        fetch('/status')
-                            .then(res => res.json())
-                            .then(data => {
-                                const status = document.getElementById('status');
-                                const qrImg = document.getElementById('qr');
-                                const placeholder = document.getElementById('qr-placeholder');
-
-                                status.textContent = 'Status: ' + data.state;
-                                status.className = 'status ' + data.state;
-
-                                if (data.state === 'qr_ready') {
-                                    qrImg.src = '/qr?t=' + Date.now();
-                                    qrImg.style.display = 'block';
-                                    placeholder.style.display = 'none';
-
-                                    qrImg.onload = () => setTimeout(updateQR, 20000);
-                                    qrImg.onerror = () => {
-                                        qrImg.style.display = 'none';
-                                        placeholder.style.display = 'block';
-                                        setTimeout(updateQR, 3000);
-                                    };
-                                } else {
-                                    qrImg.style.display = 'none';
-                                    placeholder.style.display = 'block';
-                                    setTimeout(updateQR, 3000);
-                                }
-                            })
-                            .catch(err => {
-                                console.error('Error fetching status:', err);
-                                setTimeout(updateQR, 3000);
-                            });
-                    }
-
-                    updateQR();
-                </script>
-            </body>
-        </html>
-    `);
-});
-
-app.get('/qr', async (req, res) => {
-    try {
-        if (!qrCode) {
-            logger.debug('QR code requested but not available yet');
-            res.status(503).send('QR code not yet available');
-            return;
-        }
-
-        logger.debug('Generating QR code image');
-        const qrImage = await qrcode.toBuffer(qrCode);
-        res.type('png').send(qrImage);
-    } catch (err) {
-        logger.error('Error generating QR code:', err);
-        res.status(500).send('Error generating QR code');
-    }
-});
-
-app.get('/status', (req, res) => {
-    res.json({ state: connectionState });
-});
 
 // Start server and connection
 app.listen(PORT, '0.0.0.0', async () => {
