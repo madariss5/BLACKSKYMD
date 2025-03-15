@@ -570,42 +570,23 @@ async function handleConnectionUpdate(update) {
   }
 }
 
-// Display QR code with enhanced error handling
+// Display QR code with simplified reliable generation
 function displayQRCode(qr) {
     try {
         LOGGER.info(`Generating QR code (Attempt ${qrRetryCount + 1}/${MAX_RETRIES})`);
 
-        // Print header first
-        console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
+        // Header
+        console.log('\n█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█');
         console.log('█                   SCAN QR CODE TO CONNECT                      █');
-        console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
+        console.log('█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█\n');
 
-        // Try all QR generation methods in sequence
-        try {
-            // Method 1: Direct terminal output
-            qrcode.generate(qr, { small: true });
-        } catch (err1) {
-            LOGGER.warn('Primary QR generation failed, trying alternative method:', err1);
+        // Generate QR directly to terminal
+        qrcode.generate(qr, { type: 'terminal', small: true });
 
-            try {
-                // Method 2: String-based QR generation
-                const qrString = qrcode.toString(qr, { type: 'terminal', small: true });
-                console.log(qrString);
-            } catch (err2) {
-                LOGGER.warn('Alternative QR generation failed, using basic formatting:', err2);
-
-                // Method 3: Format the QR data in chunks
-                const chunks = qr.match(/.{1,32}/g) || [];
-                chunks.forEach((chunk, i) => {
-                    console.log(`${chunk}${i < chunks.length - 1 ? '▄' : ''}`);
-                });
-            }
-        }
-
-        // Print footer
-        console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
+        // Footer
+        console.log('\n█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█');
         console.log(`█  Scan within ${QR_TIMEOUT/1000} seconds. Attempt ${qrRetryCount + 1} of ${MAX_RETRIES}   █`);
-        console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
+        console.log('█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█\n');
 
         // Set QR timeout
         if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
@@ -623,19 +604,18 @@ function displayQRCode(qr) {
         }, QR_TIMEOUT);
 
     } catch (err) {
-        LOGGER.error('Critical error in QR generation:', err);
-        connectionErrors.push({
-            timestamp: new Date().toISOString(),
-            type: 'QR_GENERATION_ERROR',
-            error: err.message,
-            stack: err.stack
-        });
+        LOGGER.error('QR generation failed:', err);
 
-        // Last resort: Display raw QR data with minimal formatting
-        console.log('\nEmergency QR Code Display:');
-        console.log('▄'.repeat(50));
-        console.log(qr);
-        console.log('▄'.repeat(50));
+        // Direct fallback output
+        console.log('\n█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█');
+        console.log('█                    DIRECT QR CODE DATA                         █');
+        console.log('█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█\n');
+
+        // Format QR data in clean lines
+        const lines = qr.match(/.{1,32}/g) || [];
+        lines.forEach(line => console.log(line));
+
+        console.log('\n█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█');
     }
 }
 
