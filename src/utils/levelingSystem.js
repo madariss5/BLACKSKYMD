@@ -203,6 +203,12 @@ async function addXP(userId, activityType = 'message', groupJid = null) {
         profile.coins = (profile.coins || 0) + coinReward;
         userDatabase.updateUserProfile(userId, { coins: profile.coins });
         
+        // Clear level card cache when user levels up to force regeneration
+        if (cardBufferCache && cardBufferCache.has(userId)) {
+            cardBufferCache.delete(userId);
+            logger.debug(`Cleared level card cache for ${userId} due to level up`);
+        }
+        
         logger.info(`User ${userId} leveled up to level ${newLevel} and received ${coinReward} coins!`);
         
         return {
@@ -467,11 +473,14 @@ async function generateLevelCard(userId, userData) {
                 ctx.fillStyle = '#bbbbbb';
                 // Get XP text with translation
                 const xpLabel = languageManager.getText('user.xp', currentLang);
-                ctx.fillText(`${xpLabel}: ${profile.xp || 0} / ${progress.requiredXP || 100}`, 30, 160);
+                // Use the next level XP requirement for consistency with profile command
+                const nextLevelXP = calculateRequiredXP(profile.level + 1);
+                ctx.fillText(`${xpLabel}: ${profile.xp || 0} / ${nextLevelXP}`, 30, 160);
             } catch (xpError) {
                 logger.error(`Error rendering XP for level card (${userId}):`, xpError);
                 // Fallback to English
-                ctx.fillText(`XP: ${profile.xp || 0} / ${progress.requiredXP || 100}`, 30, 160);
+                const nextLevelXP = calculateRequiredXP(profile.level + 1);
+                ctx.fillText(`XP: ${profile.xp || 0} / ${nextLevelXP}`, 30, 160);
             }
             
             // Progress bar background
@@ -481,7 +490,15 @@ async function generateLevelCard(userId, userData) {
             // Progress bar
             try {
                 ctx.fillStyle = '#5865f2';
-                const progressPercent = progress.progressPercent || 0;
+                // Calculate progress percent based on same formula as getLevelProgress
+                const currentLevel = profile.level || 1;
+                const userXP = profile.xp || 0;
+                const currentLevelXP = calculateRequiredXP(currentLevel);
+                const nextLevelXP = calculateRequiredXP(currentLevel + 1);
+                const xpForCurrentLevel = Math.max(0, userXP - currentLevelXP);
+                const xpRequiredForNextLevel = Math.max(1, nextLevelXP - currentLevelXP);
+                const progressPercent = Math.min(100, Math.floor((xpForCurrentLevel / xpRequiredForNextLevel) * 100));
+                
                 const progressWidth = (progressPercent / 100) * 740;
                 ctx.fillRect(30, 200, progressWidth, 30);
             } catch (progressBarError) {
