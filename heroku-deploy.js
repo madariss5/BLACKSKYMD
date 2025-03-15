@@ -15,8 +15,8 @@ const server = http.createServer(app);
 
 // Constants
 const PORT = process.env.PORT || 5000;
-const AUTH_DIR = './auth_info';
-const SESSION_PATH = './session.json';
+const AUTH_DIR = './auth_info_baileys';
+const SESSION_PATH = './baileys_store.json';
 let messageHandler = null;
 
 // Session state
@@ -39,156 +39,47 @@ try {
     console.log('Warning: Message handler not loaded yet');
 }
 
-/**
- * Convert session data to a transportable string
- */
-function sessionToString(sessionData) {
-    try {
-        // Convert to JSON string then Base64 encode for safety
-        const jsonData = JSON.stringify(sessionData);
-        const base64Data = Buffer.from(jsonData).toString('base64');
-        return base64Data;
-    } catch (error) {
-        console.error('Error converting session to string:', error);
-        return null;
-    }
-}
 
 /**
- * Parse session string back to session data
- */
-function stringToSession(sessionString) {
-    try {
-        // Decode Base64 string then parse JSON
-        const jsonData = Buffer.from(sessionString, 'base64').toString();
-        const parsedData = JSON.parse(jsonData);
-        return parsedData;
-    } catch (error) {
-        console.error('Error parsing session string:', error);
-        return null;
-    }
-}
-
-/**
- * Save session data to filesystem
- */
-async function saveSessionData(sessionData) {
-    try {
-        // First convert to safe string format
-        const sessionString = sessionToString(sessionData);
-        if (!sessionString) return false;
-
-        // Save to file
-        fs.writeFileSync(SESSION_PATH, sessionString);
-        console.log('Session data saved to file');
-
-        // Also store in environment variable for Heroku persistence
-        // Note: This won't actually work in Heroku as env vars are read-only at runtime
-        // This is just shown as an example of the concept
-        process.env.SESSION_DATA = sessionString;
-
-        return true;
-    } catch (error) {
-        console.error('Error saving session data:', error);
-        return false;
-    }
-}
-
-/**
- * Load session data from environment or filesystem
- */
-async function loadSessionData() {
-    try {
-        // Try to load from environment variable first (Heroku persistence)
-        if (process.env.SESSION_DATA) {
-            console.log('Found session data in environment');
-            const sessionData = stringToSession(process.env.SESSION_DATA);
-            if (sessionData) {
-                console.log('Successfully loaded session from environment');
-                return sessionData;
-            }
-        }
-
-        // Fall back to filesystem
-        if (fs.existsSync(SESSION_PATH)) {
-            console.log('Found session data file');
-            const sessionString = fs.readFileSync(SESSION_PATH, 'utf8');
-            const sessionData = stringToSession(sessionString);
-            if (sessionData) {
-                console.log('Successfully loaded session from file');
-                return sessionData;
-            }
-        }
-
-        console.log('No valid session data found');
-        return null;
-    } catch (error) {
-        console.error('Error loading session data:', error);
-        return null;
-    }
-}
-
-/**
- * Calculate exponential backoff delay
- */
-function getReconnectDelay() {
-    return Math.min(1000 * Math.pow(2, reconnectAttempts), 300000); // Max 5 minutes
-}
-
-/**
- * Initialize WhatsApp connection
+ * Initialize WhatsApp connection with improved error handling
  */
 async function connectToWhatsApp() {
     try {
-        // Create auth directory if it doesn't exist
+        // Ensure auth directory exists
         if (!fs.existsSync(AUTH_DIR)) {
             fs.mkdirSync(AUTH_DIR, { recursive: true });
         }
 
-        // Initialize auth state with better error handling
-        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR).catch(err => {
-            console.error('Error initializing auth state:', err);
-            throw err;
-        });
-
-        // Generate a unique browser ID for Heroku
-        const browserId = `BLACKSKY-HEROKU-${Date.now().toString(36)}`;
-        console.log('Using browser ID:', browserId);
+        // Initialize auth state
+        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
         // Create WhatsApp socket with optimized settings for Heroku
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            browser: ['BLACKSKY-MD', 'Desktop', '3.0'],
-            logger: pino({ level: 'warn' }),
+            browser: ['BLACKSKY-MD', 'Chrome', '116.0.0'],
+            logger: pino({ level: 'error' }),
+            markOnlineOnConnect: false,
             connectTimeoutMs: 60000,
+            qrTimeout: 40000,
             defaultQueryTimeoutMs: 60000,
             keepAliveIntervalMs: 30000,
             emitOwnEvents: false,
-            markOnlineOnConnect: false,
-            // Optimize for Heroku's limited resources
-            syncFullHistory: false,
-            fireAndForget: true,
-            retryRequestDelayMs: 2000,
-            qrTimeout: 40000,
-            shouldIgnoreJid: jid => isJidBroadcast(jid),
             version: [2, 2323, 4],
-            validateConnection: (json) => {
-                console.log('Connection validation:', json);
-                return true;
+            getMessage: async () => {
+                return { conversation: 'hello' };
             }
         });
 
         // Handle connection events
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            console.log('Connection update:', update); // More detailed logging
+            console.log('Connection update:', update);
 
             if (qr) {
-                // Generate QR code and store it
                 qrCodeDataURL = await qrcode.toDataURL(qr);
                 console.log('New QR code generated');
-                reconnectAttempts = 0; // Reset reconnect attempts when new QR is generated
+                reconnectAttempts = 0;
             }
 
             if (connection) {
@@ -198,37 +89,18 @@ async function connectToWhatsApp() {
 
             if (connection === 'open') {
                 console.log('Connection established successfully');
-                reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+                reconnectAttempts = 0;
 
-                // On successful connection, save credentials
+                // Save credentials
                 try {
                     await saveCreds();
-                    console.log('Credentials saved to filesystem');
-
-                    // Try to make a more permanent backup of the session
-                    if (sock.authState && sock.authState.creds) {
-                        // Create session data object
-                        sessionData = {
-                            creds: sock.authState.creds,
-                            timestamp: Date.now(),
-                            version: '1.0'
-                        };
-
-                        // Save to more permanent storage
-                        await saveSessionData(sessionData);
-                        console.log('Session data backed up successfully');
-
-                        // Log successful connection details
-                        console.log('Connected as:', sock.user?.id?.split(':')[0]);
-                    }
+                    console.log('Credentials saved successfully');
                 } catch (err) {
                     console.error('Error saving credentials:', err);
                 }
 
-                // Initialize message handler with better error handling
+                // Initialize message handler
                 if (messageHandler) {
-                    console.log('Initializing message handler');
-
                     sock.ev.on('messages.upsert', async ({ messages, type }) => {
                         if (type === 'notify') {
                             for (const message of messages) {
@@ -236,88 +108,42 @@ async function connectToWhatsApp() {
                                     await messageHandler(sock, message);
                                 } catch (err) {
                                     console.error('Error handling message:', err);
-                                    // Continue processing other messages despite errors
                                 }
                             }
                         }
                     });
-                } else {
-                    console.warn('No message handler available');
-
-                    // Try to load it dynamically with better error handling
-                    try {
-                        const { messageHandler: handler } = require('./src/handlers/messageHandler');
-                        if (handler) {
-                            messageHandler = handler;
-                            console.log('Successfully loaded message handler dynamically');
-
-                            sock.ev.on('messages.upsert', async ({ messages, type }) => {
-                                if (type === 'notify') {
-                                    for (const message of messages) {
-                                        try {
-                                            await messageHandler(sock, message);
-                                        } catch (err) {
-                                            console.error('Error handling message:', err);
-                                        }
-                                    }
-                                }
-                            });
-                        }
-                    } catch (err) {
-                        console.error('Failed to load message handler dynamically:', err);
-                    }
                 }
             }
 
             if (connection === 'close') {
-                // Handle disconnection with improved error handling
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
-                    reconnectAttempts < MAX_RECONNECT_ATTEMPTS;
-
                 console.log(`Connection closed with status code: ${statusCode}`);
-                console.log(`Reconnection attempt: ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
 
-                if (shouldReconnect) {
-                    reconnectAttempts++;
-                    const delay = getReconnectDelay();
-                    console.log(`Attempting to reconnect in ${delay/1000} seconds...`);
-                    setTimeout(connectToWhatsApp, delay);
-                } else if (statusCode === DisconnectReason.loggedOut) {
+                if (statusCode === DisconnectReason.loggedOut) {
                     console.log('Not reconnecting - logged out');
-                    // Clear session data on logout
+                    // Clear auth files on logout
                     try {
-                        fs.unlinkSync(SESSION_PATH);
-                        console.log('Session data cleared');
+                        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+                        console.log('Auth directory cleared');
                     } catch (err) {
-                        console.error('Error clearing session data:', err);
+                        console.error('Error clearing auth directory:', err);
                     }
+                } else if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 300000);
+                    console.log(`Attempting to reconnect in ${delay/1000} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                    setTimeout(connectToWhatsApp, delay);
                 } else {
                     console.log('Maximum reconnection attempts reached');
                 }
             }
         });
 
-        // Save credentials when they update with improved error handling
-        sock.ev.on('creds.update', async (creds) => {
+        // Handle credential updates
+        sock.ev.on('creds.update', async () => {
             try {
                 await saveCreds();
-
-                // Update our session backup
-                if (sessionData) {
-                    sessionData.creds = creds;
-                    sessionData.timestamp = Date.now();
-                    await saveSessionData(sessionData);
-                } else {
-                    // Create new session data
-                    sessionData = {
-                        creds: creds,
-                        timestamp: Date.now(),
-                        version: '1.0'
-                    };
-                    await saveSessionData(sessionData);
-                }
-                console.log('Credentials updated and backed up');
+                console.log('Credentials updated successfully');
             } catch (err) {
                 console.error('Error updating credentials:', err);
             }
@@ -326,10 +152,12 @@ async function connectToWhatsApp() {
         return sock;
     } catch (error) {
         console.error('Connection error:', error);
-        // Implement exponential backoff for retry
-        const delay = getReconnectDelay();
-        console.log(`Retrying connection in ${delay/1000} seconds...`);
-        setTimeout(connectToWhatsApp, delay);
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 300000);
+            console.log(`Retrying connection in ${delay/1000} seconds...`);
+            setTimeout(connectToWhatsApp, delay);
+        }
     }
 }
 
@@ -352,215 +180,52 @@ function getUptime() {
     return uptimeString;
 }
 
-/**
- * Main application startup
- */
-async function start() {
-    // Set up Express endpoints
+// Set up Express endpoints
+app.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>BLACKSKY WhatsApp Bot - Heroku</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    line-height: 1.6;
+                }
+                .status {
+                    display: inline-block;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                .connecting { background: #FFF3CD; color: #856404; }
+                .connected { background: #D4EDDA; color: #155724; }
+                .disconnected { background: #F8D7DA; color: #721C24; }
+            </style>
+        </head>
+        <body>
+            <h1>BLACKSKY WhatsApp Bot</h1>
+            <div>
+                <p><strong>Status:</strong> <span class="status ${connectionStatus}">${connectionStatus.toUpperCase()}</span></p>
+                <p><strong>Uptime:</strong> ${getUptime()}</p>
+                ${qrCodeDataURL 
+                    ? `<p>Scan this QR code with WhatsApp:</p><img src="${qrCodeDataURL}" alt="WhatsApp QR Code" />`
+                    : connectionStatus === 'connected' 
+                        ? '<p>Bot is connected to WhatsApp</p>'
+                        : '<p>Waiting for connection...</p>'
+                }
+            </div>
+        </body>
+        </html>
+    `);
+});
 
-    // Home page with status info
-    app.get('/', (req, res) => {
-        res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>BLACKSKY WhatsApp Bot</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                        max-width: 800px;
-                        margin: 0 auto;
-                        padding: 20px;
-                        line-height: 1.6;
-                    }
-                    h1 { color: #128C7E; }
-                    .card {
-                        background: #f5f5f5;
-                        border-radius: 8px;
-                        padding: 20px;
-                        margin-bottom: 20px;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    }
-                    .status {
-                        display: inline-block;
-                        padding: 5px 10px;
-                        border-radius: 4px;
-                        font-weight: bold;
-                    }
-                    .connecting { background: #FFF3CD; color: #856404; }
-                    .connected { background: #D4EDDA; color: #155724; }
-                    .disconnected { background: #F8D7DA; color: #721C24; }
-                </style>
-            </head>
-            <body>
-                <h1>BLACKSKY WhatsApp Bot</h1>
-                <div class="card">
-                    <h2>Bot Status</h2>
-                    <p><strong>Connection:</strong> <span class="status ${connectionStatus}">${connectionStatus.toUpperCase()}</span></p>
-                    <p><strong>Uptime:</strong> ${getUptime()}</p>
-                    <p><strong>Server Time:</strong> ${new Date().toLocaleString()}</p>
-                </div>
-
-                <div class="card">
-                    <h2>Connection</h2>
-                    ${qrCodeDataURL
-                        ? `<p>Scan this QR code with WhatsApp:</p><img src="${qrCodeDataURL}" alt="WhatsApp QR Code" />`
-                        : connectionStatus === 'connected'
-                            ? '<p>Bot is connected to WhatsApp</p>'
-                            : '<p>Waiting for connection...</p>'
-                    }
-                </div>
-
-                <div class="card">
-                    <h2>Bot Information</h2>
-                    <p><strong>Version:</strong> 1.0.0</p>
-                    <p><strong>Environment:</strong> ${process.env.NODE_ENV || 'development'}</p>
-                    <p><strong>Session Backup:</strong> ${sessionData ? 'Available' : 'Not available'}</p>
-                </div>
-
-                <footer>
-                    &copy; 2025 BLACKSKY WhatsApp Bot - Running on Heroku
-                </footer>
-            </body>
-            </html>
-        `);
-    });
-
-    // QR code endpoint
-    app.get('/qr', (req, res) => {
-        if (qrCodeDataURL) {
-            res.send(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>WhatsApp QR Code</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <meta http-equiv="refresh" content="30">
-                    <style>
-                        body { 
-                            display: flex; 
-                            flex-direction: column;
-                            align-items: center; 
-                            justify-content: center; 
-                            min-height: 100vh; 
-                            margin: 0;
-                            font-family: Arial, sans-serif;
-                            background: #f0f2f5;
-                            padding: 20px;
-                        }
-                        .qr-container {
-                            background: white;
-                            padding: 20px;
-                            border-radius: 8px;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                            text-align: center;
-                        }
-                        h1 { color: #128C7E; }
-                        .instructions {
-                            margin-top: 20px;
-                            text-align: left;
-                        }
-                        .refresh-note {
-                            margin-top: 20px;
-                            font-style: italic;
-                            color: #666;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="qr-container">
-                        <h1>WhatsApp QR Code</h1>
-                        <img src="${qrCodeDataURL}" alt="WhatsApp QR Code" />
-
-                        <div class="instructions">
-                            <h3>How to connect:</h3>
-                            <ol>
-                                <li>Open WhatsApp on your phone</li>
-                                <li>Tap Menu or Settings and select Linked Devices</li>
-                                <li>Tap on "Link a Device"</li>
-                                <li>Point your phone at this screen to scan the QR code</li>
-                            </ol>
-                        </div>
-
-                        <p class="refresh-note">This page will automatically refresh every 30 seconds.</p>
-                    </div>
-                </body>
-                </html>
-            `);
-        } else {
-            res.send(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>WhatsApp QR Code</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <meta http-equiv="refresh" content="5">
-                    <style>
-                        body { 
-                            display: flex; 
-                            flex-direction: column;
-                            align-items: center; 
-                            justify-content: center; 
-                            min-height: 100vh; 
-                            margin: 0;
-                            font-family: Arial, sans-serif;
-                            background: #f0f2f5;
-                            padding: 20px;
-                        }
-                        .message-container {
-                            background: white;
-                            padding: 20px;
-                            border-radius: 8px;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                            text-align: center;
-                        }
-                        h1 { color: #128C7E; }
-                        .status {
-                            margin-top: 20px;
-                            padding: 10px;
-                            background: #FFF3CD;
-                            color: #856404;
-                            border-radius: 4px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="message-container">
-                        <h1>WhatsApp QR Code</h1>
-
-                        <div class="status">
-                            ${connectionStatus === 'connected'
-                                ? 'Already connected to WhatsApp. No QR code needed.'
-                                : 'Waiting for QR code generation. This page will refresh automatically.'}
-                        </div>
-                    </div>
-                </body>
-                </html>
-            `);
-        }
-    });
-
-    // Status endpoint for monitoring
-    app.get('/status', (req, res) => {
-        res.json({
-            status: connectionStatus,
-            uptime: getUptime(),
-            serverTime: new Date().toISOString(),
-            hasQR: !!qrCodeDataURL,
-            hasSession: !!sessionData
-        });
-    });
-
-    // Start the web server
-    server.listen(PORT, '0.0.0.0', () => {
-        console.log(`Server running on port ${PORT}`);
-        console.log(`Open http://localhost:${PORT} in your browser`);
-
-        // Start WhatsApp connection
-        connectToWhatsApp();
-    });
-}
-
-// Start the application
-start();
+// Start the server and bot
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+    connectToWhatsApp();
+});
