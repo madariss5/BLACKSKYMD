@@ -33,7 +33,214 @@ let sessionInvalidated = false;
 let reconnectTimer = null;
 let latestQR = null;
 
-// Set up Express server for QR code display
+// Enhanced connection configuration
+const connectionConfig = {
+    printQRInTerminal: true,
+    logger: pino({ 
+        level: 'warn',
+        transport: {
+            target: 'pino-pretty',
+            options: { colorize: true }
+        }
+    }),
+    // Use a unique browser ID for each connection to prevent conflicts
+    browser: [`BLACKSKY-MD-${Date.now().toString().slice(-6)}`, 'Chrome', '110.0.0'],
+    // Enhanced connection settings
+    connectTimeoutMs: 120000, // Increased timeout
+    defaultQueryTimeoutMs: 60000,
+    keepAliveIntervalMs: 10000,
+    emitOwnEvents: false,
+    retryRequestDelayMs: 2000,
+    fireInitQueries: true,
+    downloadHistory: false,
+    syncFullHistory: false,
+    shouldSyncHistoryMessage: false,
+    markOnlineOnConnect: false,
+    version: [2, 2323, 4],
+    transactionOpts: { 
+        maxCommitRetries: 5, 
+        delayBetweenTriesMs: 2000 
+    }
+};
+
+async function startConnection() {
+    if (isConnecting || connectionLock) {
+        logger.info('Connection attempt already in progress, skipping...');
+        return null;
+    }
+
+    try {
+        isConnecting = true;
+        connectionLock = true;
+
+        // Ensure auth directory exists
+        const authDir = await ensureAuthDir();
+        const { state, saveCreds } = await useMultiFileAuthState(authDir);
+
+        // Create socket with enhanced config
+        sock = makeWASocket({
+            ...connectionConfig,
+            auth: state
+        });
+
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                await displayQR(qr);
+            }
+
+            if (connection === 'open') {
+                logger.info('Connection established successfully');
+                retryCount = 0;
+                currentRetryInterval = INITIAL_RETRY_INTERVAL;
+                sessionInvalidated = false;
+                clearReconnectTimer();
+                await saveCreds();
+
+                // Initialize message handling after successful connection
+                sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                    if (type === 'notify' && messageHandler) {
+                        for (const message of messages) {
+                            try {
+                                await messageHandler(sock, message);
+                            } catch (err) {
+                                logger.error('Error handling message:', err);
+                            }
+                        }
+                    }
+                });
+
+                isConnecting = false;
+                connectionLock = false;
+            }
+
+            if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                logger.info(`Connection closed with status code: ${statusCode}`);
+
+                // Handle critical errors
+                if (statusCode === DisconnectReason.loggedOut || 
+                    statusCode === DisconnectReason.connectionReplaced ||
+                    statusCode === DisconnectReason.connectionClosed ||
+                    statusCode === DisconnectReason.connectionLost ||
+                    statusCode === DisconnectReason.timedOut ||
+                    statusCode === 440) {
+
+                    if (retryCount >= MAX_RETRIES) {
+                        logger.error('Max retries reached, clearing session and restarting...');
+                        await cleanupSession();
+                        process.exit(1);
+                        return;
+                    }
+
+                    // Implement exponential backoff
+                    retryCount++;
+                    currentRetryInterval = Math.min(
+                        currentRetryInterval * 2,
+                        MAX_RETRY_INTERVAL
+                    );
+
+                    logger.info(`Scheduling reconnection attempt ${retryCount}/${MAX_RETRIES} in ${currentRetryInterval/1000}s`);
+
+                    clearReconnectTimer();
+                    reconnectTimer = setTimeout(async () => {
+                        isConnecting = false;
+                        connectionLock = false;
+                        await startConnection();
+                    }, currentRetryInterval);
+                } else {
+                    // For other errors, attempt immediate reconnection
+                    isConnecting = false;
+                    connectionLock = false;
+                    await startConnection();
+                }
+            }
+        });
+
+        sock.ev.on('creds.update', saveCreds);
+
+        return sock;
+    } catch (err) {
+        logger.error('Fatal error in startConnection:', err);
+
+        if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            currentRetryInterval = Math.min(
+                currentRetryInterval * 2,
+                MAX_RETRY_INTERVAL
+            );
+
+            logger.info(`Retrying connection in ${currentRetryInterval/1000}s`);
+            clearReconnectTimer();
+            reconnectTimer = setTimeout(async () => {
+                isConnecting = false;
+                connectionLock = false;
+                await startConnection();
+            }, currentRetryInterval);
+        } else {
+            await cleanupSession();
+            process.exit(1);
+        }
+    } finally {
+        isConnecting = false;
+        connectionLock = false;
+    }
+}
+
+async function ensureAuthDir() {
+    const authDir = path.join(process.cwd(), 'auth_info');
+    try {
+        await fsPromises.mkdir(authDir, { recursive: true });
+        return authDir;
+    } catch (err) {
+        logger.error('Failed to create auth directory:', err);
+        throw err;
+    }
+}
+
+async function cleanupSession() {
+    try {
+        const authDir = path.join(process.cwd(), 'auth_info');
+        if (fs.existsSync(authDir)) {
+            await fsPromises.rm(authDir, { recursive: true, force: true });
+            await fsPromises.mkdir(authDir, { recursive: true });
+            sessionInvalidated = true;
+            logger.info('Session cleaned up successfully');
+        }
+    } catch (err) {
+        logger.error('Error during session cleanup:', err);
+    }
+}
+
+function clearReconnectTimer() {
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+}
+
+// Handle process termination
+process.on('SIGINT', async () => {
+    logger.info('Received SIGINT, cleaning up...');
+    clearReconnectTimer();
+    if (sock) {
+        await sock.logout();
+    }
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    logger.info('Received SIGTERM, cleaning up...');
+    clearReconnectTimer();
+    if (sock) {
+        await sock.logout();
+    }
+    process.exit(0);
+});
+
+module.exports = { startConnection };
+
 app.get('/', (req, res) => {
     // Create dynamic status message based on state
     let statusMessage = "Please scan the QR code with WhatsApp to connect";
@@ -176,72 +383,6 @@ app.get('/', (req, res) => {
     `);
 });
 
-async function cleanupSession() {
-    try {
-        logger.info('Starting complete session cleanup...');
-
-        // Files to clean
-        const filesToClean = [
-            'auth_info_multi.json',
-            'auth_info_baileys.json',
-            'auth_info.json',
-            'auth_info_qr.json',
-            'session.json',
-            'creds.json'
-        ];
-
-        // Directories to clean
-        const authDirs = [
-            'auth_info',
-            'auth_info_baileys',
-            'auth_info_multi',
-            'session',
-            '.session'
-        ].map(dir => path.join(process.cwd(), dir));
-
-        // Clean files
-        for (const file of filesToClean) {
-            try {
-                if (fs.existsSync(file)) {
-                    await fsPromises.unlink(file);
-                    logger.info(`Removed session file: ${file}`);
-                }
-            } catch (err) {
-                logger.error(`Error removing file ${file}:`, err);
-            }
-        }
-
-        // Clean directories
-        for (const dir of authDirs) {
-            try {
-                if (fs.existsSync(dir)) {
-                    await fsPromises.rm(dir, { recursive: true, force: true });
-                    logger.info(`Removed directory: ${dir}`);
-                }
-            } catch (err) {
-                logger.error(`Error removing directory ${dir}:`, err);
-            }
-        }
-
-        sessionInvalidated = true;
-        logger.info('Session cleanup completed successfully');
-    } catch (err) {
-        logger.error('Error during session cleanup:', err);
-        throw err;
-    }
-}
-
-async function ensureAuthDir() {
-    const authDir = path.join(process.cwd(), 'auth_info');
-    try {
-        await fsPromises.mkdir(authDir, { recursive: true });
-        return authDir;
-    } catch (err) {
-        logger.error('Failed to create auth directory:', err);
-        throw err;
-    }
-}
-
 async function displayQR(qr) {
     try {
         // Generate QR code and store it in memory
@@ -264,281 +405,3 @@ async function displayQR(qr) {
         throw err;
     }
 }
-
-function clearReconnectTimer() {
-    if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-    }
-}
-
-async function startConnection() {
-    if (isConnecting || connectionLock) {
-        logger.info('Connection attempt already in progress, skipping...');
-        return null;
-    }
-
-    try {
-        isConnecting = true;
-        connectionLock = true;
-
-        // Start QR server if not already running
-        if (!server.listening) {
-            server.listen(qrPort, '0.0.0.0', () => {
-                logger.info(`QR server listening on port ${qrPort}`);
-            });
-        }
-
-        // Clear any existing session before starting
-        await cleanupSession();
-
-        const authDir = await ensureAuthDir();
-        const { state, saveCreds } = await useMultiFileAuthState(authDir);
-
-        // Create socket with enhanced settings to prevent conflicts
-        const browserId = `BLACKSKY-MD-${Date.now().toString().slice(-6)}`;
-        logger.info(`Using browser ID: ${browserId}`);
-        
-        sock = makeWASocket({
-            auth: state,
-            printQRInTerminal: true, // Enable terminal QR as backup
-            logger: pino({ 
-                level: 'warn',
-                transport: {
-                    target: 'pino-pretty',
-                    options: { colorize: true }
-                }
-            }),
-            // Use a unique browser ID for each connection to prevent conflicts
-            browser: [browserId, 'Chrome', '110.0.0'],
-            // Enhanced connection settings to reduce reconnections
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 60000,
-            keepAliveIntervalMs: 10000, // Lower interval to keep connection alive
-            emitOwnEvents: false,
-            retryRequestDelayMs: 2000, // Lower retry delay to be more responsive
-            fireInitQueries: true,
-            downloadHistory: false,
-            syncFullHistory: false,
-            shouldSyncHistoryMessage: false,
-            markOnlineOnConnect: false,
-            version: [2, 2323, 4],
-            transactionOpts: { 
-                maxCommitRetries: 5, 
-                delayBetweenTriesMs: 2000 
-            },
-            // Optimize for Replit environment
-            linkPreviewImageThumbnailWidth: 300, // Lower resource usage
-            mediaCache: new Map(), // In-memory media cache
-            getMessage: async () => { return { conversation: 'hello' }; }
-        });
-
-        sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-
-            if (qr) {
-                await displayQR(qr);
-            }
-
-            if (connection === 'open') {
-                logger.info('Connection established successfully');
-                retryCount = 0;
-                currentRetryInterval = INITIAL_RETRY_INTERVAL;
-                sessionInvalidated = false;
-                clearReconnectTimer();
-                await saveCreds();
-
-                // Initialize message handling after successful connection
-                sock.ev.on('messages.upsert', async ({ messages, type }) => {
-                    if (type === 'notify') {
-                        for (const message of messages) {
-                            try {
-                                await messageHandler(sock, message);
-                                logger.info('Message handled successfully');
-                            } catch (err) {
-                                logger.error('Error handling message:', err);
-                            }
-                        }
-                    }
-                });
-
-                isConnecting = false;
-                connectionLock = false;
-            }
-
-            if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                logger.info(`Connection closed with status code: ${statusCode}`);
-
-                // Handle critical errors
-                if (statusCode === DisconnectReason.loggedOut || 
-                    statusCode === DisconnectReason.connectionReplaced ||
-                    statusCode === DisconnectReason.connectionClosed ||
-                    statusCode === DisconnectReason.connectionLost ||
-                    statusCode === DisconnectReason.timedOut ||
-                    statusCode === 440) {
-
-                    logger.info('Critical connection error detected');
-                    await cleanupSession();
-
-                    // Force restart on critical errors
-                    logger.info('Restarting process after critical error...');
-                    process.exit(1);
-                    return;
-                }
-
-                if (retryCount >= MAX_RETRIES) {
-                    logger.error('Max retries reached, clearing session and restarting...');
-                    await cleanupSession();
-                    process.exit(1);
-                    return;
-                }
-
-                // Implement exponential backoff
-                retryCount++;
-                currentRetryInterval = Math.min(
-                    currentRetryInterval * 2,
-                    MAX_RETRY_INTERVAL
-                );
-
-                logger.info(`Scheduling reconnection attempt ${retryCount}/${MAX_RETRIES} in ${currentRetryInterval}ms`);
-
-                clearReconnectTimer();
-                reconnectTimer = setTimeout(async () => {
-                    try {
-                        // First, completely clear any session data
-                        await cleanupSession();
-                        
-                        // Make sure we reset flags before reconnecting
-                        isConnecting = false;
-                        connectionLock = false;
-                        
-                        // Create some delay to ensure WhatsApp servers register the disconnect
-                        logger.info('Cleared session, waiting 5 seconds before reconnecting...');
-                        await new Promise(resolve => setTimeout(resolve, 5000));
-                        
-                        // Attempt reconnection with fresh session
-                        logger.info('Starting fresh connection after cleanup...');
-                        await startConnection();
-                    } catch (err) {
-                        logger.error('Reconnection attempt failed:', err);
-                        if (retryCount >= MAX_RETRIES) {
-                            await cleanupSession();
-                            process.exit(1);
-                        }
-                    }
-                }, currentRetryInterval);
-            }
-        });
-
-        sock.ev.on('creds.update', saveCreds);
-
-        // Add message receipt acknowledgment
-        sock.ev.on('messages.update', async (messages) => {
-            for (const message of messages) {
-                if (message.key && message.key.remoteJid) {
-                    try {
-                        await sock.readMessages([message.key]);
-                        logger.debug('Message marked as read');
-                    } catch (err) {
-                        logger.error('Error marking message as read:', err);
-                    }
-                }
-            }
-        });
-
-        // Handle chat updates
-        sock.ev.on('chats.update', async (chats) => {
-            for (const chat of chats) {
-                if (chat.unreadCount > 0) {
-                    try {
-                        await sock.readMessages([{
-                            remoteJid: chat.id,
-                            id: chat.conversationTimestamp.toString()
-                        }]);
-                        logger.debug('Chat marked as read');
-                    } catch (err) {
-                        logger.error('Error marking chat as read:', err);
-                    }
-                }
-            }
-        });
-
-
-        return sock;
-    } catch (err) {
-        logger.error('Fatal error in startConnection:', err);
-
-        if (retryCount < MAX_RETRIES) {
-            retryCount++;
-            currentRetryInterval = Math.min(
-                currentRetryInterval * 2,
-                MAX_RETRY_INTERVAL
-            );
-
-            logger.info(`Retrying connection in ${currentRetryInterval}ms`);
-            clearReconnectTimer();
-            reconnectTimer = setTimeout(async () => {
-                try {
-                    // First, completely clear any session data
-                    await cleanupSession();
-                    
-                    // Make sure we reset flags before reconnecting
-                    isConnecting = false;
-                    connectionLock = false;
-                    
-                    // Create some delay to ensure WhatsApp servers register the disconnect
-                    logger.info('Cleared session, waiting 5 seconds before reconnecting...');
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                    
-                    // Attempt reconnection with fresh session
-                    logger.info('Starting fresh connection after cleanup...');
-                    await startConnection();
-                } catch (retryErr) {
-                    logger.error('Retry failed:', retryErr);
-                    if (retryCount >= MAX_RETRIES) {
-                        await cleanupSession();
-                        process.exit(1);
-                    }
-                }
-            }, currentRetryInterval);
-        } else {
-            await cleanupSession();
-            process.exit(1);
-        }
-    } finally {
-        isConnecting = false;
-        connectionLock = false;
-    }
-}
-
-// Handle process termination
-process.on('SIGINT', async () => {
-    logger.info('Received SIGINT, cleaning up...');
-    clearReconnectTimer();
-    try {
-        if (sock) {
-            await sock.logout();
-            await cleanupSession();
-        }
-    } catch (err) {
-        logger.error('Cleanup error:', err);
-    }
-    process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-    logger.info('Received SIGTERM, cleaning up...');
-    clearReconnectTimer();
-    try {
-        if (sock) {
-            await sock.logout();
-            await cleanupSession();
-        }
-    } catch (err) {
-        logger.error('Cleanup error:', err);
-    }
-    process.exit(0);
-});
-
-module.exports = { startConnection };
