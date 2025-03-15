@@ -11,6 +11,7 @@ const logger = require('./utils/logger');
 const SessionManager = require('./utils/sessionManager');
 const path = require('path');
 const qrcode = require('qrcode');
+const pino = require('pino');
 
 // Initialize Express app and server
 const app = express();
@@ -21,6 +22,43 @@ const PORT = process.env.PORT || 5000;
 const sessionManager = new SessionManager();
 let sock = null;
 let latestQR = null;
+let isConnecting = false;
+let connectionLock = false;
+let retryCount = 0;
+const MAX_RETRIES = 5;
+
+// Connection configuration
+const connectionConfig = {
+    printQRInTerminal: true,
+    logger: pino({ 
+        level: 'warn',
+        transport: {
+            target: 'pino-pretty',
+            options: { colorize: true }
+        }
+    }),
+    browser: ['BLACKSKY-MD', 'Firefox', '119.0.0'],
+    version: [2, 2323, 4],
+    connectTimeoutMs: 120000,
+    qrTimeout: 60000,
+    defaultQueryTimeoutMs: 60000,
+    keepAliveIntervalMs: 15000,
+    emitOwnEvents: true,
+    markOnlineOnConnect: false,
+    syncFullHistory: false,
+    linkPreviewImageThumbnailWidth: 300,
+    transactionOpts: { 
+        maxCommitRetries: 5, 
+        delayBetweenTriesMs: 2000 
+    },
+    // Customize user agent
+    browser: [`BLACKSKY-MD-${Date.now()}`, 'Chrome', '119.0.0'],
+    // WebSocket config
+    customUploadHosts: ['upload.whatsapp.net'],
+    retryRequestDelayMs: 3000,
+    fireInitQueries: true,
+    downloadHistory: false
+};
 
 // Serve QR code page
 app.get('/', (req, res) => {
@@ -30,6 +68,7 @@ app.get('/', (req, res) => {
             <head>
                 <title>WhatsApp Bot QR Code</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="refresh" content="30">
                 <style>
                     body { 
                         display: flex; 
@@ -41,7 +80,6 @@ app.get('/', (req, res) => {
                         font-family: Arial, sans-serif;
                         background: #f0f2f5;
                         padding: 20px;
-                        box-sizing: border-box;
                     }
                     .container {
                         text-align: center;
@@ -54,51 +92,29 @@ app.get('/', (req, res) => {
                         border-radius: 10px;
                         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
                         margin: 20px auto;
-                        display: inline-block;
                     }
                     .qrcode img {
                         max-width: 100%;
                         height: auto;
-                        display: block;
                     }
-                    h1 { color: #128C7E; margin-bottom: 5px; }
-                    h2 { color: #075E54; font-size: 1.2em; margin-top: 0; }
+                    h1 { color: #128C7E; }
                     .status { 
-                        margin-top: 20px; 
+                        margin: 20px 0;
                         padding: 10px;
                         border-radius: 5px;
-                        background-color: #e8f5e9;
+                        background: #e8f5e9;
                         color: #2e7d32;
-                        font-weight: bold;
                     }
-                    .refresh-button {
-                        background-color: #128C7E;
+                    .refresh { 
+                        background: #128C7E;
                         color: white;
                         border: none;
                         padding: 10px 20px;
                         border-radius: 5px;
                         cursor: pointer;
-                        font-size: 1em;
-                        margin-top: 20px;
                     }
-                    .waiting-message {
-                        margin: 20px 0;
+                    .waiting {
                         color: #666;
-                        font-style: italic;
-                    }
-                    .instructions {
-                        margin-top: 30px;
-                        text-align: left;
-                        background: white;
-                        padding: 20px;
-                        border-radius: 10px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    }
-                    .instructions ol {
-                        margin-top: 10px;
-                        padding-left: 25px;
-                    }
-                    .pulse {
                         animation: pulse 2s infinite;
                     }
                     @keyframes pulse {
@@ -110,54 +126,25 @@ app.get('/', (req, res) => {
             </head>
             <body>
                 <div class="container">
-                    <h1>WhatsApp Bot</h1>
-                    <h2>QR Code Connection</h2>
-
+                    <h1>WhatsApp Bot QR Code</h1>
                     <div class="qrcode">
                         ${latestQR 
                             ? `<img src="${latestQR}" alt="WhatsApp QR Code">`
-                            : `<div class="waiting-message pulse">Generating QR code... Please wait.</div>`
+                            : `<div class="waiting">Generating QR code... Please wait.</div>`
                         }
                     </div>
-
-                    <button class="refresh-button" onclick="location.reload()">Refresh QR Code</button>
-
-                    <div class="instructions">
-                        <strong>How to connect:</strong>
-                        <ol>
-                            <li>Open WhatsApp on your phone</li>
-                            <li>Tap Menu ⋮ or Settings ⚙ and select "Linked Devices"</li>
-                            <li>Tap on "Link a Device"</li>
-                            <li>Point your phone camera at this QR code to scan</li>
-                        </ol>
-                        <p>The QR code will automatically refresh every 60 seconds. If you don't see a QR code, click the Refresh button.</p>
+                    <button class="refresh" onclick="location.reload()">Refresh QR Code</button>
+                    <div class="status">
+                        Scan this QR code with WhatsApp to connect the bot
                     </div>
                 </div>
-
                 <script>
-                    // Auto-refresh if no QR code appears or every 60 seconds
-                    const hasQR = ${latestQR ? 'true' : 'false'};
-
-                    if (!hasQR) {
-                        // If no QR code, refresh more frequently (10 seconds)
-                        setTimeout(() => location.reload(), 10000);
-                    } else {
-                        // Regular refresh every 60 seconds
-                        setTimeout(() => location.reload(), 60000);
-                    }
+                    // Auto refresh every 30 seconds
+                    setTimeout(() => location.reload(), 30000);
                 </script>
             </body>
         </html>
     `);
-});
-
-// Basic health check endpoint
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        uptime: process.uptime(),
-        timestamp: Date.now()
-    });
 });
 
 // Status endpoint
@@ -165,25 +152,37 @@ app.get('/status', (req, res) => {
     res.json({
         connected: sock?.user ? true : false,
         user: sock?.user || null,
-        connectionState: sock?.state || 'disconnected'
+        retryCount,
+        isConnecting,
+        timestamp: Date.now()
     });
 });
 
 async function startWhatsAppConnection() {
+    if (isConnecting || connectionLock) {
+        logger.info('Connection attempt already in progress, skipping...');
+        return;
+    }
+
     try {
-        // Initialize handler
-        await handler.init();
-        logger.info('Command handler initialized');
+        isConnecting = true;
+        connectionLock = true;
 
-        // Initialize session manager
+        // Initialize session and handler
         await sessionManager.initialize();
-        logger.info('Session manager initialized');
+        await handler.init();
+        logger.info('Session and handler initialized');
 
-        // Get connection config from session manager
-        const config = sessionManager.getConnectionConfig();
-        logger.info('Retrieved connection configuration');
+        // Get credentials from session manager
+        const config = {
+            ...connectionConfig,
+            auth: {
+                creds: sessionManager.credentialsFile,
+                keys: sessionManager.authDir
+            }
+        };
 
-        // Create WhatsApp socket
+        // Create socket
         sock = makeWASocket(config);
 
         // Handle connection updates
@@ -191,107 +190,124 @@ async function startWhatsAppConnection() {
             const { connection, lastDisconnect, qr } = update;
             logger.info('Connection update:', update);
 
-            // Handle QR code updates
             if (qr) {
                 try {
                     latestQR = await qrcode.toDataURL(qr);
-                    logger.info('New QR code generated and ready for display');
+                    logger.info('New QR code generated');
                 } catch (err) {
-                    logger.error('Failed to generate QR code:', err);
+                    logger.error('QR generation error:', err);
                 }
             }
 
             if (connection === 'open') {
                 logger.info('Connection established successfully');
-                sessionManager.resetRetryCount();
-                latestQR = null; // Clear QR code once connected
-                try {
-                    const user = sock.user;
-                    logger.info('Connected as:', user.name || user.verifiedName || user.id.split(':')[0]);
-                } catch (e) {
-                    logger.error('Could not get user details:', e.message);
-                }
+                retryCount = 0;
+                isConnecting = false;
+                connectionLock = false;
+                latestQR = null;
+
+                // Setup message handler
+                sock.ev.on('messages.upsert', async (m) => {
+                    if (m.type === 'notify') {
+                        try {
+                            await handler.messageHandler(sock, m.messages[0]);
+                        } catch (err) {
+                            logger.error('Message handling error:', err);
+                        }
+                    }
+                });
             }
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 logger.info(`Connection closed with status code: ${statusCode}`);
 
-                const action = await sessionManager.handleConnectionError(
-                    lastDisconnect?.error,
-                    statusCode
-                );
+                if (statusCode === DisconnectReason.loggedOut ||
+                    statusCode === DisconnectReason.connectionClosed ||
+                    statusCode === DisconnectReason.connectionLost ||
+                    statusCode === DisconnectReason.connectionReplaced ||
+                    statusCode === DisconnectReason.timedOut) {
 
-                if (action === 'retry') {
-                    logger.info('Attempting immediate reconnection...');
-                    startWhatsAppConnection();
-                } else if (typeof action === 'number') {
-                    logger.info(`Scheduling reconnection in ${action/1000} seconds...`);
-                    setTimeout(startWhatsAppConnection, action);
-                } else {
-                    logger.error('Connection terminated, manual restart required');
-                    process.exit(1);
+                    if (retryCount >= MAX_RETRIES) {
+                        logger.error('Max retries reached, clearing session');
+                        await sessionManager.clearSession();
+                        retryCount = 0;
+                    } else {
+                        retryCount++;
+                        const delay = Math.min(5000 * Math.pow(2, retryCount - 1), 300000);
+                        logger.info(`Retrying in ${delay/1000} seconds (attempt ${retryCount}/${MAX_RETRIES})`);
+
+                        isConnecting = false;
+                        connectionLock = false;
+
+                        setTimeout(startWhatsAppConnection, delay);
+                    }
                 }
             }
         });
 
-        // Handle messages
-        sock.ev.on('messages.upsert', async (m) => {
-            if (m.type === 'notify') {
-                try {
-                    await handler.messageHandler(sock, m.messages[0]);
-                } catch (err) {
-                    logger.error('Message handling error:', err);
-                }
+        // Handle credentials update
+        sock.ev.on('creds.update', async (creds) => {
+            try {
+                await sessionManager.saveSession(sessionManager.sessionId, creds);
+            } catch (err) {
+                logger.error('Failed to save credentials:', err);
             }
         });
 
         return sock;
     } catch (err) {
-        logger.error('Fatal error in startWhatsAppConnection:', err);
-        process.exit(1);
+        logger.error('Fatal error in connection:', err);
+        isConnecting = false;
+        connectionLock = false;
+
+        if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            const delay = Math.min(5000 * Math.pow(2, retryCount - 1), 300000);
+            setTimeout(startWhatsAppConnection, delay);
+        } else {
+            await sessionManager.clearSession();
+            process.exit(1);
+        }
     }
 }
 
-// Start the server first to ensure port binding
+// Start server and connection
 server.listen(PORT, '0.0.0.0', async () => {
     logger.info(`Server running on port ${PORT}`);
-
     try {
-        // Start WhatsApp connection
         await startWhatsAppConnection();
     } catch (err) {
-        logger.error('Failed to start WhatsApp connection:', err);
+        logger.error('Failed to start:', err);
         process.exit(1);
     }
 });
 
-// Handle process termination
+// Handle graceful shutdown
 process.on('SIGTERM', async () => {
-    logger.info('Received SIGTERM signal');
+    logger.info('Received SIGTERM');
     try {
         if (sock) {
             await sock.logout();
             await sessionManager.clearSession();
         }
     } catch (err) {
-        logger.error('Error during shutdown:', err);
+        logger.error('Shutdown error:', err);
     }
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-    logger.info('Received SIGINT signal');
+    logger.info('Received SIGINT');
     try {
         if (sock) {
             await sock.logout();
             await sessionManager.clearSession();
         }
     } catch (err) {
-        logger.error('Error during shutdown:', err);
+        logger.error('Shutdown error:', err);
     }
     process.exit(0);
 });
 
-// Export for testing
-module.exports = { app, server, startWhatsAppConnection };
+module.exports = { app, server };
