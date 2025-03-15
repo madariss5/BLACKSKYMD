@@ -1,6 +1,6 @@
 /**
  * BLACKSKY-MD WhatsApp Bot - Main Entry Point
- * Enhanced connection handling and QR display
+ * Enhanced connection handling and QR display with integrated ConnectionMonitor
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
 const handler = require('./handlers/ultra-minimal-handler');
+const ConnectionMonitor = require('./utils/connectionMonitor');
 
 // Import credential backup system for more robust connection persistence
 try {

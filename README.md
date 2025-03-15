@@ -29,25 +29,55 @@ For detailed information about connection options, see [CONNECTION_README.md](CO
 
 ## Quick Start
 
-### Option 1: Use the Connection Helper
+### Option 1: One-Click Quick Connect (Easiest)
+
+```bash
+node quick-connect.js
+```
+
+This script automatically tries all connection methods sequentially until one works:
+- Starts with the standard connection method
+- Tries terminal QR if standard fails
+- Falls back to browser switching if needed
+- Provides clear recommendations if all methods fail
+
+### Option 2: Interactive Connection Tool (Recommended)
+
+```bash
+node connect-interactive.js
+```
+
+This user-friendly interactive tool provides:
+- Auto mode that tries different connection methods until one works
+- Easy access to all connection options
+- Connection diagnostics and troubleshooting
+- Credential management
+
+### Option 3: Simple Connection Helper
 
 ```bash
 node run-connection.js
 ```
 
-This interactive script will guide you through the different connection options.
+A simpler interactive script that lets you select different connection methods.
 
-### Option 2: Direct Connection
+### Option 4: Direct Connection Methods
 
 ```bash
 # Standard web connection (default)
 node src/index.js
 
-# Or for connection issues, use the web QR generator
+# For connection issues, use the web QR generator
 node src/qr-generator.js
 
-# Or for most reliable connection
+# For the most reliable connection
 node src/terminal-qr.js
+
+# To try different browser configurations automatically
+node try-alternate-browser.js
+
+# To check connection status and troubleshoot issues
+node check-connection.js
 ```
 
 ### After Connecting
