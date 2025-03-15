@@ -1,183 +1,268 @@
-# WhatsApp Connection Troubleshooting Guide
+# WhatsApp Bot Connection Fixes
 
-This guide provides specific solutions for common WhatsApp connection issues, especially when using the bot in cloud environments like Replit.
+This document provides specific solutions to common connection issues encountered with WhatsApp bots, especially in cloud environments like Replit.
 
-## Common Errors and Solutions
+## Common Error: Status Code 405 (Connection Failure)
 
-### Error: "Connection Failure (Status code: 405)"
+This is the most common error in cloud environments and indicates that WhatsApp is detecting and blocking the connection attempt.
 
-This is the most common error when connecting from cloud environments. WhatsApp is blocking the connection attempt.
+### Fix 1: Use Safari Browser Fingerprint
 
-**Solutions:**
+The Safari browser fingerprint is less likely to be blocked by WhatsApp:
 
-1. **Try the Terminal-Only QR Code Method**
-   ```bash
-   node src/terminal-qr.js
-   ```
-   
-2. **Clear Authentication State and Try Again**
-   ```bash
-   # Use the interactive tool
-   node connect-interactive.js
-   # Select "Clear Credentials" option
-   
-   # Or manually delete auth folders
-   rm -rf auth_info_baileys
-   rm -rf auth_info_baileys_qr
-   rm -rf auth_info_simple
-   ```
-   
-3. **Use the Alternate Browser Connection Tool**
-   ```bash
-   node try-alternate-browser.js
-   ```
-   This tool lets you switch browser configurations to bypass restrictions.
+```javascript
+// Configure socket with Safari browser fingerprint
+const sock = makeWASocket({
+  auth: state,
+  browser: ['BLACKSKY-SAFARI', 'Safari', '17.0'],
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+});
+```
 
-4. **Try After Hours or on Weekends**
-   WhatsApp's server-side security measures may be less strict during off-peak hours.
+### Fix 2: Implement Browser Fingerprint Rotation
 
-### Error: "getaddrinfo ENOTFOUND web.whatsapp.com"
+When a connection fails, try using a different browser fingerprint on the next attempt:
 
-This indicates DNS resolution issues.
+```javascript
+const browserOptions = [
+  ['Chrome', '120.0.0.0'],
+  ['Firefox', '115.0'],
+  ['Edge', '120.0.0.0'],
+  ['Safari', '17.0'],
+  ['Opera', '105.0.0.0']
+];
 
-**Solutions:**
+const browser = browserOptions[retryCount % browserOptions.length];
+console.log(`Using ${browser[0]} browser fingerprint`);
 
-1. **Check Your Network Connection**
-   Make sure your internet connection is working properly.
-   
-2. **Run Connection Diagnostics**
-   ```bash
-   node check-connection.js
-   ```
-   
-3. **Modify Your DNS Settings (if possible)**
-   Use Google DNS (8.8.8.8) or Cloudflare DNS (1.1.1.1).
+const sock = makeWASocket({
+  auth: state,
+  browser: ['BLACKSKY-' + Date.now(), browser[0], browser[1]]
+});
+```
 
-### Error: "WebSocket connection failed"
+### Fix 3: Generate Unique Device ID for Each Connection
 
-This usually indicates network restrictions or firewall issues.
+Ensure each connection attempt uses a unique device identifier:
 
-**Solutions:**
+```javascript
+function generateDeviceId() {
+  const randomString = Math.random().toString(36).substring(2, 7);
+  const timestamp = Date.now().toString();
+  return `DEVICE-${timestamp}-${randomString}`;
+}
 
-1. **Try the Specialized QR Generator**
-   ```bash
-   node src/qr-generator.js
-   ```
-   
-2. **Enable Keep-Alive in Connection Parameters**
-   Edit `src/qr-generator.js` and modify the connection options:
-   ```javascript
-   const connectOptions = {
-       keepAliveIntervalMs: 10000,
-       retryRequestDelayMs: 3000
-   };
-   ```
+const sock = makeWASocket({
+  auth: state,
+  browser: [generateDeviceId(), 'Safari', '17.0']
+});
+```
 
-### Error: "timeout after 60000 ms"
+### Fix 4: Optimize Connection Parameters
 
-The connection process is taking too long and timing out.
+Tune the connection parameters for better reliability:
 
-**Solutions:**
+```javascript
+const sock = makeWASocket({
+  auth: state,
+  browser: ['BLACKSKY-MD', 'Safari', '17.0'],
+  printQRInTerminal: true,
+  connectTimeoutMs: 60000,
+  markOnlineOnConnect: false,
+  syncFullHistory: false,
+  keepAliveIntervalMs: 10000,
+  emitOwnEvents: false
+});
+```
 
-1. **Increase Timeout Duration**
-   Edit the connection parameters in the relevant file (e.g., `src/index.js`):
-   ```javascript
-   const connectOptions = {
-       connectTimeoutMs: 120000  // Increase to 2 minutes
-   };
-   ```
-   
-2. **Check Your Internet Speed**
-   Slow connections may need increased timeouts.
+### Fix 5: Try Local Connection
 
-### Error: "User rejected the conversation"
+If cloud connections repeatedly fail, connect locally and transfer the authentication:
 
-WhatsApp servers are actively rejecting the connection request.
+1. Download `local-connect.js` to your computer
+2. Run it: `node local-connect.js`
+3. After successful authentication, upload the `auth_info_baileys` folder to your Replit project
 
-**Solutions:**
+## Handling Authentication Issues
 
-1. **Use the Quick Connect Script**
-   ```bash
-   node quick-connect.js
-   ```
-   This script tries multiple connection methods automatically.
-   
-2. **Wait 24 Hours Before Trying Again**
-   WhatsApp may temporarily restrict connections from certain IP addresses.
-   
-3. **Try Connecting from a Different Network**
-   If possible, restart your Replit project to get a new IP address.
+### Fix 1: Ensure Authentication Directory Exists
 
-## Preventing Connection Issues
+```javascript
+const AUTH_FOLDER = './auth_info_baileys';
 
-Follow these best practices to minimize connection problems:
+// Make sure auth folder exists
+if (!fs.existsSync(AUTH_FOLDER)) {
+  fs.mkdirSync(AUTH_FOLDER, { recursive: true });
+}
+```
 
-1. **Use Session Persistence**
-   Once connected, the bot will save credentials for future use.
-   
-2. **Use the Interactive Connection Helper**
-   ```bash
-   node connect-interactive.js
-   ```
-   
-3. **Maintain a Single Active Session**
-   Don't connect the same WhatsApp account from multiple locations simultaneously.
+### Fix 2: Clear Authentication Data on Persistent Failures
 
-4. **Implement Gradual Reconnection**
-   When the bot disconnects, it should attempt reconnection with increasing delay intervals.
+```javascript
+// Clear auth data to start fresh
+function clearAuthData() {
+  if (fs.existsSync('./auth_info_baileys')) {
+    fs.rmSync('./auth_info_baileys', { recursive: true, force: true });
+    fs.mkdirSync('./auth_info_baileys', { recursive: true });
+    console.log('Auth data cleared');
+  }
+}
+```
 
-## Advanced Troubleshooting
+### Fix 3: Implement Multiple Auth Directories
 
-### Connection Not Working Even After Multiple Attempts
+Use multiple authentication directories with fallback:
 
-If you've tried all the above solutions and still cannot connect:
+```javascript
+// Try to use alternate auth locations
+const AUTH_DIRS = [
+  './auth_info_baileys',
+  './auth_info_terminal',
+  './auth_info_safari'
+];
 
-1. **Check Browser Compatibility**
-   Edit `try-alternate-browser.js` to try different browser fingerprints.
-   
-2. **Verify WhatsApp Server Status**
-   Check if WhatsApp is experiencing outages.
-   
-3. **Try the Ultra-Minimal Connection Script**
-   ```bash
-   node src/terminal-qr.js
-   ```
-   
-4. **Check the Latest WhatsApp Web Changes**
-   WhatsApp occasionally updates their web interface, which can affect the bot.
+// Find first available auth directory or create default
+function findAuthDir() {
+  for (const dir of AUTH_DIRS) {
+    if (fs.existsSync(dir) && fs.readdirSync(dir).length > 0) {
+      return dir;
+    }
+  }
+  // Fall back to default
+  if (!fs.existsSync(AUTH_DIRS[0])) {
+    fs.mkdirSync(AUTH_DIRS[0], { recursive: true });
+  }
+  return AUTH_DIRS[0];
+}
+```
 
-### Persistent Authentication Problems
+## Reconnection Strategies
 
-If the bot cannot maintain a session or keeps asking for QR code scanning:
+### Fix 1: Implement Exponential Backoff
 
-1. **Ensure Auth Directory Permissions**
-   Make sure the `auth_info_baileys` directory is writable.
-   
-2. **Implement Session Backup**
-   The bot includes session backup functionality to prevent loss of authentication.
-   
-3. **Check WhatsApp Account Status**
-   Make sure your WhatsApp account is active and not banned or restricted.
+```javascript
+// Calculate delay with exponential backoff
+function getRetryDelay(retryCount) {
+  return Math.min(Math.pow(2, retryCount) * 1000, 60000); // Max 1 minute
+}
 
-## Getting Help
+// Use in reconnection logic
+if (connection === 'close') {
+  const delay = getRetryDelay(retryCount);
+  console.log(`Reconnecting in ${delay/1000}s (Attempt ${retryCount + 1})`);
+  
+  setTimeout(() => {
+    connectToWhatsApp(retryCount + 1);
+  }, delay);
+}
+```
 
-If you continue to experience connection issues:
+### Fix 2: Limit Total Retry Attempts
 
-1. **Run Diagnostics and Check Logs**
-   ```bash
-   node check-connection.js
-   ```
-   
-2. **Try the Auto-Connection Feature**
-   ```bash
-   node quick-connect.js
-   ```
-   
-3. **Contact Project Maintainers**
-   Provide detailed information about the error and the steps you've already taken.
+```javascript
+const MAX_RETRIES = 5;
 
-## Additional Resources
+// In connection handler
+if (connection === 'close' && retryCount < MAX_RETRIES) {
+  // Retry logic here
+} else if (retryCount >= MAX_RETRIES) {
+  console.log('Max retries reached, please try an alternative connection method');
+}
+```
 
-- [Baileys Documentation](https://github.com/WhiskeySockets/Baileys)
-- [WhatsApp Web API Changes Log](https://github.com/WhiskeySockets/Baileys/blob/master/CHANGELOG.md)
-- [WhatsApp's Official Business API](https://developers.facebook.com/docs/whatsapp/)
+### Fix 3: Handle Different Disconnection Reasons Differently
+
+```javascript
+if (connection === 'close') {
+  const statusCode = lastDisconnect?.error?.output?.statusCode;
+  
+  if (statusCode === DisconnectReason.loggedOut) {
+    // Clear auth and restart from scratch
+    await clearAuthData();
+    connectToWhatsApp(0);
+  } else if (statusCode === 405) {
+    // 405 is common for cloud environments
+    // Try with different browser fingerprint
+    connectToWhatsApp(retryCount + 1);
+  } else if (statusCode === DisconnectReason.connectionClosed) {
+    // Connection was just closed, simple reconnect
+    connectToWhatsApp(retryCount);
+  } else {
+    // Default reconnection behavior
+    connectToWhatsApp(retryCount + 1);
+  }
+}
+```
+
+## Message Sending Issues
+
+### Fix 1: Implement Safe Message Sending
+
+Always wrap message sending in try-catch blocks:
+
+```javascript
+async function safeSendMessage(sock, jid, content) {
+  try {
+    return await sock.sendMessage(jid, content);
+  } catch (error) {
+    console.error(`Error sending message to ${jid}:`, error);
+    return null;
+  }
+}
+```
+
+### Fix 2: Validate JIDs Before Sending
+
+```javascript
+function isValidJid(jid) {
+  if (!jid) return false;
+  return typeof jid === 'string' && (jid.includes('@s.whatsapp.net') || jid.includes('@g.us'));
+}
+
+async function sendMessageIfValid(sock, jid, content) {
+  if (!isValidJid(jid)) {
+    console.error('Invalid JID:', jid);
+    return null;
+  }
+  return await sock.sendMessage(jid, content);
+}
+```
+
+## Preventing Common Errors
+
+### Fix 1: Handle "jid.endsWith is not a function" Error
+
+```javascript
+// Ensure JID is a string before using string methods
+function ensureJidString(jid) {
+  if (!jid) return '';
+  return String(jid);
+}
+
+// Use in your code
+if (ensureJidString(jid).endsWith('@g.us')) {
+  // This is a group
+}
+```
+
+### Fix 2: Safe Access to Message Properties
+
+```javascript
+// Safely extract message text
+const messageText = message.message?.conversation || 
+                   message.message?.extendedTextMessage?.text || 
+                   message.message?.imageMessage?.caption || 
+                   '';
+```
+
+## Further Troubleshooting
+
+If you continue to experience connection issues after trying these fixes:
+
+1. Check that your environment has outbound network access to WhatsApp servers
+2. Verify your Internet connection and DNS resolution
+3. Make sure your Replit project has required permissions
+4. Check if you have any VPN or proxy that might be blocked by WhatsApp
+5. Try using a different device to scan the QR code
+
+For additional help, refer to the Baileys library documentation or WhatsApp's official developer resources.

@@ -17,11 +17,23 @@ args = "WhatsApp Bot"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "QR Code Server"
+args = "Terminal QR"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Terminal QR"
+args = "Web QR"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Safari Connect"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Connected Bot"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "QR Code Server"
 
 [[workflows.workflow]]
 name = "Run Bot"
@@ -48,21 +60,6 @@ args = "node src/index.js"
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "QR Code Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node src/qr-generator.js"
-waitForPort = 5001
-
-[[workflows.workflow]]
 name = "Terminal QR"
 author = "agent"
 
@@ -75,6 +72,65 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node use-terminal-qr.js"
+
+[[workflows.workflow]]
+name = "Web QR"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node src/web-qr.js"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Safari Connect"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node safari-connect.js"
+
+[[workflows.workflow]]
+name = "Connected Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node connected-bot.js"
+waitForPort = 5004
+
+[[workflows.workflow]]
+name = "QR Code Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node src/qr-generator.js"
+waitForPort = 5003
 
 [deployment]
 run = ["sh", "-c", "node src/index.js"]

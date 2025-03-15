@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "2025-03-15T15:18:49.043Z",
+  "lastUpdated": "2025-03-15T15:59:15.846Z",
   "status": "reconnecting",
-  "healthScore": 70,
+  "healthScore": 55,
   "reconnectAttempts": 1,
   "diagnosticResults": {
-    "timestamp": "2025-03-15T15:18:49.042Z",
+    "timestamp": "2025-03-15T15:59:15.846Z",
     "webWhatsappReachable": false,
     "authFilesExist": false,
     "dnsResolution": false,
@@ -26,40 +26,52 @@
   },
   "logs": [
     {
-      "timestamp": "2025-03-15T15:18:20.525Z",
+      "timestamp": "2025-03-15T15:58:24.060Z",
       "message": "Connection monitoring started",
       "status": "connecting",
       "healthScore": 100
     },
     {
-      "timestamp": "2025-03-15T15:18:22.727Z",
+      "timestamp": "2025-03-15T15:58:27.348Z",
       "message": "Connection closed: Connection Failure (Status code: 405)",
       "status": "disconnected",
       "healthScore": 80
     },
     {
-      "timestamp": "2025-03-15T15:18:22.727Z",
+      "timestamp": "2025-03-15T15:58:27.349Z",
       "message": "Reconnecting in 5000ms (attempt 1/10)",
       "status": "reconnecting",
       "healthScore": 80
     },
     {
-      "timestamp": "2025-03-15T15:18:27.728Z",
+      "timestamp": "2025-03-15T15:58:32.350Z",
       "message": "Would restart connection now (simulation)",
       "status": "reconnecting",
       "healthScore": 80
     },
     {
-      "timestamp": "2025-03-15T15:18:49.043Z",
+      "timestamp": "2025-03-15T15:58:51.008Z",
       "message": "Diagnostic warning: Network connectivity issues detected",
       "status": "reconnecting",
       "healthScore": 80
     },
     {
-      "timestamp": "2025-03-15T15:18:49.043Z",
+      "timestamp": "2025-03-15T15:58:51.008Z",
       "message": "Diagnostic warning: Authentication files missing or incomplete",
       "status": "reconnecting",
       "healthScore": 70
+    },
+    {
+      "timestamp": "2025-03-15T15:59:15.846Z",
+      "message": "Diagnostic warning: Network connectivity issues detected",
+      "status": "reconnecting",
+      "healthScore": 65
+    },
+    {
+      "timestamp": "2025-03-15T15:59:15.846Z",
+      "message": "Diagnostic warning: Authentication files missing or incomplete",
+      "status": "reconnecting",
+      "healthScore": 55
     }
   ]
 }

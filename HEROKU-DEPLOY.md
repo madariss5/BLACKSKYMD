@@ -37,6 +37,17 @@ Heroku has an ephemeral filesystem, meaning files written during runtime are not
 - Implementing automatic credential backup and restore
 - Utilizing Heroku's PostgreSQL add-on for persistent storage
 
+#### Automatic Credentials Backup System
+
+The bot implements a robust credential backup system specifically designed for Heroku deployment:
+
+1. Upon successful WhatsApp connection, the bot automatically sends the `creds.json` file to your WhatsApp account
+2. Session files are also compressed and sent as a backup
+3. When the Heroku dyno restarts, you can simply forward these files back to the bot
+4. Multiple authentication directories are scanned to ensure the most up-to-date credentials are used
+
+This system ensures that even with Heroku's ephemeral filesystem, your bot can maintain persistent authentication across restarts.
+
 ## Setting Up Heroku
 
 ### 1. Create a new Heroku application

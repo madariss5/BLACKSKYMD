@@ -15,7 +15,7 @@ const fs = require('fs');
 
 // Create Express app
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5002; // Changed to 5002 to avoid conflicts with other workflows
 
 // Track connection state
 let connectionInstance = null;

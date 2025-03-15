@@ -14,7 +14,7 @@ const server = http.createServer(app);
 const qrcodeWeb = require('qrcode');
 
 // Constants - use a separate auth directory from the main app
-const PORT = 5001;  // Use different port to avoid conflict with main app
+const PORT = 5003;  // Changed to 5003 to avoid conflict with other workflows
 const AUTH_DIR = './auth_info_baileys_qr';
 
 // Create auth directory if it doesn't exist
