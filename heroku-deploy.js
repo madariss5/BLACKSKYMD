@@ -3,7 +3,7 @@
  * This version is optimized for Heroku environments where filesystem changes aren't persistent
  */
 
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, isJidBroadcast } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
@@ -21,10 +21,11 @@ let qrCodeDataURL = null;
 let connectionStatus = 'disconnected';
 let startTime = Date.now();
 
-// Add reconnection control
+// Enhanced reconnection control
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_INTERVAL = 5000;
+const MAX_RECONNECT_ATTEMPTS = 10; // Increased from 5
+const BASE_RECONNECT_INTERVAL = 5000;
+const MAX_RECONNECT_INTERVAL = 300000; // 5 minutes
 
 /**
  * Initialize WhatsApp connection with improved error handling
@@ -39,12 +40,20 @@ async function connectToWhatsApp() {
         // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
-        // Create WhatsApp socket with optimized settings for Heroku
+        // Create WhatsApp socket with optimized settings
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
             browser: ['BLACKSKY-MD', 'Chrome', '1.0.0'],
-            logger: pino({ level: 'error' }),
+            logger: pino({ 
+                level: 'warn',
+                transport: {
+                    target: 'pino-pretty',
+                    options: {
+                        colorize: true
+                    }
+                }
+            }),
             markOnlineOnConnect: false,
             connectTimeoutMs: 60000,
             qrTimeout: 40000,
@@ -52,18 +61,23 @@ async function connectToWhatsApp() {
             keepAliveIntervalMs: 15000,
             emitOwnEvents: true,
             syncFullHistory: false,
-            version: [2, 2323, 4]
+            retryRequestDelayMs: 2000,
+            version: [2, 2323, 4],
+            // Added browser configurations to help prevent 405 errors
+            browserDescription: ["BLACKSKY-MD", "Chrome", "1.0.0"],
+            connectCooldownMs: 4000,
+            linkPreviewImageThumbnailWidth: 192
         });
 
         // Handle connection events
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            console.log('Connection update:', update);
+            console.log('Connection update:', JSON.stringify(update, null, 2));
 
             if (qr) {
                 qrCodeDataURL = await qrcode.toDataURL(qr);
                 console.log('New QR code generated');
-                reconnectAttempts = 0;
+                reconnectAttempts = 0; // Reset attempts on new QR
             }
 
             if (connection) {
@@ -76,6 +90,7 @@ async function connectToWhatsApp() {
                 reconnectAttempts = 0;
                 try {
                     await saveCreds();
+                    console.log('Credentials saved successfully');
                 } catch (err) {
                     console.error('Error saving credentials:', err);
                 }
@@ -85,50 +100,63 @@ async function connectToWhatsApp() {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 console.log(`Connection closed with status code: ${statusCode}`);
 
+                // Handle specific error codes
+                if (statusCode === 405) {
+                    console.log('Authentication failure (405) - clearing auth and retrying');
+                    try {
+                        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+                        reconnectAttempts = 0; // Reset attempts for fresh auth
+                    } catch (err) {
+                        console.error('Error clearing auth directory:', err);
+                    }
+                }
+
                 if (statusCode === DisconnectReason.loggedOut || 
                     statusCode === DisconnectReason.connectionClosed ||
-                    statusCode === DisconnectReason.connectionLost) {
-                    console.log('Connection closed - attempting recovery');
+                    statusCode === DisconnectReason.connectionLost ||
+                    statusCode === 405) {
 
                     if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                         reconnectAttempts++;
-                        const delay = Math.min(RECONNECT_INTERVAL * Math.pow(2, reconnectAttempts - 1), 300000);
-                        console.log(`Attempting to reconnect in ${delay/1000} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                        // Exponential backoff with jitter
+                        const delay = Math.min(
+                            BASE_RECONNECT_INTERVAL * Math.pow(1.5, reconnectAttempts - 1) * (1 + Math.random() * 0.1),
+                            MAX_RECONNECT_INTERVAL
+                        );
+                        console.log(`Attempting to reconnect in ${Math.floor(delay/1000)} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
                         setTimeout(connectToWhatsApp, delay);
                     } else {
-                        console.log('Maximum reconnection attempts reached - clearing auth');
-                        try {
-                            fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-                        } catch (err) {
-                            console.error('Error clearing auth directory:', err);
-                        }
-                        process.exit(1); // Let Heroku restart the process
+                        console.log('Maximum reconnection attempts reached - restarting process');
+                        process.exit(1); // Let the process manager restart
                     }
-                } else if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    reconnectAttempts++;
-                    const delay = Math.min(RECONNECT_INTERVAL * Math.pow(2, reconnectAttempts - 1), 300000);
-                    console.log(`Attempting to reconnect in ${delay/1000} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-                    setTimeout(connectToWhatsApp, delay);
-                } else {
-                    console.log('Maximum reconnection attempts reached');
-                    process.exit(1); // Let Heroku restart the process
                 }
             }
         });
 
-        // Handle credential updates
-        sock.ev.on('creds.update', saveCreds);
+        // Enhanced error handling for creds updates
+        sock.ev.on('creds.update', async () => {
+            try {
+                await saveCreds();
+                console.log('Credentials updated successfully');
+            } catch (err) {
+                console.error('Failed to save credentials:', err);
+            }
+        });
 
         return sock;
     } catch (error) {
         console.error('Connection error:', error);
         if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttempts++;
-            const delay = Math.min(RECONNECT_INTERVAL * Math.pow(2, reconnectAttempts - 1), 300000);
-            console.log(`Retrying connection in ${delay/1000} seconds...`);
+            const delay = Math.min(
+                BASE_RECONNECT_INTERVAL * Math.pow(1.5, reconnectAttempts - 1),
+                MAX_RECONNECT_INTERVAL
+            );
+            console.log(`Retrying connection in ${Math.floor(delay/1000)} seconds...`);
             setTimeout(connectToWhatsApp, delay);
         } else {
-            process.exit(1); // Let Heroku restart the process
+            console.log('Maximum reconnection attempts reached - restarting process');
+            process.exit(1);
         }
     }
 }
