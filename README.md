@@ -1,72 +1,87 @@
 # BLACKSKY-MD WhatsApp Bot
 
-A sophisticated WhatsApp multi-device bot delivering intelligent, interactive, and educational messaging experiences with advanced personalization and user engagement capabilities.
+A robust WhatsApp multi-device bot engineered to tackle complex network connectivity challenges with intelligent communication resilience.
 
-## Features
+## Key Features
 
-- 🌐 **Multi-language Support** - English and German language support built-in
-- 🔄 **Stable Connection** - Improved session management and reconnection handling
-- 🖥️ **Web QR Display** - Easy to scan QR code interface accessible via web browser
-- 💾 **Auto-Backup** - Credential backups sent directly to the bot's chat
-- 🛡️ **Improved Auth Management** - Auth data only clears on actual logout
-- 🌈 **Flash-MD Style Menu** - Modern, responsive menu system with multi-column display
-- 📝 **350+ Commands** - Comprehensive command system organized by categories
-- 📊 **Educational Features** - Learning tools, quizzes, and educational content
-- 🎮 **Games & Fun** - Interactive games and entertainment commands
-- 🖼️ **Media Processing** - Stickers, image editing, and media conversion tools
+- Multi-device WhatsApp bot using @whiskeysockets/baileys
+- Advanced connection handling for cloud environments like Replit
+- Intelligent error recovery and credential management
+- Multiple connection methods for different usage scenarios
 
-## Setup Instructions
+## Connection System
 
-1. **Clone this repository**
-   ```bash
-   git clone https://github.com/yourusername/blacksky-md.git
-   cd blacksky-md
-   ```
+This bot includes an enhanced connection system specifically designed to work around the "Connection Failure" issues common when running WhatsApp bots in cloud environments. We provide multiple connection methods:
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+1. **Standard Web Connection**
+   - Default connection option with web QR interface
+   - Automatically attempts to reconnect with optimized parameters
 
-3. **Configure environment variables**
-   - Copy `.env.example` to `.env`
-   - Edit the `.env` file with your settings
+2. **Specialized QR Generator**
+   - Alternative connection method for difficult environments
+   - Uses a streamlined approach with fewer dependencies
 
-4. **Start the bot**
-   ```bash
-   node connected-bot.js
-   ```
+3. **Terminal-only QR**
+   - Most reliable connection method
+   - No web interface required, works directly in the terminal
 
-5. **Access the QR code**
-   - Open your browser to `http://localhost:5000`
-   - Scan the QR code with your WhatsApp
+For detailed information about connection options, see [CONNECTION_README.md](CONNECTION_README.md).
 
-## Command Categories
+## Quick Start
 
-- **Basic** - Essential commands like `.help`, `.info`, `.ping`
-- **Group** - Group management: `.kick`, `.add`, `.promote`
-- **Media** - Media processing: `.sticker`, `.toimg`, `.ytmp3`
-- **Educational** - Learning tools: `.translate`, `.wiki`, `.math`
-- **Fun** - Entertainment: `.quiz`, `.truth`, `.dare`
-- **User** - User profile: `.register`, `.profile`, `.level`
-- **Utility** - Tools: `.weather`, `.calculate`, `.currency`
-- **Menu** - Menu navigation: `.menu`, `.list`
+### Option 1: Use the Connection Helper
 
-## Development
+```bash
+node run-connection.js
+```
 
-To contribute to the project:
+This interactive script will guide you through the different connection options.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### Option 2: Direct Connection
 
-## License
+```bash
+# Standard web connection (default)
+node src/index.js
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+# Or for connection issues, use the web QR generator
+node src/qr-generator.js
 
-## Acknowledgements
+# Or for most reliable connection
+node src/terminal-qr.js
+```
 
-- [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) for the WhatsApp Web API
-- All contributors who have helped make this project better
+### After Connecting
+
+1. Scan the QR code with your WhatsApp app:
+   - Go to WhatsApp Settings → Linked Devices
+   - Tap on "Link a Device"
+   - Scan the QR code shown in the web interface or terminal
+
+2. Once connected, the bot will automatically save credentials for future use
+   - You should only need to scan the QR code once
+   - Subsequent restarts will use the saved credentials
+
+## Troubleshooting
+
+If you're experiencing connection issues:
+
+1. Try the different connection methods mentioned above
+2. Check [CONNECTION_README.md](CONNECTION_README.md) for detailed troubleshooting steps
+3. Clear the authentication data (delete the `auth_info_baileys` folder)
+
+## Important Notes
+
+- WhatsApp may occasionally reject connections from cloud providers
+- The connection system will automatically try different approaches
+- If all methods fail, WhatsApp servers may be temporarily blocking the IP address
+
+## Command Usage
+
+Once connected, the bot will automatically load and process commands.
+
+For more information about available commands and features, see the source code in the `src/commands` directory.
+
+## Credits
+
+- @whiskeysockets/baileys library for WhatsApp Web API
+- Contributors to this project for connection resilience enhancements

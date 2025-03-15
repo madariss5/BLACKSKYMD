@@ -195,7 +195,34 @@ async function startWhatsAppConnection() {
                     
                     setTimeout(startWhatsAppConnection, delay);
                 } else {
-                    logger.info('Not reconnecting - clearing auth state and generating fresh QR');
+                    logger.info('Not reconnecting through standard method - preparing fallback options');
+                    
+                    // Check if repeated Connection Failure errors, use special fallback
+                    if (isConnectionFailure && retryCount >= MAX_RETRIES - 1) {
+                        logger.info('⚠️ Persistent Connection Failure detected');
+                        logger.info('Starting specialized QR generator to bypass connection restrictions...');
+                        
+                        try {
+                            const { spawn } = require('child_process');
+                            const path = require('path');
+                            
+                            // Launch the specialized QR generator in a separate process
+                            const qrProcess = spawn('node', [path.join(__dirname, 'qr-generator.js')], {
+                                detached: true,
+                                stdio: 'inherit'
+                            });
+                            
+                            logger.info(`Specialized QR generator launched (PID: ${qrProcess.pid})`);
+                            logger.info('Please visit http://localhost:5001 to scan the QR code');
+                            logger.info('After successful connection, restart this app to use the new credentials');
+                            
+                            // Don't attempt further connections from this process
+                            return;
+                        } catch (e) {
+                            logger.error('Failed to start specialized QR generator:', e);
+                        }
+                    }
+                    
                     await clearAuthState();
                     retryCount = 0;
                     setTimeout(startWhatsAppConnection, 5000);
