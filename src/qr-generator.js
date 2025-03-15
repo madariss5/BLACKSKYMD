@@ -124,8 +124,20 @@ app.get('/', (req, res) => {
 // Start web server
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`[Server] QR web server running at http://localhost:${PORT}`);
-    startConnection();
+    // Clear session for fresh start
+    clearSession();
+    // Add a slight delay before connecting
+    setTimeout(startConnection, 1000);
 });
+
+// Define browser rotation options globally
+const browserOptions = [
+    ['Firefox', '115.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0'],
+    ['Chrome', '120.0.0.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'],
+    ['Edge', '120.0.0.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'],
+    ['Safari', '17.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'],
+    ['Opera', '105.0.0.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 OPR/105.0.0.0']
+];
 
 // Connect to WhatsApp
 async function connectToWhatsApp() {
@@ -140,18 +152,31 @@ async function connectToWhatsApp() {
 
         // Get auth state - don't clear existing auth unless necessary
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+        
+        // Select a browser option based on retry count
+        const browserOption = browserOptions[retryCount % browserOptions.length];
+        console.log(`[Connection] Using ${browserOption[0]} browser fingerprint (attempt ${retryCount + 1})`);
+        
+        // Generate a unique device ID for this attempt
+        const deviceId = `BLACKSKY-MD-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-        // Connect to WhatsApp with minimal settings for reliable QR code generation
+        // Connect to WhatsApp with enhanced settings for restricted environments
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            browser: ['BLACKSKY-MD', 'Chrome', '110.0.0'],
+            browser: [deviceId, browserOption[0], browserOption[1]],
             version: [2, 2323, 4],
             defaultQueryTimeoutMs: 60000,
             connectTimeoutMs: 60000,
             keepAliveIntervalMs: 10000,
             retryRequestDelayMs: 2000,
-            emitOwnEvents: false
+            emitOwnEvents: false,
+            customUploadHosts: [], // Use default hosts for more compatibility
+            transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
+            markOnlineOnConnect: false,
+            qrTimeout: 60000,
+            syncFullHistory: false,
+            userAgent: browserOption[2] // Use user agent matching the browser fingerprint
         });
 
         // Handle connection updates
@@ -213,9 +238,49 @@ async function connectToWhatsApp() {
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                console.log(`\n[Connection] Connection closed due to ${lastDisconnect?.error?.output?.payload?.message || 'unknown reason'}`);
+                const errorMessage = lastDisconnect?.error?.message || 'Unknown error';
+                console.log(`\n[Connection] Connection closed due to ${errorMessage} (Status code: ${statusCode})`);
 
-                if (statusCode === DisconnectReason.loggedOut || 
+                // Special handling for common cloud environment errors
+                const isConnectionFailure = errorMessage.includes('Connection Failure');
+                
+                // In Replit, we often see 405 status codes which require special handling
+                if (statusCode === 405 || isConnectionFailure) {
+                    console.log('[Connection] Cloud environment restriction detected (405 error)');
+                    
+                    // For 405 errors, use a completely different browser fingerprint on each retry
+                    // This has been shown to work around Replit restrictions in some cases
+                    if (retryCount < 5) {
+                        retryCount++;
+                        
+                        // Using global browserOptions array defined above
+                        
+                        // Get a browser option based on retry count
+                        const browserOption = browserOptions[retryCount % browserOptions.length];
+                        console.log(`[Connection] Trying with ${browserOption[0]} browser fingerprint (attempt ${retryCount})`);
+                        
+                        // Use a shorter retry delay for 405 errors
+                        const retryDelay = 5000;
+                        console.log(`[Connection] Retrying in ${retryDelay/1000} seconds`);
+                        
+                        // Clear session before retry with a new browser fingerprint
+                        clearSession();
+                        
+                        clearReconnectTimer();
+                        reconnectTimer = setTimeout(() => {
+                            isConnecting = false;
+                            connectionLock = false;
+                            startConnection();
+                        }, retryDelay);
+                    } else {
+                        console.log('[Connection] Max 405-specific retries reached');
+                        clearSession();
+                        // Exit with a specific code for 405 errors
+                        process.exit(3);
+                    }
+                }
+                // Standard handling for regular disconnects
+                else if (statusCode === DisconnectReason.loggedOut || 
                     statusCode === DisconnectReason.connectionClosed ||
                     statusCode === DisconnectReason.connectionLost ||
                     statusCode === DisconnectReason.connectionReplaced ||

@@ -9,9 +9,18 @@ const fs = require('fs');
 const path = require('path');
 
 // Constants - sharing auth directory with main app for seamless transition
-const AUTH_DIR = './auth_info_baileys';
+const AUTH_DIR = './auth_info_terminal';
 let isConnecting = false;
 let retryCount = 0;
+
+// Define browser rotation options globally
+const browserOptions = [
+    ['Firefox', '115.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0'],
+    ['Chrome', '120.0.0.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'],
+    ['Edge', '120.0.0.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'],
+    ['Safari', '17.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'],
+    ['Opera', '105.0.0.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 OPR/105.0.0.0']
+];
 
 // Ensure auth directory exists
 if (!fs.existsSync(AUTH_DIR)) {
@@ -36,16 +45,29 @@ async function connectToWhatsApp() {
         console.log('\n▶️ Starting WhatsApp Terminal QR connection...\n');
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
         
+        // Select a browser option based on retry count
+        const browserOption = browserOptions[retryCount % browserOptions.length];
+        console.log(`🌐 Using ${browserOption[0]} browser fingerprint (attempt ${retryCount + 1})`);
+        
+        // Generate a unique device ID for this attempt
+        const deviceId = `BLACKSKY-TERMINAL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
         // Create connection with optimized settings
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,  // This is the key setting for terminal QR
-            browser: [`BLACKSKY-TERMINAL-${Date.now()}`, 'Chrome', '108.0.0'],
+            browser: [deviceId, browserOption[0], browserOption[1]],
             version: [2, 2323, 4],
             defaultQueryTimeoutMs: 60000,
             connectTimeoutMs: 60000,
             keepAliveIntervalMs: 10000,
-            emitOwnEvents: false
+            retryRequestDelayMs: 2000,
+            emitOwnEvents: false,
+            customUploadHosts: [], // Use default hosts for more compatibility
+            transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
+            markOnlineOnConnect: false, // Avoid extra connections
+            syncFullHistory: false, // Skip history sync for faster connection
+            userAgent: browserOption[2] // Use user agent matching the browser fingerprint
         });
         
         // Handle connection updates

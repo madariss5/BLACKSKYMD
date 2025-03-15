@@ -1,24 +1,24 @@
 {
-  "lastUpdated": "2025-03-15T15:15:09.601Z",
+  "lastUpdated": "2025-03-15T15:18:22.728Z",
   "status": "reconnecting",
   "healthScore": 80,
   "reconnectAttempts": 1,
   "diagnosticResults": {},
   "logs": [
     {
-      "timestamp": "2025-03-15T15:15:06.706Z",
+      "timestamp": "2025-03-15T15:18:20.525Z",
       "message": "Connection monitoring started",
       "status": "connecting",
       "healthScore": 100
     },
     {
-      "timestamp": "2025-03-15T15:15:09.601Z",
+      "timestamp": "2025-03-15T15:18:22.727Z",
       "message": "Connection closed: Connection Failure (Status code: 405)",
       "status": "disconnected",
       "healthScore": 80
     },
     {
-      "timestamp": "2025-03-15T15:15:09.601Z",
+      "timestamp": "2025-03-15T15:18:22.727Z",
       "message": "Reconnecting in 5000ms (attempt 1/10)",
       "status": "reconnecting",
       "healthScore": 80
