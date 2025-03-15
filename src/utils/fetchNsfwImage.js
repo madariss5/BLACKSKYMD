@@ -60,97 +60,210 @@ const CATEGORY_MAPPING = {
     }
 };
 
+// Cache for URL validations
+const URL_VALIDATION_CACHE = new Map();
+const VALIDATION_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
 async function validateGifUrl(url) {
+    // Fast path for common cases
+    if (url.endsWith('.gif') || 
+        url.includes('tenor.com') || 
+        url.includes('giphy.com')) {
+        return true;
+    }
+    
+    // Check cache before making HEAD request
+    const cacheKey = `url_valid:${url}`;
+    const cached = URL_VALIDATION_CACHE.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < VALIDATION_CACHE_DURATION)) {
+        return cached.isValid;
+    }
+    
+    // Only make HEAD request if absolutely necessary
     try {
-        const response = await axios.head(url);
-        return response.headers['content-type']?.includes('gif') || 
-               url.endsWith('.gif') ||
-               url.includes('tenor.com') ||
-               url.includes('giphy.com');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+        
+        const response = await axios.head(url, {
+            signal: controller.signal,
+            timeout: 2000
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const isValid = response.headers['content-type']?.includes('gif');
+        
+        // Cache the result
+        URL_VALIDATION_CACHE.set(cacheKey, {
+            isValid,
+            timestamp: Date.now()
+        });
+        
+        return isValid;
     } catch (err) {
-        logger.error('Error validating GIF URL:', err);
+        // Cache negative result too
+        URL_VALIDATION_CACHE.set(cacheKey, {
+            isValid: false,
+            timestamp: Date.now()
+        });
         return false;
     }
 }
+
+// Cache successful API responses for 15 minutes
+const API_CACHE = new Map();
+const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
 async function fetchApi(url, fallbacks = [], requireGif = false) {
     const headers = {
         'User-Agent': 'WhatsApp-MD-Bot/1.0',
         'Accept': 'image/gif,image/webp,video/mp4,*/*'
     };
+    
+    // Generate cache key based on request parameters
+    const cacheKey = `${url}|${requireGif}`;
+    
+    // Check cache first
+    const cachedItem = API_CACHE.get(cacheKey);
+    if (cachedItem && (Date.now() - cachedItem.timestamp < CACHE_DURATION)) {
+        return cachedItem.data;
+    }
 
     async function tryFetch(endpoint) {
         try {
+            // Reduce timeout to fail faster on non-responsive APIs
             const response = await axios.get(endpoint, {
-                timeout: 5000,
+                timeout: 3000, // Reduced from 5000ms
                 headers
             });
+
+            if (!response.data) return null;
 
             if (requireGif) {
                 const data = response.data;
                 const imageUrl = data.url || (data.images && data.images[0]?.url);
 
-                if (!imageUrl) {
-                    logger.warn('No image URL found in response');
-                    return null;
-                }
+                if (!imageUrl) return null;
 
-                const isGif = await validateGifUrl(imageUrl);
-                if (!isGif) {
-                    logger.warn('URL is not a GIF:', imageUrl);
-                    return null;
+                // Simple GIF validation without making another request when possible
+                const isGif = imageUrl.endsWith('.gif') || 
+                              imageUrl.includes('tenor.com') || 
+                              imageUrl.includes('giphy.com');
+                              
+                if (isGif) {
+                    return { url: imageUrl };
                 }
-
-                return { url: imageUrl };
+                
+                // Only do a HEAD request if we can't determine from URL
+                if (!isGif && !imageUrl.includes('.')) {
+                    const isValidGif = await validateGifUrl(imageUrl);
+                    if (!isValidGif) return null;
+                    return { url: imageUrl };
+                }
+                
+                return null;
             }
 
             return response.data;
         } catch (err) {
-            logger.warn(`API fetch error (${endpoint}):`, err.message);
+            // Minimal logging in the hot path
             return null;
         }
     }
 
     // Try primary URL first
     const primaryResult = await tryFetch(url);
-    if (primaryResult) return primaryResult;
+    if (primaryResult) {
+        // Cache successful result
+        API_CACHE.set(cacheKey, {
+            data: primaryResult,
+            timestamp: Date.now()
+        });
+        return primaryResult;
+    }
 
-    // Try fallbacks
-    for (const fallbackUrl of fallbacks) {
-        const fallbackResult = await tryFetch(fallbackUrl);
-        if (fallbackResult) return fallbackResult;
+    // Try all fallbacks in parallel instead of sequentially
+    if (fallbacks && fallbacks.length > 0) {
+        try {
+            const results = await Promise.allSettled(
+                fallbacks.map(fallbackUrl => tryFetch(fallbackUrl))
+            );
+            
+            for (const result of results) {
+                if (result.status === 'fulfilled' && result.value) {
+                    // Cache successful fallback result
+                    API_CACHE.set(cacheKey, {
+                        data: result.value,
+                        timestamp: Date.now()
+                    });
+                    return result.value;
+                }
+            }
+        } catch (err) {
+            // Fail silently and continue to direct GIFs
+        }
     }
 
     // If all attempts failed, try direct Tenor GIF if available
     if (requireGif) {
         const category = url.split('/').pop();
         if (DIRECT_GIFS[category]) {
-            return { url: DIRECT_GIFS[category] };
+            const directResult = { url: DIRECT_GIFS[category] };
+            // Cache the direct GIF result
+            API_CACHE.set(cacheKey, {
+                data: directResult,
+                timestamp: Date.now()
+            });
+            return directResult;
         }
     }
 
     return null;
 }
 
+// Cache for direct Tenor GIF validation results
+const GIF_VALIDATION_CACHE = new Map();
+const GIF_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
 async function fetchNsfwImage(category, requireGif = false) {
     try {
-        // For GIF commands, use direct Tenor URLs first
-        if (requireGif && DIRECT_GIFS[category]) {
-            const isValid = await validateGifUrl(DIRECT_GIFS[category]);
-            if (isValid) {
-                return DIRECT_GIFS[category];
+        const categoryLower = category.toLowerCase();
+        
+        // For GIF commands, use direct Tenor URLs first (with caching)
+        if (requireGif && DIRECT_GIFS[categoryLower]) {
+            const gifUrl = DIRECT_GIFS[categoryLower];
+            
+            // Check validation cache first
+            const cacheKey = `gif_valid:${gifUrl}`;
+            const cached = GIF_VALIDATION_CACHE.get(cacheKey);
+            
+            if (cached) {
+                if (cached.isValid) {
+                    return gifUrl;
+                }
+            } else {
+                // Only validate if not in cache
+                const isValid = await validateGifUrl(gifUrl);
+                
+                // Cache the validation result
+                GIF_VALIDATION_CACHE.set(cacheKey, {
+                    isValid,
+                    timestamp: Date.now()
+                });
+                
+                if (isValid) {
+                    return gifUrl;
+                }
             }
-            logger.warn(`Direct GIF URL invalid for category: ${category}`);
         }
 
-        // Get category mapping
-        const mapping = CATEGORY_MAPPING[category.toLowerCase()];
+        // Get category mapping with fast lookup
+        const mapping = CATEGORY_MAPPING[categoryLower];
         if (!mapping) {
-            logger.warn(`No mapping found for category: ${category}`);
             return null;
         }
 
-        // Try fetching from APIs
+        // Try fetching from APIs (fetchApi already has caching)
         const response = await fetchApi(
             mapping.primary,
             mapping.fallbacks,
@@ -158,17 +271,17 @@ async function fetchNsfwImage(category, requireGif = false) {
         );
 
         if (response) {
-            if (response.url) {
-                return response.url;
-            } else if (response.images && response.images.length > 0) {
-                return response.images[0].url;
-            }
+            // Fast path extraction with null checking
+            const url = response.url || 
+                       (response.images && response.images[0] && response.images[0].url);
+            
+            if (url) return url;
         }
 
-        logger.error(`Failed to fetch NSFW ${requireGif ? 'GIF' : 'image'} for category: ${category}`);
+        // Reduce logging frequency for failed fetches
         return null;
     } catch (err) {
-        logger.error(`Error in fetchNsfwImage for ${category}:`, err);
+        // Only log critical errors
         return null;
     }
 }

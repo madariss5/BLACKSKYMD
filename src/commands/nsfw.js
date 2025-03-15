@@ -64,29 +64,137 @@ function detectFileTypeFromMagicNumbers(buffer) {
 const verifiedUsers = new Map();
 const groupNsfwSettings = new Map();
 const userCooldowns = new Map();
+const VERIFIED_USERS_FILE = path.join(process.cwd(), 'data', 'verified_users.json');
+
+/**
+ * Save verified users to a JSON file
+ */
+async function saveVerifiedUsers() {
+    try {
+        const dataDir = path.join(process.cwd(), 'data');
+        
+        // Check if directory exists using fs.promises
+        try {
+            await fs.access(dataDir);
+        } catch {
+            // Directory doesn't exist, create it
+            await fs.mkdir(dataDir, { recursive: true });
+        }
+        
+        const verifiedData = {};
+        for (const [userId, data] of verifiedUsers.entries()) {
+            verifiedData[userId] = data;
+        }
+        
+        await fs.writeFile(VERIFIED_USERS_FILE, JSON.stringify(verifiedData, null, 2));
+        logger.info(`✅ NSFW: Saved ${verifiedUsers.size} verified users to file: ${VERIFIED_USERS_FILE}`);
+        console.log(`✅ NSFW: Saved ${verifiedUsers.size} verified users to file: ${VERIFIED_USERS_FILE}`);
+    } catch (err) {
+        logger.error('❌ NSFW: Failed to save verified users:', err);
+        console.error('❌ NSFW: Failed to save verified users:', err);
+    }
+}
+
+/**
+ * Load verified users from JSON file
+ */
+async function loadVerifiedUsers() {
+    try {
+        if (await fileExists(VERIFIED_USERS_FILE)) {
+            const data = await fs.readFile(VERIFIED_USERS_FILE, 'utf8');
+            const verifiedData = JSON.parse(data);
+            
+            for (const [userId, userData] of Object.entries(verifiedData)) {
+                verifiedUsers.set(userId, userData);
+            }
+            
+            logger.info(`✅ NSFW: Loaded ${verifiedUsers.size} verified users from file`);
+            console.log(`✅ NSFW: Loaded ${verifiedUsers.size} verified users from file`);
+        } else {
+            logger.info('✅ NSFW: No verified users file found, creating one now');
+            console.log('✅ NSFW: No verified users file found, creating one now');
+            // Create an empty file to ensure it exists for future writes
+            await saveVerifiedUsers();
+        }
+    } catch (err) {
+        logger.error('❌ NSFW: Failed to load verified users:', err);
+        console.error('❌ NSFW: Failed to load verified users:', err);
+    }
+}
+
+/**
+ * Check if a file exists
+ * @param {string} filePath - Path to check
+ * @returns {Promise<boolean>} - Whether file exists
+ */
+async function fileExists(filePath) {
+    try {
+        await fs.access(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 async function initDirectories() {
     try {
         await fs.mkdir(TEMP_DIR, { recursive: true });
         logger.info('NSFW temp directories created');
+        
+        // Load verified users data from file
+        await loadVerifiedUsers();
     } catch (err) {
         logger.error('Failed to create NSFW temp directories:', err);
     }
 }
 
 function isUserVerified(userId) {
-    return verifiedUsers.has(userId);
+    // Ensure userId is a string and normalize it
+    const normalizedId = String(userId || '');
+    
+    // Debug log to help troubleshoot the verification issue
+    logger.debug(`Checking verification for user: ${normalizedId}, result: ${verifiedUsers.has(normalizedId)}`);
+    logger.debug(`Verified users: ${Array.from(verifiedUsers.keys()).join(', ')}`);
+    
+    return verifiedUsers.has(normalizedId);
 }
 
 function setUserVerification(userId, verified = true) {
+    // Ensure userId is a string and normalize it
+    let normalizedId = String(userId || '');
+    
+    // Fix for [object Object] issue - ensure we have a proper string
+    if (normalizedId === '[object Object]' || normalizedId.includes('[object')) {
+        // This means we're dealing with a JID object instead of a string
+        logger.warn(`Received invalid userId format: ${normalizedId}, using fallback`);
+        // If we can extract a string ID from it, do so 
+        if (userId && userId.user) {
+            normalizedId = `${userId.user}@${userId.server || 's.whatsapp.net'}`;
+        }
+    }
+    
+    // Additional validation to prevent invalid JIDs
+    if (!normalizedId.includes('@')) {
+        logger.warn(`Invalid JID format for verification: ${normalizedId}, appending domain`);
+        normalizedId = `${normalizedId}@s.whatsapp.net`;
+    }
+    
     if (verified) {
-        verifiedUsers.set(userId, {
+        verifiedUsers.set(normalizedId, {
             verified: true,
             timestamp: Date.now()
         });
+        logger.debug(`User verification set for ${normalizedId}`);
+        logger.debug(`Updated verified users: ${Array.from(verifiedUsers.keys()).join(', ')}`);
     } else {
-        verifiedUsers.delete(userId);
+        verifiedUsers.delete(normalizedId);
+        logger.debug(`User verification removed for ${normalizedId}`);
     }
+    
+    // Save the updated verification data to persist across restarts
+    saveVerifiedUsers().catch(err => {
+        logger.error('Failed to save user verification data:', err);
+    });
 }
 
 async function isNsfwEnabledForGroup(groupId) {
@@ -152,39 +260,67 @@ async function downloadMedia(url) {
     }
 }
 
-async function fetchApi(url, fallbacks = []) {
+async function fetchApi(url, fallbacks = [], requireGif = false) {
     const headers = {
         'User-Agent': 'WhatsApp-MD-Bot/1.0',
         'Accept': 'image/gif,image/webp,video/mp4,*/*'
     };
 
+    // Try the primary API endpoint with exponential backoff
     try {
-        const response = await axios.get(url, {
-            timeout: 5000,
-            headers
-        });
-        return response.data;
+        const data = await fetchWithExponentialBackoff(url, { headers }, 2);
+        
+        // Validate response has an image URL
+        if (!data || (!data.url && !data.image)) {
+            throw new Error('Invalid API response: No image URL found');
+        }
+        
+        // Extract the image URL
+        const imageUrl = data.url || data.image;
+        
+        // Validate GIF format if required
+        if (requireGif) {
+            const isGif = imageUrl.endsWith('.gif') || imageUrl.includes('gif');
+            if (!isGif) {
+                throw new Error('Non-GIF image returned when GIF was required');
+            }
+        }
+        
+        return data;
     } catch (err) {
         logger.warn(`Primary API fetch error (${url}):`, err.message);
 
+        // Try fallback APIs if available
         if (fallbacks && fallbacks.length > 0) {
             logger.info(`Attempting ${fallbacks.length} fallback APIs`);
 
             for (const fallbackUrl of fallbacks) {
                 try {
                     logger.info(`Trying fallback API: ${fallbackUrl}`);
-                    const response = await axios.get(fallbackUrl, {
-                        timeout: 5000,
-                        headers
-                    });
+                    const data = await fetchWithExponentialBackoff(fallbackUrl, { headers }, 1);
+                    
+                    // Extract the image URL and validate
+                    const imageUrl = data.url || data.image;
+                    if (!imageUrl) {
+                        logger.warn(`Fallback API ${fallbackUrl} returned invalid response`);
+                        continue;
+                    }
+                    
+                    // Validate GIF format if required
+                    if (requireGif && !imageUrl.endsWith('.gif') && !imageUrl.includes('gif')) {
+                        logger.warn(`Fallback API ${fallbackUrl} returned non-GIF image`);
+                        continue;
+                    }
+                    
                     logger.info(`Fallback API success: ${fallbackUrl}`);
-                    return response.data;
+                    return data;
                 } catch (fallbackErr) {
                     logger.warn(`Fallback API fetch error (${fallbackUrl}):`, fallbackErr.message);
                 }
             }
         }
 
+        // All APIs failed
         return null;
     }
 }
@@ -213,41 +349,75 @@ function getRemainingCooldown(userId) {
 }
 
 async function sendNsfwGif(sock, sender, url, caption) {
-    try {
-        // Download GIF first
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const buffer = Buffer.from(response.data);
-
-        // Send as animated sticker using safe message sending
-        await safeSendMessage(sock, sender, {
-            sticker: buffer,
-            mimetype: 'image/gif',
-            gifAttribution: 'TENOR',
-            gifPlayback: true,
-            caption: caption,
-            stickerAuthor: "BLACKSKY-MD",
-            stickerName: "nsfw_gif",
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                externalAdReply: {
-                    title: caption,
-                    mediaType: 1,
-                    renderLargerThumbnail: true
-                }
-            }
-        });
-
-        logger.info(`NSFW GIF sent successfully to ${formatJidForLogging(sender)}`);
-    } catch (err) {
-        logger.error('Error sending NSFW GIF:', err);
+    let retries = 2;
+    let delay = 1000;
+    
+    for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            // Fallback to regular message if GIF fails
-            await safeSendText(sock, sender, `${caption}\n\n(GIF failed to send)`);
-        } catch (sendErr) {
-            logger.error('Failed to send error message:', sendErr);
+            // Download GIF with timeout
+            const response = await axios.get(url, { 
+                responseType: 'arraybuffer',
+                timeout: 5000 
+            });
+            
+            const buffer = Buffer.from(response.data);
+            
+            // Verify it's actually a GIF or media file
+            const fileType = await getFileTypeFromBuffer(buffer);
+            if (!fileType || (!fileType.mime.includes('image') && !fileType.mime.includes('video'))) {
+                throw new Error(`Invalid media type: ${fileType?.mime || 'unknown'}`);
+            }
+            
+            // Try sending as animation first
+            try {
+                await safeSendAnimatedGif(sock, sender, buffer, caption);
+                logger.info(`NSFW GIF sent successfully to ${formatJidForLogging(sender)}`);
+                return true;
+            } catch (gifError) {
+                logger.warn(`Failed to send as animated GIF: ${gifError.message}, trying as sticker...`);
+                
+                // Fallback to sticker
+                await safeSendMessage(sock, sender, {
+                    sticker: buffer,
+                    mimetype: 'image/gif',
+                    gifAttribution: 'TENOR',
+                    gifPlayback: true,
+                    caption: caption,
+                    stickerAuthor: "BLACKSKY-MD",
+                    stickerName: "nsfw_gif",
+                    contextInfo: {
+                        forwardingScore: 999,
+                        isForwarded: true,
+                        externalAdReply: {
+                            title: caption,
+                            mediaType: 1,
+                            renderLargerThumbnail: true
+                        }
+                    }
+                });
+                
+                logger.info(`NSFW GIF sent as sticker to ${formatJidForLogging(sender)}`);
+                return true;
+            }
+        } catch (err) {
+            if (attempt === retries) {
+                logger.error(`Final attempt (${attempt+1}/${retries+1}) to send NSFW GIF failed:`, err);
+                try {
+                    // Fallback to regular message if GIF fails
+                    await safeSendText(sock, sender, `${caption}\n\n(GIF failed to send after ${retries+1} attempts)`);
+                } catch (sendErr) {
+                    logger.error('Failed to send error message:', sendErr);
+                }
+                return false;
+            }
+            
+            logger.warn(`Attempt ${attempt+1}/${retries+1} to send NSFW GIF failed: ${err.message}, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2; // Exponential backoff
         }
     }
+    
+    return false;
 }
 
 // Using formatJidForLogging from jidHelper utility
@@ -255,7 +425,7 @@ async function sendNsfwGif(sock, sender, url, caption) {
 initDirectories();
 
 const nsfwCommands = {
-    async toggleNSFW(sock, sender, args) {
+    async togglensfw(sock, sender, args) {
         try {
             const [action] = args;
             if (!action || !['on', 'off'].includes(action.toLowerCase())) {
@@ -270,12 +440,12 @@ const nsfwCommands = {
 
             logger.info(`NSFW toggled ${action.toLowerCase()} for ${formatJidForLogging(sender)}`);
         } catch (err) {
-            logger.error('Error in toggleNSFW:', err);
+            logger.error('Error in togglensfw:', err);
             await safeSendText(sock, sender, 'Failed to toggle NSFW settings.');
         }
     },
 
-    async isNSFW(sock, sender, args) {
+    async isnsfw(sock, sender, args) {
         try {
             const imageUrl = args[0];
             if (!imageUrl) {
@@ -294,12 +464,12 @@ const nsfwCommands = {
 
             logger.info(`NSFW check requested for ${formatJidForLogging(sender)}`);
         } catch (err) {
-            logger.error('Error in isNSFW:', err);
+            logger.error('Error in isnsfw:', err);
             await safeSendText(sock, sender, 'Failed to check content safety.');
         }
     },
 
-    async nsfwSettings(sock, sender, args) {
+    async nsfwsettings(sock, sender, args) {
         try {
             const [setting, value] = args;
             const validSettings = ['threshold', 'action', 'notification'];
@@ -313,12 +483,12 @@ const nsfwCommands = {
 
             logger.info(`NSFW settings update requested by ${formatJidForLogging(sender)}`);
         } catch (err) {
-            logger.error('Error in nsfwSettings:', err);
+            logger.error('Error in nsfwsettings:', err);
             await safeSendText(sock, sender, 'Failed to update NSFW settings.');
         }
     },
 
-    async nsfwStats(sock, sender) {
+    async nsfwstats(sock, sender) {
         try {
             const stats = `
 NSFW Statistics:
@@ -333,7 +503,7 @@ NSFW Statistics:
             await safeSendText(sock, sender, stats);
             logger.info(`NSFW stats requested by ${formatJidForLogging(sender)}`);
         } catch (err) {
-            logger.error('Error in nsfwStats:', err);
+            logger.error('Error in nsfwstats:', err);
             await safeSendText(sock, sender, 'Failed to retrieve NSFW statistics.');
         }
     },
@@ -363,7 +533,7 @@ NSFW Statistics:
         }
     },
 
-    async nsfwHelp(sock, sender) {
+    async nsfwhelp(sock, sender) {
         try {
             if (!isNsfwEnabledForGroup(sender)) {
                 await safeSendText(sock, sender, `❌ NSFW commands are disabled for this group. An admin can enable them with !togglensfw on`);
@@ -407,7 +577,7 @@ NSFW Statistics:
             await safeSendText(sock, sender, helpText);
             logger.info(`NSFW help requested by ${formatJidForLogging(sender)}`);
         } catch (err) {
-            logger.error('Error in nsfwHelp:', err);
+            logger.error('Error in nsfwhelp:', err);
             await safeSendText(sock, sender, 'Failed to provide NSFW help.');
         }
     },
@@ -1196,15 +1366,51 @@ NSFW Statistics:
     },
 };
 
-const commands = nsfwCommands;
+// Add specialized error handler for API failures with exponential backoff
+async function fetchWithExponentialBackoff(url, options = {}, retries = 3, initialDelay = 500) {
+    let delay = initialDelay;
+    
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const response = await axios.get(url, {
+                timeout: 5000,
+                ...options
+            });
+            return response.data;
+        } catch (error) {
+            if (attempt === retries) {
+                throw error;
+            }
+            
+            logger.warn(`API fetch attempt ${attempt + 1}/${retries} failed for ${url}: ${error.message}`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2; // Exponential backoff
+        }
+    }
+}
 
+// Directly export the commands instead of using an intermediate variable
 module.exports = {
-    commands,
+    commands: nsfwCommands,
     category: 'nsfw',
-    async init() {
+    async init(sock) {
         try {
             logger.info('NSFW module initialized with enhanced commands');
             await initDirectories();
+            
+            // Validate API endpoints for early failure detection
+            try {
+                logger.info('Testing NSFW API connectivity...');
+                await fetchWithExponentialBackoff('https://api.waifu.pics/nsfw/waifu', { 
+                    timeout: 3000,
+                    validateStatus: status => status === 200 
+                }, 1);
+                logger.info('NSFW API connectivity verified');
+            } catch (apiErr) {
+                logger.warn('NSFW API connectivity test failed, commands may not work:', apiErr.message);
+                // Continue initialization despite API issues - we'll handle them per command
+            }
+            
             logger.moduleSuccess('NSFW');
             return true;
         } catch (err) {

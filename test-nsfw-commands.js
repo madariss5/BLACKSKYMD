@@ -48,7 +48,7 @@ function createGroupMessage(command) {
 
 // Check if a command exists
 function commandExists(commandName) {
-    return typeof nsfwModule[commandName] === 'function';
+    return typeof nsfwModule.commands[commandName] === 'function';
 }
 
 // Test a specific command
@@ -62,9 +62,11 @@ async function testCommand(commandName, args = [], isGroup = false) {
         }
         
         const message = isGroup ? createGroupMessage(commandName) : createUserMessage(commandName);
+        const jid = isGroup ? 'group123456@g.us' : 'user123456@s.whatsapp.net';
         
-        logger.info(`Executing command with message: ${JSON.stringify(message.key)}`);
-        await nsfwModule[commandName](mockSock, message, args);
+        logger.info(`Executing command with JID: ${jid}`);
+        // Call the command function properly with JID parameter
+        await nsfwModule.commands[commandName](mockSock, jid, args);
         
         logger.info(`✅ Command '${commandName}' executed without errors`);
         return true;

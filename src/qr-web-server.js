@@ -13,6 +13,11 @@ const path = require('path');
 const pino = require('pino');
 const logger = require('./utils/logger');
 const handler = require('./handlers/ultra-minimal-handler');
+const { 
+    isConnectionError, 
+    handleConnectionError, 
+    resetConnectionStats 
+} = require('./utils/connectionErrorHandler');
 
 // Create Express app
 const app = express();
@@ -284,6 +289,9 @@ async function startConnection() {
                 await saveCreds();
                 logger.info('Connection established successfully!');
                 
+                // Reset connection error stats after successful connection
+                resetConnectionStats();
+                
                 try {
                     const user = sock.user;
                     logger.info('Connected as:', user.name || user.verifiedName || user.id.split(':')[0]);
@@ -295,13 +303,25 @@ async function startConnection() {
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                const error = lastDisconnect?.error;
 
                 connectionStatus = 'disconnected';
                 logger.info(`Connection closed with status code: ${statusCode || 'Unknown'}`);
 
                 if (shouldReconnect) {
-                    logger.info('Reconnecting...');
-                    setTimeout(startConnection, 5000);
+                    if (error && isConnectionError(error)) {
+                        // Handle connection error with specialized module
+                        await handleConnectionError(
+                            sock, 
+                            error, 
+                            'connection-closed', 
+                            () => startConnection()
+                        );
+                    } else {
+                        // Standard reconnection
+                        logger.info('Reconnecting with standard procedure...');
+                        setTimeout(startConnection, 5000);
+                    }
                 } else {
                     logger.info('Not reconnecting - user logged out');
                 }
@@ -326,7 +346,19 @@ async function startConnection() {
     } catch (err) {
         logger.error('Error starting connection:', err);
         connectionStatus = 'disconnected';
-        setTimeout(startConnection, 5000);
+        
+        if (isConnectionError(err)) {
+            // Use specialized connection error handler
+            await handleConnectionError(
+                sock, 
+                err, 
+                'connection-initialization', 
+                () => startConnection()
+            );
+        } else {
+            // Standard error handling
+            setTimeout(startConnection, 5000);
+        }
     }
 }
 

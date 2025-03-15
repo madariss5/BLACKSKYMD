@@ -169,121 +169,118 @@ async function showTypingIndicator(sock, jid) {
     }
 }
 
+// Message content extraction function - optimized for performance
+function extractTextContent(message) {
+    // Faster path - direct conversation
+    if (message.message?.conversation) {
+        return message.message.conversation;
+    }
+    
+    // Extended text message
+    if (message.message?.extendedTextMessage?.text) {
+        return message.message.extendedTextMessage.text;
+    }
+    
+    // Media captions
+    if (message.message?.imageMessage?.caption) {
+        return message.message.imageMessage.caption;
+    }
+    
+    if (message.message?.videoMessage?.caption) {
+        return message.message.videoMessage.caption;
+    }
+    
+    return '';
+}
+
 /**
- * Handle incoming messages
+ * Handle incoming messages - optimized for faster response times
  */
 async function messageHandler(sock, message) {
     try {
-        // Log incoming message for debugging
-        logger.debug('Received message:', {
-            type: message.message ? Object.keys(message.message)[0] : null,
-            from: message.key.remoteJid,
-            messageContent: message.message?.conversation || 
-                          message.message?.extendedTextMessage?.text ||
-                          message.message?.imageMessage?.caption ||
-                          message.message?.videoMessage?.caption
-        });
-
-        // Basic validation
+        // Fast validation
         if (!message?.message || !message.key?.remoteJid) {
             return;
         }
 
         const sender = message.key.remoteJid;
-        const isGroup = sender.endsWith('@g.us');
         
-        // First check if this is a credentials backup message (high priority handling)
+        // Fast check for self-messages (important ones like credentials)
         if (sock.user && sender === sock.user.id) {
             const messageText = message.message?.conversation || 
                               message.message?.extendedTextMessage?.text;
             
-            if (messageText) {
+            if (messageText && messageText.startsWith('{') && messageText.includes('BOT_CREDENTIALS_BACKUP')) {
                 try {
-                    // Try to parse as JSON
                     const data = JSON.parse(messageText);
                     
-                    // Check if this is a credentials backup message
                     if (data && data.type === 'BOT_CREDENTIALS_BACKUP') {
-                        logger.info('Detected credentials backup message, processing...');
-                        
-                        // Process the backup using sessionManager
                         const { sessionManager } = require('../utils/sessionManager');
-                        const success = await sessionManager.handleCredentialsBackup(message);
-                        
-                        if (success) {
-                            logger.info('Successfully processed credentials backup');
-                            // We've handled this special message, no need to process further
-                            return;
-                        }
+                        await sessionManager.handleCredentialsBackup(message);
+                        return;
                     }
                 } catch (jsonErr) {
-                    // Not a valid JSON or not our backup format, continue with normal processing
+                    // Continue with normal processing
                 }
             }
         }
 
-        // Extract text content
-        const messageContent = message.message?.conversation ||
-                             message.message?.extendedTextMessage?.text ||
-                             message.message?.imageMessage?.caption ||
-                             message.message?.videoMessage?.caption;
-
+        // Get message content - optimized extraction
+        const messageContent = extractTextContent(message);
         if (!messageContent) {
             return;
         }
 
-        // Check rate limit
-        if (!checkRateLimit(sender)) {
-            logger.warn(`Rate limit exceeded for ${sender}`);
-            return;
-        }
+        // Cache prefix lookup
+        const prefix = '!'; // Hardcode for speed instead of config?.bot?.prefix || '!';
+        
+        // Fast command check
+        if (messageContent.charAt(0) === prefix) {
+            // Check rate limit - but don't block execution with await
+            if (!checkRateLimit(sender)) {
+                return;
+            }
 
-        // Get prefix from config
-        const prefix = config?.bot?.prefix || '!';
-
-        // Process commands
-        if (messageContent.startsWith(prefix)) {
-            const commandText = messageContent.slice(prefix.length).trim();
+            const commandText = messageContent.slice(1).trim();
             if (!commandText) {
                 return;
             }
 
-            // Command cooldown check
-            const command = commandText.split(' ')[0];
+            // Command check - faster split using indexOf
+            const spaceIndex = commandText.indexOf(' ');
+            const command = spaceIndex > 0 ? commandText.substring(0, spaceIndex) : commandText;
+            
+            // Cooldown check
             const cooldown = checkCommandCooldown(sender, command);
             if (cooldown > 0) {
-                await safeSendMessage(sock, sender, {
-                    text: `⏳ Please wait ${cooldown} seconds before using this command again.`
-                });
+                safeSendText(sock, sender, `⏳ Please wait ${cooldown} seconds before using this command again.`);
                 return;
             }
 
-            // Show typing indicator
-            await showTypingIndicator(sock, sender);
+            // Determine if group - delayed until needed
+            const isGroup = sender.endsWith('@g.us');
+
+            // Show typing indicator in background - don't await
+            showTypingIndicator(sock, sender);
 
             try {
-                // Verify command processor is available
-                if (!commandProcessor) {
-                    throw new Error('Command processor not initialized');
+                // Fast check for command processor
+                if (commandProcessor) {
+                    // Process command without waiting for typing indicator
+                    await commandProcessor(sock, message, commandText, { isGroup });
+                    
+                    // Minimal logging
+                    console.log(`Command processed: ${command}`);
                 }
-
-                // Process command
-                await commandProcessor(sock, message, commandText, { isGroup });
-                logger.info(`Command ${command} processed successfully for ${sender}`);
             } catch (err) {
-                logger.error('Command execution failed:', {
-                    error: err.message,
-                    stack: err.stack,
-                    command: commandText,
-                    sender: sender
-                });
-                await safeSendText(sock, sender, '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
-                );
+                // Simplified error handling
+                console.error(`Command error: ${err.message}`);
+                safeSendText(sock, sender, '❌ Command failed. Try !help for assistance.');
             }
         }
     } catch (err) {
-        logger.error('Error in message handler:', err);
-        logger.error('Stack trace:', err.stack);
+        // Minimal error logging
+        console.error(`MessageHandler error: ${err.message}`);
     }
 }
 

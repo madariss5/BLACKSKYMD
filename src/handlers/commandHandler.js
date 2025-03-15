@@ -338,79 +338,79 @@ async function loadCommands() {
 /**
  * Process incoming commands
  */
+// Command cache for direct module lookup
+const commandModuleCache = new Map();
+
+/**
+ * Process incoming commands with optimized performance
+ */
 async function processCommand(sock, message, commandText, options = {}) {
     const sender = message.key.remoteJid;
 
     try {
-        // Skip if no command text
+        // Skip if no command text (fast path)
         if (!commandText?.trim()) {
             return;
         }
 
-        // Split command and args
-        const [commandName, ...args] = commandText.trim().split(' ');
-        const cmdName = commandName.toLowerCase();
+        // Split command and args - optimize by limiting splits
+        const parts = commandText.trim().split(' ');
+        const cmdName = parts[0].toLowerCase();
+        const args = parts.slice(1);
 
-        logger.info('Processing command:', {
-            command: cmdName,
-            args: args,
-            sender: sender,
-            options: options
-        });
+        // Minimal logging for command processing - only log command name and args
+        console.log(`Processing command: ${cmdName} with args: ${JSON.stringify(args)}`);
 
-        // Try to get command handler from our Map
+        // Try to get command handler from our Map (fastest path)
         const command = commands.get(cmdName);
 
-        if (!command) {
-            // If not found in our Map, try to load from modules directly
-            try {
-                // Load command modules index
-                const commandModules = require('../commands/index');
-                
-                if (commandModules && commandModules.commands && typeof commandModules.commands[cmdName] === 'function') {
-                    logger.info(`Executing command ${cmdName} directly from modules`);
-                    await commandModules.commands[cmdName](sock, message, args, options);
-                    logger.info(`Command ${cmdName} executed successfully from modules`);
-                    return;
-                } else {
-                    await safeSendMessage(sock, sender, {
-                        text: `❌ Unknown command: ${cmdName}\nUse !help to see available commands.`
-                    });
-                    return;
-                }
-            } catch (moduleErr) {
-                logger.error(`Error trying to execute command ${cmdName} from modules:`, moduleErr);
-                await safeSendMessage(sock, sender, {
-                    text: `❌ Unknown command: ${cmdName}\nUse !help to see available commands.`
-                });
+        if (command) {
+            // Fast path - Check group-only commands
+            if (command.groupOnly && !options.isGroup) {
+                await safeSendText(sock, sender, '❌ This command can only be used in groups.');
                 return;
             }
-        }
 
-        // Check group-only commands
-        if (command.groupOnly && !options.isGroup) {
-            await safeSendText(sock, sender, '❌ This command can only be used in groups.'
-            );
+            // Execute command
+            await command.execute(sock, message, args, options);
+            console.log(`Command executed successfully: ${cmdName}`);
             return;
         }
 
-        // Execute command
-        await command.execute(sock, message, args, options);
-        logger.info(`Command ${cmdName} executed successfully`);
+        // Slower path - Check module cache first before requiring module again
+        if (!commandModuleCache.has('indexCommands')) {
+            try {
+                const commandModules = require('../commands/index');
+                if (commandModules && commandModules.commands) {
+                    commandModuleCache.set('indexCommands', commandModules.commands);
+                }
+            } catch (err) {
+                commandModuleCache.set('indexCommands', {});
+            }
+        }
 
+        // Get cached commands
+        const cachedCommands = commandModuleCache.get('indexCommands');
+        
+        // If command exists in cached module
+        if (cachedCommands && typeof cachedCommands[cmdName] === 'function') {
+            await cachedCommands[cmdName](sock, message, args, options);
+            console.log(`Command executed successfully from modules: ${cmdName}`);
+            return;
+        }
+        
+        // Command not found - only send message for actual command attempts (starting with !)
+        if (commandText.startsWith('!')) {
+            await safeSendText(sock, sender, `❌ Unknown command: ${cmdName}\nUse !help to see available commands.`);
+        }
     } catch (err) {
-        logger.error('Command processing error:', {
-            error: err.message,
-            command: commandText,
-            sender: sender,
-            stack: err.stack
-        });
+        // Streamlined error logging
+        logger.error(`Command error (${commandText}): ${err.message}`);
         
         try {
-            await safeSendText(sock, sender, '❌ Command failed. Please try again.\n\nUse !help to see available commands.'
-            );
+            await safeSendText(sock, sender, '❌ Command failed. Please try again.\n\nUse !help to see available commands.');
         } catch (sendErr) {
-            logger.error('Error sending error message:', sendErr);
+            // Silent fail for error message
         }
     }
 }

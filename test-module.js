@@ -13,7 +13,10 @@ if (!moduleName) {
 
 // Get the module path
 let modulePath;
-if (moduleName.includes('/')) {
+// Check if the moduleName is already a full path
+if (moduleName.startsWith('/')) {
+  modulePath = moduleName;
+} else if (moduleName.includes('/')) {
   // For paths like educational/commands
   modulePath = path.join(__dirname, 'src', 'commands', `${moduleName}.js`);
 } else {
