@@ -352,21 +352,68 @@ async function clearAuthData(force = false) {
 }
 
 /**
+ * Check if we have valid credentials from the pairing code generator
+ */
+async function checkPairingCredentials() {
+  try {
+    // Check if pairing connection status file exists
+    if (fs.existsSync('pairing_connection_status.json')) {
+      const statusData = JSON.parse(fs.readFileSync('pairing_connection_status.json', 'utf8'));
+      
+      // Check if status is connected and it's recent (last 12 hours)
+      const statusTime = new Date(statusData.time);
+      const now = new Date();
+      const hoursDiff = (now - statusTime) / (1000 * 60 * 60);
+      
+      if (statusData.status === 'connected' && hoursDiff < 12) {
+        console.log('Found valid pairing connection data');
+        
+        // Run transfer script to ensure credentials are copied
+        try {
+          console.log('Running auth transfer to ensure credentials are updated...');
+          require('child_process').execSync('node transfer-auth.js', { stdio: 'inherit' });
+          return true;
+        } catch (error) {
+          console.error('Error running auth transfer:', error.message);
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking pairing credentials:', error.message);
+    return false;
+  }
+}
+
+/**
  * Initialize WhatsApp connection with retry logic and pairing code
  */
 async function connectToWhatsApp(retryCount = 0) {
-    // Clear any existing reconnect timer
-    clearReconnectTimer();
+  // Check if we already have credentials from pairing code generator
+  const hasPairingCreds = await checkPairingCredentials();
+  
+  // Clear any existing reconnect timer
+  clearReconnectTimer();
     
     try {
         // Update connection status
         connectionStatus = 'connecting';
         console.log(`Starting WhatsApp connection (attempt ${retryCount + 1})...`);
         
-        // Try to use auth_info_terminal first, fall back to auth_info_baileys if not available
-        const authDir = fs.existsSync(AUTH_DIR) && fs.readdirSync(AUTH_DIR).length > 0
-            ? AUTH_DIR
-            : './auth_info_baileys';
+        // First try to use pairing auth if available, then terminal auth, then baileys auth
+        let authDir = './auth_info_baileys';
+        
+        // Check for pairing auth first
+        if (fs.existsSync('./auth_info_pairing') && fs.readdirSync('./auth_info_pairing').length > 0) {
+            console.log('Using pairing-generated authentication');
+            authDir = './auth_info_pairing';
+        }
+        // Then check for terminal auth
+        else if (fs.existsSync(AUTH_DIR) && fs.readdirSync(AUTH_DIR).length > 0) {
+            console.log('Using terminal-generated authentication');
+            authDir = AUTH_DIR;
+        }
         
         console.log(`Using authentication from ${authDir}`);
         
@@ -402,27 +449,66 @@ async function connectToWhatsApp(retryCount = 0) {
             console.log(`Will attempt to pair with: ${phoneNumber}`);
         }
         
-        // Initialize socket with different options based on pairing mode
+        // Check if running in Replit environment
+        const isReplitEnvironment = process.env.REPL_ID || process.env.REPL_OWNER;
+        console.log(`Environment detected: ${isReplitEnvironment ? 'Replit Cloud' : 'Local/Other'}`);
+        
+        // Generate a Safari browser fingerprint for better Replit compatibility
+        const getSafariBrowser = () => {
+            // Safari has better success rates on cloud platforms
+            const timestamp = Date.now().toString().slice(-6);
+            return [`BLACKSKY-${timestamp}`, "Safari", "17.0.1"];
+        };
+        
+        // Initialize socket with different options based on environment
         const socketOptions = {
             auth: state,
             printQRInTerminal: true, // Always print QR in terminal for debugging
-            browser: [deviceId, browser[0], browser[1]],
+            browser: isReplitEnvironment ? getSafariBrowser() : [deviceId, browser[0], browser[1]],
             syncFullHistory: false,
             connectTimeoutMs: 60000,
             qrTimeout: 40000, // Increase QR timeout to give users more time
             markOnlineOnConnect: true,
-            retryRequestDelayMs: 2000
+            retryRequestDelayMs: 2000,
+            // Add Replit-specific optimizations
+            defaultQueryTimeoutMs: 60000,
+            keepAliveIntervalMs: 25000,
+            emitOwnEvents: false,
+            fireInitQueries: true,
+            shouldSyncHistoryMessage: false,
+            transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 }
         };
         
         // Add pairing code specific options if enabled
         if (usePairingCode) {
-            console.log('Using mobile device fingerprint for pairing code mode');
+            console.log('Using optimized configuration for pairing code mode');
+            
+            // Choose browser config based on environment
+            const pairingBrowser = isReplitEnvironment ? 
+                ["BLACKSKY-PAIR", "Safari", "17.0.1"] : 
+                ["BLACKSKY-MD", "Chrome", "110.0.0"];
+                
+            console.log(`Using browser fingerprint: ${pairingBrowser.join(', ')}`);
+            
             Object.assign(socketOptions, {
-                mobile: true,
-                browser: ['BLACKSKY-MD', 'Safari', '1.0.0'],
-                logger: pino({ level: 'debug' }),
-                defaultQueryTimeoutMs: undefined,
-                patchMessageBeforeSending: true
+                browser: pairingBrowser,
+                syncFullHistory: false,
+                markOnlineOnConnect: true,
+                logger: pino({ level: 'warn' }), // Reduced logging level to prevent too much output
+                defaultQueryTimeoutMs: 60000,
+                patchMessageBeforeSending: true,
+                // Added parameters to improve pairing code stability
+                connectTimeoutMs: 90000,
+                qrTimeout: 60000,
+                maxRetries: 6,
+                linkPreviewImageThumbnailWidth: 192,
+                transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
+                // Cloud environment optimizations
+                shouldIgnoreJid: () => false, // Don't ignore any JIDs
+                customUploadHosts: [], // Use default upload hosts
+                retryRequestDelayMs: 600, // More aggressive request retry
+                agent: undefined, // Use default agent
+                fetchAgent: undefined // Use default fetch agent
             });
         }
         
@@ -476,13 +562,34 @@ async function connectToWhatsApp(retryCount = 0) {
                 if (formattedNumber) {
                     try {
                         console.log(`Requesting pairing code for ${formattedNumber}...`);
-                        // Request a pairing code with retry mechanism
-                        const requestPairingCodeWithRetry = async (retries = 3) => {
+                        
+                        // Define pairing code request function
+                        const requestPairingCode = async () => {
+                            // Check for Mobile API error
+                            if (lastError && lastError.includes('Mobile API is not supported anymore')) {
+                                console.error('Pairing code feature is temporarily unavailable');
+                                const errorHTML = `
+                                <div style="text-align:center; padding: 20px; font-family: monospace; background: #300; color: #f77; border-radius: 10px; margin: 20px 0;">
+                                    <h2>❌ Pairing Code Not Available</h2>
+                                    <p>Pairing code feature is temporarily unavailable due to API changes.</p>
+                                    <p>Please use QR code authentication instead.</p>
+                                    <button onclick="window.location.href='/reset'" style="background: #900; color: white; border: none; padding: 10px 20px; margin-top: 15px; border-radius: 5px; cursor: pointer;">Switch to QR Code</button>
+                                </div>`;
+                                qrCodeDataURL = `data:text/html,${encodeURIComponent(errorHTML)}`;
+                                return;
+                            }
+                            
                             try {
+                                console.log(`Attempting to get pairing code for ${formattedNumber}...`);
                                 const code = await sock.requestPairingCode(formattedNumber);
+                                
+                                if (!code) {
+                                    throw new Error('Received empty pairing code');
+                                }
+                                
                                 console.log(`\n💻 Pairing Code: ${code}\n`);
                                 
-                                // Display the code on the web interface with enhanced UI
+                                // Display the code with enhanced UI
                                 const pairingCodeHTML = `
                                 <div style="text-align:center; padding: 20px; font-family: monospace; background: #000; color: #0f0; border-radius: 10px; margin: 20px 0; box-shadow: 0 0 20px rgba(0,255,0,0.3);">
                                     <h2>📱 WhatsApp Pairing Code</h2>
@@ -493,7 +600,7 @@ async function connectToWhatsApp(retryCount = 0) {
                                 </div>`;
                                 qrCodeDataURL = `data:text/html,${encodeURIComponent(pairingCodeHTML)}`;
                                 
-                                // Set a timer to update the UI when the code expires
+                                // Set expiration timer
                                 setTimeout(() => {
                                     if (connectionStatus !== 'connected') {
                                         const expiredHTML = `
@@ -505,31 +612,24 @@ async function connectToWhatsApp(retryCount = 0) {
                                         qrCodeDataURL = `data:text/html,${encodeURIComponent(expiredHTML)}`;
                                     }
                                 }, 60000); // 60 seconds
-                                
                             } catch (error) {
-                                console.error(`Failed to request pairing code (attempt ${4-retries}/3):`, error);
-                                lastError = `Pairing code request failed: ${error.message}`;
+                                console.error('Error requesting pairing code:', error);
                                 
-                                if (retries > 0) {
-                                    console.log(`Retrying pairing code request in 5 seconds... (${retries} attempts left)`);
-                                    setTimeout(() => requestPairingCodeWithRetry(retries - 1), 5000);
-                                } else {
-                                    console.error('All pairing code request attempts failed');
-                                    // Show error on the web interface
-                                    const errorHTML = `
-                                    <div style="text-align:center; padding: 20px; font-family: monospace; background: #300; color: #f77; border-radius: 10px; margin: 20px 0;">
-                                        <h2>❌ Pairing Code Error</h2>
-                                        <p>${error.message}</p>
-                                        <p>Please check your phone number format and try again</p>
-                                        <button onclick="window.location.href='/pairing'" style="background: #900; color: white; border: none; padding: 10px 20px; margin-top: 15px; border-radius: 5px; cursor: pointer;">Configure Pairing</button>
-                                    </div>`;
-                                    qrCodeDataURL = `data:text/html,${encodeURIComponent(errorHTML)}`;
-                                }
+                                // Show error UI
+                                const errorHTML = `
+                                <div style="text-align:center; padding: 20px; font-family: monospace; background: #300; color: #f77; border-radius: 10px; margin: 20px 0;">
+                                    <h2>❌ Pairing Code Error</h2>
+                                    <p>${error.message}</p>
+                                    <p>Please check your phone number format and try again</p>
+                                    <button onclick="window.location.href='/pairing'" style="background: #900; color: white; border: none; padding: 10px 20px; margin-top: 15px; border-radius: 5px; cursor: pointer;">Configure Pairing</button>
+                                </div>`;
+                                qrCodeDataURL = `data:text/html,${encodeURIComponent(errorHTML)}`;
+                                lastError = `Pairing code request failed: ${error.message}`;
                             }
                         };
                         
-                        // Start the pairing code request with a slight delay to ensure connection is fully ready
-                        setTimeout(() => requestPairingCodeWithRetry(), 3000);
+                        // Start the pairing code request with a slight delay
+                        setTimeout(requestPairingCode, 3000);
                         
                     } catch (error) {
                         console.error('Failed to initiate pairing code request:', error);
@@ -901,7 +1001,16 @@ async function sendDeploymentNotification(sock) {
 async function start() {
     console.log('Starting WhatsApp bot...');
     
-    // Initialize language manager
+    // Start the web server first
+    app.listen(port, '0.0.0.0', () => {
+        console.log(`Server running on port ${port}`);
+    });
+    
+    // Show connection options in console before loading commands
+    console.log('Preparing connection interface...');
+    await showConnectionOptionsAndConnect();
+    
+    // Initialize language manager and load commands after connection attempt
     await languageManager.loadTranslations();
     console.log('Translations loaded successfully');
     
@@ -921,13 +1030,91 @@ async function start() {
     } catch (error) {
         console.error('Error loading commands:', error);
     }
-    
-    // Start the web server
-    app.listen(port, '0.0.0.0', () => {
-        console.log(`Server running on port ${port}`);
+}
+
+/**
+ * Show connection options in console first, then connect
+ */
+async function showConnectionOptionsAndConnect() {
+    // Create a readline interface for console input
+    const readline = require('readline').createInterface({
+        input: process.stdin,
+        output: process.stdout
     });
     
-    // Start the WhatsApp connection
+    // Display ASCII art header
+    console.log('\n========================================================');
+    console.log('  𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻 WhatsApp Bot Connection Options');
+    console.log('========================================================\n');
+    
+    // Get current settings
+    const usePairingCode = process.env.USE_PAIRING_CODE === 'true';
+    const phoneNumber = process.env.PAIRING_NUMBER || '';
+    
+    console.log('Current Settings:');
+    console.log(`- Connection Method: ${usePairingCode ? 'Pairing Code' : 'QR Code'}`);
+    if (usePairingCode) {
+        console.log(`- Phone Number: ${phoneNumber || '(not configured)'}\n`);
+    }
+    
+    console.log('Connection Options:');
+    console.log('1. Connect with QR Code (scan with your phone)');
+    console.log('2. Connect with Pairing Code (enter on your phone)');
+    console.log('3. Continue with current settings');
+    
+    // Ask for user selection
+    const selection = await new Promise(resolve => {
+        readline.question('\nSelect connection method (1-3): ', answer => {
+            readline.close();
+            resolve(answer.trim());
+        });
+    });
+    
+    if (selection === '1') {
+        // QR Code selected
+        process.env.USE_PAIRING_CODE = 'false';
+        console.log('\n✅ Selected QR Code authentication method');
+        console.log('Initiating connection - please scan the QR code with your phone...\n');
+    } else if (selection === '2') {
+        // Pairing Code selected
+        process.env.USE_PAIRING_CODE = 'true';
+        
+        // If phone number isn't set, ask for it
+        if (!phoneNumber) {
+            const rl = require('readline').createInterface({
+                input: process.stdin,
+                output: process.stdout
+            });
+            
+            console.log('\n📱 Pairing Code Method Selected');
+            console.log('----------------------------');
+            console.log('Enter your phone number with country code');
+            console.log('Example: 19876543210 (US number) or 447123456789 (UK number)');
+            console.log('Do not include any spaces, dashes, or the + symbol\n');
+            
+            const enteredNumber = await new Promise(resolve => {
+                rl.question('Phone Number: ', answer => {
+                    rl.close();
+                    resolve(answer.trim());
+                });
+            });
+            
+            // Remove any non-numeric characters
+            const formattedNumber = enteredNumber.replace(/\D/g, '');
+            process.env.PAIRING_NUMBER = formattedNumber;
+            
+            console.log(`\n✅ Phone number set to: ${formattedNumber}`);
+            console.log('Initiating connection - a pairing code will be displayed shortly...\n');
+        } else {
+            console.log('\n✅ Using previously configured phone number');
+            console.log('Initiating connection - a pairing code will be displayed shortly...\n');
+        }
+    } else {
+        console.log('\n✅ Continuing with current settings');
+        console.log(`Connection method: ${usePairingCode ? 'Pairing Code' : 'QR Code'}\n`);
+    }
+    
+    // Start the connection
     await connectToWhatsApp();
 }
 

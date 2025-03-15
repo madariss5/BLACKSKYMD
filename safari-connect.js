@@ -65,6 +65,7 @@ const ConnectionState = {
 
 // Browser fingerprints with enhanced variety
 const BROWSER_FINGERPRINTS = [
+  // Added specialized cloud-friendly fingerprints
   {
     device: 'Safari on MacOS',
     platform: 'darwin',
@@ -72,16 +73,47 @@ const BROWSER_FINGERPRINTS = [
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
   },
   {
-    device: 'Chrome on MacOS',
-    platform: 'darwin',
-    browser: ['Chrome', '120.0.0'],
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    device: 'Chrome on Windows', // Windows fingerprints often work better on cloud
+    platform: 'win32',
+    browser: ['Chrome', '120.0.0.0'],
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
   },
   {
-    device: 'Firefox on MacOS',
-    platform: 'darwin',
+    device: 'Firefox on Windows',
+    platform: 'win32',
+    browser: ['Firefox', '110.0'],
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:110.0) Gecko/20100101 Firefox/110.0'
+  },
+  {
+    device: 'Edge on Windows',
+    platform: 'win32',
+    browser: ['Edge', '120.0.0.0'],
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'
+  },
+  // These two fingerprints have shown better acceptance rates on cloud platforms
+  {
+    device: 'Chrome on Linux',
+    platform: 'linux',
+    browser: ['Chrome', '110.0.0.0'],
+    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'
+  },
+  {
+    device: 'Chromium on Ubuntu',
+    platform: 'linux',
+    browser: ['Chrome', '111.0.0.0'],
+    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/111.0.5563.146 Chrome/111.0.5563.146 Safari/537.36'
+  },
+  {
+    device: 'Firefox Mobile',
+    platform: 'android',
     browser: ['Firefox', '120.0'],
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:120.0) Gecko/20100101 Firefox/120.0'
+    userAgent: 'Mozilla/5.0 (Android 13; Mobile; rv:120.0) Gecko/120.0 Firefox/120.0'
+  },
+  {
+    device: 'Chrome Mobile',
+    platform: 'android',
+    browser: ['Chrome', '121.0.0.0'],
+    userAgent: 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36'
   }
 ];
 

@@ -35,6 +35,18 @@ args = "Connected Bot"
 task = "workflow.run"
 args = "QR Code Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Pairing Code Generator"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Status Dashboard"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Improved Pairing Code"
+
 [[workflows.workflow]]
 name = "Run Bot"
 author = 40502297
@@ -134,6 +146,51 @@ task = "shell.exec"
 args = "node src/qr-generator.js"
 waitForPort = 5003
 
+[[workflows.workflow]]
+name = "Pairing Code Generator"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node pairing-code-generator.js"
+waitForPort = 5050
+
+[[workflows.workflow]]
+name = "Status Dashboard"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node connection-status.js"
+waitForPort = 5090
+
+[[workflows.workflow]]
+name = "Improved Pairing Code"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node improved-pairing-code.js"
+waitForPort = 5005
+
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
 
@@ -176,3 +233,11 @@ externalPort = 6000
 [[ports]]
 localPort = 5009
 externalPort = 6800
+
+[[ports]]
+localPort = 5050
+externalPort = 8000
+
+[[ports]]
+localPort = 5090
+externalPort = 8008

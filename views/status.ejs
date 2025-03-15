@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Connection Status</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f7f7f7;
+    }
+    h1 {
+      color: #075e54;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.2em;
+    }
+    .dashboard {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      overflow: hidden;
+      width: 350px;
+      margin-bottom: 20px;
+    }
+    .card-header {
+      background: #128c7e;
+      color: white;
+      padding: 15px;
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+    .card-body {
+      padding: 20px;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    .status-active {
+      background-color: #25D366;
+    }
+    .status-error {
+      background-color: #f44336;
+    }
+    .status-inactive {
+      background-color: #aaa;
+    }
+    .status-warning {
+      background-color: #ff9800;
+    }
+    .status-text {
+      flex: 1;
+    }
+    .detail-item {
+      border-bottom: 1px solid #eee;
+      padding: 8px 0;
+      display: flex;
+    }
+    .detail-label {
+      font-weight: bold;
+      width: 150px;
+    }
+    .detail-value {
+      flex: 1;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .action-button {
+      display: inline-block;
+      background: #075e54;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 4px;
+      text-decoration: none;
+      margin-top: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    .action-button:hover {
+      background: #128c7e;
+    }
+    .refresh-bar {
+      text-align: center;
+      margin: 20px 0;
+    }
+    .system-info {
+      max-width: 720px;
+      margin: 30px auto;
+    }
+    .error-log {
+      background: #fff9f9;
+      border-left: 4px solid #f44336;
+      padding: 10px;
+      margin: 10px 0;
+      font-family: monospace;
+      overflow-x: auto;
+    }
+    pre {
+      white-space: pre-wrap;
+      background: #f7f7f7;
+      padding: 10px;
+      border-radius: 5px;
+      overflow: auto;
+      font-size: 13px;
+    }
+    .environment-badge {
+      display: inline-block;
+      background: #128c7e;
+      color: white;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-size: 0.8em;
+      margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>WhatsApp Connection Status Dashboard</h1>
+  
+  <div class="refresh-bar">
+    <p>Last updated: <%= new Date().toLocaleString() %></p>
+    <button class="action-button" onclick="window.location.reload()">Refresh</button>
+  </div>
+
+  <div class="dashboard">
+    <!-- Connection Status Card -->
+    <div class="card">
+      <div class="card-header">Connection Status</div>
+      <div class="card-body">
+        <% Object.entries(connectionMethods).forEach(([method, status]) => { %>
+          <div class="status">
+            <div class="status-indicator status-<%= status.active ? 'active' : status.error ? 'error' : 'inactive' %>"></div>
+            <div class="status-text">
+              <strong><%= method %></strong>
+              <% if (status.environment) { %>
+                <span class="environment-badge"><%= status.environment %></span>
+              <% } %>
+              <div><%= status.message %></div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- Auth Files Card -->
+    <div class="card">
+      <div class="card-header">Authentication Files</div>
+      <div class="card-body">
+        <% authFolders.forEach(folder => { %>
+          <div class="status">
+            <div class="status-indicator status-<%= folder.exists && folder.valid ? 'active' : folder.exists ? 'warning' : 'inactive' %>"></div>
+            <div class="status-text">
+              <strong><%= folder.name %></strong>
+              <div><%= folder.message %></div>
+              <% if (folder.files && folder.files.length > 0) { %>
+                <div style="font-size: 0.8em; color: #666;">
+                  Files: <%= folder.files.join(', ') %>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- Environment Card -->
+    <div class="card">
+      <div class="card-header">Environment</div>
+      <div class="card-body">
+        <div class="detail-item">
+          <div class="detail-label">Platform</div>
+          <div class="detail-value"><%= systemInfo.platform %></div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Node.js Version</div>
+          <div class="detail-value"><%= systemInfo.nodeVersion %></div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Memory</div>
+          <div class="detail-value"><%= systemInfo.memory %></div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Uptime</div>
+          <div class="detail-value"><%= systemInfo.uptime %></div>
+        </div>
+        <% if (systemInfo.isReplit) { %>
+          <div class="detail-item">
+            <div class="detail-label">Replit Environment</div>
+            <div class="detail-value">Yes</div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Logs Section -->
+  <% if (errorLogs.length > 0) { %>
+    <div class="card system-info">
+      <div class="card-header">Recent Error Logs</div>
+      <div class="card-body">
+        <% errorLogs.forEach(log => { %>
+          <div class="error-log">
+            <strong><%= log.time %></strong>
+            <pre><%= log.message %></pre>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Network Tests Section -->
+  <div class="card system-info">
+    <div class="card-header">Network Connectivity Tests</div>
+    <div class="card-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Endpoint</th>
+            <th>Status</th>
+            <th>Latency</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% networkTests.forEach(test => { %>
+            <tr>
+              <td><%= test.endpoint %></td>
+              <td style="color: <%= test.success ? '#25D366' : '#f44336' %>">
+                <%= test.success ? 'Success' : 'Failed' %>
+              </td>
+              <td><%= test.latency %> ms</td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Actions Section -->
+  <div class="card system-info">
+    <div class="card-header">Actions</div>
+    <div class="card-body">
+      <a href="/clear-auth" class="action-button">Clear Auth Files</a>
+      <a href="/test-network" class="action-button">Test Network</a>
+      <a href="/logs" class="action-button">View Detailed Logs</a>
+    </div>
+  </div>
+
+  <script>
+    // Auto-refresh the page every 30 seconds
+    setTimeout(() => {
+      window.location.reload();
+    }, 30000);
+  </script>
+</body>
+</html>
