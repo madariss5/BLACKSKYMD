@@ -139,14 +139,17 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Status endpoint
+// Add detailed status endpoint
 app.get('/status', (req, res) => {
     res.json({
         connected: sock?.user ? true : false,
         user: sock?.user || null,
         retryCount,
         isConnecting,
-        timestamp: Date.now()
+        connectionState: sock?.ws?.readyState || 'unknown',
+        lastError: sock?.lastDisconnect?.error?.message || null,
+        timestamp: Date.now(),
+        qrAvailable: latestQR ? true : false
     });
 });
 
