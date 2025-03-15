@@ -5,7 +5,7 @@
 
 const express = require('express');
 const http = require('http');
-const { default: makeWASocket, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const handler = require('./handlers/ultra-minimal-handler');
 const logger = require('./utils/logger');
 const SessionManager = require('./utils/sessionManager');
@@ -26,38 +26,31 @@ let isConnecting = false;
 let connectionLock = false;
 let retryCount = 0;
 const MAX_RETRIES = 5;
+let handlerInitialized = false;
 
-// Connection configuration
+// Enhanced connection configuration
 const connectionConfig = {
     printQRInTerminal: true,
     logger: pino({ 
-        level: 'warn',
+        level: 'silent',
         transport: {
             target: 'pino-pretty',
             options: { colorize: true }
         }
     }),
-    browser: ['BLACKSKY-MD', 'Firefox', '119.0.0'],
+    // Use a unique browser ID for each connection
+    browser: [`BLACKSKY-MD-${Date.now().toString().slice(-6)}`, 'Chrome', '110.0.0'],
     version: [2, 2323, 4],
-    connectTimeoutMs: 120000,
-    qrTimeout: 60000,
-    defaultQueryTimeoutMs: 60000,
+    connectTimeoutMs: 60000,
+    qrTimeout: 40000,
+    defaultQueryTimeoutMs: 30000,
     keepAliveIntervalMs: 15000,
-    emitOwnEvents: true,
+    emitOwnEvents: false,
     markOnlineOnConnect: false,
     syncFullHistory: false,
-    linkPreviewImageThumbnailWidth: 300,
-    transactionOpts: { 
-        maxCommitRetries: 5, 
-        delayBetweenTriesMs: 2000 
-    },
-    // Customize user agent
-    browser: [`BLACKSKY-MD-${Date.now()}`, 'Chrome', '119.0.0'],
-    // WebSocket config
-    customUploadHosts: ['upload.whatsapp.net'],
-    retryRequestDelayMs: 3000,
+    downloadHistory: false,
     fireInitQueries: true,
-    downloadHistory: false
+    retryRequestDelayMs: 2000
 };
 
 // Serve QR code page
@@ -135,11 +128,10 @@ app.get('/', (req, res) => {
                     </div>
                     <button class="refresh" onclick="location.reload()">Refresh QR Code</button>
                     <div class="status">
-                        Scan this QR code with WhatsApp to connect the bot
+                        ${isConnecting ? 'Connecting to WhatsApp...' : 'Scan this QR code with WhatsApp to connect'}
                     </div>
                 </div>
                 <script>
-                    // Auto refresh every 30 seconds
                     setTimeout(() => location.reload(), 30000);
                 </script>
             </body>
@@ -158,6 +150,19 @@ app.get('/status', (req, res) => {
     });
 });
 
+async function initializeHandler() {
+    if (!handlerInitialized) {
+        try {
+            await handler.init();
+            handlerInitialized = true;
+            logger.info('Command handler initialized successfully');
+        } catch (err) {
+            logger.error('Failed to initialize command handler:', err);
+            throw err;
+        }
+    }
+}
+
 async function startWhatsAppConnection() {
     if (isConnecting || connectionLock) {
         logger.info('Connection attempt already in progress, skipping...');
@@ -168,22 +173,21 @@ async function startWhatsAppConnection() {
         isConnecting = true;
         connectionLock = true;
 
-        // Initialize session and handler
+        // Initialize handler only once
+        await initializeHandler();
+
+        // Initialize session manager
         await sessionManager.initialize();
-        await handler.init();
-        logger.info('Session and handler initialized');
+        logger.info('Session manager initialized');
 
-        // Get credentials from session manager
-        const config = {
+        // Get auth state from session manager
+        const { state, saveCreds } = await useMultiFileAuthState(sessionManager.authDir);
+
+        // Create socket with enhanced config
+        sock = makeWASocket({
             ...connectionConfig,
-            auth: {
-                creds: sessionManager.credentialsFile,
-                keys: sessionManager.authDir
-            }
-        };
-
-        // Create socket
-        sock = makeWASocket(config);
+            auth: state
+        });
 
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
@@ -206,6 +210,9 @@ async function startWhatsAppConnection() {
                 connectionLock = false;
                 latestQR = null;
 
+                // Save credentials
+                await saveCreds();
+
                 // Setup message handler
                 sock.ev.on('messages.upsert', async (m) => {
                     if (m.type === 'notify') {
@@ -222,6 +229,10 @@ async function startWhatsAppConnection() {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 logger.info(`Connection closed with status code: ${statusCode}`);
 
+                // Clear flags immediately
+                isConnecting = false;
+                connectionLock = false;
+
                 if (statusCode === DisconnectReason.loggedOut ||
                     statusCode === DisconnectReason.connectionClosed ||
                     statusCode === DisconnectReason.connectionLost ||
@@ -232,14 +243,12 @@ async function startWhatsAppConnection() {
                         logger.error('Max retries reached, clearing session');
                         await sessionManager.clearSession();
                         retryCount = 0;
+                        // Wait before retrying
+                        setTimeout(startWhatsAppConnection, 5000);
                     } else {
                         retryCount++;
                         const delay = Math.min(5000 * Math.pow(2, retryCount - 1), 300000);
                         logger.info(`Retrying in ${delay/1000} seconds (attempt ${retryCount}/${MAX_RETRIES})`);
-
-                        isConnecting = false;
-                        connectionLock = false;
-
                         setTimeout(startWhatsAppConnection, delay);
                     }
                 }
@@ -247,13 +256,7 @@ async function startWhatsAppConnection() {
         });
 
         // Handle credentials update
-        sock.ev.on('creds.update', async (creds) => {
-            try {
-                await sessionManager.saveSession(sessionManager.sessionId, creds);
-            } catch (err) {
-                logger.error('Failed to save credentials:', err);
-            }
-        });
+        sock.ev.on('creds.update', saveCreds);
 
         return sock;
     } catch (err) {
