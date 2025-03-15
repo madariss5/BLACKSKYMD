@@ -47,6 +47,10 @@ args = "Status Dashboard"
 task = "workflow.run"
 args = "Improved Pairing Code"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "FLASH-MD"
+
 [[workflows.workflow]]
 name = "Run Bot"
 author = 40502297
@@ -191,6 +195,21 @@ task = "shell.exec"
 args = "node improved-pairing-code.js"
 waitForPort = 5005
 
+[[workflows.workflow]]
+name = "FLASH-MD"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node flash-md-connect.js"
+waitForPort = 5500
+
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
 
@@ -241,3 +260,7 @@ externalPort = 8000
 [[ports]]
 localPort = 5090
 externalPort = 8008
+
+[[ports]]
+localPort = 5500
+externalPort = 8080
