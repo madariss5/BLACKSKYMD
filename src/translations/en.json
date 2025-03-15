@@ -324,6 +324,30 @@
     "no_info_available": "No additional information available",
     "command_not_found": "Command '%s' not found. Try %shelp for a list of commands."
   },
+  "user": {
+    "category": "User Profile",
+    "commands": "Profile Commands",
+    "profile": "Profile",
+    "level": "Level",
+    "xp": "XP",
+    "rank": "Rank",
+    "progress": "Progress",
+    "next_level": "Next Level",
+    "coins": "Coins",
+    "inventory": "Inventory",
+    "stats": "Statistics",
+    "profile_updated": "Profile Updated",
+    "cache_hit": "Loaded from cache",
+    "balance": "Balance",
+    "daily_reward": "Daily Reward",
+    "daily_streak": "Daily Streak",
+    "claimed": "Claimed",
+    "achievements": "Achievements"
+  },
+  "utility": {
+    "category": "Utilities",
+    "commands": "Utility Commands"
+  },
   "errors": {
     "fetch_failed": "Failed to fetch data from API",
     "invalid_arguments": "Invalid arguments. Usage: %s",

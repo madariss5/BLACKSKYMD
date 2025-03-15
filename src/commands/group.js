@@ -1,6 +1,6 @@
 const logger = require('../utils/logger');
 const { isAdmin, isBotAdmin } = require('../utils/permissions');
-const { downloadMediaMessage } = require('../utils/helpers');
+const { downloadMediaMessage, formatPhoneNumber, formatNumber } = require('../utils/helpers');
 const { getGroupSettings, saveGroupSettings } = require('../utils/groupSettings');
 const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 const path = require('path');
@@ -855,18 +855,143 @@ const groupCommands = {
                 return;
             }
 
+            // Get group metadata with participant details
             const metadata = await sock.groupMetadata(remoteJid);
-            const mentions = metadata.participants.map(p => p.id);
-            const message = args.length > 0 ? args.join(' ') : '👥 Group Members';
-
+            const { participants, subject } = metadata;
+            
+            // Create mentions array for everyone
+            const mentions = participants.map(p => p.id);
+            
+            // Separate admins from regular members
+            const admins = [];
+            const members = [];
+            
+            for (const participant of participants) {
+                const { id, admin } = participant;
+                if (admin) {
+                    admins.push(id);
+                } else {
+                    members.push(id);
+                }
+            }
+            
+            // Build header with custom message or group name
+            const customMessage = args.length > 0 ? args.join(' ') : null;
+            const header = customMessage ? 
+                `*${customMessage}*\n\n` : 
+                `*📢 Mentioning all members of ${subject}*\n\n`;
+            
+            // Format the admins section
+            let formattedText = header;
+            
+            // Add admins section if there are admins
+            if (admins.length > 0) {
+                formattedText += '👑 *Group Admins:*\n';
+                admins.forEach(admin => {
+                    const phoneNumber = admin.split('@')[0];
+                    formattedText += `👤 @${phoneNumber}\n`;
+                });
+                formattedText += '\n';
+            }
+            
+            // Add members section
+            if (members.length > 0) {
+                formattedText += '👥 *Group Members:*\n';
+                members.forEach(member => {
+                    const phoneNumber = member.split('@')[0];
+                    formattedText += `👤 @${phoneNumber}\n`;
+                });
+            }
+            
+            // Add footer with statistics
+            formattedText += `\n*Total:* ${participants.length} members (${admins.length} admins)`;
+            
+            // Send the formatted message with mentions
             await safeSendMessage(sock, remoteJid, {
-                text: `${message}\n\n${mentions.map(m => `@${m.split('@')[0]}`).join('\n')}`,
+                text: formattedText,
                 mentions
             });
 
         } catch (err) {
             logger.error('Error in tagall command:', err);
             await safeSendText(sock, message.key.remoteJid, '❌ Failed to tag all members' );
+        }
+    },
+    
+    async mentionall(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await safeSendText(sock, remoteJid, '❌ This command can only be used in groups' );
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+
+            if (!isUserAdmin) {
+                await safeSendText(sock, remoteJid, '❌ This command can only be used by admins' );
+                return;
+            }
+
+            // Get group metadata and participants
+            const metadata = await sock.groupMetadata(remoteJid);
+            const { participants } = metadata;
+            
+            // Create mentions array for everyone
+            const mentions = participants.map(p => p.id);
+            
+            // Get custom message if provided
+            const customMessage = args.length > 0 ? args.join(' ') : '📣 Attention everyone!';
+            
+            // Create a simpler format with formatted phone numbers
+            const formattedParticipants = participants.map(participant => {
+                const numberStr = participant.id.split('@')[0];
+                const formattedNumber = formatPhoneNumber(numberStr);
+                // Use different emoji for admin vs member
+                const emoji = participant.admin ? '👑' : '👤';
+                return {
+                    id: participant.id,
+                    number: numberStr,
+                    formatted: formattedNumber,
+                    emoji: emoji
+                };
+            });
+            
+            // Build the message with 5 participants per line
+            let mentionText = `*${customMessage}*\n\n`;
+            let currentLine = '';
+            let count = 0;
+            
+            for (const participant of formattedParticipants) {
+                currentLine += `${participant.emoji}@${participant.number} `;
+                count++;
+                
+                // Start a new line every 5 participants
+                if (count % 5 === 0) {
+                    mentionText += currentLine + '\n';
+                    currentLine = '';
+                }
+            }
+            
+            // Add any remaining participants
+            if (currentLine) {
+                mentionText += currentLine;
+            }
+            
+            // Add footer with total count
+            mentionText += `\n\n*Total members:* ${formatNumber(participants.length)}`;
+
+            // Send the mention message
+            await safeSendMessage(sock, remoteJid, {
+                text: mentionText,
+                mentions
+            });
+
+        } catch (err) {
+            logger.error('Error in mentionall command:', err);
+            await safeSendText(sock, message.key.remoteJid, '❌ Failed to mention all members' );
         }
     },
     async poll(sock, message, args) {

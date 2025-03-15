@@ -316,25 +316,165 @@ const funCommands = {
 
     async meme(sock, sender) {
         try {
-            // List of safe meme URLs
-            const memeUrls = [
-                'https://i.imgur.com/NL0W9Kz.jpg',
-                'https://i.imgur.com/mE9eZ2a.jpg',
-                'https://i.imgur.com/7hbOQHG.jpg',
-                'https://i.imgur.com/0wCQ6eL.jpg',
-                'https://i.imgur.com/UHVGKJ7.jpg',
-                'https://i.imgur.com/g11QPYr.jpg',
-                'https://i.imgur.com/lDiLZY6.jpg',
-                'https://i.imgur.com/Qrc0GJR.jpg',
-                'https://i.imgur.com/XqQ3qdY.jpg',
-                'https://i.imgur.com/QJAVtAX.jpg'
+            // First try to fetch from a meme API with fallbacks
+            await safeSendText(sock, sender, '🔍 Finding a funny meme for you...');
+            
+            // Multiple API endpoints for better reliability
+            const memeApis = [
+                'https://meme-api.com/gimme',
+                'https://meme-api.com/gimme/wholesomememes',
+                'https://meme-api.com/gimme/dankmemes'
             ];
             
-            const randomMemeUrl = memeUrls[Math.floor(Math.random() * memeUrls.length)];
-            await safeSendImage(sock, sender, randomMemeUrl, "😂 Enjoy this meme!");
+            // Fallback to these pre-vetted meme URLs if API fails
+            const fallbackMemeUrls = [
+                'https://i.imgur.com/LLz6g0Y.jpg',  // Updated working URLs
+                'https://i.imgur.com/XvAFW5s.jpg',
+                'https://i.imgur.com/7bEYwDM.jpg',
+                'https://i.imgur.com/aqPAIEP.jpg',
+                'https://i.imgur.com/LF5I4ZF.jpg',
+                'https://i.redd.it/tj1zdm55xqq81.jpg',
+                'https://i.redd.it/2vawrxpwgyp81.jpg',
+                'https://i.redd.it/5fxniwolm1q81.jpg'
+            ];
+            
+            // Try APIs first with exponential backoff
+            let memeUrl = null;
+            let memeTitle = null;
+            let success = false;
+            
+            // Exponential backoff config
+            let retries = 2;
+            let delay = 500;
+            const maxDelay = 2000;
+            
+            // Shuffle APIs for load balancing
+            const shuffledApis = [...memeApis].sort(() => Math.random() - 0.5);
+            
+            // Try each API with retries
+            for (const api of shuffledApis) {
+                if (success) break;
+                
+                for (let attempt = 0; attempt <= retries; attempt++) {
+                    try {
+                        logger.info(`Attempting to fetch meme from ${api}, attempt ${attempt+1}`);
+                        
+                        // Fetch meme with timeout
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 5000);
+                        
+                        const response = await fetch(api, { 
+                            signal: controller.signal,
+                            headers: { 'Accept': 'application/json' }
+                        });
+                        clearTimeout(timeoutId);
+                        
+                        if (!response.ok) {
+                            throw new Error(`API returned status ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        
+                        // Verify we have a valid image URL
+                        if (data && data.url && (
+                            data.url.endsWith('.jpg') || 
+                            data.url.endsWith('.jpeg') || 
+                            data.url.endsWith('.png') || 
+                            data.url.endsWith('.gif')
+                        )) {
+                            memeUrl = data.url;
+                            memeTitle = data.title || "Enjoy this meme!";
+                            success = true;
+                            break;
+                        } else {
+                            throw new Error('Invalid meme data received');
+                        }
+                    } catch (apiError) {
+                        logger.warn(`API meme error (${api}): ${apiError.message}`);
+                        
+                        if (attempt === retries) {
+                            logger.error(`All retries failed for ${api}`);
+                            continue; // Try next API
+                        }
+                        
+                        // Wait with exponential backoff before retry
+                        const jitter = Math.random() * 200 - 100;
+                        await new Promise(r => setTimeout(r, delay + jitter));
+                        delay = Math.min(delay * 2, maxDelay);
+                    }
+                }
+            }
+            
+            // If all APIs failed, use fallback URLs
+            if (!success) {
+                logger.warn('All meme APIs failed, using fallback meme URLs');
+                const randomIndex = Math.floor(Math.random() * fallbackMemeUrls.length);
+                memeUrl = fallbackMemeUrls[randomIndex];
+                memeTitle = "😂 Enjoy this meme!";
+            }
+            
+            // Download and validate the image before sending
+            try {
+                // Use axios instead of fetch for better buffer handling
+                const axios = require('axios');
+                
+                logger.info(`Downloading meme from URL: ${memeUrl}`);
+                
+                const imageResponse = await axios.get(memeUrl, { 
+                    responseType: 'arraybuffer',
+                    timeout: 8000,  // Increased timeout for larger images
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+                    }
+                });
+                
+                if (imageResponse.status !== 200) {
+                    throw new Error(`Image fetch failed with status ${imageResponse.status}`);
+                }
+                
+                const imageBuffer = Buffer.from(imageResponse.data);
+                
+                // Validate it's actually an image by checking size
+                if (imageBuffer.length < 1000) {
+                    throw new Error('Image too small, likely invalid');
+                }
+                
+                // Process the image to ensure high quality
+                const tempDir = path.join(process.cwd(), 'temp');
+                await fs.mkdir(tempDir, { recursive: true });
+                
+                const tempFilePath = path.join(tempDir, `meme_${Date.now()}.jpg`);
+                await fs.writeFile(tempFilePath, imageBuffer);
+                
+                logger.info(`Saved meme to temporary path: ${tempFilePath}`);
+                
+                // Send the meme with high quality mode
+                await safeSendMessage(sock, sender, {
+                    image: imageBuffer,
+                    caption: memeTitle,
+                    jpegThumbnail: imageBuffer.slice(0, Math.min(imageBuffer.length, 16000)), // Smaller thumbnail for preview
+                });
+                
+                logger.info(`Successfully sent meme with high quality settings`);
+            } catch (imageError) {
+                logger.error(`Failed to process meme image: ${imageError.message}`);
+                
+                // Fallback to direct URL if buffer processing failed
+                try {
+                    logger.info(`Attempting fallback send method for meme`);
+                    await safeSendMessage(sock, sender, {
+                        image: { url: memeUrl },
+                        caption: memeTitle
+                    });
+                } catch (fallbackError) {
+                    logger.error(`Fallback meme send failed: ${fallbackError.message}`);
+                    await safeSendText(sock, sender, '❌ Sorry, I had trouble processing that meme. Please try again.');
+                }
+            }
         } catch (err) {
-            logger.error('Meme error:', err);
-            await safeSendText(sock, sender, '❌ An error occurred while fetching a meme.');
+            logger.error('Meme command error:', err);
+            await safeSendText(sock, sender, '❌ Sorry, I couldn\'t find a meme right now. Please try again later.');
         }
     },
 

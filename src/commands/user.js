@@ -225,7 +225,7 @@ function toRoman(num) {
     return roman;
 }
 
-// Create a visually appealing profile card image
+// Create a simpler profile card image without the profile picture
 async function createProfileCard(profile, theme = null, jid = null) {
     try {
         // Use provided theme, user's preferred theme, or default
@@ -238,7 +238,7 @@ async function createProfileCard(profile, theme = null, jid = null) {
         const canvas = createCanvas(width, height);
         const ctx = canvas.getContext('2d');
         
-        // Draw rounded background with gradient
+        // Draw background
         ctx.fillStyle = colors.background;
         ctx.fillRect(0, 0, width, height);
         
@@ -251,85 +251,11 @@ async function createProfileCard(profile, theme = null, jid = null) {
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, width, 100);
         
-        // Avatar circle position
-        const circleX = 120;
-        const circleY = 170;
-        const radius = 80;
-        
-        // Draw profile picture or placeholder
-        if (profile.profilePic && await fs.access(profile.profilePic).then(() => true).catch(() => false)) {
-            try {
-                // Load the profile picture
-                const img = await loadImage(profile.profilePic);
-                
-                // Create circular clipping path
-                ctx.beginPath();
-                ctx.arc(circleX, circleY, radius, 0, Math.PI * 2, false);
-                ctx.closePath();
-                ctx.clip();
-                
-                // Calculate dimensions to maintain aspect ratio and cover the circle
-                const aspectRatio = img.width / img.height;
-                let drawWidth, drawHeight, drawX, drawY;
-                
-                if (aspectRatio >= 1) {
-                    // Image is wider than tall
-                    drawHeight = radius * 2;
-                    drawWidth = drawHeight * aspectRatio;
-                    drawX = circleX - (drawWidth / 2);
-                    drawY = circleY - radius;
-                } else {
-                    // Image is taller than wide
-                    drawWidth = radius * 2;
-                    drawHeight = drawWidth / aspectRatio;
-                    drawX = circleX - radius;
-                    drawY = circleY - (drawHeight / 2);
-                }
-                
-                // Draw the image
-                ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                
-                // Reset clipping and draw border
-                ctx.restore();
-                ctx.save();
-                
-                // Draw circle border
-                ctx.beginPath();
-                ctx.arc(circleX, circleY, radius, 0, Math.PI * 2, false);
-                ctx.strokeStyle = colors.primary;
-                ctx.lineWidth = 5;
-                ctx.stroke();
-                
-            } catch (err) {
-                logger.error(`Error loading profile picture for ${formatJidForLogging(sender)}:`, err);
-                // If there's an error loading the image, fall back to the placeholder
-                drawPlaceholderAvatar();
-            }
-        } else {
-            // No profile pic, draw placeholder
-            drawPlaceholderAvatar();
-        }
-        
-        // Function to draw placeholder avatar
-        function drawPlaceholderAvatar() {
-            // Draw circle for profile picture
-            ctx.beginPath();
-            ctx.arc(circleX, circleY, radius, 0, Math.PI * 2, false);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fill();
-            ctx.strokeStyle = colors.primary;
-            ctx.lineWidth = 5;
-            ctx.stroke();
-            
-            // Draw text avatar with first letter of name
-            ctx.font = '90px Arial';
-            ctx.fillStyle = colors.primary;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(profile.name.charAt(0).toUpperCase(), circleX, circleY);
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'alphabetic';
-        }
+        // Draw decorative elements (sidebar)
+        ctx.fillStyle = colors.primary;
+        ctx.globalAlpha = 0.3;
+        ctx.fillRect(0, 100, 30, height - 100);
+        ctx.globalAlpha = 1.0;
         
         // Save context state for further drawing
         ctx.save();
@@ -337,12 +263,12 @@ async function createProfileCard(profile, theme = null, jid = null) {
         // Draw name
         ctx.fillStyle = '#FFFFFF';
         ctx.font = 'bold 48px Arial';
-        ctx.fillText(profile.name, 220, 60);
+        ctx.fillText(profile.name, 50, 60);
         
         // Draw user title if available
         if (profile.customTitle) {
             ctx.font = 'italic 24px Arial';
-            ctx.fillText(profile.customTitle, 220, 90);
+            ctx.fillText(profile.customTitle, 50, 90);
         }
         
         // Draw user info section - right side panel
@@ -538,13 +464,17 @@ const userCommands = {
         try {
             const sender = message.key.remoteJid;
             const targetUser = args[0]?.replace(/[^0-9]/g, '') || sender;
+            const targetJid = targetUser.includes('@') ? targetUser : `${targetUser}@s.whatsapp.net`;
+            
+            // Send initial feedback
+            await safeSendText(sock, sender, '🔍 Fetching profile information...');
             
             // Get the profile with defensive error handling
             let profile = null;
             try {
-                profile = userDatabase.getUserProfile(targetUser);
+                profile = userDatabase.getUserProfile(targetJid);
             } catch (profileErr) {
-                logger.error(`Error getting user profile for ${formatJidForLogging(targetUser)}:`, profileErr);
+                logger.error(`Error getting user profile for ${formatJidForLogging(targetJid)}:`, profileErr);
                 // Continue with null profile to trigger the not found error message
             }
 
@@ -565,6 +495,37 @@ const userCommands = {
             profile.customTitle = profile.customTitle || '';
             profile.theme = profile.theme || 'default';
             profile.registeredAt = profile.registeredAt || new Date().toISOString();
+            
+            // Try to fetch profile picture from WhatsApp if not already set
+            if (!profile.profilePic || !(await fs.access(profile.profilePic).then(() => true).catch(() => false))) {
+                try {
+                    await fs.mkdir(TEMP_DIR, { recursive: true });
+                    logger.info(`Attempting to fetch WhatsApp profile picture for ${formatJidForLogging(targetJid)}`);
+                    
+                    // Try to get profile picture URL from WhatsApp
+                    const ppUrl = await sock.profilePictureUrl(targetJid, 'image').catch(() => null);
+                    
+                    if (ppUrl) {
+                        // Download profile picture
+                        const profilePicPath = path.join(TEMP_DIR, `profile_${targetJid.split('@')[0]}_${Date.now()}.jpg`);
+                        
+                        // Use axios to download the image
+                        const axios = require('axios');
+                        const response = await axios.get(ppUrl, { responseType: 'arraybuffer' });
+                        await fs.writeFile(profilePicPath, Buffer.from(response.data));
+                        
+                        // Update the profile with the new picture path
+                        profile.profilePic = profilePicPath;
+                        userDatabase.updateUserProfile(targetJid, { profilePic: profilePicPath });
+                        logger.info(`Successfully fetched and saved profile picture for ${formatJidForLogging(targetJid)}`);
+                    } else {
+                        logger.info(`No profile picture available for ${formatJidForLogging(targetJid)}`);
+                    }
+                } catch (ppErr) {
+                    logger.error(`Error fetching profile picture for ${formatJidForLogging(targetJid)}:`, ppErr);
+                    // Continue without profile picture
+                }
+            }
 
             // Get level progress with error handling
             let progress = { progressBar: '░░░░░░░░░░░░░░░░░░░░ 0%', requiredXP: 100 };
@@ -604,12 +565,33 @@ ${rankText}
 *Progress:* ${progress.progressBar}
 *🕒 Registered:* ${new Date(profile.registeredAt).toLocaleDateString()}`;
 
+            // Send profile picture first if available
+            if (profile.profilePic && await fs.access(profile.profilePic).then(() => true).catch(() => false)) {
+                try {
+                    // Read profile picture as buffer
+                    const profilePicBuffer = await fs.readFile(profile.profilePic);
+                    
+                    // Send profile picture with caption
+                    await safeSendMessage(sock, sender, {
+                        image: profilePicBuffer,
+                        caption: `*👤 ${profile.name}'s Profile Picture*`
+                    });
+                    logger.info(`Successfully sent profile picture for ${formatJidForLogging(targetJid)}`);
+                    
+                    // Short delay to ensure messages are sent in order
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (picErr) {
+                    logger.error(`Error sending profile picture for ${formatJidForLogging(targetJid)}:`, picErr);
+                    // Continue even if sending profile picture fails
+                }
+            }
+            
             // Send profile text
             await safeSendText(sock, sender, profileText.trim());
             
             // Generate and send profile card with robust error handling
             try {
-                // First try to generate a custom profile card
+                // Generate a custom profile card
                 let cardPath = null;
                 try {
                     cardPath = await createProfileCard(profile, null, sender);
@@ -632,11 +614,28 @@ ${rankText}
                     const caption = targetUser === sender ? 
                         '🎭 Your Profile Card' : 
                         `🎭 Profile Card: ${profile.name}`;
-                        
-                    await safeSendMessage(sock, sender, {
-                        image: { url: cardPath },
-                        caption: caption
-                    });
+                    
+                    // Check if file exists and is readable
+                    const fileExists = await fs.access(cardPath).then(() => true).catch(() => false);
+                    
+                    if (fileExists) {
+                        try {
+                            // Send as buffer for better reliability
+                            const imageBuffer = await fs.readFile(cardPath);
+                            
+                            await safeSendMessage(sock, sender, {
+                                image: imageBuffer,
+                                caption: caption
+                            });
+                            logger.info(`Successfully sent profile card to ${formatJidForLogging(sender)}`);
+                        } catch (fileErr) {
+                            logger.error(`Error reading profile card file: ${fileErr.message}`);
+                            throw fileErr; // Will be caught by outer catch and send fallback
+                        }
+                    } else {
+                        logger.error(`Profile card file not accessible: ${cardPath}`);
+                        throw new Error('Card file not accessible'); // Will be caught by outer catch
+                    }
                 } else {
                     // Inform the user that profile card generation failed but profile info was displayed
                     await safeSendText(sock, sender, 
@@ -753,11 +752,19 @@ ${rankText}
             // Generate and send a preview of the profile card with the new theme
             try {
                 const cardPath = await createProfileCard(profile, theme, sender);
-                if (cardPath) {
-                    await safeSendMessage(sock, sender, {
-                        image: { url: cardPath },
-                        caption: `🎨 Here's a preview of your profile card with the *${theme}* theme!`
-                    });
+                if (cardPath && await fs.access(cardPath).then(() => true).catch(() => false)) {
+                    try {
+                        // Read card as buffer for better quality
+                        const cardBuffer = await fs.readFile(cardPath);
+                        
+                        await safeSendMessage(sock, sender, {
+                            image: cardBuffer,
+                            caption: `🎨 Here's a preview of your profile card with the *${theme}* theme!`
+                        });
+                    } catch (cardErr) {
+                        logger.error(`Error reading theme preview card: ${cardErr.message}`);
+                        // Continue without preview
+                    }
                 }
             } catch (err) {
                 logger.error(`Error generating theme preview for ${formatJidForLogging(sender)}:`, err);
@@ -809,11 +816,19 @@ ${rankText}
                 // Generate and send a new profile card with the picture
                 try {
                     const cardPath = await createProfileCard(profile, null, sender);
-                    if (cardPath) {
-                        await safeSendMessage(sock, sender, {
-                            image: { url: cardPath },
-                            caption: '🎭 Here\'s your updated profile card!'
-                        });
+                    if (cardPath && await fs.access(cardPath).then(() => true).catch(() => false)) {
+                        try {
+                            // Read card as buffer for better quality
+                            const cardBuffer = await fs.readFile(cardPath);
+                            
+                            await safeSendMessage(sock, sender, {
+                                image: cardBuffer,
+                                caption: '🎭 Here\'s your updated profile card!'
+                            });
+                        } catch (cardErr) {
+                            logger.error(`Error reading profile card in setprofilepic: ${cardErr.message}`);
+                            // Continue without preview if there's an error
+                        }
                     }
                 } catch (err) {
                     logger.error(`Error generating profile card for ${formatJidForLogging(sender)}:`, err);
@@ -857,12 +872,24 @@ ${rankText}
             
             // Generate and send level card image
             try {
-                const cardPath = await levelingSystem.generateLevelCard(sender, profile);
-                if (cardPath) {
-                    await safeSendMessage(sock, sender, {
-                        image: { url: cardPath },
-                        caption: `🏆 Your Level ${progress.currentLevel} Status Card`
-                    });
+                // Use the new buffer cache method
+                const cardResult = await levelingSystem.getLevelCardBuffer(sender, profile);
+                if (cardResult && cardResult.buffer) {
+                    try {
+                        await safeSendMessage(sock, sender, {
+                            image: cardResult.buffer,
+                            caption: `🏆 Your Level ${progress.currentLevel} Status Card`
+                        });
+                    } catch (cardErr) {
+                        logger.error(`Error sending level card buffer: ${cardErr.message}`);
+                        // If buffer fails, try URL as fallback
+                        if (cardResult.path && await fs.access(cardResult.path).then(() => true).catch(() => false)) {
+                            await safeSendMessage(sock, sender, {
+                                image: { url: cardResult.path },
+                                caption: `🏆 Your Level ${progress.currentLevel} Status Card`
+                            });
+                        }
+                    }
                 }
             } catch (err) {
                 logger.error(`Error generating level card in level command for ${formatJidForLogging(sender)}:`, err);
@@ -1038,12 +1065,24 @@ ${users.map((user, i) => `${i + 1}. *${user.name}*: ${formatNumber(user.value)} 
                     const topUserProfile = userDatabase.getUserProfile(topUser.id);
                     
                     if (topUserProfile) {
-                        const cardPath = await levelingSystem.generateLevelCard(topUser.id, topUserProfile);
-                        if (cardPath) {
-                            await safeSendMessage(sock, sender, {
-                                image: { url: cardPath },
-                                caption: `👑 Top user: ${topUser.name} (Level ${topUser.level})`
-                            });
+                        // Use the new buffer cache method
+                        const cardResult = await levelingSystem.getLevelCardBuffer(topUser.id, topUserProfile);
+                        if (cardResult && cardResult.buffer) {
+                            try {
+                                await safeSendMessage(sock, sender, {
+                                    image: cardResult.buffer,
+                                    caption: `👑 Top user: ${topUser.name} (Level ${topUserProfile.level || 1})`
+                                });
+                            } catch (cardErr) {
+                                logger.error(`Error sending leaderboard card buffer: ${cardErr.message}`);
+                                // If buffer fails, try URL as fallback
+                                if (cardResult.path && await fs.access(cardResult.path).then(() => true).catch(() => false)) {
+                                    await safeSendMessage(sock, sender, {
+                                        image: { url: cardResult.path },
+                                        caption: `👑 Top user: ${topUser.name} (Level ${topUserProfile.level || 1})`
+                                    });
+                                }
+                            }
                         }
                     }
                 } catch (err) {

@@ -130,7 +130,9 @@
     "utilities": "Hilfsprogramme",
     "educational_tools": "Lernwerkzeuge",
     "and_more": "Und vieles mehr!",
-    "support_contact": "Für Unterstützung kontaktieren Sie den Bot-Besitzer."
+    "support_contact": "Für Unterstützung kontaktieren Sie den Bot-Besitzer.",
+    "category": "Kategorie",
+    "commands": "Befehle"
   },
   "group": {
     "admin_only": "Dieser Befehl ist nur für Administratoren",
@@ -139,14 +141,18 @@
     "add_success": "Benutzer erfolgreich hinzugefügt",
     "promote_success": "Benutzer zum Admin befördert",
     "demote_success": "Admin zum Benutzer herabgestuft",
-    "group_only": "Dieser Befehl kann nur in Gruppen verwendet werden"
+    "group_only": "Dieser Befehl kann nur in Gruppen verwendet werden",
+    "category": "Gruppenverwaltung",
+    "commands": "Gruppenbefehle"
   },
   "media": {
     "sticker_created": "Sticker erfolgreich erstellt",
     "processing": "Medien werden verarbeitet...",
     "download_failed": "Fehler beim Herunterladen der Medien",
     "missing_query": "Bitte gebe eine Suchanfrage an",
-    "video_too_large": "Video ist zu groß zum Verarbeiten"
+    "video_too_large": "Video ist zu groß zum Verarbeiten",
+    "category": "Medienwerkzeuge",
+    "commands": "Medienbefehle"
   },
   "fun": {
     "quote": "Zitat: %s",
@@ -158,7 +164,9 @@
     "hangman_start": "Galgenmännchen Spiel gestartet!",
     "game_win": "Glückwunsch! Du hast gewonnen!",
     "game_loss": "Spiel vorbei! Du hast verloren.",
-    "game_draw": "Spiel endet unentschieden."
+    "game_draw": "Spiel endet unentschieden.",
+    "category": "Spaß & Spiele",
+    "commands": "Spaßbefehle"
   },
   "nsfw": {
     "not_enabled": "NSFW-Befehle sind für diesen Chat nicht aktiviert",
@@ -173,7 +181,9 @@
     "age_requirement": "Du musst mindestens 18 Jahre alt sein, um auf NSFW-Inhalte zuzugreifen.",
     "verification_success": "Altersverifikation erfolgreich. Du kannst jetzt NSFW-Befehle verwenden.",
     "verification_failed": "Altersverifikation fehlgeschlagen. Bitte versuche es erneut.",
-    "fetching": "NSFW-Inhalte werden abgerufen..."
+    "fetching": "NSFW-Inhalte werden abgerufen...",
+    "category": "NSFW Inhalte",
+    "commands": "NSFW Befehle"
   },
   "reactions": {
     "sending": "Sende %s Reaktion...",
@@ -288,7 +298,9 @@
       "self": "%s yeeetet %s",
       "toTarget": "%s yeeetet %s %s",
       "toEveryone": "%s yeeetet alle %s"
-    }
+    },
+    "category": "Reaktionen",
+    "commands": "Reaktionsbefehle"
   },
   "commands": {
     "help": {
@@ -322,7 +334,9 @@
     "description": "Beschreibung",
     "usage": "Verwendung",
     "no_info_available": "Keine zusätzlichen Informationen verfügbar",
-    "command_not_found": "Befehl '%s' nicht gefunden. Versuche %shelp für eine Liste der Befehle."
+    "command_not_found": "Befehl '%s' nicht gefunden. Versuche %shelp für eine Liste der Befehle.",
+    "name": "Menü",
+    "commands": "Menübefehle"
   },
   "errors": {
     "fetch_failed": "Fehler beim Abrufen von Daten von der API",
@@ -333,5 +347,37 @@
     "timeout": "Zeitüberschreitung bei der Anfrage",
     "toggle_failed": "Fehler beim Umschalten der NSFW-Einstellungen.",
     "command_execution": "Fehler bei der Ausführung des Befehls"
+  },
+  "educational": {
+    "category": "Bildung",
+    "commands": "Bildungsbefehle"
+  },
+  "owner": {
+    "category": "Besitzerbefehle",
+    "commands": "Besitzerbefehle"
+  },
+  "user": {
+    "category": "Benutzerprofil",
+    "commands": "Profilbefehle",
+    "profile": "Profil",
+    "level": "Level",
+    "xp": "XP",
+    "rank": "Rang",
+    "progress": "Fortschritt",
+    "next_level": "Nächstes Level",
+    "coins": "Münzen",
+    "inventory": "Inventar",
+    "stats": "Statistiken",
+    "profile_updated": "Profil aktualisiert",
+    "cache_hit": "Aus Cache geladen",
+    "balance": "Guthaben",
+    "daily_reward": "Tägliche Belohnung",
+    "daily_streak": "Tägliche Serie",
+    "claimed": "Beansprucht",
+    "achievements": "Errungenschaften"
+  },
+  "utility": {
+    "category": "Hilfsprogramme",
+    "commands": "Hilfsbefehle"
   }
 }

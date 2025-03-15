@@ -1,6 +1,6 @@
 /**
  * Leveling System - Tracks user activity and manages level progression
- * Inspired by popular Discord and WhatsApp bots
+ * Features multilingual support and optimized buffer handling with caching
  */
 const fs = require('fs').promises;
 const path = require('path');
@@ -8,6 +8,8 @@ const { createCanvas, loadImage } = require('canvas');
 const userDatabase = require('./userDatabase');
 const logger = require('./logger');
 const { isFeatureEnabled } = require('./groupSettings');
+const { languageManager } = require('./language');
+const config = require('../config/config');
 
 // XP gain settings
 const XP_SETTINGS = {
@@ -25,6 +27,67 @@ const COOLDOWN_MS = 60 * 1000; // 1 minute cooldown between XP gains
 // Formula settings for level calculation
 const BASE_XP = 100;
 const XP_MULTIPLIER = 1.5;
+
+// Cache settings
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
+// LRU Cache implementation for level cards
+class LRUCache {
+    constructor(maxSize = 50) {
+        this.maxSize = maxSize;
+        this.cache = new Map();
+        this.keys = [];
+    }
+
+    has(key) {
+        return this.cache.has(key);
+    }
+
+    get(key) {
+        if (!this.cache.has(key)) return null;
+        
+        // Move this key to the end of keys (most recently used)
+        this.keys = this.keys.filter(k => k !== key);
+        this.keys.push(key);
+        
+        return this.cache.get(key);
+    }
+
+    set(key, value) {
+        // Add or update the value
+        this.cache.set(key, value);
+        
+        // Remove key from keys array if it exists
+        this.keys = this.keys.filter(k => k !== key);
+        
+        // Add key to the end (most recently used)
+        this.keys.push(key);
+        
+        // Prune cache if it exceeds max size
+        if (this.keys.length > this.maxSize) {
+            const oldestKey = this.keys.shift();
+            this.cache.delete(oldestKey);
+            logger.debug(`Cache pruned, removed oldest key: ${oldestKey}`);
+        }
+    }
+
+    delete(key) {
+        this.cache.delete(key);
+        this.keys = this.keys.filter(k => k !== key);
+    }
+
+    clear() {
+        this.cache.clear();
+        this.keys = [];
+    }
+
+    get size() {
+        return this.cache.size;
+    }
+}
+
+// Initialize LRU cache for level card buffers
+const cardBufferCache = new LRUCache(20);
 
 /**
  * Initialize a user's XP data
@@ -382,22 +445,33 @@ async function generateLevelCard(userId, userData) {
                 ctx.fillText('User', 30, 60);
             }
             
-            // Level info
+            // Get current language
+            const currentLang = config.bot.language || 'en';
+            
+            // Level info with translation
             try {
                 ctx.font = 'bold 32px Arial';
                 ctx.fillStyle = '#5865f2';
-                ctx.fillText(`Level ${profile.level || 1}`, 30, 120);
+                // Get translated "Level" text
+                const levelText = languageManager.getText('user.level', currentLang);
+                ctx.fillText(`${levelText} ${profile.level || 1}`, 30, 120);
             } catch (levelError) {
                 logger.error(`Error rendering level for level card (${userId}):`, levelError);
+                // Fallback to English
+                ctx.fillText(`Level ${profile.level || 1}`, 30, 120);
             }
             
-            // XP info
+            // XP info with translation
             try {
                 ctx.font = '24px Arial';
                 ctx.fillStyle = '#bbbbbb';
-                ctx.fillText(`XP: ${profile.xp || 0} / ${progress.requiredXP || 100}`, 30, 160);
+                // Get XP text with translation
+                const xpLabel = languageManager.getText('user.xp', currentLang);
+                ctx.fillText(`${xpLabel}: ${profile.xp || 0} / ${progress.requiredXP || 100}`, 30, 160);
             } catch (xpError) {
                 logger.error(`Error rendering XP for level card (${userId}):`, xpError);
+                // Fallback to English
+                ctx.fillText(`XP: ${profile.xp || 0} / ${progress.requiredXP || 100}`, 30, 160);
             }
             
             // Progress bar background
@@ -414,7 +488,7 @@ async function generateLevelCard(userId, userData) {
                 logger.error(`Error rendering progress bar for level card (${userId}):`, progressBarError);
             }
             
-            // Rank info (if available)
+            // Rank info (if available) with translation
             try {
                 const leaderboard = getLeaderboard(100);
                 const rank = leaderboard.findIndex(u => u.id === userId) + 1;
@@ -422,7 +496,10 @@ async function generateLevelCard(userId, userData) {
                 if (rank > 0) {
                     ctx.font = 'bold 28px Arial';
                     ctx.fillStyle = '#ffffff';
-                    ctx.fillText(`Rank: #${rank}`, 600, 120);
+                    
+                    // Get translated "Rank" text
+                    const rankText = languageManager.getText('user.rank', currentLang);
+                    ctx.fillText(`${rankText}: #${rank}`, 600, 120);
                 }
             } catch (rankError) {
                 logger.error(`Error rendering rank for level card (${userId}):`, rankError);
@@ -430,10 +507,34 @@ async function generateLevelCard(userId, userData) {
             }
             
             try {
-                // Save the image
+                // Create output path
                 const outputPath = path.join(tempDir, `${userId.split('@')[0]}_level.png`);
-                const buffer = canvas.toBuffer('image/png');
+                
+                // Generate high-quality PNG buffer with better compression
+                const buffer = canvas.toBuffer('image/png', {
+                    compressionLevel: 6,
+                    filters: canvas.PNG_FILTER_NONE,
+                    resolution: 96
+                });
+                
+                // Save buffer to file with explicit binary writing
                 await fs.writeFile(outputPath, buffer);
+                
+                // Store the buffer in LRU cache for quicker access with memory efficiency
+                try {
+                    // Store in LRU cache - automatically manages size limits
+                    cardBufferCache.set(userId, {
+                        buffer,
+                        path: outputPath,
+                        timestamp: Date.now(),
+                        expiry: Date.now() + CACHE_DURATION_MS
+                    });
+                    
+                    logger.debug(`Stored level card in LRU cache for ${userId} (cache size: ${cardBufferCache.size})`);
+                } catch (cacheError) {
+                    // Just log - caching is optional
+                    logger.debug(`Cache error for level card (${userId}):`, cacheError);
+                }
                 
                 return outputPath;
             } catch (saveError) {
@@ -486,6 +587,71 @@ function wrapText(ctx, text, maxWidth, fontSize) {
     }
 })();
 
+/**
+ * Get the buffer for a level card image with LRU caching
+ * @param {string} userId User ID
+ * @param {Object} userData User data including name
+ * @returns {Promise<{buffer: Buffer, path: string}|null>} Card buffer and path or null
+ */
+async function getLevelCardBuffer(userId, userData) {
+    try {
+        // Get current language for debug messages
+        const currentLang = config.bot.language || 'en';
+        
+        // Check LRU cache first for optimal performance
+        if (cardBufferCache.has(userId)) {
+            const cached = cardBufferCache.get(userId);
+            const now = Date.now();
+            
+            // Return cache if still valid
+            if (cached && cached.expiry > now && cached.buffer) {
+                logger.debug(`Using cached level card for ${userId} (${languageManager.getText('user.cache_hit', currentLang)})`);
+                return {
+                    buffer: cached.buffer,
+                    path: cached.path,
+                    cached: true
+                };
+            }
+            
+            // Remove expired cache entry
+            cardBufferCache.delete(userId);
+            logger.debug(`Cache expired for ${userId}, generating new card`);
+        }
+        
+        // Generate new card
+        const cardPath = await generateLevelCard(userId, userData);
+        if (!cardPath) {
+            logger.error(`Failed to generate level card for ${userId}`);
+            return null;
+        }
+        
+        // Read buffer directly with optimized error handling
+        try {
+            const buffer = await fs.readFile(cardPath);
+            
+            // Add to LRU cache for future requests
+            cardBufferCache.set(userId, {
+                buffer,
+                path: cardPath,
+                timestamp: Date.now(),
+                expiry: Date.now() + CACHE_DURATION_MS
+            });
+            
+            return { 
+                buffer, 
+                path: cardPath,
+                cached: false
+            };
+        } catch (readErr) {
+            logger.error(`Error reading level card buffer for ${userId}:`, readErr);
+            return null;
+        }
+    } catch (error) {
+        logger.error(`Error in getLevelCardBuffer for ${userId}:`, error);
+        return null;
+    }
+}
+
 module.exports = {
     initializeUser,
     getUserLevelData,
@@ -496,5 +662,6 @@ module.exports = {
     getLevelProgress,
     getLeaderboard,
     createProgressBar,
-    generateLevelCard
+    generateLevelCard,
+    getLevelCardBuffer
 };

@@ -169,6 +169,48 @@ function getRandomElement(array) {
     return array[Math.floor(Math.random() * array.length)];
 }
 
+/**
+ * Format a phone number to international format
+ * @param {string} phoneNumber Phone number to format
+ * @returns {string} Formatted phone number
+ */
+function formatPhoneNumber(phoneNumber) {
+    // Strip any non-numeric characters
+    let cleaned = phoneNumber.replace(/\D/g, '');
+    
+    // If it's a JID, extract just the number part
+    if (phoneNumber.includes('@')) {
+        cleaned = phoneNumber.split('@')[0];
+    }
+    
+    // Format different phone number lengths appropriately
+    if (cleaned.length > 10) {
+        // International format with country code
+        const countryCode = cleaned.slice(0, cleaned.length - 10);
+        const areaCode = cleaned.slice(cleaned.length - 10, cleaned.length - 7);
+        const firstPart = cleaned.slice(cleaned.length - 7, cleaned.length - 4);
+        const lastPart = cleaned.slice(cleaned.length - 4);
+        
+        return `+${countryCode} ${areaCode}-${firstPart}-${lastPart}`;
+    } else if (cleaned.length === 10) {
+        // US format: (123) 456-7890
+        const areaCode = cleaned.slice(0, 3);
+        const firstPart = cleaned.slice(3, 6);
+        const lastPart = cleaned.slice(6);
+        
+        return `(${areaCode}) ${firstPart}-${lastPart}`;
+    } else {
+        // Unknown format, add dashes for readability
+        if (cleaned.length > 5) {
+            const firstPart = cleaned.slice(0, cleaned.length - 4);
+            const lastPart = cleaned.slice(cleaned.length - 4);
+            return `${firstPart}-${lastPart}`;
+        }
+        
+        return cleaned;
+    }
+}
+
 module.exports = {
     parseDuration,
     formatDuration,
@@ -182,5 +224,6 @@ module.exports = {
     capitalize,
     deepClone,
     isNumeric,
-    getRandomElement
+    getRandomElement,
+    formatPhoneNumber
 };
