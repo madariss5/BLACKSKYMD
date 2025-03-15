@@ -575,21 +575,40 @@ function displayQRCode(qr) {
   try {
     LOGGER.info(`Generating QR code (Attempt ${qrRetryCount + 1}/${MAX_RETRIES})`);
 
+    console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
+    console.log('█                   SCAN QR CODE TO CONNECT                      █');
+    console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
+
+    // First attempt: Use qrcode-terminal
     qrcode.generate(qr, { small: true }, (err, qrOutput) => {
       if (err) {
         LOGGER.error('Primary QR generation failed:', err);
-        console.log('\nQR Code Data (Fallback):', qr);
+        // Try direct QR generation
+        try {
+          qrcode.toString(qr, { type: 'terminal', small: true }, (err2, qrOutput2) => {
+            if (err2) {
+              LOGGER.error('Secondary QR generation failed:', err2);
+              // Last resort: show formatted raw data
+              const lines = qr.match(/.{1,32}/g) || [];
+              console.log('\nQR Code Data:');
+              lines.forEach(line => console.log(line));
+            } else {
+              console.log(qrOutput2);
+            }
+          });
+        } catch (fallbackErr) {
+          LOGGER.error('Fallback QR generation failed:', fallbackErr);
+          console.log('\nQR Code Data:', qr);
+        }
         return;
       }
 
-      console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
-      console.log('█                   SCAN QR CODE TO CONNECT                      █');
-      console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
       console.log(qrOutput);
-      console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
-      console.log(`█  Scan within ${QR_TIMEOUT/1000} seconds. Attempt ${qrRetryCount + 1} of ${MAX_RETRIES}   █`);
-      console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
     });
+
+    console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
+    console.log(`█  Scan within ${QR_TIMEOUT/1000} seconds. Attempt ${qrRetryCount + 1} of ${MAX_RETRIES}   █`);
+    console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
 
     if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
     qrDisplayTimer = setTimeout(() => {
@@ -614,7 +633,14 @@ function displayQRCode(qr) {
       stack: err.stack
     });
 
-    console.log('\nQR Code Data (Emergency Fallback):', qr);
+    // Last resort: Split raw QR data into readable chunks
+    console.log('\nEmergency QR Code Display:');
+    try {
+      const chunks = qr.match(/.{1,32}/g) || [];
+      chunks.forEach(chunk => console.log(chunk));
+    } catch {
+      console.log(qr);
+    }
   }
 }
 
