@@ -16,29 +16,14 @@ const server = http.createServer(app);
 // Constants
 const PORT = process.env.PORT || 5000;
 const AUTH_DIR = './auth_info_baileys';
-const SESSION_PATH = './baileys_store.json';
-let messageHandler = null;
-
-// Session state
 let sock = null;
 let qrCodeDataURL = null;
 let connectionStatus = 'disconnected';
 let startTime = Date.now();
-let sessionData = null;
 
 // Add reconnection control
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
-const INITIAL_RECONNECT_INTERVAL = 5000;
-
-// Try to load message handler
-try {
-    const { messageHandler: handler } = require('./src/handlers/messageHandler');
-    messageHandler = handler;
-} catch (err) {
-    console.log('Warning: Message handler not loaded yet');
-}
-
 
 /**
  * Initialize WhatsApp connection with improved error handling
@@ -57,18 +42,16 @@ async function connectToWhatsApp() {
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            browser: ['BLACKSKY-MD', 'Chrome', '116.0.0'],
-            logger: pino({ level: 'error' }),
+            browser: ['BLACKSKY-MD', 'Safari', '1.0.0'],
+            logger: pino({ level: 'silent' }),
             markOnlineOnConnect: false,
-            connectTimeoutMs: 60000,
-            qrTimeout: 40000,
-            defaultQueryTimeoutMs: 60000,
-            keepAliveIntervalMs: 30000,
+            connectTimeoutMs: 30000,
+            qrTimeout: 30000,
+            defaultQueryTimeoutMs: 20000,
+            keepAliveIntervalMs: 10000,
             emitOwnEvents: false,
-            version: [2, 2323, 4],
-            getMessage: async () => {
-                return { conversation: 'hello' };
-            }
+            syncFullHistory: false,
+            version: [2, 2323, 4]
         });
 
         // Handle connection events
@@ -90,28 +73,10 @@ async function connectToWhatsApp() {
             if (connection === 'open') {
                 console.log('Connection established successfully');
                 reconnectAttempts = 0;
-
-                // Save credentials
                 try {
                     await saveCreds();
-                    console.log('Credentials saved successfully');
                 } catch (err) {
                     console.error('Error saving credentials:', err);
-                }
-
-                // Initialize message handler
-                if (messageHandler) {
-                    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-                        if (type === 'notify') {
-                            for (const message of messages) {
-                                try {
-                                    await messageHandler(sock, message);
-                                } catch (err) {
-                                    console.error('Error handling message:', err);
-                                }
-                            }
-                        }
-                    });
                 }
             }
 
@@ -119,15 +84,15 @@ async function connectToWhatsApp() {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 console.log(`Connection closed with status code: ${statusCode}`);
 
-                if (statusCode === DisconnectReason.loggedOut) {
-                    console.log('Not reconnecting - logged out');
-                    // Clear auth files on logout
+                if (statusCode === DisconnectReason.loggedOut || 
+                    statusCode === DisconnectReason.connectionClosed) {
+                    console.log('Connection closed - clearing auth');
                     try {
                         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-                        console.log('Auth directory cleared');
                     } catch (err) {
                         console.error('Error clearing auth directory:', err);
                     }
+                    process.exit(1); // Let Heroku restart the process
                 } else if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                     reconnectAttempts++;
                     const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 300000);
@@ -135,19 +100,13 @@ async function connectToWhatsApp() {
                     setTimeout(connectToWhatsApp, delay);
                 } else {
                     console.log('Maximum reconnection attempts reached');
+                    process.exit(1); // Let Heroku restart the process
                 }
             }
         });
 
         // Handle credential updates
-        sock.ev.on('creds.update', async () => {
-            try {
-                await saveCreds();
-                console.log('Credentials updated successfully');
-            } catch (err) {
-                console.error('Error updating credentials:', err);
-            }
-        });
+        sock.ev.on('creds.update', saveCreds);
 
         return sock;
     } catch (error) {
