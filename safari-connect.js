@@ -102,33 +102,43 @@ const server = app.listen(port, '0.0.0.0', () => {
   LOGGER.info(`Status monitor running on port ${port}`);
 });
 
-// Display QR code with proper formatting
+// Update the displayQRCode function with enhanced logging
 function displayQRCode(qr) {
+  LOGGER.info(`Generating QR code (Attempt ${qrRetryCount + 1}/${MAX_RETRIES})`);
+
   console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
   console.log('█                   SCAN QR CODE TO CONNECT                      █');
   console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
 
-  // Generate QR in terminal
-  qrcode.generate(qr, { small: true });
+  try {
+    // Generate QR in terminal with small size for better cloud compatibility
+    qrcode.generate(qr, { small: true });
+    LOGGER.info('QR code generated successfully');
 
-  console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
-  console.log(`█  Scan within ${QR_TIMEOUT/1000} seconds. Attempt ${qrRetryCount + 1} of ${MAX_RETRIES}   █`);
-  console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
+    console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
+    console.log(`█  Scan within ${QR_TIMEOUT/1000} seconds. Attempt ${qrRetryCount + 1} of ${MAX_RETRIES}   █`);
+    console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
 
-  // Set QR timeout
-  if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
-  qrDisplayTimer = setTimeout(() => {
-    if (connectionState === 'awaiting_scan') {
-      LOGGER.info('QR code expired, generating new one...');
-      qrRetryCount++;
-      if (qrRetryCount < MAX_RETRIES) {
-        handleReconnection('QR timeout');
-      } else {
-        LOGGER.error('Max QR retry attempts reached');
-        process.exit(1); // Force restart in cloud environment
+    // Set QR timeout
+    if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
+    qrDisplayTimer = setTimeout(() => {
+      if (connectionState === 'awaiting_scan') {
+        LOGGER.warn('QR code expired, initiating new QR generation');
+        qrRetryCount++;
+        if (qrRetryCount < MAX_RETRIES) {
+          handleReconnection('QR timeout');
+        } else {
+          LOGGER.error('Max QR retry attempts reached, restarting process');
+          process.exit(1); // Force restart in cloud environment
+        }
       }
-    }
-  }, QR_TIMEOUT);
+    }, QR_TIMEOUT);
+
+  } catch (err) {
+    LOGGER.error('Error generating QR code:', err);
+    // Attempt to recover by using baileys built-in QR display
+    sock.ev.emit('connection.update', { qr: qr });
+  }
 }
 
 // Initialize connection
@@ -534,7 +544,7 @@ function setupMessageHandler() {
         LOGGER.info(`New message from ${formattedJid}: ${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}`);
         
         // Handle commands
-        if (messageText.startsWith('!')) {
+        if (messageText.startsWith('!') ) {
           const command = messageText.slice(1).trim().split(' ')[0].toLowerCase();
           const args = messageText.slice(1).trim().split(' ').slice(1);
           
@@ -847,155 +857,162 @@ async function loadCommandModules() {
       LOGGER.warn('No commands were loaded!');
       return false;
     }
-  } catch (error) {
-    LOGGER.error('Error loading command modules:', error);
-    return false;
-  }
-}
-
-// Safely send a message with proper JID validation
-async function safeSendMessage(sock, jid, content) {
-  try {
-    if (!jid || typeof jid !== 'string') {
-      LOGGER.error('Invalid JID provided to safeSendMessage:', jid);
-      return null;
-    }
-    
-    return await sock.sendMessage(jid, content);
-  } catch (error) {
-    LOGGER.error(`Error in safeSendMessage to ${jid?.replace?.(/@.+/, '@...')}:`, error.message);
-    return null;
-  }
-}
-
-// Safely send text with proper JID validation
-async function safeSendText(sock, jid, text) {
-  return safeSendMessage(sock, jid, { text });
-}
-
-// Process command from command modules
-async function processModuleCommand(sock, message, command, args) {
-  try {
-    const commandData = cachedCommands[command.toLowerCase()];
-    if (!commandData) {
-      // Command not found in modules
+    } catch (error) {
+      LOGGER.error('Error loading command modules:', error);
       return false;
     }
-    
-    const { handler, module: moduleName, name: cmdName } = commandData;
-    LOGGER.info(`Executing command ${cmdName} from module ${moduleName}`);
-    
-    // Execute the command handler
-    await handler(sock, message, args);
-    return true;
-  } catch (error) {
-    LOGGER.error(`Error executing command ${command}:`, error);
-    
-    // Try to send error message
+  }
+
+  // Safely send a message with proper JID validation
+  async function safeSendMessage(sock, jid, content) {
     try {
-      const jid = message.key.remoteJid;
-      await safeSendText(sock, jid, `❌ Error executing command: ${error.message}`);
-    } catch (notifyError) {
-      LOGGER.error('Error sending error notification:', notifyError);
-    }
-    
-    return true; // Mark as handled to prevent fallback
-  }
-}
-
-// Start connection
-async function startConnection() {
-  try {
-    // Update connection state
-    connectionState = 'connecting';
-    LOGGER.info(`Starting WhatsApp connection (Attempt ${connectionRetries + 1}/${MAX_RETRIES})...`);
-    
-    // Get auth state
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-    
-    // Get Baileys version
-    const { version } = await fetchLatestBaileysVersion();
-    LOGGER.info(`Using Baileys version: ${version.join('.')}`);
-    
-    // Create socket with optimized settings
-    sock = makeWASocket({
-      version,
-      auth: state,
-      printQRInTerminal: false, // We handle QR code display ourselves
-      browser: [generateDeviceId(), ...SAFARI_FINGERPRINT.browser],
-      userAgent: SAFARI_FINGERPRINT.userAgent,
-      connectTimeoutMs: 60000,
-      qrTimeout: QR_TIMEOUT,
-      defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 10000,
-      emitOwnEvents: false,
-      syncFullHistory: false,
-      markOnlineOnConnect: false,
-      logger: LOGGER,
-      // Cloud environment optimizations
-      retryRequestDelayMs: IS_CLOUD_ENV ? 5000 : 2000,
-      fireAndRetry: IS_CLOUD_ENV,
-      maxRetries: IS_CLOUD_ENV ? 5 : 3,
-      patchMessageBeforeSending: msg=> msg
-    });
-    
-    // Handle connection updates
-    sock.ev.on('connection.update', handleConnectionUpdate);
-    
-    // Save credentials when updated
-    sock.ev.on('creds.update', saveCreds);
-    setupMessageHandler();
-    // Load command modules
-    LOGGER.info('Loading command modules...');
-    await loadCommandModules();
-    
-  } catch (err) {
-    LOGGER.error('Error in connection:', err);
-    connectionState = 'error';
-    
-    if (connectionRetries < MAX_RETRIES) {
-      connectionRetries++;
-      const delay = Math.min(Math.pow(2, connectionRetries) * 1000, 10000);
-      LOGGER.info(`Retrying after error in ${delay/1000}s (Attempt ${connectionRetries}/${MAX_RETRIES})`);
-      setTimeout(startConnection, delay);
-    } else {
-      LOGGER.error('Max retries reached after errors');
-      process.exit(1); // Force restart in cloud environment
+      if (!jid || typeof jid !== 'string') {
+        LOGGER.error('Invalid JID provided to safeSendMessage:', jid);
+        return null;
+      }
+      
+      return await sock.sendMessage(jid, content);
+    } catch (error) {
+      LOGGER.error(`Error in safeSendMessage to ${jid?.replace?.(/@.+/, '@...')}:`, error.message);
+      return null;
     }
   }
-}
 
-// Initialize and start
-initializeConnection().then(() => {
-  startConnection();
-}).catch(err => {
-  LOGGER.error('Failed to initialize:', err);
-  process.exit(1);
-});
-
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-  LOGGER.info('Shutting down...');
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
-  if (cleanupTimer) clearInterval(cleanupTimer);
-  if (reconnectTimer) clearTimeout(reconnectTimer);
-  if (sock) {
-    sock.end();
+  // Safely send text with proper JID validation
+  async function safeSendText(sock, jid, text) {
+    return safeSendMessage(sock, jid, { text });
   }
-  server.close(() => {
-    LOGGER.info('Server closed');
-    process.exit(0);
+
+  // Process command from command modules
+  async function processModuleCommand(sock, message, command, args) {
+    try {
+      const commandData = cachedCommands[command.toLowerCase()];
+      if (!commandData) {
+        // Command not found in modules
+        return false;
+      }
+      
+      const { handler, module: moduleName, name: cmdName } = commandData;
+      LOGGER.info(`Executing command ${cmdName} from module ${moduleName}`);
+      
+      // Execute the command handler
+      await handler(sock, message, args);
+      return true;
+    } catch (error) {
+      LOGGER.error(`Error executing command ${command}:`, error);
+      
+      // Try to send error message
+      try {
+        const jid = message.key.remoteJid;
+        await safeSendText(sock, jid, `❌ Error executing command: ${error.message}`);
+      } catch (notifyError) {
+        LOGGER.error('Error sending error notification:', notifyError);
+      }
+      
+      return true; // Mark as handled to prevent fallback
+    }
+  }
+
+  // Start connection
+  async function startConnection() {
+    try {
+      // Update connection state
+      connectionState = 'connecting';
+      LOGGER.info(`Starting WhatsApp connection (Attempt ${connectionRetries + 1}/${MAX_RETRIES})...`);
+      
+      // Get auth state
+      const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+      
+      // Get Baileys version
+      const { version } = await fetchLatestBaileysVersion();
+      LOGGER.info(`Using Baileys version: ${version.join('.')}`);
+      
+      // Update socket creation with optimized Safari settings
+      sock = makeWASocket({
+        version,
+        auth: state,
+        printQRInTerminal: true, // Fallback QR display
+        browser: [generateDeviceId(), ...SAFARI_FINGERPRINT.browser],
+        userAgent: SAFARI_FINGERPRINT.userAgent,
+        connectTimeoutMs: 60000,
+        qrTimeout: QR_TIMEOUT,
+        defaultQueryTimeoutMs: 60000,
+        keepAliveIntervalMs: 10000,
+        emitOwnEvents: false,
+        customUploadHosts: ['media-sin1-1.cdn.whatsapp.net'], // Use Singapore server
+        syncFullHistory: false,
+        markOnlineOnConnect: false,
+        logger: LOGGER,
+        // Cloud environment optimizations
+        retryRequestDelayMs: IS_CLOUD_ENV ? 5000 : 2000,
+        fireAndRetry: IS_CLOUD_ENV,
+        maxRetries: IS_CLOUD_ENV ? 5 : 3,
+        throwErrorOnTosBlock: true, // Detect ToS violations early
+        agent: undefined, // Let system handle proxy
+        fetchAgent: undefined, // Let system handle fetch
+        msgRetryCounterCache: {
+          setKey: () => { }, // No-op to avoid Redis requirements
+          getKey: () => undefined,
+        }
+      });
+      
+      // Handle connection updates
+      sock.ev.on('connection.update', handleConnectionUpdate);
+      
+      // Save credentials when updated
+      sock.ev.on('creds.update', saveCreds);
+      setupMessageHandler();
+      // Load command modules
+      LOGGER.info('Loading command modules...');
+      await loadCommandModules();
+      
+    } catch (err) {
+      LOGGER.error('Error in connection:', err);
+      connectionState = 'error';
+      
+      if (connectionRetries < MAX_RETRIES) {
+        connectionRetries++;
+        const delay = Math.min(Math.pow(2, connectionRetries) * 1000, 10000);
+        LOGGER.info(`Retrying after error in ${delay/1000}s (Attempt ${connectionRetries}/${MAX_RETRIES})`);
+        setTimeout(startConnection, delay);
+      } else {
+        LOGGER.error('Max retries reached after errors');
+        process.exit(1); // Force restart in cloud environment
+      }
+    }
+  }
+
+  // Initialize and start
+  initializeConnection().then(() => {
+    startConnection();
+  }).catch(err => {
+    LOGGER.error('Failed to initialize:', err);
+    process.exit(1);
   });
-});
 
-// Export connection state for monitoring
-module.exports = {
-  getConnectionState: () => ({
-    state: connectionState,
-    retries: connectionRetries,
-    lastError: lastDisconnectCode,
-    qrGenerated,
-    hasQR: !!lastQRCode,
-    uptime: lastConnectTime ? Math.floor((Date.now() - lastConnectTime) / 1000) : 0
-  })
-};
+  // Handle graceful shutdown
+  process.on('SIGINT', () => {
+    LOGGER.info('Shutting down...');
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (cleanupTimer) clearInterval(cleanupTimer);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (sock) {
+      sock.end();
+    }
+    server.close(() => {
+      LOGGER.info('Server closed');
+      process.exit(0);
+    });
+  });
+
+  // Export connection state for monitoring
+  module.exports = {
+    getConnectionState: () => ({
+      state: connectionState,
+      retries: connectionRetries,
+      lastError: lastDisconnectCode,
+      qrGenerated,
+      hasQR: !!lastQRCode,
+      uptime: lastConnectTime ? Math.floor((Date.now() - lastConnectTime) / 1000) : 0
+    })
+  };
