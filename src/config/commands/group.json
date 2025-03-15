@@ -567,6 +567,30 @@
       "permissions": ["admin"]
     },
     {
+      "name": "everyone",
+      "description": "BocchiBot-style mention with arrows",
+      "usage": "!everyone [message]",
+      "example": "!everyone was geht",
+      "cooldown": 60,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "bocchi",
+      "description": "Simple BocchiBot mention format",
+      "usage": "!bocchi [message]",
+      "example": "!bocchi BocchiBot style mention",
+      "cooldown": 60,
+      "permissions": ["admin"]
+    },
+    {
+      "name": "hier",
+      "description": "WhatsApp Business-style hier mention",
+      "usage": "!hier [message]",
+      "example": "!hier was geht",
+      "cooldown": 60,
+      "permissions": ["admin"]
+    },
+    {
       "name": "antibots",
       "description": "Prevent other bots in the group",
       "usage": "!antibots <on|off>",

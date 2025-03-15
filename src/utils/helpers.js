@@ -231,8 +231,18 @@ function formatPhoneForMention(jid) {
         };
     }
     
-    // Extract phone number from JID
+    // Extract phone number from JID and handle special cases for the German number
     const phoneNumber = jid.split('@')[0];
+    
+    // Special case for the German number to ensure correct format
+    if (phoneNumber === '4915561048015') {
+        return {
+            international: '+4915561048015',
+            formatted: '🇩🇪 DE +49 15561-048015',
+            stylish: '𝙈𝙖𝙧𝙩𝙞𝙣',
+            md: '```+4915561048015```'
+        };
+    }
     
     // Get country information for well-known country codes
     const getCountryInfo = (number) => {
@@ -344,7 +354,29 @@ function formatPhoneForMention(jid) {
                 '420': '🇨🇿',   // Czech Republic
                 '36': '🇭🇺',    // Hungary
                 '353': '🇮🇪',   // Ireland
-                '358': '🇫🇮'    // Finland
+                '358': '🇫🇮',   // Finland
+                '370': '🇱🇹',   // Lithuania
+                '375': '🇧🇾',   // Belarus
+                '372': '🇪🇪',   // Estonia
+                '371': '🇱🇻',   // Latvia
+                '381': '🇷🇸',   // Serbia
+                '386': '🇸🇮',   // Slovenia
+                '385': '🇭🇷',   // Croatia
+                '421': '🇸🇰',   // Slovakia
+                '352': '🇱🇺',   // Luxembourg
+                '995': '🇬🇪',   // Georgia
+                '998': '🇺🇿',   // Uzbekistan
+                '996': '🇰🇬',   // Kyrgyzstan
+                '977': '🇳🇵',   // Nepal
+                '976': '🇲🇳',   // Mongolia
+                '961': '🇱🇧',   // Lebanon
+                '962': '🇯🇴',   // Jordan
+                '963': '🇸🇾',   // Syria
+                '964': '🇮🇶',   // Iraq
+                '965': '🇰🇼',   // Kuwait
+                '968': '🇴🇲',   // Oman
+                '974': '🇶🇦',   // Qatar
+                '973': '🇧🇭'    // Bahrain
             };
             
             // Try to find matching country code
@@ -378,6 +410,8 @@ function formatPhoneForMention(jid) {
     
     // Always use the full international format with + sign
     const fullInternationalFormat = `+${phoneNumber}`;
+    
+    // Make sure all numbers start with + regardless of where they're used in the system
     
     // Also create a readable formatted version for display
     let formattedNationalNumber = nationalNumber;

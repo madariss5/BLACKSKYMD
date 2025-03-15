@@ -190,6 +190,18 @@ async function safeSendMessage(sock, jid, content) {
             return null;
         }
         
+        // Enhanced mention handling for notification delivery
+        if (content.mentions && Array.isArray(content.mentions)) {
+            // Log mention information for debugging
+            logger.info(`Sending message with ${content.mentions.length} mentions to ${formatJidForLogging(normalizedJid)}`);
+            
+            // Ensure all mentions are properly formatted as strings
+            content.mentions = content.mentions.map(mentionJid => {
+                // Convert any non-string JIDs to strings
+                return ensureJidString(mentionJid);
+            }).filter(Boolean); // Remove any empty/invalid JIDs
+        }
+        
         return await sock.sendMessage(normalizedJid, content);
     } catch (err) {
         logger.error('Error in safeSendMessage:', err);

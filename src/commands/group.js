@@ -60,6 +60,163 @@ function formatDuration(seconds) {
 
 // Group command handlers
 const groupCommands = {
+    async everyone(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await safeSendText(sock, remoteJid, '❌ This command can only be used in groups');
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+
+            if (!isUserAdmin) {
+                await safeSendText(sock, remoteJid, '❌ This command can only be used by admins');
+                return;
+            }
+
+            // Get group metadata with participant details
+            const metadata = await sock.groupMetadata(remoteJid);
+            const { participants, subject } = metadata;
+            
+            // Create mentions array for everyone
+            const mentions = participants.map(p => p.id);
+            
+            // Get custom message if provided
+            const customMessage = args.length > 0 ? args.join(' ') : 'was geht';
+            
+            // Create BocchiBot-style everyone message with arrow pointers
+            let formattedText = `┏━━\n┃❏『 *EVERYONE* 』❏\n┗━━\n\n${customMessage}\n\n`;
+            
+            // Add each participant with arrow pointer - with simplified display
+            for (const participant of participants) {
+                // Instead of showing the full phone number, just use the last 4 digits with a name format
+                const phoneNumber = participant.id.split('@')[0];
+                // Use full phone number with country code
+                
+                // Format with full phone number
+                formattedText += `┃➤ @${phoneNumber}\n`;
+            }
+            
+            // Add footer
+            formattedText += `\n『 *BLACKSKY-MD* 』`;
+            
+            // Send the formatted message with mentions
+            await safeSendMessage(sock, remoteJid, {
+                text: formattedText,
+                mentions
+            });
+
+        } catch (err) {
+            logger.error('Error in everyone command:', err);
+            await safeSendText(sock, message.key.remoteJid, '❌ Failed to tag everyone');
+        }
+    },
+    
+    async bocchi(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await safeSendText(sock, remoteJid, '❌ This command can only be used in groups');
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+
+            if (!isUserAdmin) {
+                await safeSendText(sock, remoteJid, '❌ This command can only be used by admins');
+                return;
+            }
+
+            // Get group metadata with participant details
+            const metadata = await sock.groupMetadata(remoteJid);
+            const { participants, subject } = metadata;
+            
+            // Create mentions array for everyone
+            const mentions = participants.map(p => p.id);
+            
+            // Get custom message if provided
+            const customMessage = args.length > 0 ? args.join(' ') : '';
+            
+            // Format in BocchiBot style exactly as seen in screenshots
+            let formattedText = `『 *${customMessage || 'MENTION'}* 』\n\n`;
+            
+            // Add each participant with arrow pointer like in the screenshot
+            for (const participant of participants) {
+                // Extract the full phone number from participant's JID
+                const phoneNumber = participant.id.split('@')[0];
+                
+                formattedText += `➤ @${phoneNumber}\n`;
+            }
+            
+            // Send the formatted message with mentions
+            await safeSendMessage(sock, remoteJid, {
+                text: formattedText,
+                mentions
+            });
+
+        } catch (err) {
+            logger.error('Error in bocchi command:', err);
+            await safeSendText(sock, message.key.remoteJid, '❌ Failed to tag everyone');
+        }
+    },
+    
+    async hier(sock, message, args) {
+        try {
+            const remoteJid = message.key.remoteJid;
+
+            if (!remoteJid.endsWith('@g.us')) {
+                await safeSendText(sock, remoteJid, '❌ This command can only be used in groups');
+                return;
+            }
+
+            const sender = message.key.participant || message.key.remoteJid;
+            const isUserAdmin = await isAdmin(sock, remoteJid, sender);
+
+            if (!isUserAdmin) {
+                await safeSendText(sock, remoteJid, '❌ This command can only be used by admins');
+                return;
+            }
+
+            // Get group metadata with participant details
+            const metadata = await sock.groupMetadata(remoteJid);
+            const { participants, subject } = metadata;
+            
+            // Create mentions array for everyone
+            const mentions = participants.map(p => p.id);
+            
+            // Get custom message if provided
+            const customMessage = args.length > 0 ? args.join(' ') : 'was geht';
+            
+            // Create the formatted message similar to the WhatsApp Business screenshot
+            const randomEmojis = ['✨', '📢', '💬', '👥', '🔔', '📣', '🌟'];
+            const emoji = randomEmojis[Math.floor(Math.random() * randomEmojis.length)];
+            
+            let formattedText = `${emoji} *Hier ${emoji}*\n\n${customMessage}\n\n`;
+            
+            // Add each participant with a simple @ mention - simplified display
+            participants.forEach(participant => {
+                // Extract the full phone number from participant's JID
+                const phoneNumber = participant.id.split('@')[0];
+                
+                formattedText += `@${phoneNumber}\n`;
+            });
+            
+            // Send the formatted message with mentions
+            await safeSendMessage(sock, remoteJid, {
+                text: formattedText,
+                mentions
+            });
+
+        } catch (err) {
+            logger.error('Error in hier command:', err);
+            await safeSendText(sock, message.key.remoteJid, '❌ Failed to tag everyone');
+        }
+    },
     async kick(sock, message, args) {
         try {
             const remoteJid = message.key.remoteJid;
@@ -900,7 +1057,7 @@ const groupCommands = {
                 let count = 1;
                 for (const admin of admins) {
                     const phoneNumber = admin.split('@')[0];
-                    // Format with numbering and sparkling crown for admins
+                    // Format with numbering and sparkling crown for admins using full phone number
                     formattedText += `┃ ${count}. ✨ @${phoneNumber}\n`;
                     count++;
                 }
@@ -987,8 +1144,11 @@ const groupCommands = {
             const metadata = await sock.groupMetadata(remoteJid);
             const { participants, subject } = metadata;
             
-            // Create mentions array for everyone
+            // Create mentions array for everyone - ensure proper JID format for notifications
             const mentions = participants.map(p => p.id);
+            
+            // Log the mentions to debug
+            console.log(`Preparing to mention ${mentions.length} participants in group ${subject}`);
             
             // Get custom message if provided
             const customMessage = args.length > 0 ? args.join(' ') : '📣 Attention everyone!';
@@ -997,12 +1157,28 @@ const groupCommands = {
             const timestamp = new Date().toLocaleTimeString();
             const mentionId = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
             
-            // Create a simpler format with formatted phone numbers
+            // Create a detailed format with properly formatted phone numbers
             const formattedParticipants = participants.map(participant => {
                 const numberStr = participant.id.split('@')[0];
                 const formatResult = formatPhoneForMention(participant.id);
+                
                 // Use different emoji for admin vs member
                 const emoji = participant.admin ? '👑' : '👤';
+                
+                // Set display name from our special cases - with country flags for better visuals
+                let participantDisplayName = '';
+                
+                // Special cases for well-known numbers with friendly names
+                if (numberStr === '4915561048015') {
+                    participantDisplayName = 'Martin 🇩🇪'; // German number
+                } else if (numberStr === '14155552671') {
+                    participantDisplayName = 'John 🇺🇸'; // US number
+                } else if (numberStr === '420123456789') {
+                    participantDisplayName = 'Pavel 🇨🇿'; // Czech number
+                } else if (numberStr === '447911123456') {
+                    participantDisplayName = 'James 🇬🇧'; // UK number
+                }
+                
                 return {
                     id: participant.id,
                     number: numberStr,
@@ -1011,7 +1187,8 @@ const groupCommands = {
                     stylish: formatResult.stylish,
                     md: formatResult.md,
                     emoji: emoji,
-                    isAdmin: participant.admin
+                    isAdmin: participant.admin,
+                    displayName: participantDisplayName
                 };
             });
             
@@ -1037,7 +1214,22 @@ const groupCommands = {
             for (const participant of formattedParticipants) {
                 // Show crown for admins in the group mention
                 const displayEmoji = participant.isAdmin ? '👑' : '👤';
-                currentLine += `${displayEmoji}@${participant.number} `;
+                
+                // Use participant's display name if it exists, otherwise use the number with @ prefix
+                // Use the displayName from participant object (initialized earlier)
+                if (participant.displayName) {
+                    // Display name with country flag for known contacts
+                    currentLine += `${displayEmoji}${participant.displayName} `;
+                } else if (participant.formatted && participant.formatted.includes('+')) {
+                    // Use formatted with country flag (e.g., "🇩🇪 DE +49 15561-048015")
+                    currentLine += `${displayEmoji}${participant.formatted} `;
+                } else if (participant.international) {
+                    // Use international format with + (e.g., +491234567890)
+                    currentLine += `${displayEmoji}${participant.international} `;
+                } else {
+                    // Show full phone number with @ prefix
+                    currentLine += `${displayEmoji}@${participant.number} `;
+                }
                 count++;
                 
                 // Start a new line after every 3 participants for cleaner look
@@ -1058,8 +1250,22 @@ const groupCommands = {
             if (admins.length > 0) {
                 mentionText += `┏━━━━『 *👑 ADMINS* 』━━━━┓\n`;
                 admins.forEach((admin, index) => {
-                    // Use the stylish format from our enhanced phone formatter
-                    mentionText += `┃ ${index + 1}. ${admin.stylish}\n`;
+                    // First try to use the display name with crown
+                    if (admin.displayName) {
+                        mentionText += `┃ ${index + 1}. 👑 ${admin.displayName}\n`;
+                    } 
+                    // Then try formatted with country flag
+                    else if (admin.formatted && admin.formatted.includes('+')) {
+                        mentionText += `┃ ${index + 1}. 👑 ${admin.formatted}\n`;
+                    }
+                    // Then international format
+                    else if (admin.international) {
+                        mentionText += `┃ ${index + 1}. 👑 ${admin.international}\n`;
+                    }
+                    // Last resort, use full phone number
+                    else {
+                        mentionText += `┃ ${index + 1}. 👑 @${admin.number}\n`;
+                    }
                 });
                 mentionText += `┗━━━━━━━━━━━━━━━━━━━━┛\n\n`;
             }
@@ -1071,7 +1277,17 @@ const groupCommands = {
             const countryGroups = {};
             formattedParticipants.forEach(p => {
                 // Extract country from formatted text (e.g., "🇩🇪 DE +49 123456789")
-                const countryCode = p.formatted.split(' ')[0]; // Get flag emoji
+                // Handle cases where formatted doesn't have proper country info
+                let countryCode = '🌐'; // Default to globe emoji for unknown
+                
+                if (p.formatted && p.formatted.includes(' ')) {
+                    countryCode = p.formatted.split(' ')[0]; // Get flag emoji
+                } else if (p.displayName && p.displayName.includes('�')) {
+                    // Extract country flag from display name if available
+                    const match = p.displayName.match(/�[a-z]{2}/i);
+                    if (match) countryCode = match[0];
+                }
+                
                 if (!countryGroups[countryCode]) {
                     countryGroups[countryCode] = [];
                 }
@@ -1098,10 +1314,14 @@ const groupCommands = {
             mentionText += `║  _Professional WhatsApp Bot_  ║\n`;
             mentionText += `╚══════════════════════╝`;
             
-            // Send the mention message
+            // Log before sending to verify the mentions structure
+            console.log(`Sending message with ${mentions.length} mentions to group ${subject}`);
+            
+            // Send the mention message with proper mention structure
+            // The mentions array must contain the JIDs of all participants to be mentioned
             await safeSendMessage(sock, remoteJid, {
                 text: mentionText,
-                mentions
+                mentions: mentions // This ensures everyone gets a notification
             });
 
         } catch (err) {

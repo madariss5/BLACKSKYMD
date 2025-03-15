@@ -20,15 +20,10 @@ const {
     formatJidForLogging
 } = require('../utils/jidHelper');
 
-const TEMP_DIR = path.join(process.cwd(), 'temp/nsfw');
+// Import optimized NSFW image fetching utility
+const { fetchNsfwImage, API_ENDPOINTS, SUPPORTED_CATEGORIES } = require('../utils/fetchNsfwImage');
 
-// API endpoints for NSFW content
-const API_ENDPOINTS = {
-    HMTAI: 'https://hmtai.hatsunia.cfd/v2',
-    WAIFU: 'https://api.waifu.pics/nsfw',
-    NEKO: 'https://nekos.life/api/v2',
-    FALLBACK: 'https://api.waifu.im/search'
-};
+const TEMP_DIR = path.join(process.cwd(), 'temp/nsfw');
 
 async function getFileTypeFromBuffer(buffer) {
     try {
@@ -600,22 +595,18 @@ NSFW Statistics:
                 return;
             }
 
-            await safeSendText(sock, sender, 'Fetching image...');
+            // Send immediate feedback to improve perceived responsiveness
+            await safeSendText(sock, sender, '🔍 Finding the perfect waifu for you...');
 
-            const waifuUrl = 'https://api.waifu.pics/nsfw/waifu';
-            const fallbacks = [
-                'https://api.nekos.fun/api/waifu',
-                'https://api.hmtai.me/nsfw/waifu'
-            ];
+            // Use optimized fetchNsfwImage utility with parallel requests and smart caching
+            const imageUrl = await fetchNsfwImage('waifu', false);
 
-            const response = await fetchApi(waifuUrl, fallbacks);
-
-            if (!response || !response.url) {
+            if (!imageUrl) {
                 await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
                 return;
             }
 
-            await safeSendImage(sock, sender, response.url, '🔞 NSFW Waifu');
+            await safeSendImage(sock, sender, imageUrl, '🔞 NSFW Waifu');
 
             logger.info(`NSFW waifu image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
@@ -642,22 +633,18 @@ NSFW Statistics:
                 return;
             }
 
-            await safeSendText(sock, sender, 'Fetching image...');
+            // Send immediate feedback with a fun message for better user experience
+            await safeSendText(sock, sender, '🔍 Searching for the perfect neko image...');
 
-            const nekoUrl = 'https://api.waifu.pics/nsfw/neko';
-            const fallbacks = [
-                'https://api.nekos.fun/api/neko',
-                'https://api.hmtai.me/nsfw/nsfwNeko'
-            ];
+            // Use optimized fetchNsfwImage utility for faster image retrieval
+            const imageUrl = await fetchNsfwImage('neko', false);
 
-            const response = await fetchApi(nekoUrl, fallbacks);
-
-            if (!response || !response.url) {
+            if (!imageUrl) {
                 await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
                 return;
             }
 
-            await safeSendImage(sock, sender, response.url, '🔞 NSFW Neko');
+            await safeSendImage(sock, sender, imageUrl, '🔞 NSFW Neko');
 
             logger.info(`NSFW neko image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
@@ -972,21 +959,18 @@ NSFW Statistics:
                 return;
             }
 
-            await safeSendText(sock, sender, 'Fetching GIF...');
+            // Send immediate feedback with improved waiting message
+            await safeSendText(sock, sender, '🔍 Searching for the perfect animated content...');
 
-            const gifUrl = `${API_ENDPOINTS.HMTAI}/nsfw/boobs`;
-            const fallbacks = [
-                'https://api.nekos.fun/api/boobs',
-                'https://api.waifu.pics/nsfw/waifu'
-            ];
-
-            const response = await fetchApi(gifUrl, fallbacks);
-            if (!response || !response.url) {
+            // Use the optimized fetchNsfwImage with requireGif=true for GIF content
+            const imageUrl = await fetchNsfwImage('gifboobs', true);
+            
+            if (!imageUrl) {
                 await safeSendText(sock, sender, 'Failed to fetch GIF. Please try again later.');
                 return;
             }
 
-            await safeSendAnimatedGif(sock, sender, response.url, '🔞 Boobs GIF');
+            await safeSendAnimatedGif(sock, sender, imageUrl, '🔞 Boobs GIF');
 
             logger.info(`NSFW boobs GIF sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
