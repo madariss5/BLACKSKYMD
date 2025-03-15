@@ -2,7 +2,7 @@
  * Safari-based WhatsApp Connection
  * Advanced connection system optimized for cloud environments
  * Features automatic credential backup and enhanced error recovery
- * Version: 1.2.3
+ * Version: 1.2.4
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
@@ -20,11 +20,8 @@ const port = process.env.PORT || 5000;
 
 // Configuration
 const AUTH_FOLDER = process.env.AUTH_DIR || './auth_info_safari';
-const VERSION = '1.2.3';
+const VERSION = '1.2.4';
 const MAX_RETRIES = 10;
-const HEARTBEAT_INTERVAL = 30000; // 30 seconds
-const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const RECONNECT_INTERVAL = 60000; // 1 minute base interval
 const QR_TIMEOUT = 60000; // 1 minute QR timeout
 const QR_REFRESH_INTERVAL = 10000; // 10 seconds between QR attempts
 
@@ -32,7 +29,7 @@ const QR_REFRESH_INTERVAL = 10000; // 10 seconds between QR attempts
 const IS_CLOUD_ENV = process.env.REPLIT_ID || process.env.HEROKU_APP_ID;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-// Setup logger with improved formatting
+// Setup logger
 const LOGGER = pino({ 
   level: process.env.LOG_LEVEL || 'info',
   transport: {
@@ -49,9 +46,6 @@ const LOGGER = pino({
 // Connection state
 let sock = null;
 let connectionRetries = 0;
-let reconnectTimer = null;
-let heartbeatTimer = null;
-let cleanupTimer = null;
 let qrDisplayTimer = null;
 let qrRefreshTimer = null;
 let qrGenerated = false;
@@ -60,10 +54,9 @@ let lastDisconnectCode = null;
 let lastQRCode = null;
 let isReconnecting = false;
 let lastConnectTime = null;
-let connectionUptime = 0;
 let qrRetryCount = 0;
 
-// Safari fingerprint (optimized for stability)
+// Safari fingerprint
 const SAFARI_FINGERPRINT = {
   device: 'Safari on MacOS',
   platform: 'darwin',
@@ -83,25 +76,11 @@ app.get('/', (req, res) => {
     lastError: lastDisconnectCode,
     version: VERSION,
     uptime: uptime,
-    isReconnecting,
-    totalUptime: connectionUptime
+    isReconnecting
   });
 });
 
-app.get('/status', (req, res) => {
-  res.json({
-    state: connectionState,
-    qrGenerated,
-    retries: connectionRetries,
-    qrRetries: qrRetryCount,
-    lastError: lastDisconnectCode,
-    environment: IS_CLOUD_ENV ? 'cloud' : 'local',
-    timestamp: new Date().toISOString(),
-    lastConnectTime: lastConnectTime ? new Date(lastConnectTime).toISOString() : null
-  });
-});
-
-// Display QR code with enhanced error handling
+// Display QR code with proper formatting
 function displayQRCode(qr) {
   LOGGER.info(`Generating QR code (Attempt ${qrRetryCount + 1}/${MAX_RETRIES})`);
 
@@ -127,27 +106,16 @@ function displayQRCode(qr) {
       console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
     });
 
-    // Set up QR refresh timer
-    if (qrRefreshTimer) clearTimeout(qrRefreshTimer);
-    qrRefreshTimer = setTimeout(() => {
-      if (connectionState === 'awaiting_scan') {
-        LOGGER.info('Refreshing QR code...');
-        if (sock) {
-          sock.ev.emit('connection.update', { qr });
-        }
-      }
-    }, QR_REFRESH_INTERVAL);
-
     // Set QR timeout
     if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
     qrDisplayTimer = setTimeout(() => {
       if (connectionState === 'awaiting_scan') {
-        LOGGER.warn('QR code expired, initiating new QR generation');
+        LOGGER.warn('QR code expired, generating new one...');
         qrRetryCount++;
         if (qrRetryCount < MAX_RETRIES) {
           handleReconnection('QR timeout');
         } else {
-          LOGGER.error('Max QR retry attempts reached, restarting process');
+          LOGGER.error('Max QR retry attempts reached');
           process.exit(1); // Force restart in cloud environment
         }
       }
@@ -163,15 +131,12 @@ function displayQRCode(qr) {
       state: connectionState
     });
 
-    // Attempt to recover
-    if (sock) {
-      LOGGER.info('Attempting fallback QR display');
-      sock.ev.emit('connection.update', { qr });
-    }
+    // Output raw QR data as fallback
+    console.log('\nQR Code Data:', qr);
   }
 }
 
-// Initialize connection
+// Initialize connection with proper cleanup
 async function initializeConnection() {
   try {
     // Clear all existing auth folders to prevent conflicts
@@ -306,43 +271,6 @@ async function handleConnectionUpdate(update) {
   }
 }
 
-// Handle reconnection with improved error handling
-async function handleReconnection(reason) {
-  if (isReconnecting) {
-    LOGGER.info('Reconnection already in progress, skipping...');
-    return;
-  }
-
-  isReconnecting = true;
-  connectionState = 'reconnecting';
-
-  try {
-    LOGGER.info(`Initiating reconnection due to: ${reason}`);
-
-    // Clear existing timers
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
-    if (cleanupTimer) clearInterval(cleanupTimer);
-    if (reconnectTimer) clearTimeout(reconnectTimer);
-    if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
-    if (qrRefreshTimer) clearTimeout(qrRefreshTimer);
-
-    // Wait before attempting reconnection
-    const delay = Math.min(Math.pow(2, connectionRetries) * 1000, RECONNECT_INTERVAL);
-    LOGGER.info(`Waiting ${delay/1000}s before reconnection attempt...`);
-
-    await new Promise(resolve => setTimeout(resolve, delay));
-
-    // Initialize fresh connection
-    await initializeConnection();
-    await startConnection();
-  } catch (err) {
-    LOGGER.error('Error during reconnection:', err);
-    connectionState = 'error';
-  } finally {
-    isReconnecting = false;
-  }
-}
-
 // Generate unique device ID
 function generateDeviceId() {
   const randomString = Math.random().toString(36).substring(2, 7);
@@ -368,7 +296,7 @@ async function startConnection() {
     sock = makeWASocket({
       version,
       auth: state,
-      printQRInTerminal: true, // Enable both QR display methods
+      printQRInTerminal: true, // Fallback QR display
       browser: [generateDeviceId(), ...SAFARI_FINGERPRINT.browser],
       browserDescription: [SAFARI_FINGERPRINT.device, SAFARI_FINGERPRINT.platform, VERSION],
       userAgent: SAFARI_FINGERPRINT.userAgent,
@@ -432,9 +360,6 @@ const server = app.listen(port, '0.0.0.0', () => {
 // Handle graceful shutdown
 process.on('SIGINT', () => {
   LOGGER.info('Shutting down...');
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
-  if (cleanupTimer) clearInterval(cleanupTimer);
-  if (reconnectTimer) clearTimeout(reconnectTimer);
   if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
   if (qrRefreshTimer) clearTimeout(qrRefreshTimer);
   if (sock) {
