@@ -2,7 +2,13 @@
  * Safari-based WhatsApp Connection
  * Advanced connection system optimized for cloud environments
  * Features automatic credential backup and enhanced error recovery
- * Version: 1.3.1
+ * Version: 2.0.0
+ * 
+ * INSTRUCTION FOR BEST RESULTS:
+ * 1. First establish a connection on your local machine using local-connect.js
+ * 2. Upload the auth_info_baileys folder to your Replit project
+ * 3. Run import-session.js to copy credentials to auth_info_safari folder
+ * 4. Then start this Safari Connect workflow
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');

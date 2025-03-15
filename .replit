@@ -13,23 +13,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "WhatsApp Bot"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Terminal QR"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Web QR"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Safari Connect"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Connected Bot"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -37,19 +21,11 @@ args = "QR Code Server"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Pairing Code Generator"
+args = "Persistent Connection"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Status Dashboard"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Improved Pairing Code"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "FLASH-MD"
+args = "WhatsApp Bot"
 
 [[workflows.workflow]]
 name = "Run Bot"
@@ -59,51 +35,6 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node src/index.js"
-
-[[workflows.workflow]]
-name = "WhatsApp Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node src/index.js"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Terminal QR"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node src/terminal-qr.js"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Web QR"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node src/web-qr.js"
-waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Safari Connect"
@@ -121,21 +52,6 @@ args = "node safari-connect.js"
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "Connected Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node connected-bot.js"
-waitForPort = 5004
-
-[[workflows.workflow]]
 name = "QR Code Server"
 author = "agent"
 
@@ -151,7 +67,7 @@ args = "node src/qr-generator.js"
 waitForPort = 5003
 
 [[workflows.workflow]]
-name = "Pairing Code Generator"
+name = "Persistent Connection"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -162,56 +78,33 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node pairing-code-generator.js"
-waitForPort = 5050
-
-[[workflows.workflow]]
-name = "Status Dashboard"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node connection-status.js"
-waitForPort = 5090
-
-[[workflows.workflow]]
-name = "Improved Pairing Code"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node improved-pairing-code.js"
-waitForPort = 5005
-
-[[workflows.workflow]]
-name = "FLASH-MD"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node flash-md-connect.js"
+args = "node persistent-connection.js"
 waitForPort = 5500
+
+[[workflows.workflow]]
+name = "WhatsApp Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node easy-start.js"
 
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
+
+[[ports]]
+localPort = 3000
+externalPort = 8081
+
+[[ports]]
+localPort = 3200
+externalPort = 8099
 
 [[ports]]
 localPort = 5000

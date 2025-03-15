@@ -4,13 +4,14 @@
 
 ### Connection Methods
 - ✅ QR Code generation (terminal and web-based)
-- ✅ Pairing code generation (with user-friendly interface)
+- ✅ Pairing code generation (with multiple options)
 - ✅ Multiple browser fingerprints for better compatibility
 - ✅ Session persistence and backup
 - ✅ Automatic reconnection with exponential backoff
 
 ### User Interface
 - ✅ Clean web interface for pairing code generation
+- ✅ Multiple connection options (FLASH-MD, Simple Pairing Code)
 - ✅ Pre-filled phone number for convenience
 - ✅ Status display with connection information
 - ✅ Toggle between QR code and pairing code methods
