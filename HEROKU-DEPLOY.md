@@ -1,6 +1,6 @@
 # Deploying WhatsApp Bot to Heroku
 
-This guide provides detailed instructions for deploying the WhatsApp Bot to Heroku, addressing the common challenges of Heroku's ephemeral filesystem.
+This guide provides detailed instructions for deploying the WhatsApp Bot to Heroku, with a focus on proper configuration and maintenance.
 
 ## Table of Contents
 1. [Prerequisites](#prerequisites)
@@ -22,32 +22,20 @@ Before you start, make sure you have:
 
 ## Preparing for Deployment
 
-### 1. Optimize Configuration for Heroku
+### 1. Configure Environment Variables
 
-Heroku has an ephemeral filesystem, meaning files written during the application's runtime are not persisted between dynos restarts. To overcome this:
+The bot uses several environment variables defined in `app.json`. Key variables include:
+- `PREFIX`: Command prefix for the bot (default: ".")
+- `OWNER_NUMBER`: Your WhatsApp number with country code (e.g., "491234567890")
+- `AUTH_DIR`: Directory for auth files (default: "auth_info_baileys")
+- `LOG_LEVEL`: Logging level (default: "info")
 
-- We'll use the bot's built-in credential backup system
-- Use environment variables for configuration
-- Utilize Heroku's add-ons for persistent storage when needed
+### 2. Understanding Heroku's Filesystem
 
-### 2. Adjust Port Configuration
-
-Heroku dynamically assigns a port to your application, which we must respect:
-
-```javascript
-// In server.js or your web server file
-const PORT = process.env.PORT || 5000;
-```
-
-### 3. Create a Procfile
-
-Create a `Procfile` in your project root (if not already present) with the following content:
-
-```
-web: node heroku-deploy.js
-```
-
-This tells Heroku to run the `heroku-deploy.js` script when starting the web dyno.
+Heroku has an ephemeral filesystem, meaning files written during runtime are not persisted between dynos restarts. The bot is designed to handle this by:
+- Using environment variables for configuration
+- Implementing automatic credential backup and restore
+- Utilizing Heroku's PostgreSQL add-on for persistent storage
 
 ## Setting Up Heroku
 
@@ -64,107 +52,62 @@ heroku create your-whatsapp-bot-name
 heroku create your-whatsapp-bot-name --region eu
 ```
 
-### 2. Add the Heroku Redis Add-on (Optional but Recommended)
-
-Redis can be used to store session data and credentials:
+### 2. Configure Environment Variables
 
 ```bash
-heroku addons:create heroku-redis:hobby-dev
-```
-
-### 3. Configure Environment Variables
-
-```bash
-# Set environment variables for your configuration
+# Set essential environment variables
 heroku config:set NODE_ENV=production
-heroku config:set PREFIX=!
-heroku config:set OWNER_NUMBER=1234567890
+heroku config:set PREFIX=.
+heroku config:set OWNER_NUMBER=your_number_here
 ```
 
-Add any other environment variables your bot needs.
+Add any other environment variables defined in `app.json` that you want to customize.
 
 ## Deployment Process
 
-### 1. Prepare your code for Heroku
-
-Ensure your `package.json` has the correct:
-- Main script
-- Node version
-- Start command
-
-Example `package.json` snippet:
-```json
-{
-  "name": "blacksky-md-bot",
-  "version": "1.0.0",
-  "description": "WhatsApp Bot for Heroku",
-  "main": "heroku-deploy.js",
-  "scripts": {
-    "start": "node heroku-deploy.js"
-  },
-  "engines": {
-    "node": "14.x"
-  }
-}
-```
-
-### 2. Commit your changes
+### 1. Deploy using Heroku Git
 
 ```bash
-git add .
-git commit -m "Prepared for Heroku deployment"
-```
+# Add Heroku remote
+heroku git:remote -a your-app-name
 
-### 3. Deploy to Heroku
-
-```bash
+# Push to Heroku
 git push heroku main
 ```
 
-Or if you're on a different branch:
+The deployment process will automatically:
+- Install required dependencies
+- Set up the PostgreSQL database
+- Configure the necessary buildpacks
+- Run post-deployment migrations
 
+### 2. Verify Deployment
+
+Check deployment status and logs:
 ```bash
-git push heroku yourbranch:main
-```
-
-### 4. Scale your app
-
-By default, Heroku doesn't start web dynos automatically after deployment. Start it with:
-
-```bash
-heroku ps:scale web=1
+# View build logs
+heroku logs --tail
 ```
 
 ## Post-Deployment Steps
 
 ### 1. Connecting to WhatsApp
 
-After deployment, you'll need to connect your bot to WhatsApp by scanning a QR code:
+After deployment:
+1. Visit your app URL to see the QR code
+2. Scan the QR code with WhatsApp
+3. The bot will automatically save and manage credentials
 
-1. View the logs to see the QR code URL:
-   ```bash
-   heroku logs --tail
-   ```
+### 2. Verify Bot Operation
 
-2. Open the URL shown in the logs (it will be something like `https://your-app-name.herokuapp.com/qr`)
-
-3. Scan the QR code with your WhatsApp app
-
-### 2. Monitoring Logs
-
-Keep monitoring the logs to ensure your bot is running correctly:
-
+Check that the bot is running properly:
 ```bash
+# Check application status
+heroku ps
+
+# View real-time logs
 heroku logs --tail
 ```
-
-### 3. Setting up credential backup
-
-The bot has a built-in credential backup system that works with Heroku's ephemeral filesystem:
-
-1. First connection: Scan the QR code as described above
-2. The credentials will be automatically backed up to a secure format
-3. On dyno restarts, the credentials will be automatically restored from backup
 
 ## Troubleshooting
 
@@ -193,7 +136,6 @@ The bot has a built-in credential backup system that works with Heroku's ephemer
 ### Resolving Authentication Issues
 
 If your bot loses connection and cannot reconnect automatically:
-
 1. Access the Heroku Dashboard
 2. Restart the dyno: `heroku restart`
 3. Check logs to see the new QR code URL
@@ -216,16 +158,9 @@ If your bot loses connection and cannot reconnect automatically:
    - Add-on usage
    - Logs for errors
 
-3. **Perform backups**
-   Export important data regularly:
-   ```bash
-   heroku pg:backups:capture --app your-app-name
-   ```
-
 ### Scaling Your Bot
 
 As your bot's user base grows, you might need to scale:
-
 1. **Upgrading dynos**
    ```bash
    heroku ps:type hobby
@@ -249,6 +184,7 @@ As your bot's user base grows, you might need to scale:
 
 ---
 
-By following this guide, you should have a successfully deployed WhatsApp bot running on Heroku with optimized settings for reliability and persistence across dyno restarts.
-
-For further assistance, refer to the Heroku documentation or the WhatsApp bot's specific documentation.
+For further assistance, refer to:
+- [Heroku Documentation](https://devcenter.heroku.com/)
+- [WhatsApp Bot Documentation](./docs/)
+- [Baileys Library Documentation](https://github.com/whiskeysockets/baileys)

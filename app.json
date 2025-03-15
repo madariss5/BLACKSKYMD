@@ -23,6 +23,16 @@
       "description": "Directory to store auth files",
       "value": "auth_info_baileys",
       "required": false
+    },
+    "PLATFORM": {
+      "description": "Deployment platform identifier",
+      "value": "heroku",
+      "required": false
+    },
+    "LOG_LEVEL": {
+      "description": "Logging level (error, warn, info, debug)",
+      "value": "info",
+      "required": false
     }
   },
   "buildpacks": [
@@ -42,5 +52,15 @@
       "size": "eco"
     }
   },
-  "stack": "heroku-22"
+  "stack": "heroku-22",
+  "success_url": "/",
+  "addons": [
+    {
+      "plan": "heroku-postgresql:mini",
+      "as": "DATABASE"
+    }
+  ],
+  "scripts": {
+    "postdeploy": "npm run db:migrate"
+  }
 }

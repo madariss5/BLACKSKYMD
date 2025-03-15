@@ -1,1 +1,1 @@
-web: node heroku-deploy.js
+web: node src/index.js

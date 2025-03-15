@@ -8,13 +8,13 @@ class SessionManager {
         this.sessionsDir = path.join(process.cwd(), 'sessions');
         this.authDir = path.join(process.cwd(), 'auth_info');
         this.credentialsFile = path.join(this.authDir, 'creds.json');
-        this.isHeroku = process.env.DYNO ? true : false;
+        this.isHeroku = process.env.PLATFORM === 'heroku';
         this.sessionId = process.env.SESSION_ID || 'default-session';
-        
-        // Create temp directories for Heroku if needed
+
+        // Use tmp directory for Heroku's ephemeral filesystem
         if (this.isHeroku) {
             this.sessionsDir = path.join('/tmp', 'whatsapp-sessions');
-            this.authDir = path.join('/tmp', 'whatsapp-auth');
+            this.authDir = path.join('/tmp', process.env.AUTH_DIR || 'whatsapp-auth');
             this.credentialsFile = path.join(this.authDir, 'creds.json');
             logger.info('Running on Heroku, using temporary filesystem paths');
         }

@@ -22,7 +22,7 @@ echo -e "${YELLOW}Adding files to git...${NC}"
 
 # Main files
 git add connected-bot.js qr-web-display.js improved-qr.js bot-handler.js
-git add heroku-deploy.js Procfile app.json HEROKU-DEPLOY.md
+git add Procfile app.json HEROKU-DEPLOY.md
 git add src/translations/en.json src/translations/de.json
 git add README.md CHANGELOG.md .gitignore .env.example
 
@@ -45,7 +45,7 @@ echo -e "${YELLOW}Enter a commit message (or press enter for default message):${
 read -r commit_message
 
 if [[ -z "$commit_message" ]]; then
-    commit_message="Update WhatsApp Bot with improved connection handling and web QR display"
+    commit_message="Update WhatsApp Bot with improved configuration and deployment settings"
 fi
 
 # Commit changes

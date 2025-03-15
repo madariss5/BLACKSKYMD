@@ -118,14 +118,15 @@ Zur Bereitstellung auf Heroku:
 
 1. Erstelle eine neue App auf [Heroku](https://dashboard.heroku.com/)
 2. Verbinde dein GitHub-Repository oder verwende die Heroku CLI zum Pushen des Codes
-3. Füge folgende Umgebungsvariablen in den Heroku-Einstellungen hinzu:
+3. Die benötigten Umgebungsvariablen werden automatisch aus `app.json` konfiguriert
+4. Füge zusätzliche Umgebungsvariablen in den Heroku-Einstellungen hinzu falls nötig:
    - Alle benötigten API-Keys (wie oben beschrieben)
    - `NODE_ENV=production`
    - `PLATFORM=heroku` 
    - `AUTH_DIR=auth_info` (oder ein anderes Verzeichnis deiner Wahl)
    - `CREDS_DATA=deine_creds_json_daten` (einfügen der Daten aus dem getcreds-Befehl)
 
-4. Starte die App und der Bot sollte automatisch mit den vorhandenen Anmeldeinformationen verbinden, ohne einen neuen QR-Code zu benötigen
+Die App wird automatisch mit den richtigen Buildpacks, Add-ons und Nachbereitstellungsskripts bereitgestellt.
 
 ### Troubleshooting für Heroku
 

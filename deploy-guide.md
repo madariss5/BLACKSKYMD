@@ -17,7 +17,7 @@ This guide will help you deploy your WhatsApp bot to various platforms.
 3. **Configure the run command**
    - In the `.replit` file, set your run command to:
    ```
-   run = "node connected-bot.js"
+   run = "node src/index.js"
    ```
 
 4. **Start the bot**
@@ -28,31 +28,34 @@ This guide will help you deploy your WhatsApp bot to various platforms.
 
 1. **Create a new Heroku app**
    ```bash
-   heroku create your-bot-name
+   heroku create your-whatsapp-bot-name
    ```
 
 2. **Set up environment variables**
+   All required environment variables are configured in `app.json`. You can override them using:
    ```bash
    heroku config:set PREFIX=.
    heroku config:set OWNER_NUMBER=491234567890
-   # Set all other required environment variables...
+   # Set any other custom environment variables...
    ```
 
-3. **Configure Procfile**
-   Make sure your Procfile contains:
-   ```
-   web: node connected-bot.js
-   ```
-
-4. **Push to Heroku**
+3. **Deploy your application**
    ```bash
    git push heroku main
    ```
 
-5. **Scale the dyno**
+   The deployment will automatically:
+   - Set up required buildpacks
+   - Install dependencies
+   - Configure PostgreSQL database
+   - Run post-deployment tasks
+
+4. **Monitor deployment**
    ```bash
-   heroku ps:scale web=1
+   heroku logs --tail
    ```
+
+For detailed Heroku deployment instructions, see [HEROKU-DEPLOY.md](./HEROKU-DEPLOY.md)
 
 ## Setup with Custom Domain
 
@@ -106,7 +109,7 @@ If you encounter connection issues:
    - Heroku: `heroku logs --tail`
 
 2. **Clear auth data**
-   - Delete the `auth_info_qr` directory
+   - Delete the `auth_info_baileys` directory
    - Restart the bot and scan a new QR code
 
 3. **Network issues**
