@@ -66,177 +66,34 @@ function getRetryDelay() {
     return Math.min(withJitter, MAX_RETRY_INTERVAL);
 }
 
-// Create simple HTML page
-app.get('/', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <title>WhatsApp Bot QR Code</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        min-height: 100vh;
-                        margin: 0;
-                        background: #f0f2f5;
-                        padding: 20px;
-                    }
-                    .container {
-                        background: white;
-                        padding: 30px;
-                        border-radius: 10px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                        max-width: 500px;
-                        width: 100%;
-                        text-align: center;
-                    }
-                    h1 { color: #128C7E; }
-                    .qr-container {
-                        margin: 20px 0;
-                        padding: 20px;
-                        border: 2px dashed #ddd;
-                        display: inline-block;
-                    }
-                    #qr-image {
-                        max-width: 300px;
-                        height: auto;
-                    }
-                    .status {
-                        margin: 20px 0;
-                        padding: 10px;
-                        border-radius: 5px;
-                        font-weight: bold;
-                    }
-                    .connected { background: #e8f5e9; color: #2e7d32; }
-                    .disconnected { background: #fff3e0; color: #ef6c00; }
-                    .error { background: #ffebee; color: #c62828; }
-                    .loading { 
-                        font-size: 1.2em;
-                        color: #666;
-                        margin: 20px 0;
-                        animation: pulse 1.5s infinite;
-                    }
-                    @keyframes pulse {
-                        0% { opacity: 1; }
-                        50% { opacity: 0.5; }
-                        100% { opacity: 1; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1>WhatsApp Bot QR Code</h1>
-                    <div class="qr-container">
-                        <div id="loading" class="loading">Generating QR code...</div>
-                        <img id="qr-image" style="display: none;" alt="QR Code">
-                    </div>
-                    <div id="status" class="status disconnected">
-                        Waiting for connection...
-                    </div>
-                </div>
-                <script>
-                    function updateQR() {
-                        fetch('/status')
-                            .then(res => res.json())
-                            .then(data => {
-                                const status = document.getElementById('status');
-                                const loading = document.getElementById('loading');
-                                const qrImage = document.getElementById('qr-image');
-
-                                status.textContent = data.message || 'Checking connection status...';
-                                status.className = 'status ' + data.state;
-
-                                if (data.state === 'qr_ready') {
-                                    qrImage.src = '/qr?' + new Date().getTime();
-                                    qrImage.style.display = 'block';
-                                    loading.style.display = 'none';
-                                } else {
-                                    qrImage.style.display = 'none';
-                                    loading.style.display = 'block';
-                                }
-                            })
-                            .catch(err => {
-                                console.error('Error:', err);
-                                setTimeout(updateQR, 3000);
-                            });
-                    }
-
-                    // Initial check
-                    updateQR();
-                    // Regular updates
-                    setInterval(updateQR, 3000);
-                </script>
-            </body>
-        </html>
-    `);
-});
-
-// Handle QR code requests
-app.get('/qr', async (req, res) => {
-    try {
-        if (!qrCode) {
-            logger.debug('QR code requested but not available');
-            res.status(503).send('QR code not yet available');
-            return;
+// Cleanup connection
+async function cleanupConnection() {
+    if (sock) {
+        try {
+            sock.ev.removeAllListeners();
+            await sock.logout();
+            sock = null;
+        } catch (err) {
+            logger.error('Error during connection cleanup:', err);
         }
-
-        logger.debug('Generating QR code image');
-        const qrImage = await qrcode.toBuffer(qrCode, {
-            errorCorrectionLevel: 'H',
-            margin: 2,
-            scale: 8
-        });
-        res.type('png').send(qrImage);
-    } catch (err) {
-        logger.error('Error generating QR code:', err);
-        res.status(500).send('Error generating QR code');
-    }
-});
-
-// Status endpoint
-app.get('/status', (req, res) => {
-    res.json({
-        state: connectionState,
-        message: getStatusMessage(),
-        hasQR: !!qrCode
-    });
-});
-
-function getStatusMessage() {
-    switch (connectionState) {
-        case 'connected':
-            return 'Connected to WhatsApp! You can close this window.';
-        case 'disconnected':
-            return 'Disconnected. Waiting for connection...';
-        case 'connecting':
-            return 'Connecting to WhatsApp...';
-        case 'qr_ready':
-            return 'Please scan the QR code with WhatsApp';
-        default:
-            return 'Initializing...';
     }
 }
 
 // WhatsApp connection configuration
 const connectionConfig = {
-    version: [2, 2323, 4],
+    version: [2, 2204, 13], // Older stable version
     browser: ['Chrome', 'Windows', '10'],
     printQRInTerminal: true,
     logger: logger.child({ level: 'debug' }),
     auth: undefined,
-    defaultQueryTimeoutMs: 60000,
-    connectTimeoutMs: 60000,
-    qrTimeout: 40000,
-    emitOwnEvents: true,
+    defaultQueryTimeoutMs: 30000,
+    connectTimeoutMs: 30000,
+    qrTimeout: 30000,
+    emitOwnEvents: false,
     markOnlineOnConnect: false,
-    generateHighQualityLinkPreview: false,
     syncFullHistory: false,
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36',
+    customUploadHosts: ['web.whatsapp.com']
 };
 
 async function startWhatsAppConnection() {
@@ -246,6 +103,7 @@ async function startWhatsAppConnection() {
     }
 
     try {
+        await cleanupConnection();
         isConnecting = true;
         connectionState = 'connecting';
         logger.info('Starting WhatsApp connection attempt...');
@@ -303,8 +161,8 @@ async function startWhatsAppConnection() {
                 if (statusCode === DisconnectReason.loggedOut || 
                     statusCode === DisconnectReason.multideviceMismatch ||
                     statusCode === 405) {
-                    logger.info('Session invalid or rejected, clearing auth state...');
-                    await clearAuthState();
+                    logger.info('Session expired or invalid, clearing auth state...');
+                    await cleanupConnection();
                     retryCount = 0;
                     setTimeout(startWhatsAppConnection, 5000);
                 } else if (retryCount < MAX_RETRIES) {
@@ -314,7 +172,7 @@ async function startWhatsAppConnection() {
                     setTimeout(startWhatsAppConnection, delay);
                 } else {
                     logger.error('Max retries reached, clearing session');
-                    await clearAuthState();
+                    await cleanupConnection();
                     retryCount = 0;
                     setTimeout(startWhatsAppConnection, 5000);
                 }
@@ -334,8 +192,182 @@ async function startWhatsAppConnection() {
             const delay = getRetryDelay();
             setTimeout(startWhatsAppConnection, delay);
         } else {
-            await clearAuthState();
+            await cleanupConnection();
         }
+    }
+}
+
+// Create simple HTML page
+app.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <title>WhatsApp Bot QR Code</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body { 
+                        font-family: Arial, sans-serif;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 100vh;
+                        margin: 0;
+                        background: #f0f2f5;
+                        padding: 20px;
+                    }
+                    .container {
+                        background: white;
+                        padding: 30px;
+                        border-radius: 10px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        max-width: 500px;
+                        width: 100%;
+                        text-align: center;
+                    }
+                    h1 { color: #128C7E; }
+                    .qr-container {
+                        margin: 20px 0;
+                        padding: 20px;
+                        border: 2px dashed #ddd;
+                        display: inline-block;
+                        background: white;
+                    }
+                    #qr-image {
+                        max-width: 300px;
+                        height: auto;
+                    }
+                    .status {
+                        margin: 20px 0;
+                        padding: 10px;
+                        border-radius: 5px;
+                        font-weight: bold;
+                    }
+                    .connected { background: #e8f5e9; color: #2e7d32; }
+                    .disconnected { background: #fff3e0; color: #ef6c00; }
+                    .error { background: #ffebee; color: #c62828; }
+                    .loading { 
+                        font-size: 1.2em;
+                        color: #666;
+                        margin: 20px 0;
+                        animation: pulse 1.5s infinite;
+                    }
+                    @keyframes pulse {
+                        0% { opacity: 1; }
+                        50% { opacity: 0.5; }
+                        100% { opacity: 1; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>WhatsApp Bot QR Code</h1>
+                    <div class="qr-container">
+                        <div id="loading" class="loading">Generating QR code...</div>
+                        <img id="qr-image" style="display: none;" alt="QR Code">
+                    </div>
+                    <div id="status" class="status disconnected">
+                        Waiting for connection...
+                    </div>
+                    <div id="error" style="color: red; margin-top: 10px;"></div>
+                </div>
+                <script>
+                    function showError(message) {
+                        const errorDiv = document.getElementById('error');
+                        errorDiv.textContent = message;
+                        setTimeout(() => errorDiv.textContent = '', 5000);
+                    }
+
+                    function updateQR() {
+                        fetch('/status')
+                            .then(res => res.json())
+                            .then(data => {
+                                const status = document.getElementById('status');
+                                const loading = document.getElementById('loading');
+                                const qrImage = document.getElementById('qr-image');
+
+                                status.textContent = data.message || 'Checking connection status...';
+                                status.className = 'status ' + data.state;
+
+                                if (data.state === 'qr_ready') {
+                                    const qrUrl = '/qr?' + new Date().getTime();
+                                    qrImage.src = qrUrl;
+                                    qrImage.onload = () => {
+                                        qrImage.style.display = 'block';
+                                        loading.style.display = 'none';
+                                    };
+                                    qrImage.onerror = () => {
+                                        qrImage.style.display = 'none';
+                                        loading.style.display = 'block';
+                                        showError('Failed to load QR code, retrying...');
+                                    };
+                                } else {
+                                    qrImage.style.display = 'none';
+                                    loading.style.display = 'block';
+                                }
+                            })
+                            .catch(err => {
+                                console.error('Error:', err);
+                                showError('Connection error, retrying...');
+                                setTimeout(updateQR, 3000);
+                            });
+                    }
+
+                    // Initial check
+                    updateQR();
+                    // Regular updates
+                    setInterval(updateQR, 3000);
+                </script>
+            </body>
+        </html>
+    `);
+});
+
+// Handle QR code requests
+app.get('/qr', async (req, res) => {
+    try {
+        if (!qrCode) {
+            logger.debug('QR code requested but not available');
+            res.status(503).send('QR code not yet available');
+            return;
+        }
+
+        logger.debug('Generating QR code image');
+        const qrImage = await qrcode.toBuffer(qrCode, {
+            errorCorrectionLevel: 'H',
+            margin: 1,
+            scale: 8,
+            width: 256
+        });
+        res.type('png').send(qrImage);
+    } catch (err) {
+        logger.error('Error generating QR code:', err);
+        res.status(500).send('Error generating QR code');
+    }
+});
+
+// Status endpoint
+app.get('/status', (req, res) => {
+    res.json({
+        state: connectionState,
+        message: getStatusMessage(),
+        hasQR: !!qrCode
+    });
+});
+
+function getStatusMessage() {
+    switch (connectionState) {
+        case 'connected':
+            return 'Connected to WhatsApp! You can close this window.';
+        case 'disconnected':
+            return 'Disconnected. Waiting for connection...';
+        case 'connecting':
+            return 'Connecting to WhatsApp...';
+        case 'qr_ready':
+            return 'Please scan the QR code with WhatsApp';
+        default:
+            return 'Initializing...';
     }
 }
 
@@ -349,27 +381,13 @@ app.listen(PORT, '0.0.0.0', async () => {
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
     logger.info('Shutting down...');
-    if (sock) {
-        try {
-            await sock.logout();
-            await clearAuthState();
-        } catch (err) {
-            logger.error('Shutdown error:', err);
-        }
-    }
+    await cleanupConnection();
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
     logger.info('Shutting down...');
-    if (sock) {
-        try {
-            await sock.logout();
-            await clearAuthState();
-        } catch (err) {
-            logger.error('Shutdown error:', err);
-        }
-    }
+    await cleanupConnection();
     process.exit(0);
 });
 
