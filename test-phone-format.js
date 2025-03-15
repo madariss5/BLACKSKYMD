@@ -7,7 +7,7 @@ const { formatPhoneForMention } = require('./src/utils/helpers');
 
 // Sample phone numbers to test
 const testNumbers = [
-  '4915561048015@s.whatsapp.net', // German number
+  '8885655@s.whatsapp.net', // User number
   '14155552671@s.whatsapp.net',   // US number
   '919876543210@s.whatsapp.net',  // India number
   '447911123456@s.whatsapp.net',  // UK number

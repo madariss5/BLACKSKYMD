@@ -4,11 +4,11 @@ const config = {
         name: process.env.OWNER_NAME || 'Bot Owner',  
         // ============================================
         // Number format: Country code + number (no spaces/symbols)
-        // Example: 4915561048015
+        // Example: 8885655
         // ============================================
         number: process.env.OWNER_NUMBER ? 
             process.env.OWNER_NUMBER.replace(/[^0-9]/g, '') : 
-            '4915561048015',
+            '8885655',
         email: process.env.OWNER_EMAIL || '',
     },
 

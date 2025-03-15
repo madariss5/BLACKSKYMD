@@ -7,7 +7,7 @@ const { formatPhoneForMention } = require('./src/utils/helpers');
 
 // Sample phone numbers to test
 const testNumbers = [
-  '4915561048015@s.whatsapp.net',  // German number
+  '8885655@s.whatsapp.net',  // User number
   '12036340763@s.whatsapp.net',    // Number from screenshot
   '858556@s.whatsapp.net'          // Short number 
 ];
