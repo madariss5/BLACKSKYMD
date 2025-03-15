@@ -3,7 +3,7 @@
  * This version is optimized for Heroku environments where filesystem changes aren't persistent
  */
 
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, isJidBroadcast } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
@@ -25,6 +25,11 @@ let qrCodeDataURL = null;
 let connectionStatus = 'disconnected';
 let startTime = Date.now();
 let sessionData = null;
+
+// Add reconnection control
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const INITIAL_RECONNECT_INTERVAL = 5000;
 
 // Try to load message handler
 try {
@@ -124,6 +129,13 @@ async function loadSessionData() {
 }
 
 /**
+ * Calculate exponential backoff delay
+ */
+function getReconnectDelay() {
+    return Math.min(1000 * Math.pow(2, reconnectAttempts), 300000); // Max 5 minutes
+}
+
+/**
  * Initialize WhatsApp connection
  */
 async function connectToWhatsApp() {
@@ -133,22 +145,11 @@ async function connectToWhatsApp() {
             fs.mkdirSync(AUTH_DIR, { recursive: true });
         }
 
-        // Initialize auth state
-        let authState;
-
-        // Try to load session data first
-        const savedSession = await loadSessionData();
-        if (savedSession && savedSession.creds) {
-            console.log('Restoring from saved session');
-
-            // Write creds to auth file
-            fs.writeFileSync(path.join(AUTH_DIR, 'creds.json'), JSON.stringify(savedSession.creds, null, 2));
-
-            // Initialize from file
-            console.log('Initializing from auth file');
-        }
-
-        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+        // Initialize auth state with better error handling
+        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR).catch(err => {
+            console.error('Error initializing auth state:', err);
+            throw err;
+        });
 
         // Generate a unique browser ID for Heroku
         const browserId = `BLACKSKY-HEROKU-${Date.now().toString(36)}`;
@@ -158,27 +159,36 @@ async function connectToWhatsApp() {
         sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
-            browser: [browserId, 'Chrome', '110.0.0'],
-            logger: pino({ level: 'silent' }),
+            browser: ['BLACKSKY-MD', 'Desktop', '3.0'],
+            logger: pino({ level: 'warn' }),
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
-            keepAliveIntervalMs: 10000,
+            keepAliveIntervalMs: 30000,
             emitOwnEvents: false,
             markOnlineOnConnect: false,
             // Optimize for Heroku's limited resources
             syncFullHistory: false,
             fireAndForget: true,
-            retryRequestDelayMs: 1000
+            retryRequestDelayMs: 2000,
+            qrTimeout: 40000,
+            shouldIgnoreJid: jid => isJidBroadcast(jid),
+            version: [2, 2323, 4],
+            validateConnection: (json) => {
+                console.log('Connection validation:', json);
+                return true;
+            }
         });
 
         // Handle connection events
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
+            console.log('Connection update:', update); // More detailed logging
 
             if (qr) {
                 // Generate QR code and store it
                 qrCodeDataURL = await qrcode.toDataURL(qr);
                 console.log('New QR code generated');
+                reconnectAttempts = 0; // Reset reconnect attempts when new QR is generated
             }
 
             if (connection) {
@@ -188,6 +198,7 @@ async function connectToWhatsApp() {
 
             if (connection === 'open') {
                 console.log('Connection established successfully');
+                reconnectAttempts = 0; // Reset reconnect attempts on successful connection
 
                 // On successful connection, save credentials
                 try {
@@ -208,13 +219,13 @@ async function connectToWhatsApp() {
                         console.log('Session data backed up successfully');
 
                         // Log successful connection details
-                        console.log('Connected as:', sock.user.id.split(':')[0]);
+                        console.log('Connected as:', sock.user?.id?.split(':')[0]);
                     }
                 } catch (err) {
                     console.error('Error saving credentials:', err);
                 }
 
-                // Initialize message handler now that we're connected
+                // Initialize message handler with better error handling
                 if (messageHandler) {
                     console.log('Initializing message handler');
 
@@ -225,6 +236,7 @@ async function connectToWhatsApp() {
                                     await messageHandler(sock, message);
                                 } catch (err) {
                                     console.error('Error handling message:', err);
+                                    // Continue processing other messages despite errors
                                 }
                             }
                         }
@@ -232,7 +244,7 @@ async function connectToWhatsApp() {
                 } else {
                     console.warn('No message handler available');
 
-                    // Try to load it dynamically
+                    // Try to load it dynamically with better error handling
                     try {
                         const { messageHandler: handler } = require('./src/handlers/messageHandler');
                         if (handler) {
@@ -258,45 +270,66 @@ async function connectToWhatsApp() {
             }
 
             if (connection === 'close') {
-                // Handle disconnection
+                // Handle disconnection with improved error handling
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                console.log(`Connection closed with status code: ${statusCode}`);
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
+                    reconnectAttempts < MAX_RECONNECT_ATTEMPTS;
 
-                // Only attempt reconnection if not logged out
-                if (statusCode !== DisconnectReason.loggedOut) {
-                    console.log('Attempting to reconnect...');
-                    setTimeout(connectToWhatsApp, 5000);
-                } else {
+                console.log(`Connection closed with status code: ${statusCode}`);
+                console.log(`Reconnection attempt: ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
+
+                if (shouldReconnect) {
+                    reconnectAttempts++;
+                    const delay = getReconnectDelay();
+                    console.log(`Attempting to reconnect in ${delay/1000} seconds...`);
+                    setTimeout(connectToWhatsApp, delay);
+                } else if (statusCode === DisconnectReason.loggedOut) {
                     console.log('Not reconnecting - logged out');
+                    // Clear session data on logout
+                    try {
+                        fs.unlinkSync(SESSION_PATH);
+                        console.log('Session data cleared');
+                    } catch (err) {
+                        console.error('Error clearing session data:', err);
+                    }
+                } else {
+                    console.log('Maximum reconnection attempts reached');
                 }
             }
         });
 
-        // Save credentials when they update
+        // Save credentials when they update with improved error handling
         sock.ev.on('creds.update', async (creds) => {
-            await saveCreds();
+            try {
+                await saveCreds();
 
-            // Update our session backup
-            if (sessionData) {
-                sessionData.creds = creds;
-                sessionData.timestamp = Date.now();
-                await saveSessionData(sessionData);
-            } else {
-                // Create new session data
-                sessionData = {
-                    creds: creds,
-                    timestamp: Date.now(),
-                    version: '1.0'
-                };
-                await saveSessionData(sessionData);
+                // Update our session backup
+                if (sessionData) {
+                    sessionData.creds = creds;
+                    sessionData.timestamp = Date.now();
+                    await saveSessionData(sessionData);
+                } else {
+                    // Create new session data
+                    sessionData = {
+                        creds: creds,
+                        timestamp: Date.now(),
+                        version: '1.0'
+                    };
+                    await saveSessionData(sessionData);
+                }
+                console.log('Credentials updated and backed up');
+            } catch (err) {
+                console.error('Error updating credentials:', err);
             }
-            console.log('Credentials updated and backed up');
         });
 
         return sock;
     } catch (error) {
         console.error('Connection error:', error);
-        setTimeout(connectToWhatsApp, 10000);
+        // Implement exponential backoff for retry
+        const delay = getReconnectDelay();
+        console.log(`Retrying connection in ${delay/1000} seconds...`);
+        setTimeout(connectToWhatsApp, delay);
     }
 }
 
