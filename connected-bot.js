@@ -1,6 +1,7 @@
 /**
  * Unified WhatsApp Bot with Web QR Interface
  * Combines the QR web display and bot functionality in a single process
+ * Includes comprehensive command module support with 490+ commands
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
@@ -8,6 +9,12 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const qrcode = require('qrcode');
+const pino = require('pino');
+
+// Command loader
+const { commandLoader } = require('./src/utils/commandLoader');
+const { languageManager } = require('./src/utils/language');
+const { handleCommandError } = require('./src/utils/errorHandler');
 
 // Constants
 const AUTH_DIR = './auth_info_terminal';
@@ -146,7 +153,16 @@ app.get('/', (req, res) => {
                     ` : 
                     `<p>Waiting for QR code...</p>`}
                     
-                    <a href="/reset" class="button">Reset Connection</a>
+                    <div style="margin-top: 20px;">
+                        <a href="/reset" class="button">Reset Connection</a>
+                        <a href="/pairing" class="button" style="background-color: #075E54; margin-left: 10px;">Configure Pairing</a>
+                    </div>
+                    
+                    ${process.env.USE_PAIRING_CODE === 'true' ? `
+                        <div style="margin-top: 15px; font-size: 14px; color: #128C7E;">
+                            <strong>Pairing Code Mode:</strong> Enabled for ${process.env.PAIRING_NUMBER}
+                        </div>
+                    ` : ''}
                 </div>
             </div>
         </body>
@@ -165,8 +181,140 @@ app.get('/status', (req, res) => {
         status: connectionStatus,
         uptime: getUptime(),
         reconnections: uptime.connectionCount,
-        error: lastError
+        error: lastError,
+        pairing: {
+            enabled: process.env.USE_PAIRING_CODE === 'true',
+            number: process.env.PAIRING_NUMBER || ''
+        }
     });
+});
+
+// Pairing code configuration page
+app.get('/pairing', (req, res) => {
+    const usePairingCode = process.env.USE_PAIRING_CODE === 'true';
+    const phoneNumber = process.env.PAIRING_NUMBER || '';
+    
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>WhatsApp Pairing Configuration</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    text-align: center;
+                    margin: 0;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                    color: #333;
+                }
+                h1 { color: #128C7E; }
+                .container {
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+                .form-card {
+                    margin: 30px auto;
+                    padding: 20px;
+                    background: white;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    max-width: 500px;
+                    text-align: left;
+                }
+                .form-group {
+                    margin-bottom: 20px;
+                }
+                label {
+                    display: block;
+                    margin-bottom: 8px;
+                    font-weight: bold;
+                }
+                input[type="text"],
+                input[type="tel"] {
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    font-size: 16px;
+                    box-sizing: border-box;
+                }
+                .button {
+                    background-color: #128C7E;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    margin-top: 20px;
+                    cursor: pointer;
+                    text-decoration: none;
+                    display: inline-block;
+                    font-size: 16px;
+                }
+                .checkbox-container {
+                    display: flex;
+                    align-items: center;
+                }
+                .checkbox-container input {
+                    margin-right: 10px;
+                    width: 20px;
+                    height: 20px;
+                }
+                .note {
+                    background-color: #ffffd9;
+                    padding: 15px;
+                    border-radius: 5px;
+                    border-left: 4px solid #ffcc00;
+                    margin: 20px 0;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>WhatsApp Pairing Configuration</h1>
+                
+                <div class="form-card">
+                    <form action="/set-pairing" method="GET">
+                        <div class="form-group checkbox-container">
+                            <input type="checkbox" id="use_pairing" name="use_pairing" value="true" ${usePairingCode ? 'checked' : ''}>
+                            <label for="use_pairing">Use Pairing Code (Instead of QR Code)</label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="phone_number">Phone Number (with country code):</label>
+                            <input type="tel" id="phone_number" name="phone_number" value="${phoneNumber}" placeholder="e.g., +19876543210">
+                        </div>
+                        
+                        <div class="note">
+                            <p><strong>Note:</strong> Enter your full phone number with country code (e.g., +1 for USA). After saving, please restart the connection for changes to take effect.</p>
+                        </div>
+                        
+                        <button type="submit" class="button">Save Configuration</button>
+                    </form>
+                    
+                    <p style="margin-top: 20px;">
+                        <a href="/" style="color: #128C7E;">Back to Status Page</a>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+// Set pairing configuration
+app.get('/set-pairing', (req, res) => {
+    const usePairingCode = req.query.use_pairing === 'true';
+    const phoneNumber = req.query.phone_number || '';
+    
+    process.env.USE_PAIRING_CODE = usePairingCode ? 'true' : 'false';
+    process.env.PAIRING_NUMBER = phoneNumber;
+    
+    console.log(`Pairing configuration updated: enabled=${usePairingCode}, number=${phoneNumber}`);
+    
+    res.redirect('/pairing?success=true');
 });
 
 /**
@@ -196,7 +344,7 @@ async function clearAuthData(force = false) {
 }
 
 /**
- * Initialize WhatsApp connection with retry logic
+ * Initialize WhatsApp connection with retry logic and pairing code
  */
 async function connectToWhatsApp(retryCount = 0) {
     // Clear any existing reconnect timer
@@ -237,13 +385,29 @@ async function connectToWhatsApp(retryCount = 0) {
         // Create a unique device ID
         const deviceId = `BLACKSKY-${Date.now()}`;
         
-        // Initialize socket
+        // Determine if we should use pairing code instead of QR
+        const usePairingCode = process.env.USE_PAIRING_CODE === 'true';
+        const phoneNumber = process.env.PAIRING_NUMBER || '';
+        
+        console.log(`Pairing code mode: ${usePairingCode ? 'Enabled' : 'Disabled'}`);
+        if (usePairingCode && phoneNumber) {
+            console.log(`Will attempt to pair with: ${phoneNumber}`);
+        }
+        
+        // Initialize socket with different options based on pairing mode
         sock = makeWASocket({
             auth: state,
-            printQRInTerminal: true,
+            printQRInTerminal: !usePairingCode, // Only print QR if not using pairing code
             browser: [deviceId, browser[0], browser[1]],
             syncFullHistory: false,
-            connectTimeoutMs: 60000
+            connectTimeoutMs: 60000,
+            // Add mobile device fingerprint if using pairing code
+            ...(usePairingCode ? {
+                mobile: true,
+                browser: ['BLACKSKY-MD', 'Safari', '1.0.0'],
+                logger: pino({ level: 'trace' }),
+                defaultQueryTimeoutMs: undefined
+            } : {})
         });
         
         // Handle connection updates
@@ -254,6 +418,36 @@ async function connectToWhatsApp(retryCount = 0) {
             if (qr) {
                 console.log('New QR code received');
                 qrCodeDataURL = await qrcode.toDataURL(qr);
+            }
+            
+            // Handle pairing code if enabled
+            const usePairingCode = process.env.USE_PAIRING_CODE === 'true';
+            const phoneNumber = process.env.PAIRING_NUMBER || '';
+            
+            if (usePairingCode && phoneNumber && !sock.authState.creds.registered && !qr) {
+                // Format the phone number (remove any non-numeric chars)
+                const formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+                if (formattedNumber) {
+                    try {
+                        console.log(`Requesting pairing code for ${formattedNumber}...`);
+                        // Request a pairing code
+                        setTimeout(async () => {
+                            const code = await sock.requestPairingCode(formattedNumber);
+                            console.log(`\n💻 Pairing Code: ${code}\n`);
+                            // Display the code on the web interface
+                            const pairingCodeHTML = `
+                            <div style="text-align:center; padding: 20px; font-family: monospace; background: #000; color: #0f0; border-radius: 10px; margin: 20px 0;">
+                                <h2>📱 WhatsApp Pairing Code</h2>
+                                <div style="font-size: 32px; letter-spacing: 5px; padding: 20px; font-weight: bold;">${code}</div>
+                                <p>Enter this code in your WhatsApp app to connect your device (${formattedNumber})</p>
+                            </div>`;
+                            qrCodeDataURL = `data:text/html,${encodeURIComponent(pairingCodeHTML)}`;
+                        }, 3000);
+                    } catch (error) {
+                        console.error('Failed to request pairing code:', error);
+                        lastError = `Pairing code request failed: ${error.message}`;
+                    }
+                }
             }
             
             // Handle connection status changes
@@ -322,32 +516,63 @@ async function connectToWhatsApp(retryCount = 0) {
         sock.ev.on('messages.upsert', async (m) => {
             if (m.type === 'notify') {
                 for (const msg of m.messages) {
-                    // Skip messages from self
-                    if (msg.key.fromMe) continue;
-                    
-                    console.log('New message received:', msg.key.remoteJid);
-                    const messageText = msg.message?.conversation || 
-                                       msg.message?.extendedTextMessage?.text || 
-                                       'Media message';
-                    
-                    console.log('Message text:', messageText);
-                    
-                    // Process command if it starts with !
-                    if (messageText.startsWith('!')) {
-                        const command = messageText.slice(1).trim().split(' ')[0];
-                        console.log('Command received:', command);
+                    try {
+                        // Skip messages from self
+                        if (msg.key.fromMe) continue;
                         
-                        if (command === 'ping') {
-                            await sock.sendMessage(msg.key.remoteJid, { text: 'Pong! Bot is operational.' });
-                        } else if (command === 'status') {
-                            await sock.sendMessage(msg.key.remoteJid, { 
-                                text: `Status: ${connectionStatus.toUpperCase()}\nUptime: ${getUptime()}\nReconnections: ${uptime.connectionCount}` 
-                            });
-                        } else if (command === 'time') {
-                            await sock.sendMessage(msg.key.remoteJid, { 
-                                text: `Current server time: ${new Date().toLocaleString()}` 
-                            });
+                        console.log('New message received:', msg.key.remoteJid);
+                        const messageText = msg.message?.conversation || 
+                                          msg.message?.extendedTextMessage?.text || 
+                                          'Media message';
+                        
+                        // Process command if it starts with !
+                        if (messageText.startsWith('!')) {
+                            const input = messageText.slice(1).trim();
+                            const [commandName, ...args] = input.split(' ');
+                            console.log('Command received:', commandName, 'with args:', args.join(' '));
+
+                            // Always handle these core commands directly
+                            if (commandName === 'ping') {
+                                await sock.sendMessage(msg.key.remoteJid, { text: 'Pong! Bot is operational.' });
+                                continue;
+                            } else if (commandName === 'status') {
+                                await sock.sendMessage(msg.key.remoteJid, { 
+                                    text: `Status: ${connectionStatus.toUpperCase()}\nUptime: ${getUptime()}\nReconnections: ${uptime.connectionCount}` 
+                                });
+                                continue;
+                            } else if (commandName === 'time') {
+                                await sock.sendMessage(msg.key.remoteJid, { 
+                                    text: `Current server time: ${new Date().toLocaleString()}` 
+                                });
+                                continue;
+                            }
+                            
+                            // Look up the command in the command loader
+                            const command = await commandLoader.getCommand(commandName);
+                            
+                            if (command) {
+                                try {
+                                    console.log(`Executing command: ${commandName}`);
+                                    // Execute the command
+                                    await command.execute(sock, msg, args);
+                                } catch (error) {
+                                    console.error(`Error executing command ${commandName}:`, error);
+                                    // Use the error handler to provide a user-friendly response
+                                    await handleCommandError(sock, msg.key.remoteJid, error, commandName, 'unknown', {
+                                        reply: true,
+                                        logError: true,
+                                        userFriendly: true
+                                    });
+                                }
+                            } else {
+                                // Command not found - you can optionally send a response here
+                                console.log(`Command not found: ${commandName}`);
+                                const helpText = languageManager.getText('system.command_not_found', 'en', commandName);
+                                await sock.sendMessage(msg.key.remoteJid, { text: helpText });
+                            }
                         }
+                    } catch (error) {
+                        console.error('Error processing message:', error);
                     }
                 }
             }
@@ -562,9 +787,19 @@ async function sendDeploymentNotification(sock) {
         const { id } = sock.user;
         console.log(`Bot JID: ${id}`);
         
+        // Get command stats
+        const stats = commandLoader.getCommandStats();
+        const breakdown = commandLoader.getCommandsBreakdown();
+        
+        // Format categories for notification
+        let categoryText = '';
+        Object.entries(breakdown).forEach(([category, count]) => {
+            categoryText += `- ${category}: ${count} commands\n`;
+        });
+        
         // Send deployment notification
         await sock.sendMessage(id, {
-            text: `🤖 Bot started and connected!\n\nTime: ${new Date().toLocaleString()}\nStatus: ${connectionStatus.toUpperCase()}\n\nAvailable commands:\n!ping - Test bot is running\n!status - Show connection status\n!time - Show server time`
+            text: `🤖 *Bot started and connected!*\n\n*Time:* ${new Date().toLocaleString()}\n*Status:* ${connectionStatus.toUpperCase()}\n*Commands:* ${stats.total} total across ${stats.modules} modules\n\n*Command Categories:*\n${categoryText}\n*Basic commands:*\n!menu - Show all commands\n!ping - Test bot is running\n!status - Show connection status\n!help - Show command help`
         });
         
     } catch (error) {
@@ -577,6 +812,27 @@ async function sendDeploymentNotification(sock) {
  */
 async function start() {
     console.log('Starting WhatsApp bot...');
+    
+    // Initialize language manager
+    await languageManager.loadTranslations();
+    console.log('Translations loaded successfully');
+    
+    // Load all commands
+    try {
+        console.log('Loading command modules...');
+        await commandLoader.loadCommandHandlers();
+        const stats = commandLoader.getCommandStats();
+        console.log(`Successfully loaded ${stats.total} commands from ${stats.modules} modules`);
+        
+        // Log command categories
+        const breakdown = commandLoader.getCommandsBreakdown();
+        console.log('Command categories:');
+        Object.entries(breakdown).forEach(([category, count]) => {
+            console.log(`- ${category}: ${count} commands`);
+        });
+    } catch (error) {
+        console.error('Error loading commands:', error);
+    }
     
     // Start the web server
     app.listen(port, '0.0.0.0', () => {
