@@ -2,7 +2,7 @@
  * Safari-based WhatsApp Connection
  * Advanced connection system optimized for cloud environments
  * Features automatic credential backup and enhanced error recovery
- * Version: 1.2.1
+ * Version: 1.2.2
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
@@ -11,8 +11,8 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
+const qrcode = require('qrcode-terminal');
 const fsPromises = require('fs').promises;
-
 
 // Initialize Express
 const app = express();
@@ -20,11 +20,12 @@ const port = process.env.PORT || 5000;
 
 // Configuration
 const AUTH_FOLDER = process.env.AUTH_DIR || './auth_info_safari';
-const VERSION = '1.2.1';
+const VERSION = '1.2.2';
 const MAX_RETRIES = 10;
 const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const RECONNECT_INTERVAL = 60000; // 1 minute base interval
+const QR_TIMEOUT = 60000; // 1 minute QR timeout
 
 // Environment detection
 const IS_CLOUD_ENV = process.env.REPLIT_ID || process.env.HEROKU_APP_ID;
@@ -50,6 +51,7 @@ let connectionRetries = 0;
 let reconnectTimer = null;
 let heartbeatTimer = null;
 let cleanupTimer = null;
+let qrDisplayTimer = null;
 let qrGenerated = false;
 let connectionState = 'disconnected';
 let lastDisconnectCode = null;
@@ -57,6 +59,7 @@ let lastQRCode = null;
 let isReconnecting = false;
 let lastConnectTime = null;
 let connectionUptime = 0;
+let qrRetryCount = 0;
 
 // Safari fingerprint (optimized for reliability)
 const SAFARI_FINGERPRINT = {
@@ -72,6 +75,7 @@ app.get('/', (req, res) => {
     retries: connectionRetries,
     maxRetries: MAX_RETRIES,
     hasQR: !!lastQRCode,
+    qrRetries: qrRetryCount,
     lastError: lastDisconnectCode,
     version: VERSION,
     uptime: uptime,
@@ -85,6 +89,7 @@ app.get('/status', (req, res) => {
     state: connectionState,
     qrGenerated,
     retries: connectionRetries,
+    qrRetries: qrRetryCount,
     lastError: lastDisconnectCode,
     environment: IS_CLOUD_ENV ? 'cloud' : 'local',
     timestamp: new Date().toISOString(),
@@ -96,6 +101,35 @@ app.get('/status', (req, res) => {
 const server = app.listen(port, '0.0.0.0', () => {
   LOGGER.info(`Status monitor running on port ${port}`);
 });
+
+// Display QR code with proper formatting
+function displayQRCode(qr) {
+  console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
+  console.log('█                   SCAN QR CODE TO CONNECT                      █');
+  console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
+
+  // Generate QR in terminal
+  qrcode.generate(qr, { small: true });
+
+  console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
+  console.log(`█  Scan within ${QR_TIMEOUT/1000} seconds. Attempt ${qrRetryCount + 1} of ${MAX_RETRIES}   █`);
+  console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
+
+  // Set QR timeout
+  if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
+  qrDisplayTimer = setTimeout(() => {
+    if (connectionState === 'awaiting_scan') {
+      LOGGER.info('QR code expired, generating new one...');
+      qrRetryCount++;
+      if (qrRetryCount < MAX_RETRIES) {
+        handleReconnection('QR timeout');
+      } else {
+        LOGGER.error('Max QR retry attempts reached');
+        process.exit(1); // Force restart in cloud environment
+      }
+    }
+  }, QR_TIMEOUT);
+}
 
 // Initialize connection
 async function initializeConnection() {
@@ -117,6 +151,11 @@ async function initializeConnection() {
   // Create fresh auth folder
   fs.mkdirSync(AUTH_FOLDER, { recursive: true });
   LOGGER.info('Fresh auth folder created');
+
+  // Reset QR state
+  qrRetryCount = 0;
+  lastQRCode = null;
+  if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
 }
 
 // Heartbeat mechanism
@@ -212,8 +251,9 @@ async function handleConnectionUpdate(update) {
   if (qr) {
     qrGenerated = true;
     lastQRCode = qr;
-    LOGGER.info('QR Code received, waiting for scan...');
+    LOGGER.info(`QR Code received (Attempt ${qrRetryCount + 1}/${MAX_RETRIES})`);
     connectionState = 'awaiting_scan';
+    displayQRCode(qr);
   }
 
   if (connection === 'close') {
@@ -231,6 +271,7 @@ async function handleConnectionUpdate(update) {
         (lastDisconnect?.error instanceof Boom && lastDisconnect.error.output.statusCode === 440)) {
       LOGGER.warn('Session expired or logged out, clearing auth state');
       connectionRetries = 0;
+      qrRetryCount = 0; // Reset QR retries on logout
       handleReconnection('Session expired');
     } else if (statusCode === 405) {
       LOGGER.warn('405 error detected - adjusting connection parameters');
@@ -254,8 +295,15 @@ async function handleConnectionUpdate(update) {
   } else if (connection === 'open') {
     connectionState = 'connected';
     lastQRCode = null;
+    qrRetryCount = 0;
     connectionRetries = 0;
     lastConnectTime = Date.now();
+
+    // Clear QR timeout if it exists
+    if (qrDisplayTimer) {
+      clearTimeout(qrDisplayTimer);
+      qrDisplayTimer = null;
+    }
 
     LOGGER.info('✅ SUCCESSFULLY CONNECTED TO WHATSAPP!');
     LOGGER.info(`📱 Connected as: ${sock.user?.id || 'Unknown'}`);
@@ -861,23 +909,23 @@ async function startConnection() {
     // Update connection state
     connectionState = 'connecting';
     LOGGER.info(`Starting WhatsApp connection (Attempt ${connectionRetries + 1}/${MAX_RETRIES})...`);
-
+    
     // Get auth state
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-
+    
     // Get Baileys version
     const { version } = await fetchLatestBaileysVersion();
     LOGGER.info(`Using Baileys version: ${version.join('.')}`);
-
+    
     // Create socket with optimized settings
     sock = makeWASocket({
       version,
       auth: state,
-      printQRInTerminal: true,
+      printQRInTerminal: false, // We handle QR code display ourselves
       browser: [generateDeviceId(), ...SAFARI_FINGERPRINT.browser],
       userAgent: SAFARI_FINGERPRINT.userAgent,
       connectTimeoutMs: 60000,
-      qrTimeout: 60000,
+      qrTimeout: QR_TIMEOUT,
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 10000,
       emitOwnEvents: false,
@@ -890,21 +938,21 @@ async function startConnection() {
       maxRetries: IS_CLOUD_ENV ? 5 : 3,
       patchMessageBeforeSending: msg=> msg
     });
-
+    
     // Handle connection updates
     sock.ev.on('connection.update', handleConnectionUpdate);
-
+    
     // Save credentials when updated
     sock.ev.on('creds.update', saveCreds);
     setupMessageHandler();
     // Load command modules
     LOGGER.info('Loading command modules...');
     await loadCommandModules();
-
+    
   } catch (err) {
     LOGGER.error('Error in connection:', err);
     connectionState = 'error';
-
+    
     if (connectionRetries < MAX_RETRIES) {
       connectionRetries++;
       const delay = Math.min(Math.pow(2, connectionRetries) * 1000, 10000);
