@@ -72,7 +72,7 @@ function cleanupConnection() {
     if (sock) {
         try {
             sock.ev.removeAllListeners();
-            sock.ws.close();
+            if (sock.ws) sock.ws.close();
             sock = null;
         } catch (err) {
             logger.error('Error during socket cleanup:', err);
@@ -85,46 +85,20 @@ function cleanupConnection() {
     }
 }
 
-// Monitor connection health
-function startConnectionMonitor() {
-    if (connectionMonitorInterval) {
-        clearInterval(connectionMonitorInterval);
-    }
-
-    connectionMonitorInterval = setInterval(() => {
-        if (sock && sock.ws) {
-            const state = sock.ws.readyState;
-            logger.debug(`WebSocket state: ${state}`);
-
-            if (state === 3) { // CLOSED
-                logger.warn('WebSocket detected as closed, initiating reconnection...');
-                cleanupConnection();
-                startWhatsAppConnection();
-            }
-        }
-    }, 30000); // Check every 30 seconds
-}
-
 // Improved connection configuration
 const connectionConfig = {
-    version: [2, 2246, 10], // Recent stable WhatsApp Web version
-    browser: ['WhatsApp Bot', 'Chrome', '116.0.0'], // Standard browser identification
+    version: [2, 2323, 4],
     printQRInTerminal: true,
+    browser: ['Chrome', 'Chrome', '112.0.0'],
     logger: logger.child({ level: 'debug' }),
     connectTimeoutMs: 60000,
     qrTimeout: 40000,
     defaultQueryTimeoutMs: 20000,
     emitOwnEvents: false,
     markOnlineOnConnect: false,
-    syncFullHistory: false,
-    fireInitQueries: true,
-    userAgent: 'WhatsApp/2.2246.10 Chrome/116.0.0', // Explicit user agent
-    auth: undefined, // Will be set during connection
-    agent: undefined, // Let the library handle the agent
-    fetchAgent: undefined, // Let the library handle fetch agent
-    proxyAgent: undefined, // No proxy needed
-    getMessage: async () => undefined,
-    shouldSyncHistoryMessage: false
+    downloadHistory: false,
+    linkPreviewImageThumbnailWidth: 192,
+    getMessage: async () => undefined
 };
 
 async function startWhatsAppConnection() {
@@ -139,6 +113,9 @@ async function startWhatsAppConnection() {
         connectionState = 'connecting';
         logger.info('Starting WhatsApp connection attempt...');
 
+        // Clear auth state for fresh start
+        await clearAuthState();
+
         // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
         connectionConfig.auth = state;
@@ -147,7 +124,7 @@ async function startWhatsAppConnection() {
         sock = makeWASocket(connectionConfig);
         logger.info('Socket created, waiting for connection...');
 
-        // Handle connection updates with enhanced logging
+        // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             logger.debug('Connection update received:', update);
@@ -180,20 +157,21 @@ async function startWhatsAppConnection() {
             }
 
             if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const errorMessage = lastDisconnect?.error?.message || 'Unknown error';
-
-                logger.warn(`Connection closed. Status: ${statusCode}, Error: ${errorMessage}`);
                 isConnecting = false;
                 connectionState = 'disconnected';
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const errorMessage = lastDisconnect?.error?.message || 'Unknown error';
+                logger.warn(`Connection closed. Status: ${statusCode}, Error: ${errorMessage}`);
 
-                if (statusCode === DisconnectReason.loggedOut) {
-                    logger.info('Session expired, clearing auth state...');
+                if (statusCode === DisconnectReason.loggedOut || 
+                    statusCode === DisconnectReason.multideviceMismatch) {
+                    logger.info('Session invalid, clearing auth state...');
                     await clearAuthState();
                     retryCount = 0;
                     setTimeout(startWhatsAppConnection, 5000);
                 } else if (statusCode === DisconnectReason.connectionClosed || 
-                         statusCode === DisconnectReason.connectionLost) {
+                         statusCode === DisconnectReason.connectionLost ||
+                         statusCode === DisconnectReason.connectionReplaced) {
                     if (retryCount < MAX_RETRIES) {
                         retryCount++;
                         const delay = getRetryDelay();
@@ -206,11 +184,10 @@ async function startWhatsAppConnection() {
                         setTimeout(startWhatsAppConnection, 5000);
                     }
                 } else {
-                    // Handle other errors
                     if (retryCount < MAX_RETRIES) {
                         retryCount++;
                         const delay = getRetryDelay();
-                        logger.info(`Retrying connection in ${delay/1000}s (Attempt ${retryCount}/${MAX_RETRIES})`);
+                        logger.info(`Unknown error, retrying in ${delay/1000}s (Attempt ${retryCount}/${MAX_RETRIES})`);
                         setTimeout(startWhatsAppConnection, delay);
                     } else {
                         logger.error('Max retries reached, clearing session');
@@ -225,7 +202,11 @@ async function startWhatsAppConnection() {
         // Handle credentials update
         sock.ev.on('creds.update', saveCreds);
 
-        // Monitor WebSocket state
+        // Monitor socket state
+        sock.ws.on('open', () => {
+            logger.info('WebSocket connection opened');
+        });
+
         sock.ws.on('error', (err) => {
             logger.error('WebSocket error:', err);
         });
@@ -335,7 +316,6 @@ app.get('/', (req, res) => {
                                     qrImg.style.display = 'block';
                                     placeholder.style.display = 'none';
 
-                                    // If QR code loads successfully
                                     qrImg.onload = () => setTimeout(updateQR, 20000);
                                     qrImg.onerror = () => {
                                         qrImg.style.display = 'none';
@@ -354,7 +334,6 @@ app.get('/', (req, res) => {
                             });
                     }
 
-                    // Start the update cycle
                     updateQR();
                 </script>
             </body>
