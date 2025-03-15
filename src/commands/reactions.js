@@ -1,7 +1,7 @@
 // Import required modules
 const logger = require('../utils/logger');
 const axios = require('axios');
-const { safeSendText, safeSendMessage, safeSendImage, safeSendAnimatedGif } = require('../utils/jidHelper');
+const { safeSendText, safeSendMessage, safeSendImage, safeSendAnimatedGif, formatJidForLogging } = require('../utils/jidHelper');
 const { languageManager } = require('../utils/language');
 
 // Cache for user information
@@ -261,7 +261,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
 
         // First send the text message for immediate response
         await safeSendText(sock, sender, decoratedMessage);
-        logger.info(`Successfully sent ${type} reaction text to ${sender}`);
+        logger.info(`Successfully sent ${type} reaction text to ${formatJidForLogging(sender)}`);
         
         // Then try to send the GIF if available - using centralized safeSendAnimatedGif utility
         if (hasGif) {
@@ -282,7 +282,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                     shouldLoop: true,    // Ensure animation loops
                     seconds: 8           // Suggested duration for looping
                 });
-                logger.info(`Successfully sent ${type} reaction GIF to ${sender} using safeSendAnimatedGif`);
+                logger.info(`Successfully sent ${type} reaction GIF to ${formatJidForLogging(sender)} using safeSendAnimatedGif`);
             } catch (gifError) {
                 logger.error(`Error sending animated GIF: ${gifError.message}`);
                 
@@ -323,7 +323,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                         caption: ''
                     });
                     
-                    logger.info(`Successfully sent ${type} reaction as MP4 with gifPlayback to ${sender}`);
+                    logger.info(`Successfully sent ${type} reaction as MP4 with gifPlayback to ${formatJidForLogging(sender)}`);
                     
                     // Clean up
                     try {
@@ -341,7 +341,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                             sticker: buffer,
                             isAnimated: true,
                         });
-                        logger.info(`Successfully sent ${type} reaction as animated sticker to ${sender} (last resort)`);
+                        logger.info(`Successfully sent ${type} reaction as animated sticker to ${formatJidForLogging(sender)} (last resort)`);
                     } catch (fallbackError) {
                         logger.error(`All fallback methods failed: ${fallbackError.message}`);
                     }

@@ -26,7 +26,6 @@ class LanguageManager {
         try {
             // Try multiple possible locations for translations directory
             const possibleDirs = [
-                path.join(__dirname, '../translations'),
                 path.join(process.cwd(), 'src/translations'),
                 path.join(process.cwd(), 'translations')
             ];

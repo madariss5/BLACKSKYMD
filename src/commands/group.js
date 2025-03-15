@@ -11,9 +11,9 @@ const fsPromises = fs.promises;
 const initializeDirectories = async () => {
     try {
         const dirs = [
-            path.join(__dirname, '../../data/groups'),
-            path.join(__dirname, '../../data/groups/settings'),
-            path.join(__dirname, '../../data/groups/media')
+            path.join(process.cwd(), 'data/groups'),
+            path.join(process.cwd(), 'data/groups/settings'),
+            path.join(process.cwd(), 'data/groups/media')
         ];
 
         for (const dir of dirs) {

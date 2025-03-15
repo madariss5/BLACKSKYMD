@@ -49,7 +49,7 @@ async function validateCommandModule(module, moduleName, requiredCommands) {
  */
 async function loadCommandsFromConfig(category) {
     try {
-        const configPath = path.join(__dirname, `../config/commands/${category}.json`);
+        const configPath = path.join(process.cwd(), `src/config/commands/${category}.json`);
         const configContent = await fs.readFile(configPath, 'utf8');
         const config = JSON.parse(configContent);
         

@@ -31,7 +31,7 @@ async function init() {
             logger.info('Loading command handler module...');
             
             // Get the full path to the command handler module for better error reporting
-            const commandHandlerPath = path.resolve(__dirname, './commandHandler.js');
+            const commandHandlerPath = path.resolve(process.cwd(), 'src/handlers/commandHandler.js');
             logger.info(`Command handler path: ${commandHandlerPath}`);
             
             // Check if file exists
@@ -95,7 +95,7 @@ async function init() {
 
         // Create temp directories
         try {
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fs.mkdir(tempDir, { recursive: true });
             logger.info('Temp directory created:', tempDir);
         } catch (err) {

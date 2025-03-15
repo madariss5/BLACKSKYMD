@@ -33,38 +33,118 @@ function levenshteinDistance(a, b) {
     return matrix[b.length][a.length];
 }
 
+// Load all JSON configurations for commands
+async function loadCommandConfigs() {
+    try {
+        const configsMap = new Map();
+        const configDir = path.join(process.cwd(), 'src/config/commands');
+        
+        // Check if config directory exists
+        try {
+            await fs.access(configDir);
+        } catch (err) {
+            logger.error('Config directory does not exist:', configDir);
+            return configsMap;
+        }
+        
+        // Read all JSON config files
+        const configFiles = await fs.readdir(configDir);
+        logger.log(`Found ${configFiles.length} config files in ${configDir}`);
+        
+        for (const file of configFiles) {
+            if (!file.endsWith('.json')) continue;
+            
+            try {
+                const filePath = path.join(configDir, file);
+                const content = await fs.readFile(filePath, 'utf8');
+                const config = JSON.parse(content);
+                const category = file.replace('.json', '');
+                
+                if (Array.isArray(config.commands)) {
+                    let cmdCount = 0;
+                    for (const cmd of config.commands) {
+                        if (cmd && cmd.name) {
+                            configsMap.set(cmd.name, {
+                                ...cmd,
+                                category
+                            });
+                            cmdCount++;
+                        }
+                    }
+                    logger.log(`Loaded ${cmdCount} command configs from ${file}`);
+                }
+            } catch (err) {
+                logger.error(`Error loading config file ${file}:`, err);
+            }
+        }
+        
+        logger.log(`Total command configs loaded: ${configsMap.size}`);
+        return configsMap;
+    } catch (err) {
+        logger.error('Error loading command configs:', err);
+        return new Map();
+    }
+}
+
 // Import all commands from the commands directory recursively
 async function loadCommands() {
     try {
-        const commandsPath = path.join(__dirname, '../commands');
+        const commandsPath = path.join(process.cwd(), 'src/commands');
         const files = await getAllFiles(commandsPath);
         let loadedCount = 0;
+        let stubCount = 0;
 
         logger.log('\nStarting command loading process...');
         logger.log('Loading commands from:', commandsPath);
+        
+        // Load all command configurations first
+        const commandConfigs = await loadCommandConfigs();
+        logger.log(`Loaded ${commandConfigs.size} command configurations from JSON files`);
 
+        // Track which commands are actually implemented
+        const implementedCommands = new Set();
+
+        // First pass - load all implemented commands
         for (const file of files) {
             if (file.endsWith('.js') && !['index.js'].includes(path.basename(file))) {
                 try {
                     logger.log(`\nProcessing file: ${path.relative(commandsPath, file)}`);
                     const filePath = file;
                     const moduleData = require(filePath);
-                    const category = path.basename(path.dirname(file));
+                    const fileBasename = path.basename(file, '.js');
+                    const category = path.basename(path.dirname(file)) !== 'commands' 
+                        ? path.basename(path.dirname(file)) 
+                        : fileBasename;
 
                     // Handle both direct commands and categorized commands
                     if (moduleData.commands) {
                         Object.entries(moduleData.commands).forEach(([name, func]) => {
                             if (typeof func === 'function' && name !== 'init') {
-                                commands.set(name, async (sock, message, args) => {
-                                    try {
-                                        return await func(sock, message, args);
-                                    } catch (err) {
-                                        logger.error(`Error executing command ${name}:`, err);
-                                        throw err;
-                                    }
+                                // Get configuration for this command
+                                const config = commandConfigs.get(name);
+                                
+                                commands.set(name, {
+                                    execute: async (sock, message, args) => {
+                                        try {
+                                            return await func(sock, message, args);
+                                        } catch (err) {
+                                            logger.error(`Error executing command ${name}:`, err);
+                                            throw err;
+                                        }
+                                    },
+                                    description: config?.description || `Command: ${name}`,
+                                    usage: config?.usage || `!${name}`,
+                                    category: config?.category || category,
+                                    cooldown: config?.cooldown || 3,
+                                    groupOnly: config?.groupOnly || false,
+                                    permissions: config?.permissions || ['user'],
+                                    enabled: config?.enabled !== false,
+                                    isStub: false
                                 });
+                                
+                                implementedCommands.add(name);
                                 loadedCount++;
-                                logger.log(`✓ Loaded command: ${name} (${category})`);
+                                logger.log(`✓ Loaded command: ${name} (${config?.category || category})`);
                             }
                         });
 
@@ -72,25 +152,40 @@ async function loadCommands() {
                         if (typeof moduleData.init === 'function') {
                             try {
                                 await moduleData.init();
-                                logger.log(`✓ Initialized module: ${path.basename(file, '.js')}`);
+                                logger.log(`✓ Initialized module: ${fileBasename}`);
                             } catch (err) {
-                                logger.error(`Error initializing module ${path.basename(file, '.js')}:`, err);
+                                logger.error(`Error initializing module ${fileBasename}:`, err);
                             }
                         }
                     } else if (typeof moduleData === 'object') {
                         // Direct command exports
                         Object.entries(moduleData).forEach(([name, func]) => {
                             if (typeof func === 'function' && name !== 'init') {
-                                commands.set(name, async (sock, message, args) => {
-                                    try {
-                                        return await func(sock, message, args);
-                                    } catch (err) {
-                                        logger.error(`Error executing command ${name}:`, err);
-                                        throw err;
-                                    }
+                                // Get configuration for this command
+                                const config = commandConfigs.get(name);
+                                
+                                commands.set(name, {
+                                    execute: async (sock, message, args) => {
+                                        try {
+                                            return await func(sock, message, args);
+                                        } catch (err) {
+                                            logger.error(`Error executing command ${name}:`, err);
+                                            throw err;
+                                        }
+                                    },
+                                    description: config?.description || `Command: ${name}`,
+                                    usage: config?.usage || `!${name}`,
+                                    category: config?.category || category,
+                                    cooldown: config?.cooldown || 3,
+                                    groupOnly: config?.groupOnly || false,
+                                    permissions: config?.permissions || ['user'],
+                                    enabled: config?.enabled !== false,
+                                    isStub: false
                                 });
+                                
+                                implementedCommands.add(name);
                                 loadedCount++;
-                                logger.log(`✓ Loaded direct command: ${name} (${category})`);
+                                logger.log(`✓ Loaded direct command: ${name} (${config?.category || category})`);
                             }
                         });
                     }
@@ -100,11 +195,74 @@ async function loadCommands() {
             }
         }
 
-        logger.log('\n✅ Command loading summary:');
-        logger.log(`Total commands loaded: ${loadedCount}`);
-        logger.log('Available commands:', Array.from(commands.keys()).sort().join(', '));
+        // Second pass - create stubs for configured but unimplemented commands
+        for (const [commandName, config] of commandConfigs.entries()) {
+            if (!implementedCommands.has(commandName)) {
+                // This command is configured but not implemented - create a stub
+                const stubHandler = async (sock, message) => {
+                    try {
+                        const sender = message.key.remoteJid;
+                        await safeSendText(sock, sender, 
+                            `⚠️ Command *!${commandName}* exists in configuration but hasn't been implemented yet.`
+                        );
+                        logger.log(`Executed stub for unimplemented command: ${commandName}`);
+                    } catch (err) {
+                        logger.error(`Error in stub command ${commandName}:`, err);
+                    }
+                };
 
-        if (loadedCount === 0) {
+                commands.set(commandName, {
+                    execute: stubHandler,
+                    description: config.description || `Command: ${commandName}`,
+                    usage: config.usage || `!${commandName}`,
+                    category: config.category || 'uncategorized',
+                    cooldown: config.cooldown || 3,
+                    groupOnly: config.groupOnly || false,
+                    permissions: config.permissions || ['user'],
+                    enabled: config.enabled !== false,
+                    isStub: true
+                });
+
+                stubCount++;
+                logger.log(`⚠️ Created stub for command: ${commandName} (${config.category})`);
+            }
+        }
+
+        logger.log('\n✅ Command loading summary:');
+        logger.log(`Total implemented commands loaded: ${loadedCount}`);
+        logger.log(`Stub commands created: ${stubCount}`);
+        logger.log(`Total commands available: ${loadedCount + stubCount}`);
+        
+        // Get detailed breakdown by category
+        const commandsByCategory = {};
+        const stubCommandsByCategory = {};
+        
+        for (const [name, cmd] of commands.entries()) {
+            if (typeof cmd === 'object' && cmd.category) {
+                const category = cmd.category;
+                if (cmd.isStub) {
+                    stubCommandsByCategory[category] = (stubCommandsByCategory[category] || 0) + 1;
+                } else {
+                    commandsByCategory[category] = (commandsByCategory[category] || 0) + 1;
+                }
+            }
+        }
+        
+        logger.log('\nImplemented commands by category:');
+        Object.entries(commandsByCategory)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([category, count]) => {
+                logger.log(`- ${category}: ${count} commands`);
+            });
+            
+        logger.log('\nStub commands by category:');
+        Object.entries(stubCommandsByCategory)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([category, count]) => {
+                logger.log(`- ${category}: ${count} commands`);
+            });
+
+        if (loadedCount === 0 && stubCount === 0) {
             logger.error('⚠️ Warning: No commands were loaded!');
         }
     } catch (err) {
@@ -125,31 +283,68 @@ async function getAllFiles(dir) {
 // Add fallback commands if they don't exist
 function addFallbackCommands() {
     if (!commands.has('ping')) {
-        commands.set('ping', async (sock, message) => {
-            try {
-                const sender = message.key.remoteJid;
-                await safeSendText(sock, sender, '🏓 Pong! Bot is working.' );
-                logger.log('Executed ping command successfully');
-            } catch (err) {
-                logger.error('Error in ping command:', err);
-            }
+        commands.set('ping', {
+            execute: async (sock, message) => {
+                try {
+                    const sender = message.key.remoteJid;
+                    await safeSendText(sock, sender, '🏓 Pong! Bot is working.' );
+                    logger.log('Executed ping command successfully');
+                } catch (err) {
+                    logger.error('Error in ping command:', err);
+                }
+            },
+            description: 'Check if the bot is online and responsive',
+            usage: '!ping',
+            category: 'general',
+            cooldown: 3,
+            groupOnly: false,
+            permissions: ['user'],
+            enabled: true
         });
         logger.log('Added fallback ping command');
     }
 
     if (!commands.has('menu')) {
-        commands.set('menu', async (sock, message) => {
-            try {
-                const sender = message.key.remoteJid;
-                const commandList = Array.from(commands.keys()).sort();
-                let menuText = `*📋 Command Menu*\n\n`;
-                menuText += `Total Commands: ${commandList.length}\n\n`;
-                menuText += commandList.map(cmd => `• !${cmd}`).join('\n');
-                await safeSendText(sock, sender, menuText );
-                logger.log('Executed menu command successfully');
-            } catch (err) {
-                logger.error('Error in menu command:', err);
-            }
+        commands.set('menu', {
+            execute: async (sock, message) => {
+                try {
+                    const sender = message.key.remoteJid;
+                    const commandList = Array.from(commands.keys()).sort();
+                    let menuText = `*📋 Command Menu*\n\n`;
+                    menuText += `Total Commands: ${commandList.length}\n\n`;
+                    
+                    // Group commands by category
+                    const categorizedCommands = {};
+                    for (const [cmdName, cmdData] of commands.entries()) {
+                        const category = typeof cmdData === 'object' && cmdData.category ? 
+                            cmdData.category : 'uncategorized';
+                        
+                        if (!categorizedCommands[category]) {
+                            categorizedCommands[category] = [];
+                        }
+                        categorizedCommands[category].push(cmdName);
+                    }
+                    
+                    // Build menu text with categories
+                    for (const [category, cmds] of Object.entries(categorizedCommands)) {
+                        menuText += `\n*${category.toUpperCase()}*\n`;
+                        menuText += cmds.map(cmd => `• !${cmd}`).join('\n');
+                        menuText += '\n';
+                    }
+                    
+                    await safeSendText(sock, sender, menuText);
+                    logger.log('Executed menu command successfully');
+                } catch (err) {
+                    logger.error('Error in menu command:', err);
+                }
+            },
+            description: 'Display a list of all available commands',
+            usage: '!menu',
+            category: 'general',
+            cooldown: 3,
+            groupOnly: false,
+            permissions: ['user'],
+            enabled: true
         });
         logger.log('Added fallback menu command');
     }
@@ -221,7 +416,16 @@ async function messageHandler(sock, message) {
 
             if (commands.has(commandName)) {
                 try {
-                    await commands.get(commandName)(sock, message, args);
+                    const command = commands.get(commandName);
+                    if (typeof command === 'function') {
+                        // Handle legacy command format
+                        await command(sock, message, args);
+                    } else if (command && typeof command.execute === 'function') {
+                        // Handle new command format with metadata
+                        await command.execute(sock, message, args);
+                    } else {
+                        throw new Error('Invalid command implementation');
+                    }
                     console.log('Command executed successfully:', commandName);
                 } catch (err) {
                     logger.error(`Error executing command ${commandName}:`, err);

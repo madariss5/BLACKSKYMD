@@ -99,6 +99,33 @@ function extractUserIdFromJid(jid) {
 }
 
 /**
+ * Format a JID for logging to prevent [object Object]
+ * @param {any} jid - JID to format for log messages
+ * @returns {string} - Formatted JID safe for logging
+ */
+function formatJidForLogging(jid) {
+    if (!jid) return 'unknown';
+    
+    try {
+        if (typeof jid === 'object') {
+            // Extract from message object if available
+            if (jid.key && jid.key.remoteJid) {
+                return ensureJidString(jid.key.remoteJid);
+            } else if (jid.remoteJid) {
+                return ensureJidString(jid.remoteJid);
+            } else {
+                return 'object_jid';
+            }
+        } else {
+            return ensureJidString(jid);
+        }
+    } catch (err) {
+        logger.error('Error formatting JID for logging:', err);
+        return 'invalid_jid';
+    }
+}
+
+/**
  * Safe message sending with JID validation
  * @param {Object} sock - WhatsApp socket connection
  * @param {any} jid - JID to send to
@@ -107,16 +134,43 @@ function extractUserIdFromJid(jid) {
  */
 async function safeSendMessage(sock, jid, content) {
     try {
-        const normalizedJid = normalizeJid(jid);
+        // First check if sock is valid
+        if (!sock || typeof sock.sendMessage !== 'function') {
+            logger.error('Invalid socket object provided to safeSendMessage');
+            return null;
+        }
+        
+        // Handle case where jid comes from message.key.remoteJid
+        let targetJid = jid;
+        if (typeof jid === 'object' && jid !== null) {
+            if (jid.remoteJid) {
+                targetJid = jid.remoteJid;
+            } else if (jid.key && jid.key.remoteJid) {
+                targetJid = jid.key.remoteJid;
+            }
+        }
+        
+        const normalizedJid = normalizeJid(targetJid);
         
         if (!normalizedJid) {
-            logger.error('Invalid JID provided for message sending:', jid);
+            logger.error('Invalid JID provided for message sending:', targetJid);
+            return null;
+        }
+        
+        // Content validation
+        if (!content || typeof content !== 'object') {
+            logger.error('Invalid content provided to safeSendMessage');
             return null;
         }
         
         return await sock.sendMessage(normalizedJid, content);
     } catch (err) {
         logger.error('Error in safeSendMessage:', err);
+        // Log more details to help with debugging
+        logger.error('JID type:', typeof jid);
+        if (jid && typeof jid === 'object') {
+            logger.error('JID is object with keys:', Object.keys(jid));
+        }
         return null;
     }
 }
@@ -177,10 +231,26 @@ async function safeSendSticker(sock, jid, sticker, options = {}) {
  */
 async function safeSendAnimatedGif(sock, jid, gif, caption = '', options = {}) {
     try {
-        const normalizedJid = normalizeJid(jid);
+        // First check if sock is valid
+        if (!sock || typeof sock.sendMessage !== 'function') {
+            logger.error('Invalid socket object provided to safeSendAnimatedGif');
+            return null;
+        }
+        
+        // Handle case where jid comes from message.key.remoteJid
+        let targetJid = jid;
+        if (typeof jid === 'object' && jid !== null) {
+            if (jid.remoteJid) {
+                targetJid = jid.remoteJid;
+            } else if (jid.key && jid.key.remoteJid) {
+                targetJid = jid.key.remoteJid;
+            }
+        }
+        
+        const normalizedJid = normalizeJid(targetJid);
         
         if (!normalizedJid) {
-            logger.error('Invalid JID provided for GIF sending:', jid);
+            logger.error('Invalid JID provided for GIF sending:', targetJid);
             return null;
         }
 
@@ -323,6 +393,7 @@ module.exports = {
     normalizeJid,
     ensureJidString,
     extractUserIdFromJid,
+    formatJidForLogging,
     safeSendMessage,
     safeSendText,
     safeSendImage,

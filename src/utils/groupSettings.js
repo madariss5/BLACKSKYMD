@@ -36,7 +36,7 @@ function getDefaultGroupSettings() {
  * @returns {Promise<Object>} Group settings
  */
 async function getGroupSettings(jid) {
-    const filePath = path.join(__dirname, '../../data/groups', `${jid}.json`);
+    const filePath = path.join(process.cwd(), 'data/groups', `${jid}.json`);
     try {
         const data = await fs.readFile(filePath, 'utf8');
         const settings = JSON.parse(data);
@@ -82,7 +82,7 @@ async function getGroupSettings(jid) {
  * @param {Object} settings Group settings
  */
 async function saveGroupSettings(jid, settings) {
-    const filePath = path.join(__dirname, '../../data/groups', `${jid}.json`);
+    const filePath = path.join(process.cwd(), 'data/groups', `${jid}.json`);
     try {
         await fs.writeFile(filePath, JSON.stringify(settings, null, 2));
     } catch (err) {

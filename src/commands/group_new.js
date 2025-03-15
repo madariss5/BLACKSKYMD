@@ -121,9 +121,9 @@ const groupNewCommands = {
 const initializeDirectories = async () => {
     try {
         const dirs = [
-            path.join(__dirname, '../../data/groups_extended'),
-            path.join(__dirname, '../../data/groups_extended/pins'),
-            path.join(__dirname, '../../data/groups_extended/media')
+            path.join(process.cwd(), 'data/groups_extended'),
+            path.join(process.cwd(), 'data/groups_extended/pins'),
+            path.join(process.cwd(), 'data/groups_extended/media')
         ];
 
         for (const dir of dirs) {

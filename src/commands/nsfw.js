@@ -15,10 +15,12 @@ const {
     safeSendImage, 
     isJidGroup, 
     isJidUser,
-    safeSendAnimatedGif 
+    safeSendAnimatedGif,
+    ensureJidString,
+    formatJidForLogging
 } = require('../utils/jidHelper');
 
-const TEMP_DIR = path.join(__dirname, '../../temp/nsfw');
+const TEMP_DIR = path.join(process.cwd(), 'temp/nsfw');
 
 // API endpoints for NSFW content
 const API_ENDPOINTS = {
@@ -236,7 +238,7 @@ async function sendNsfwGif(sock, sender, url, caption) {
             }
         });
 
-        logger.info(`NSFW GIF sent successfully to ${sender}`);
+        logger.info(`NSFW GIF sent successfully to ${formatJidForLogging(sender)}`);
     } catch (err) {
         logger.error('Error sending NSFW GIF:', err);
         try {
@@ -247,6 +249,8 @@ async function sendNsfwGif(sock, sender, url, caption) {
         }
     }
 }
+
+// Using formatJidForLogging from jidHelper utility
 
 initDirectories();
 
@@ -264,7 +268,7 @@ const nsfwCommands = {
 
             await safeSendText(sock, sender, `NSFW commands are now ${isEnabled ? 'enabled' : 'disabled'} for this chat`);
 
-            logger.info(`NSFW toggled ${action.toLowerCase()} for ${sender}`);
+            logger.info(`NSFW toggled ${action.toLowerCase()} for ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in toggleNSFW:', err);
             await safeSendText(sock, sender, 'Failed to toggle NSFW settings.');
@@ -288,7 +292,7 @@ const nsfwCommands = {
 
             await safeSendText(sock, sender, 'Content appears to be safe. For more accurate detection, an AI service integration is needed.');
 
-            logger.info(`NSFW check requested for ${sender}`);
+            logger.info(`NSFW check requested for ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in isNSFW:', err);
             await safeSendText(sock, sender, 'Failed to check content safety.');
@@ -307,7 +311,7 @@ const nsfwCommands = {
 
             await safeSendText(sock, sender, `NSFW setting '${setting}' will be configurable soon.`);
 
-            logger.info(`NSFW settings update requested by ${sender}`);
+            logger.info(`NSFW settings update requested by ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in nsfwSettings:', err);
             await safeSendText(sock, sender, 'Failed to update NSFW settings.');
@@ -327,7 +331,7 @@ NSFW Statistics:
             `.trim();
 
             await safeSendText(sock, sender, stats);
-            logger.info(`NSFW stats requested by ${sender}`);
+            logger.info(`NSFW stats requested by ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in nsfwStats:', err);
             await safeSendText(sock, sender, 'Failed to retrieve NSFW statistics.');
@@ -352,7 +356,7 @@ NSFW Statistics:
             setUserVerification(sender, true);
             await safeSendText(sock, sender, '✅ Age verification successful. You can now use NSFW commands.');
 
-            logger.info(`User ${sender} verified for NSFW content, age: ${parsedAge}`);
+            logger.info(`User ${formatJidForLogging(sender)} verified for NSFW content, age: ${parsedAge}`);
         } catch (err) {
             logger.error('Error in verify:', err);
             await safeSendText(sock, sender, 'Verification failed. Please try again.');
@@ -401,7 +405,7 @@ NSFW Statistics:
             `.trim();
 
             await safeSendText(sock, sender, helpText);
-            logger.info(`NSFW help requested by ${sender}`);
+            logger.info(`NSFW help requested by ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in nsfwHelp:', err);
             await safeSendText(sock, sender, 'Failed to provide NSFW help.');
@@ -443,7 +447,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 NSFW Waifu');
 
-            logger.info(`NSFW waifu image sent to ${sender}`);
+            logger.info(`NSFW waifu image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in waifu:', err);
             await safeSendText(sock, sender, 'Failed to fetch waifu image due to server error.');
@@ -485,7 +489,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 NSFW Neko');
 
-            logger.info(`NSFW neko image sent to ${sender}`);
+            logger.info(`NSFW neko image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in neko:', err);
             await safeSendText(sock, sender, 'Failed to fetch neko image due to server error.');
@@ -526,7 +530,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Hentai');
 
-            logger.info(`NSFW hentai image sent to ${sender}`);
+            logger.info(`NSFW hentai image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in hentai:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -567,7 +571,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Boobs');
 
-            logger.info(`NSFW boobs image sent to ${sender}`);
+            logger.info(`NSFW boobs image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in boobs:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -608,7 +612,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Ass');
 
-            logger.info(`NSFW ass image sent to ${sender}`);
+            logger.info(`NSFW ass image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in ass:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -649,7 +653,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Pussy');
 
-            logger.info(`NSFW pussy image sent to ${sender}`);
+            logger.info(`NSFW pussy image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in pussy:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -690,7 +694,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Blowjob');
 
-            logger.info(`NSFW blowjob image sent to ${sender}`);
+            logger.info(`NSFW blowjob image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in blowjob:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -731,7 +735,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Anal');
 
-            logger.info(`NSFW anal image sent to ${sender}`);
+            logger.info(`NSFW anal image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in anal:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -772,7 +776,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Feet');
 
-            logger.info(`NSFW feet image sent to ${sender}`);
+            logger.info(`NSFW feet image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in feet:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -814,7 +818,7 @@ NSFW Statistics:
 
             await safeSendAnimatedGif(sock, sender, response.url, '🔞 Boobs GIF');
 
-            logger.info(`NSFW boobs GIF sent to ${sender}`);
+            logger.info(`NSFW boobs GIF sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in gifboobs:', err);
             await safeSendText(sock, sender, 'Failed to fetch GIF due to server error.');
@@ -855,7 +859,7 @@ NSFW Statistics:
 
             await safeSendAnimatedGif(sock, sender, response.url, '🔞 Ass GIF');
 
-            logger.info(`NSFW ass GIF sent to ${sender}`);
+            logger.info(`NSFW ass GIF sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in gifass:', err);
             await safeSendText(sock, sender, 'Failed to fetch GIF due to server error.');
@@ -896,7 +900,7 @@ NSFW Statistics:
 
             await safeSendAnimatedGif(sock, sender, response.url, '🔞 Hentai GIF');
 
-            logger.info(`NSFW hentai GIF sent to ${sender}`);
+            logger.info(`NSFW hentai GIF sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in gifhentai:', err);
             await safeSendText(sock, sender, 'Failed to fetch GIF due to server error.');
@@ -937,7 +941,7 @@ NSFW Statistics:
 
             await safeSendAnimatedGif(sock, sender, response.url, '🔞 Blowjob GIF');
 
-            logger.info(`NSFW blowjob GIF sent to ${sender}`);
+            logger.info(`NSFW blowjob GIF sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in gifblowjob:', err);
             await safeSendText(sock, sender, 'Failed to fetch GIF due to server error.');
@@ -979,7 +983,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Uniform');
 
-            logger.info(`NSFW uniform image sent to ${sender}`);
+            logger.info(`NSFW uniform image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in uniform:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -1020,7 +1024,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Thighs');
 
-            logger.info(`NSFW thighs image sent to ${sender}`);
+            logger.info(`NSFW thighs image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in thighs:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -1061,7 +1065,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Femdom');
 
-            logger.info(`NSFW femdom image sent to ${sender}`);
+            logger.info(`NSFW femdom image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in femdom:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -1102,7 +1106,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Tentacle');
 
-            logger.info(`NSFW tentacle image sent to ${sender}`);
+            logger.info(`NSFW tentacle image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in tentacle:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -1143,7 +1147,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Pantsu');
 
-            logger.info(`NSFW pantsu image sent to ${sender}`);
+            logger.info(`NSFW pantsu image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in pantsu:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -1184,7 +1188,7 @@ NSFW Statistics:
 
             await safeSendImage(sock, sender, response.url, '🔞 Kitsune');
 
-            logger.info(`NSFW kitsune image sent to ${sender}`);
+            logger.info(`NSFW kitsune image sent to ${formatJidForLogging(sender)}`);
         } catch (err) {
             logger.error('Error in kitsune:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');

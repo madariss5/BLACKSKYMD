@@ -163,7 +163,7 @@ class CommandLoader {
             this.commands.clear();
             this.commandSources.clear();
 
-            const commandsPath = path.join(__dirname, '../commands');
+            const commandsPath = path.join(process.cwd(), 'src/commands');
             logger.info(`Loading commands from path: ${commandsPath}`);
             
             // List all directories in the commands folder
@@ -325,7 +325,7 @@ class CommandLoader {
     }
     async loadCommandConfigs() {
         try {
-            const configPath = path.join(__dirname, '../config/commands');
+            const configPath = path.join(process.cwd(), 'src/config/commands');
             if (!fs.existsSync(configPath)) {
                 await fsPromises.mkdir(configPath, { recursive: true });
             }

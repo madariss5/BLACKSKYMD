@@ -184,7 +184,7 @@ const menuCommands = {
             }
         
             // Find command details
-            const commandsPath = path.join(__dirname);
+            const commandsPath = path.join(process.cwd(), 'src/commands');
             const commandFiles = await fs.readdir(commandsPath);
             let foundCommand = null;
             let foundIn = null;
@@ -212,7 +212,7 @@ const menuCommands = {
                 // Get command configuration
                 let configInfo = languageManager.getText('menu.no_info_available', userLang, "No additional information available.");
                 try {
-                    const configPath = path.join(__dirname, '../config/commands', `${foundIn}.json`);
+                    const configPath = path.join(process.cwd(), 'src/config/commands', `${foundIn}.json`);
                     const configData = await fs.readFile(configPath, 'utf8');
                     const configs = JSON.parse(configData);
         
@@ -264,7 +264,7 @@ const menuCommands = {
 // Load all commands from command files
 async function loadAllCommands() {
     try {
-        const commandsPath = path.join(__dirname);
+        const commandsPath = path.join(process.cwd(), 'src/commands');
         const allCommands = {};
         let totalCommands = 0;
 

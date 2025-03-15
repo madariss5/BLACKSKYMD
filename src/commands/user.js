@@ -94,7 +94,7 @@ const achievementsList = [
 
 // Level thresholds
 const levelThresholds = [0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600, 4500, 5500, 6600, 7800, 9100, 10500, 12000, 13600, 15300, 17100, 19000];
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+const { safeSendText, safeSendMessage, safeSendImage, formatJidForLogging } = require('../utils/jidHelper');
 
 /**
  * Create temp directories if they don't exist
@@ -526,7 +526,7 @@ const userCommands = {
                 // Continue even if card generation fails
             }
 
-            logger.info(`New user registered: ${sender} (${name}, ${ageInt})`);
+            logger.info(`New user registered: ${formatJidForLogging(sender)} (${name}, ${ageInt})`);
         } catch (err) {
             logger.error('Error in register command:', err);
             await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to register. Please try again.'

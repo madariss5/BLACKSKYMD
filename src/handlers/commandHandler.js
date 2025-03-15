@@ -6,6 +6,37 @@ const path = require('path');
 // Command storage
 const commands = new Map();
 
+// Load JSON configurations for commands
+async function loadCommandConfig(commandName) {
+    try {
+        const configDir = path.join(process.cwd(), 'src/config/commands');
+        const configFiles = await fs.promises.readdir(configDir);
+        
+        for (const file of configFiles) {
+            if (!file.endsWith('.json')) continue;
+            
+            const configPath = path.join(configDir, file);
+            const configContent = await fs.promises.readFile(configPath, 'utf8');
+            const config = JSON.parse(configContent);
+            
+            if (Array.isArray(config.commands)) {
+                // Find the command config by name
+                const cmdConfig = config.commands.find(cmd => cmd.name === commandName);
+                if (cmdConfig) {
+                    return {
+                        ...cmdConfig,
+                        configCategory: file.replace('.json', '')
+                    };
+                }
+            }
+        }
+        return null;
+    } catch (err) {
+        logger.error(`Error loading config for command ${commandName}:`, err);
+        return null;
+    }
+}
+
 // Load all commands from the commands directory
 async function loadCommands() {
     try {
@@ -24,6 +55,9 @@ async function loadCommands() {
             for (const [name, func] of Object.entries(allCommands)) {
                 if (typeof func === 'function' && name !== 'init') {
                     try {
+                        // Load configuration for this command from JSON files
+                        const config = await loadCommandConfig(name);
+                        
                         commands.set(name, {
                             execute: async (sock, message, args, options = {}) => {
                                 try {
@@ -33,8 +67,13 @@ async function loadCommands() {
                                     throw err;
                                 }
                             },
-                            cooldown: 5,
-                            groupOnly: false
+                            cooldown: config?.cooldown || 5,
+                            groupOnly: config?.groupOnly || false,
+                            category: config?.configCategory || 'uncategorized',
+                            description: config?.description || `Command: ${name}`,
+                            usage: config?.usage || `!${name}`,
+                            enabled: config?.enabled !== false,
+                            permissions: config?.permissions || ['user']
                         });
                     } catch (err) {
                         logger.error(`Error registering command ${name}:`, err);
@@ -63,6 +102,33 @@ async function loadCommands() {
                 { name: 'utility', module: require('../commands/utility') }
             ];
             
+            // Load all command configs to process in batch
+            const commandConfigs = new Map();
+            const configDir = path.join(process.cwd(), 'src/config/commands');
+            const configFiles = await fs.promises.readdir(configDir);
+            
+            for (const file of configFiles) {
+                if (!file.endsWith('.json')) continue;
+                
+                const configPath = path.join(configDir, file);
+                const configContent = await fs.promises.readFile(configPath, 'utf8');
+                const config = JSON.parse(configContent);
+                
+                if (Array.isArray(config.commands)) {
+                    const category = file.replace('.json', '');
+                    for (const cmdConfig of config.commands) {
+                        if (cmdConfig.name) {
+                            commandConfigs.set(cmdConfig.name, {
+                                ...cmdConfig,
+                                configCategory: category
+                            });
+                        }
+                    }
+                }
+            }
+            
+            logger.info(`Loaded ${commandConfigs.size} command configurations from JSON files`);
+            
             for (const { name, module } of commandModules) {
                 if (module && typeof module === 'object') {
                     // Try to get commands from module
@@ -73,6 +139,9 @@ async function loadCommands() {
                         for (const [cmdName, cmdFunc] of Object.entries(moduleCommands)) {
                             if (typeof cmdFunc === 'function' && cmdName !== 'init') {
                                 try {
+                                    // Get configuration from our preloaded configs
+                                    const config = commandConfigs.get(cmdName);
+                                    
                                     commands.set(cmdName, {
                                         execute: async (sock, message, args, options = {}) => {
                                             try {
@@ -82,9 +151,13 @@ async function loadCommands() {
                                                 throw err;
                                             }
                                         },
-                                        cooldown: 5,
-                                        groupOnly: name === 'group', // Group commands are group-only
-                                        category: name
+                                        cooldown: config?.cooldown || 5,
+                                        groupOnly: config?.groupOnly || name === 'group',
+                                        category: config?.configCategory || name,
+                                        description: config?.description || `Command: ${cmdName}`,
+                                        usage: config?.usage || `!${cmdName}`,
+                                        enabled: config?.enabled !== false,
+                                        permissions: config?.permissions || ['user']
                                     });
                                 } catch (err) {
                                     logger.error(`Error registering command ${cmdName} from ${name}:`, err);
@@ -123,17 +196,65 @@ async function loadCommands() {
                 execute: async (sock, message, args, options = {}) => {
                     try {
                         const sender = message.key.remoteJid;
-                        const commandList = Array.from(commands.entries())
+                        
+                        // If a specific category is provided
+                        if (args.length > 0) {
+                            const requestedCategory = args[0].toLowerCase();
+                            const categoryCommands = Array.from(commands.entries())
+                                .filter(([_, cmd]) => cmd.category?.toLowerCase() === requestedCategory && (!options.isGroup || !cmd.groupOnly))
+                                .sort((a, b) => a[0].localeCompare(b[0])); // Sort alphabetically
+                            
+                            if (categoryCommands.length === 0) {
+                                await safeSendText(sock, sender, `❌ No commands found in category: ${requestedCategory}\nUse !help to see all available categories.`);
+                                return;
+                            }
+                            
+                            const commandList = categoryCommands.map(([name, cmd]) => {
+                                return `!${name} - ${cmd.description || 'No description'}`;
+                            }).join('\n');
+                            
+                            await safeSendMessage(sock, sender, {
+                                text: `*Commands in category "${requestedCategory}":*\n\n${commandList}\n\nUse !help [command] for specific command details.`
+                            });
+                            return;
+                        }
+                        
+                        // If a specific command is requested
+                        if (args.length > 0 && commands.has(args[0].toLowerCase())) {
+                            const cmdName = args[0].toLowerCase();
+                            const cmd = commands.get(cmdName);
+                            
+                            await safeSendMessage(sock, sender, {
+                                text: `*Command: ${cmdName}*\n\n` +
+                                      `Description: ${cmd.description || 'No description'}\n` +
+                                      `Usage: ${cmd.usage || '!' + cmdName}\n` +
+                                      `Cooldown: ${cmd.cooldown || 3}s\n` +
+                                      `Category: ${cmd.category || 'Uncategorized'}\n` +
+                                      `Group Only: ${cmd.groupOnly ? 'Yes' : 'No'}`
+                            });
+                            return;
+                        }
+                        
+                        // Group commands by category
+                        const categorizedCommands = Array.from(commands.entries())
                             .filter(([_, cmd]) => !options.isGroup || !cmd.groupOnly)
-                            .map(([name, cmd]) => {
-                                const cooldown = cmd.cooldown || 3;
-                                const groupOnly = cmd.groupOnly ? '(Group Only)' : '';
-                                return `!${name} - ${cooldown}s cooldown ${groupOnly}`;
-                            })
-                            .join('\n');
-        
+                            .reduce((acc, [name, cmd]) => {
+                                const category = cmd.category || 'Uncategorized';
+                                if (!acc[category]) acc[category] = [];
+                                acc[category].push(name);
+                                return acc;
+                            }, {});
+                        
+                        // Create category list
+                        let categoryList = '*Available Command Categories:*\n\n';
+                        for (const [category, cmdList] of Object.entries(categorizedCommands)) {
+                            categoryList += `📁 ${category} (${cmdList.length} commands)\n`;
+                        }
+                        
+                        categoryList += '\nUse !help [category] to list commands in a category.\nUse !help [command] for specific command details.';
+                        
                         await safeSendMessage(sock, sender, {
-                            text: `*Available Commands:*\n\n${commandList}`
+                            text: categoryList
                         });
                     } catch (err) {
                         logger.error('Error executing help command:', err);
@@ -141,7 +262,10 @@ async function loadCommands() {
                     }
                 },
                 cooldown: 10,
-                groupOnly: false
+                groupOnly: false,
+                description: 'Get help with bot commands',
+                usage: '!help [category/command]',
+                category: 'basic'
             });
         }
         

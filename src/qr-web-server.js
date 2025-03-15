@@ -17,7 +17,7 @@ const handler = require('./handlers/ultra-minimal-handler');
 // Create Express app
 const app = express();
 const server = http.createServer(app);
-const PORT = 5007; // Changed to port 5007 to avoid conflicts
+const PORT = 5007; // Using port 5007 to match workflow configuration
 
 // QR code state
 let latestQR = null;
@@ -170,7 +170,38 @@ app.get('/', (req, res) => {
             ${connectionStatus === 'connected' ? `
                 <div class="bot-status">
                     <strong>Bot Status:</strong> Active and ready to use<br>
-                    <strong>Commands Available:</strong> ${handler?.commands?.size || 'Loading...'}<br>
+                    <strong>Commands Available:</strong> ${handler?.commands?.size || 'Loading...'} loaded / ${(() => {
+                        try {
+                            // Get the config directory path
+                            const configDir = path.join(process.cwd(), 'src/config/commands');
+                            let count = 0;
+                            
+                            // Check if the directory exists before trying to read
+                            if (fs.existsSync(configDir)) {
+                                // Read all JSON files
+                                const configFiles = fs.readdirSync(configDir);
+                                
+                                // Count commands in each JSON file
+                                for (const file of configFiles) {
+                                    if (file.endsWith('.json')) {
+                                        const filePath = path.join(configDir, file);
+                                        const fileContent = fs.readFileSync(filePath, 'utf8');
+                                        try {
+                                            const config = JSON.parse(fileContent);
+                                            if (Array.isArray(config.commands)) {
+                                                count += config.commands.length;
+                                            }
+                                        } catch (e) {
+                                            // JSON parsing error, skip this file
+                                        }
+                                    }
+                                }
+                            }
+                            return count;
+                        } catch (err) {
+                            return '?';
+                        }
+                    })()} configured<br>
                     <strong>Prefix:</strong> !, /, or .
                 </div>
                 <div class="command-examples">
@@ -299,13 +330,114 @@ async function startConnection() {
     }
 }
 
+// Enable JSON parsing for request bodies
+app.use(express.json());
+
 // API endpoint to check bot status
 app.get('/status', (req, res) => {
+    // For command count, include both commands available in the handler
+    // and configuration details from our command loading process
+    let commandCount = handler?.commands?.size || 0;
+    let configuredCommandCount = 0;
+    
+    try {
+        // Get the config directory path
+        const configDir = path.join(process.cwd(), 'src/config/commands');
+        
+        // Check if the directory exists before trying to read
+        if (fs.existsSync(configDir)) {
+            // Read all JSON files
+            const configFiles = fs.readdirSync(configDir);
+            
+            // Count commands in each JSON file
+            for (const file of configFiles) {
+                if (file.endsWith('.json')) {
+                    const filePath = path.join(configDir, file);
+                    const fileContent = fs.readFileSync(filePath, 'utf8');
+                    try {
+                        const config = JSON.parse(fileContent);
+                        if (Array.isArray(config.commands)) {
+                            configuredCommandCount += config.commands.length;
+                        }
+                    } catch (e) {
+                        // JSON parsing error, skip this file
+                        console.error(`Error parsing ${file}:`, e.message);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error reading command configurations:', err);
+    }
+    
     res.json({
         status: connectionStatus,
-        commandsLoaded: handler?.commands?.size || 0,
+        commandsLoaded: commandCount,
+        commandsConfigured: configuredCommandCount,
         qrAvailable: latestQR !== null
     });
+});
+
+// Test command endpoint for debugging
+app.post('/test-command', async (req, res) => {
+    try {
+        const { command, args = [] } = req.body;
+        
+        if (!command) {
+            return res.status(400).json({ error: 'Command is required' });
+        }
+        
+        // Create a mock message object
+        const mockMessage = {
+            key: {
+                remoteJid: 'test@s.whatsapp.net',
+                fromMe: false,
+                id: `mock-${Date.now()}`
+            },
+            message: {
+                conversation: `!${command} ${args.join(' ')}`.trim()
+            }
+        };
+        
+        // Get the command from the handler
+        const commandObj = handler.commands.get(command);
+        
+        if (!commandObj) {
+            return res.status(404).json({ error: 'Command not found' });
+        }
+        
+        // Create a mock socket with logging
+        const mockSock = {
+            sendMessage: async (jid, content) => {
+                logger.info(`Test: Sending message to ${jid}`);
+                logger.info(`Test: Content: ${JSON.stringify(content)}`);
+                return { status: 'success', jid, content };
+            },
+            sendPresenceUpdate: async () => {}
+        };
+        
+        // Execute the command
+        let result;
+        if (typeof commandObj === 'function') {
+            result = await commandObj(mockSock, mockMessage, args);
+        } else if (commandObj && typeof commandObj.execute === 'function') {
+            result = await commandObj.execute(mockSock, mockMessage, args);
+        } else {
+            return res.status(500).json({ error: 'Invalid command implementation' });
+        }
+        
+        return res.json({ 
+            success: true, 
+            command,
+            result: result || 'Command executed successfully but returned no result'
+        });
+    } catch (error) {
+        logger.error('Error in test command endpoint:', error);
+        return res.status(500).json({ 
+            error: error.message || 'Unknown error',
+            stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+        });
+    }
 });
 
 // Start the server

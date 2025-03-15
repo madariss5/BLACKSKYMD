@@ -1,7 +1,7 @@
 const logger = require('../utils/logger');
 const os = require('os');
 const { proto } = require('@whiskeysockets/baileys');
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+const { safeSendText, safeSendMessage, safeSendImage, formatJidForLogging } = require('../utils/jidHelper');
 const { languageManager } = require('../utils/language');
 
 const basicCommands = {
@@ -341,7 +341,7 @@ ${languageManager.getText('basic.support_contact')}`.trim();
         }
 
         const report = args.join(' ');
-        logger.info(`New report from ${sender}: ${report}`);
+        logger.info(`New report from ${formatJidForLogging(sender)}: ${report}`);
 
         await safeSendText(sock, sender, '✅ ' + languageManager.getText('basic.report_success')
         );
@@ -354,7 +354,7 @@ ${languageManager.getText('basic.support_contact')}`.trim();
         }
 
         const feedback = args.join(' ');
-        logger.info(`New feedback from ${sender}: ${feedback}`);
+        logger.info(`New feedback from ${formatJidForLogging(sender)}: ${feedback}`);
 
         await safeSendText(sock, sender, '✅ ' + languageManager.getText('basic.feedback_success')
         );

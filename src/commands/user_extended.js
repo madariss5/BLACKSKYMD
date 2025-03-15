@@ -28,7 +28,7 @@ const {
 
 // Create necessary directories
 const TEMP_DIR = path.join(process.cwd(), 'temp', 'user_extended');
-const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHelper');
+const { safeSendText, safeSendMessage, safeSendImage, formatJidForLogging } = require('../utils/jidHelper');
 
 /**
  * Create temp directories if they don't exist

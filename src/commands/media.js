@@ -20,7 +20,7 @@ const { safeSendText, safeSendMessage, safeSendImage } = require('../utils/jidHe
 // Initialize required directories
 const initializeDirectories = async () => {
     try {
-        const tempDir = path.join(__dirname, '../../temp');
+        const tempDir = path.join(process.cwd(), 'temp');
         if (!fs.existsSync(tempDir)) {
             await fsPromises.mkdir(tempDir, { recursive: true });
             logger.info('Media temp directory created successfully');
@@ -114,7 +114,7 @@ const mediaCommands = {
             }
 
             // Create a temporary directory and file paths
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
             const outputPath = path.join(tempDir, `${Date.now()}.mp3`);
             
@@ -194,7 +194,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Creating sticker...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}`);
@@ -242,7 +242,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Converting sticker to image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -361,7 +361,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Downloading video...' );
 
             // Create a temporary directory and file paths
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
             const outputPath = path.join(tempDir, `${Date.now()}.mp4`);
             
@@ -438,7 +438,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Enhancing image quality...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -500,7 +500,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Sharpening image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -550,7 +550,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Reversing video...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
@@ -603,7 +603,7 @@ const mediaCommands = {
 
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Creating text sticker...' );
 
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
             const outputPath = path.join(tempDir, `${Date.now()}.webp`);
 
@@ -657,7 +657,7 @@ const mediaCommands = {
 
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Creating animated text sticker...' );
 
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
             const outputPath = path.join(tempDir, `${Date.now()}.webp`);
 
@@ -736,7 +736,7 @@ const mediaCommands = {
             const response = await axios.get(emojiUrl, { responseType: 'arraybuffer' });
             const buffer = Buffer.from(response.data);
 
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
             const outputPath = path.join(tempDir, `${Date.now()}.webp`);
 
@@ -778,7 +778,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Converting sticker to video...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}.webp`);
@@ -832,7 +832,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Trimming video...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
@@ -893,7 +893,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Adjusting video speed...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const inputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
@@ -947,7 +947,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Adjusting image brightness...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -989,7 +989,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Adjusting image contrast...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1031,7 +1031,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Applying blur effect...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1071,7 +1071,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Rotating image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1111,7 +1111,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Flipping image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1152,7 +1152,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Applying color tint...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1186,7 +1186,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Inverting image colors...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1226,7 +1226,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Converting image to grayscale...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1274,7 +1274,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Rotating image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1322,7 +1322,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Flipping image...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1364,7 +1364,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Inverting image colors...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1412,7 +1412,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Applying blur effect...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1460,7 +1460,7 @@ const mediaCommands = {
             await safeSendText(sock, remoteJid, '*⏳ Processing:* Applying color tint...' );
 
             const buffer = await downloadMediaMessage(message, 'buffer', {});
-            const tempDir = path.join(__dirname, '../../temp');
+            const tempDir = path.join(process.cwd(), 'temp');
             await fsPromises.mkdir(tempDir, { recursive: true });
 
             const outputPath = path.join(tempDir, `${Date.now()}.png`);
@@ -1530,9 +1530,9 @@ module.exports = {
 
             // Ensure required directories exist
             const dirs = [
-                path.join(__dirname, '../../temp'),
-                path.join(__dirname, '../../temp/media'),
-                path.join(__dirname, '../../temp/stickers')
+                path.join(process.cwd(), 'temp'),
+                path.join(process.cwd(), 'temp/media'),
+                path.join(process.cwd(), 'temp/stickers')
             ];
 
             for (const dir of dirs) {
