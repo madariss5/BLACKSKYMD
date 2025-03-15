@@ -11,6 +11,16 @@ const path = require('path');
 const pino = require('pino');
 const handler = require('./handlers/ultra-minimal-handler');
 
+// Import credential backup system for more robust connection persistence
+try {
+    var { backupCredentials, restoreCredentials } = require('./utils/credentialsBackup');
+} catch (err) {
+    console.log('Credential backup system not available:', err.message);
+    // Create stub functions if the module is not available
+    backupCredentials = async () => null;
+    restoreCredentials = async () => null;
+}
+
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -58,19 +68,21 @@ async function clearAuthState() {
     }
 }
 
-// Minimal WhatsApp connection configuration
+// Enhanced WhatsApp connection configuration with fixes for Connection Failure
 const connectionConfig = {
-    version: [2, 2140, 12], // Much older stable version
-    browser: ['Chrome', 'Windows', '10'],
+    version: [2, 2323, 4], // Use a newer compatible version
+    browser: [`BLACKSKY-${Date.now()}`, 'Chrome', '110.0.0'], // Unique browser identifier
     printQRInTerminal: true,
     logger: logger.child({ level: 'silent' }),
     connectTimeoutMs: 60000,
     qrTimeout: 60000,
     defaultQueryTimeoutMs: 60000,
+    keepAliveIntervalMs: 10000, // Keep connection alive
+    retryRequestDelayMs: 2000, // More conservative retry settings
     emitOwnEvents: false,
     markOnlineOnConnect: false,
     syncFullHistory: false,
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36' // Updated Chrome version
 };
 
 async function startWhatsAppConnection() {
@@ -83,6 +95,24 @@ async function startWhatsAppConnection() {
         isConnecting = true;
         connectionState = 'connecting';
         logger.info('Starting WhatsApp connection attempt...');
+
+        // If we're at max retries or seeing Connection Failure errors, try fallback approaches
+        if (retryCount >= MAX_RETRIES - 1) {
+            logger.info('Using fallback connection approach after multiple failed attempts');
+            
+            // Try to restore from backup if available
+            try {
+                const restoredCreds = await restoreCredentials();
+                if (restoredCreds) {
+                    logger.info('Successfully restored credentials from backup, using them for connection');
+                }
+            } catch (restoreErr) {
+                logger.warn('Failed to restore credentials from backup:', restoreErr.message);
+            }
+            
+            // Generate a completely unique browser ID for this attempt
+            connectionConfig.browser = [`BLACKSKY-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, 'Chrome', '110.0.0'];
+        }
 
         // Clear auth state and initialize new session
         await clearAuthState();
@@ -112,6 +142,16 @@ async function startWhatsAppConnection() {
                 retryCount = 0;
                 qrCode = null;
 
+                // Backup credentials for recovery in case of future connection issues
+                try {
+                    if (sock.authState && sock.authState.creds) {
+                        logger.info('Backing up credentials for future recovery');
+                        await backupCredentials(sock.authState.creds);
+                    }
+                } catch (backupErr) {
+                    logger.warn('Failed to backup credentials:', backupErr.message);
+                }
+
                 // Initialize message handler
                 sock.ev.on('messages.upsert', async (m) => {
                     if (m.type === 'notify') {
@@ -126,19 +166,36 @@ async function startWhatsAppConnection() {
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                const errorMessage = lastDisconnect?.error?.message || 'Unknown error';
+                const isConnectionFailure = errorMessage.includes('Connection Failure');
+                
+                // Handle different types of disconnect errors
+                const shouldReconnect = 
+                    statusCode !== DisconnectReason.loggedOut && 
+                    // Connection failure might require special handling
+                    (!isConnectionFailure || retryCount < 3);
 
-                logger.info('Connection closed due to:', lastDisconnect?.error?.message);
+                logger.info(`Connection closed due to: ${errorMessage} (Status code: ${statusCode})`);
                 isConnecting = false;
                 connectionState = 'disconnected';
 
                 if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
-                    const delay = BASE_RETRY_INTERVAL * Math.pow(2, retryCount - 1);
+                    // Use higher backoff for connection failures
+                    const multiplier = isConnectionFailure ? 2 : 1;
+                    const delay = BASE_RETRY_INTERVAL * Math.pow(2, retryCount - 1) * multiplier;
+                    
                     logger.info(`Retrying connection in ${delay/1000}s (Attempt ${retryCount}/${MAX_RETRIES})`);
+                    
+                    // For connection failure specifically, try a different browser fingerprint each time
+                    if (isConnectionFailure) {
+                        logger.info('Connection failure detected, will use new browser fingerprint on next attempt');
+                        connectionConfig.browser = [`BLACKSKY-${Date.now()}`, 'Chrome', '110.0.0'];
+                    }
+                    
                     setTimeout(startWhatsAppConnection, delay);
                 } else {
-                    logger.info('Not reconnecting - clearing auth state');
+                    logger.info('Not reconnecting - clearing auth state and generating fresh QR');
                     await clearAuthState();
                     retryCount = 0;
                     setTimeout(startWhatsAppConnection, 5000);
