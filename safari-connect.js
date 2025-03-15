@@ -1,57 +1,36 @@
 /**
  * Safari-based WhatsApp Connection
- * Advanced connection system optimized for cloud environments like Replit/Heroku
+ * Advanced connection system optimized for cloud environments
  * Features automatic credential backup and enhanced error recovery
- * Version: 1.1.0
+ * Version: 1.2.1
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
+const express = require('express');
 const fs = require('fs');
-const fsPromises = fs.promises;
 const path = require('path');
 const pino = require('pino');
-const { exec } = require('child_process');
-const os = require('os');
-const { promisify } = require('util');
+const fsPromises = require('fs').promises;
+
+
+// Initialize Express
+const app = express();
+const port = process.env.PORT || 5000;
 
 // Configuration
 const AUTH_FOLDER = process.env.AUTH_DIR || './auth_info_safari';
-const MAIN_AUTH_FOLDER = './auth_info_baileys';
-const VERSION = '1.1.0';
-const MAX_QR_RETRIES = 3;
-const CREDENTIAL_BACKUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
-const PORT = process.env.PORT || 5000; // For Heroku dynamic port binding
-const IS_HEROKU = process.env.PLATFORM === 'heroku';
-const BROWSER_FINGERPRINTS = [
-  ['Safari', '17.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'],
-  ['Chrome', '110.0.0.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'],
-  ['Firefox', '115.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:115.0) Gecko/20100101 Firefox/115.0']
-];
+const VERSION = '1.2.1';
+const MAX_RETRIES = 10;
+const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const RECONNECT_INTERVAL = 60000; // 1 minute base interval
 
 // Environment detection
-const IS_CLOUD_ENV = process.env.REPLIT_ID || process.env.HEROKU_APP_ID || process.env.RENDER_SERVICE_ID;
+const IS_CLOUD_ENV = process.env.REPLIT_ID || process.env.HEROKU_APP_ID;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-// Utility function to send typing indicator
-async function showTypingIndicator(sock, jid, durationMs = 1000) {
-  try {
-    await sock.presenceSubscribe(jid);
-    await sock.sendPresenceUpdate('composing', jid);
-    
-    // Wait for the specified duration
-    await new Promise(resolve => setTimeout(resolve, durationMs));
-    
-    // Stop typing indicator
-    await sock.sendPresenceUpdate('paused', jid);
-    return true;
-  } catch (err) {
-    LOGGER.error(`Error showing typing indicator: ${err.message}`);
-    return false;
-  }
-}
-
-// Setup logger
+// Setup logger with improved formatting
 const LOGGER = pino({ 
   level: process.env.LOG_LEVEL || 'info',
   transport: {
@@ -68,29 +47,255 @@ const LOGGER = pino({
 // Connection state
 let sock = null;
 let connectionRetries = 0;
-const MAX_RETRIES = 5;
 let reconnectTimer = null;
+let heartbeatTimer = null;
+let cleanupTimer = null;
 let qrGenerated = false;
 let connectionState = 'disconnected';
 let lastDisconnectCode = null;
+let lastQRCode = null;
+let isReconnecting = false;
+let lastConnectTime = null;
+let connectionUptime = 0;
 
-// Safari fingerprint (popular with MD bots)
-const SAFARI_FINGERPRINT = ['Safari', '17.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'];
+// Safari fingerprint (optimized for reliability)
+const SAFARI_FINGERPRINT = {
+  browser: ['Safari', '17.0'],
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+};
 
-// Make sure auth folder exists
-function ensureAuthFolder() {
-  if (!fs.existsSync(AUTH_FOLDER)) {
-    LOGGER.info(`Creating auth folder: ${AUTH_FOLDER}`);
-    fs.mkdirSync(AUTH_FOLDER, { recursive: true });
+// Setup Express routes
+app.get('/', (req, res) => {
+  const uptime = lastConnectTime ? Math.floor((Date.now() - lastConnectTime) / 1000) : 0;
+  res.json({
+    status: connectionState,
+    retries: connectionRetries,
+    maxRetries: MAX_RETRIES,
+    hasQR: !!lastQRCode,
+    lastError: lastDisconnectCode,
+    version: VERSION,
+    uptime: uptime,
+    isReconnecting,
+    totalUptime: connectionUptime
+  });
+});
+
+app.get('/status', (req, res) => {
+  res.json({
+    state: connectionState,
+    qrGenerated,
+    retries: connectionRetries,
+    lastError: lastDisconnectCode,
+    environment: IS_CLOUD_ENV ? 'cloud' : 'local',
+    timestamp: new Date().toISOString(),
+    lastConnectTime: lastConnectTime ? new Date(lastConnectTime).toISOString() : null
+  });
+});
+
+// Start Express server
+const server = app.listen(port, '0.0.0.0', () => {
+  LOGGER.info(`Status monitor running on port ${port}`);
+});
+
+// Initialize connection
+async function initializeConnection() {
+  // Clear all existing auth folders to prevent conflicts
+  const authFolders = [
+    './auth_info_baileys',
+    './auth_info_terminal',
+    './auth_info_safari',
+    './auth_info_web'
+  ];
+
+  for (const folder of authFolders) {
+    if (fs.existsSync(folder)) {
+      LOGGER.info(`Cleaning up auth folder: ${folder}`);
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
+  }
+
+  // Create fresh auth folder
+  fs.mkdirSync(AUTH_FOLDER, { recursive: true });
+  LOGGER.info('Fresh auth folder created');
+}
+
+// Heartbeat mechanism
+function startHeartbeat() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+
+  heartbeatTimer = setInterval(async () => {
+    if (sock && sock.user) {
+      try {
+        await sock.sendPresenceUpdate('available');
+        LOGGER.debug('Heartbeat sent successfully');
+
+        // Update connection uptime
+        if (lastConnectTime) {
+          connectionUptime = Math.floor((Date.now() - lastConnectTime) / 1000);
+        }
+      } catch (err) {
+        LOGGER.warn('Heartbeat failed:', err.message);
+        if (!isReconnecting) {
+          handleReconnection('Heartbeat failure');
+        }
+      }
+    }
+  }, HEARTBEAT_INTERVAL);
+}
+
+// Cleanup mechanism
+function startCleanup() {
+  if (cleanupTimer) clearInterval(cleanupTimer);
+
+  cleanupTimer = setInterval(async () => {
+    if (sock && sock.user) {
+      try {
+        // Clear any pending messages
+        await sock.sendPresenceUpdate('unavailable');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await sock.sendPresenceUpdate('available');
+
+        LOGGER.debug('Cleanup completed successfully');
+      } catch (err) {
+        LOGGER.warn('Cleanup failed:', err.message);
+      }
+    }
+  }, CLEANUP_INTERVAL);
+}
+
+// Handle reconnection
+async function handleReconnection(reason) {
+  if (isReconnecting) {
+    LOGGER.info('Reconnection already in progress, skipping...');
+    return;
+  }
+
+  isReconnecting = true;
+  connectionState = 'reconnecting';
+
+  try {
+    LOGGER.info(`Initiating reconnection due to: ${reason}`);
+
+    // Clear existing timers
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (cleanupTimer) clearInterval(cleanupTimer);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+
+    // Wait before attempting reconnection
+    const delay = Math.min(Math.pow(2, connectionRetries) * 1000, RECONNECT_INTERVAL);
+    LOGGER.info(`Waiting ${delay/1000}s before reconnection attempt...`);
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    // Initialize fresh connection
+    await initializeConnection();
+    await startConnection();
+  } catch (err) {
+    LOGGER.error('Error during reconnection:', err);
+    connectionState = 'error';
+  } finally {
+    isReconnecting = false;
   }
 }
 
-// Clean auth state if needed
-async function clearAuthState() {
-  if (fs.existsSync(AUTH_FOLDER)) {
-    LOGGER.info('Clearing auth state...');
-    fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
-    fs.mkdirSync(AUTH_FOLDER, { recursive: true });
+// Generate unique device ID
+function generateDeviceId() {
+  const randomString = Math.random().toString(36).substring(2, 7);
+  const timestamp = Date.now().toString().slice(-6);
+  return `BLACKSKY-MD-${timestamp}-${randomString}`;
+}
+
+// Handle connection updates
+async function handleConnectionUpdate(update) {
+  const { connection, lastDisconnect, qr } = update;
+
+  if (qr) {
+    qrGenerated = true;
+    lastQRCode = qr;
+    LOGGER.info('QR Code received, waiting for scan...');
+    connectionState = 'awaiting_scan';
+  }
+
+  if (connection === 'close') {
+    const statusCode = lastDisconnect?.error?.output?.statusCode;
+    const reason = lastDisconnect?.error?.message || 'Unknown';
+
+    lastDisconnectCode = statusCode;
+    connectionState = 'disconnected';
+    lastConnectTime = null;
+
+    LOGGER.info(`Connection closed (Code: ${statusCode}). Reason: ${reason}`);
+
+    // Handle specific error cases
+    if (statusCode === DisconnectReason.loggedOut || 
+        (lastDisconnect?.error instanceof Boom && lastDisconnect.error.output.statusCode === 440)) {
+      LOGGER.warn('Session expired or logged out, clearing auth state');
+      connectionRetries = 0;
+      handleReconnection('Session expired');
+    } else if (statusCode === 405) {
+      LOGGER.warn('405 error detected - adjusting connection parameters');
+      if (connectionRetries < MAX_RETRIES) {
+        connectionRetries++;
+        handleReconnection('Rate limit (405)');
+      } else {
+        LOGGER.error('Max retries reached - restarting process');
+        process.exit(1); // Force restart in cloud environment
+      }
+    } else {
+      // Generic reconnection logic
+      if (connectionRetries < MAX_RETRIES) {
+        connectionRetries++;
+        handleReconnection('Generic error');
+      } else {
+        LOGGER.error('Max retries reached - restarting process');
+        process.exit(1); // Force restart in cloud environment
+      }
+    }
+  } else if (connection === 'open') {
+    connectionState = 'connected';
+    lastQRCode = null;
+    connectionRetries = 0;
+    lastConnectTime = Date.now();
+
+    LOGGER.info('✅ SUCCESSFULLY CONNECTED TO WHATSAPP!');
+    LOGGER.info(`📱 Connected as: ${sock.user?.id || 'Unknown'}`);
+
+    // Start monitoring systems
+    startHeartbeat();
+    startCleanup();
+
+    try {
+      // Send welcome message
+      if (sock && sock.user) {
+        await sock.sendMessage(sock.user.id, { 
+          text: `🤖 *BLACKSKY-MD Bot Connected!*\n\n` +
+                `_Connection Time: ${new Date().toLocaleString()}_\n` +
+                `_Version: ${VERSION}_\n\n` +
+                `Send *!help* to see available commands.` 
+        });
+        LOGGER.info('Welcome message sent');
+      }
+    } catch (err) {
+      LOGGER.error('Error sending welcome message:', err);
+    }
+  }
+}
+
+// Utility function to send typing indicator
+async function showTypingIndicator(sock, jid, durationMs = 1000) {
+  try {
+    await sock.presenceSubscribe(jid);
+    await sock.sendPresenceUpdate('composing', jid);
+    
+    // Wait for the specified duration
+    await new Promise(resolve => setTimeout(resolve, durationMs));
+    
+    // Stop typing indicator
+    await sock.sendPresenceUpdate('paused', jid);
+    return true;
+  } catch (err) {
+    LOGGER.error(`Error showing typing indicator: ${err.message}`);
+    return false;
   }
 }
 
@@ -159,17 +364,7 @@ async function copyAuthToMain() {
   }
 }
 
-// Unique device ID generator
-function generateDeviceId() {
-  const randomString = Math.random().toString(36).substring(2, 7);
-  const timestamp = Date.now().toString();
-  return `BLACKSKY-SAFARI-${timestamp}-${randomString}`;
-}
-
-/**
- * Send credentials backup to the bot's own number
- * This is useful for Heroku deployment where credentials need to be restored
- */
+// Send credentials backup to the bot's own number
 async function sendCredsBackup(sock) {
   try {
     // Get the bot's own JID
@@ -237,122 +432,6 @@ async function sendCredsBackup(sock) {
   }
 }
 
-// Handle connection status changes
-async function handleConnectionUpdate(update) {
-  const { connection, lastDisconnect, qr } = update;
-  
-  if (qr) {
-    qrGenerated = true;
-    console.log('────────────────────────────────────────');
-    console.log('🔄 SCAN THIS QR CODE WITH YOUR PHONE:');
-    console.log('────────────────────────────────────────');
-    
-    // Display QR in terminal (better for cloud environments)
-    const qrcode = require('qrcode-terminal');
-    qrcode.generate(qr, { small: true });
-    
-    console.log('────────────────────────────────────────');
-    console.log('📱 Waiting for QR code scan...');
-    console.log('────────────────────────────────────────');
-  }
-  
-  if (connection === 'close') {
-    const statusCode = lastDisconnect?.error?.output?.statusCode;
-    const reason = lastDisconnect?.error?.message || 'Unknown';
-    
-    // Save for potential diagnosis
-    lastDisconnectCode = statusCode;
-    connectionState = 'disconnected';
-    
-    LOGGER.info(`Connection closed (Code: ${statusCode}). Reason: ${reason}`);
-    
-    if (statusCode === DisconnectReason.loggedOut) {
-      LOGGER.warn('Device logged out, clearing auth state');
-      await clearAuthState();
-      connectionRetries = 0;
-      startConnection();
-    } else if (statusCode === 405) {
-      LOGGER.warn('405 error detected - WhatsApp blocking cloud environment');
-      
-      // Try new attempt with same browser but different device ID
-      if (connectionRetries < MAX_RETRIES) {
-        connectionRetries++;
-        const delay = Math.min(Math.pow(2, connectionRetries) * 1000, 10000);
-        LOGGER.info(`Retrying with new device ID in ${delay/1000}s (Attempt ${connectionRetries}/${MAX_RETRIES})`);
-        
-        clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(startConnection, delay);
-      } else {
-        LOGGER.error('Max retries reached, please try alternative connection method');
-        LOGGER.info('Try using local-connect.js on your computer, then upload auth files');
-      }
-    } else {
-      // Generic reconnection logic
-      if (connectionRetries < MAX_RETRIES) {
-        connectionRetries++;
-        const delay = Math.min(Math.pow(2, connectionRetries) * 1000, 10000);
-        LOGGER.info(`Reconnecting in ${delay/1000}s (Attempt ${connectionRetries}/${MAX_RETRIES})`);
-        
-        clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(startConnection, delay);
-      } else {
-        LOGGER.error('Max retries reached, connection attempts failed');
-      }
-    }
-  } else if (connection === 'open') {
-    connectionState = 'connected';
-    LOGGER.info('✅ SUCCESSFULLY CONNECTED TO WHATSAPP!');
-    LOGGER.info(`📱 Connected as: ${sock.user?.id || 'Unknown'}`);
-    
-    // Reset retry counter on successful connection
-    connectionRetries = 0;
-    
-    // Copy auth files to main auth folder
-    await copyAuthToMain();
-    
-    // Send a welcome message and credentials backup to yourself
-    try {
-      if (sock && sock.user) {
-        // First send welcome message
-        await sock.sendMessage(sock.user.id, { 
-          text: `🤖 *BLACKSKY-MD Bot Connected!*\n\n_Connection Time: ${new Date().toLocaleString()}_\n_Version: ${VERSION}_\n\nSend *!help* to see available commands.` 
-        });
-        LOGGER.info('Welcome message sent');
-        
-        // Then send creds.json file as a backup for Heroku deployment
-        await sendCredsBackup(sock);
-        
-        // Set up periodic credential backup for Heroku deployment
-        // This ensures your credentials are always available even if Heroku restarts
-        if (process.env.HEROKU_APP_ID || IS_CLOUD_ENV) {
-          LOGGER.info('Setting up periodic credential backup for cloud environment');
-          
-          // Clear any existing backup timer
-          if (global.credentialBackupTimer) {
-            clearInterval(global.credentialBackupTimer);
-          }
-          
-          // Set up new periodic backup (every 24 hours by default)
-          global.credentialBackupTimer = setInterval(async () => {
-            LOGGER.info('Running scheduled credential backup...');
-            try {
-              if (sock && sock.user && sock.user.id) {
-                await sendCredsBackup(sock);
-                LOGGER.info('Scheduled credential backup completed successfully');
-              }
-            } catch (backupErr) {
-              LOGGER.error('Error in scheduled credential backup:', backupErr);
-            }
-          }, CREDENTIAL_BACKUP_INTERVAL);
-          
-          LOGGER.info(`Credential backup scheduled every ${CREDENTIAL_BACKUP_INTERVAL / (1000 * 60 * 60)} hours`);
-        }
-      }
-    } catch (err) {
-      LOGGER.error('Error sending welcome message:', err);
-    }
-  }
-}
 
 // Set up message handler with enhanced reliability
 function setupMessageHandler() {
@@ -468,8 +547,8 @@ function setupMessageHandler() {
                 // Calculate uptime for display
                 const uptime = process.uptime();
                 const uptimeStr = Math.floor(uptime / 3600) + 'h ' + 
-                                 Math.floor((uptime % 3600) / 60) + 'm ' + 
-                                 Math.floor(uptime % 60) + 's';
+                                  Math.floor((uptime % 3600) / 60) + 'm ' + 
+                                  Math.floor(uptime % 60) + 's';
                 
                 // Get module stats
                 const moduleCount = Object.keys(commandModules).length;
@@ -779,119 +858,96 @@ async function processModuleCommand(sock, message, command, args) {
 // Start connection
 async function startConnection() {
   try {
-    // Make sure auth folder exists
-    ensureAuthFolder();
-    
     // Update connection state
     connectionState = 'connecting';
     LOGGER.info(`Starting WhatsApp connection (Attempt ${connectionRetries + 1}/${MAX_RETRIES})...`);
-    
+
     // Get auth state
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-    
+
     // Get Baileys version
     const { version } = await fetchLatestBaileysVersion();
     LOGGER.info(`Using Baileys version: ${version.join('.')}`);
-    
-    // For Heroku deployment, always use Safari browser fingerprint
-    // as it's the most reliable for cloud environments
-    const browser = IS_HEROKU ? 
-      ['BLACKSKY-SAFARI-' + Date.now(), 'Safari', '17.0'] : 
-      ['BLACKSKY-' + Date.now(), 'Chrome', '120.0.0.0'];
-    
-    if (IS_HEROKU) {
-      LOGGER.info('Using Safari browser fingerprint (optimized for Heroku)');
-    }
-    
-    // Create socket with Heroku-optimized settings
+
+    // Create socket with optimized settings
     sock = makeWASocket({
       version,
-      browser,
       auth: state,
-      printQRInTerminal: true, // Also print in terminal for backup
-      connectTimeoutMs: IS_HEROKU ? 60000 : 30000, // Longer timeout for Heroku
-      keepAliveIntervalMs: IS_HEROKU ? 25000 : 10000, // More frequent keepalive for Heroku
-      logger: LOGGER,
+      printQRInTerminal: true,
+      browser: [generateDeviceId(), ...SAFARI_FINGERPRINT.browser],
+      userAgent: SAFARI_FINGERPRINT.userAgent,
       connectTimeoutMs: 60000,
-      browser: [generateDeviceId(), ...SAFARI_FINGERPRINT.slice(0, 2)],
-      userAgent: SAFARI_FINGERPRINT[2],
-      markOnlineOnConnect: false,
-      syncFullHistory: false,
+      qrTimeout: 60000,
+      defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 10000,
       emitOwnEvents: false,
-      defaultQueryTimeoutMs: 60000,
-      qrTimeout: 60000,
-      /* Advanced options to help with cloud restrictions */
-      retryRequestDelayMs: 250,
-      fireInitQueries: true,
-      transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
-      generateHighQualityLinkPreview: false, // Saves resources
-      patchMessageBeforeSending: (message) => {
-        // Adjust message properties to avoid restrictions
-        const requiresPatch = !!(
-          message.buttonsMessage ||
-          message.templateMessage ||
-          message.listMessage
-        );
-        
-        if (requiresPatch) {
-          // Convert to compatible format
-          message = {
-            viewOnceMessage: {
-              message: {
-                messageContextInfo: {
-                  deviceListMetadataVersion: 2,
-                  deviceListMetadata: {}
-                },
-                ...message
-              }
-            }
-          };
-        }
-        
-        return message;
-      }
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
+      logger: LOGGER,
+      // Cloud environment optimizations
+      retryRequestDelayMs: IS_CLOUD_ENV ? 5000 : 2000,
+      fireAndRetry: IS_CLOUD_ENV,
+      maxRetries: IS_CLOUD_ENV ? 5 : 3,
+      patchMessageBeforeSending: msg=> msg
     });
-    
+
     // Handle connection updates
     sock.ev.on('connection.update', handleConnectionUpdate);
-    
-    // Save credentials on update
+
+    // Save credentials when updated
     sock.ev.on('creds.update', saveCreds);
-    
-    // Setup message handler
     setupMessageHandler();
-    
     // Load command modules
     LOGGER.info('Loading command modules...');
     await loadCommandModules();
-    
-  } catch (error) {
-    LOGGER.error('Error starting connection:', error);
+
+  } catch (err) {
+    LOGGER.error('Error in connection:', err);
     connectionState = 'error';
-    
-    // Retry on error
+
     if (connectionRetries < MAX_RETRIES) {
       connectionRetries++;
       const delay = Math.min(Math.pow(2, connectionRetries) * 1000, 10000);
-      LOGGER.info(`Retrying in ${delay/1000}s due to error (Attempt ${connectionRetries}/${MAX_RETRIES})`);
-      
-      clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(startConnection, delay);
+      LOGGER.info(`Retrying after error in ${delay/1000}s (Attempt ${connectionRetries}/${MAX_RETRIES})`);
+      setTimeout(startConnection, delay);
+    } else {
+      LOGGER.error('Max retries reached after errors');
+      process.exit(1); // Force restart in cloud environment
     }
   }
 }
 
-// Handle shutdown
-process.on('SIGINT', async () => {
-  console.log('\nShutting down...');
-  clearTimeout(reconnectTimer);
-  process.exit(0);
+// Initialize and start
+initializeConnection().then(() => {
+  startConnection();
+}).catch(err => {
+  LOGGER.error('Failed to initialize:', err);
+  process.exit(1);
 });
 
-// Start the application
-console.log('╔═══════════════════════════════════════╗');
-console.log('║     🤖 BLACKSKY-MD BOT LAUNCHER      ║');
-console.log('║      Safari Connection Edition        ║');
-console.log('╚═══════════════════════════════════════╝');
-startConnection();
+// Handle graceful shutdown
+process.on('SIGINT', () => {
+  LOGGER.info('Shutting down...');
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  if (cleanupTimer) clearInterval(cleanupTimer);
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  if (sock) {
+    sock.end();
+  }
+  server.close(() => {
+    LOGGER.info('Server closed');
+    process.exit(0);
+  });
+});
+
+// Export connection state for monitoring
+module.exports = {
+  getConnectionState: () => ({
+    state: connectionState,
+    retries: connectionRetries,
+    lastError: lastDisconnectCode,
+    qrGenerated,
+    hasQR: !!lastQRCode,
+    uptime: lastConnectTime ? Math.floor((Date.now() - lastConnectTime) / 1000) : 0
+  })
+};
