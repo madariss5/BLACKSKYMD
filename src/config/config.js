@@ -22,7 +22,7 @@ const config = {
     // Bot Configuration
     bot: {
         name: process.env.BOT_NAME || '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻',
-        version: process.env.BOT_VERSION || '1.0.0',
+        version: process.env.BOT_VERSION || '1.0.1', // Updated version number
         prefix: process.env.BOT_PREFIX || '!', // Changed default to ! to match owner commands
         language: process.env.BOT_LANGUAGE || 'en',
         debug: process.env.NODE_ENV !== 'production',
