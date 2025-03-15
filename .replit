@@ -27,6 +27,14 @@ args = "Persistent Connection"
 task = "workflow.run"
 args = "WhatsApp Bot"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Heroku Test"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Heroku Web Server"
+
 [[workflows.workflow]]
 name = "Run Bot"
 author = 40502297
@@ -95,6 +103,36 @@ task = "packager.installForAll"
 task = "shell.exec"
 args = "node easy-start.js"
 
+[[workflows.workflow]]
+name = "Heroku Test"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node heroku-bot.js"
+waitForPort = 8000
+
+[[workflows.workflow]]
+name = "Heroku Web Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=5001 node heroku-bot.js"
+waitForPort = 5001
+
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
 
@@ -157,3 +195,7 @@ externalPort = 8008
 [[ports]]
 localPort = 5500
 externalPort = 8080
+
+[[ports]]
+localPort = 8000
+externalPort = 9000

@@ -1,71 +1,29 @@
 {
-  "name": "BLACKSKY-MD WhatsApp Bot",
-  "description": "Advanced WhatsApp Multi-Device Bot with enhanced connection stability",
-  "repository": "https://github.com/yourusername/blacksky-md",
-  "logo": "https://raw.githubusercontent.com/yourusername/blacksky-md/main/generated-icon.png",
-  "keywords": ["whatsapp", "bot", "baileys", "node", "javascript"],
+  "name": "WhatsApp Bot",
+  "description": "A reliable WhatsApp bot optimized for Heroku deployment",
+  "repository": "https://github.com/yourusername/whatsapp-bot",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": ["node", "whatsapp", "bot", "baileys"],
   "env": {
-    "PREFIX": {
-      "description": "Bot command prefix",
-      "value": ".",
-      "required": false
-    },
-    "OWNER_NUMBER": {
-      "description": "Your WhatsApp number WITH country code but WITHOUT + symbol (e.g., 491234567890 for Germany)",
-      "value": "",
-      "required": true
-    },
-    "NODE_ENV": {
-      "description": "Environment for Node.js",
-      "value": "production"
-    },
-    "AUTH_DIR": {
-      "description": "Directory to store auth files",
-      "value": "auth_info_safari",
-      "required": false
-    },
-    "CONNECTION_METHOD": {
-      "description": "WhatsApp connection method to use (safari recommended for Heroku)",
-      "value": "safari",
-      "required": false
-    },
-    "PLATFORM": {
-      "description": "Deployment platform identifier",
-      "value": "heroku",
-      "required": false
+    "ADMIN_NUMBER": {
+      "description": "Your WhatsApp number without the + sign (e.g., 1234567890)",
+      "required": false,
+      "value": "4915561048015"
     },
     "LOG_LEVEL": {
-      "description": "Logging level (error, warn, info, debug)",
-      "value": "info",
-      "required": false
+      "description": "Logging level (info, warn, error, debug)",
+      "required": false,
+      "value": "info"
+    },
+    "ENABLE_COMMANDS": {
+      "description": "Enable or disable command processing (true/false)",
+      "required": false,
+      "value": "true"
     }
   },
   "buildpacks": [
     {
       "url": "heroku/nodejs"
-    },
-    {
-      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
-    },
-    {
-      "url": "https://github.com/clhuang/heroku-buildpack-webp-binaries.git"
     }
-  ],
-  "formation": {
-    "web": {
-      "quantity": 1,
-      "size": "eco"
-    }
-  },
-  "stack": "heroku-22",
-  "success_url": "/",
-  "addons": [
-    {
-      "plan": "heroku-postgresql:mini",
-      "as": "DATABASE"
-    }
-  ],
-  "scripts": {
-    "postdeploy": "npm run db:migrate"
-  }
+  ]
 }
