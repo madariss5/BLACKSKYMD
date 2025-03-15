@@ -51,6 +51,15 @@ let connectionState = 'disconnected';
 let retryCount = 0;
 let isConnecting = false;
 
+// Initialize connection monitor
+const monitor = new ConnectionMonitor({
+    checkIntervalMs: 30000,
+    maxReconnectAttempts: 10,
+    logFilePath: path.join(process.cwd(), 'connection-health.json'),
+    autoReconnect: true,
+    notifyDiscoveredIssues: true
+});
+
 // Ensure auth directory exists
 if (!fs.existsSync(AUTH_DIR)) {
     fs.mkdirSync(AUTH_DIR, { recursive: true });
@@ -179,6 +188,36 @@ async function startWhatsAppConnection() {
                 logger.info(`Connection closed due to: ${errorMessage} (Status code: ${statusCode})`);
                 isConnecting = false;
                 connectionState = 'disconnected';
+                
+                // Let ConnectionMonitor know about the disconnection
+                if (monitor) {
+                    try {
+                        // Update connection monitor with status
+                        const healthInfo = monitor.getHealthStatus();
+                        logger.info(`Connection health: ${healthInfo.healthScore}/100`);
+                        
+                        // Check diagnostics if this is a persistent issue
+                        if (retryCount >= 2) {
+                            logger.info('Running connection diagnostics...');
+                            monitor.runDiagnostics()
+                                .then(diagnostics => {
+                                    logger.info('Diagnostic results:', diagnostics);
+                                    
+                                    // If diagnostics show network issues, log specific advice
+                                    if (!diagnostics.webWhatsappReachable) {
+                                        logger.warn('Network connectivity issues detected - check internet connection');
+                                    }
+                                    
+                                    if (!diagnostics.authFilesExist) {
+                                        logger.warn('Authentication files missing or corrupted');
+                                    }
+                                })
+                                .catch(err => logger.error('Diagnostics error:', err));
+                        }
+                    } catch (monitorErr) {
+                        logger.error('Error updating connection monitor:', monitorErr);
+                    }
+                }
 
                 if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
@@ -194,9 +233,34 @@ async function startWhatsAppConnection() {
                         connectionConfig.browser = [`BLACKSKY-${Date.now()}`, 'Chrome', '110.0.0'];
                     }
                     
-                    setTimeout(startWhatsAppConnection, delay);
+                    setTimeout(() => {
+                        // Before reconnecting, check if the monitor recommends a different approach
+                        if (monitor && monitor.getHealthStatus().healthScore < 30) {
+                            logger.info('Low health score detected, using advanced recovery approach');
+                            
+                            // Try to restore from a backup first
+                            restoreCredentials()
+                                .then(restored => {
+                                    if (restored) {
+                                        logger.info('Successfully restored credentials from backup');
+                                    }
+                                    return startWhatsAppConnection();
+                                })
+                                .catch(() => startWhatsAppConnection());
+                        } else {
+                            startWhatsAppConnection();
+                        }
+                    }, delay);
                 } else {
                     logger.info('Not reconnecting through standard method - preparing fallback options');
+                    
+                    // Check if ConnectionMonitor can provide specific advice
+                    if (monitor) {
+                        const healthStatus = monitor.getHealthStatus();
+                        if (healthStatus.diagnostics && Object.keys(healthStatus.diagnostics).length > 0) {
+                            logger.info('ConnectionMonitor diagnostics:', healthStatus.diagnostics);
+                        }
+                    }
                     
                     // Check if repeated Connection Failure errors, use special fallback
                     if (isConnectionFailure && retryCount >= MAX_RETRIES - 1) {
@@ -205,7 +269,6 @@ async function startWhatsAppConnection() {
                         
                         try {
                             const { spawn } = require('child_process');
-                            const path = require('path');
                             
                             // Launch the specialized QR generator in a separate process
                             const qrProcess = spawn('node', [path.join(__dirname, 'qr-generator.js')], {
@@ -411,21 +474,51 @@ function getStatusMessage() {
     }
 }
 
+// Add health monitoring endpoints
+app.get('/connection/health', (req, res) => {
+    const healthStatus = monitor.getHealthStatus();
+    res.json(healthStatus);
+});
+
+app.get('/connection/logs', (req, res) => {
+    const logs = monitor.getLogs();
+    res.json(logs);
+});
+
+app.get('/connection/diagnostics', async (req, res) => {
+    const diagnostics = await monitor.runDiagnostics();
+    res.json(diagnostics);
+});
+
 // Start server and connection
 app.listen(PORT, '0.0.0.0', async () => {
     logger.info(`Server running on port ${PORT}`);
     logger.info('Starting WhatsApp connection...');
+    
+    // Start the connection
     await startWhatsAppConnection();
+    
+    // Start monitoring once socket is created
+    if (sock) {
+        logger.info('Starting connection monitoring...');
+        monitor.startMonitoring(sock);
+    }
 });
 
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
     logger.info('Shutting down...');
+    monitor.stopMonitoring();
+    // Save any important state here
+    await monitor.saveLogs();
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
     logger.info('Shutting down...');
+    monitor.stopMonitoring();
+    // Save any important state here
+    await monitor.saveLogs();
     process.exit(0);
 });
 

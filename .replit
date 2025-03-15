@@ -15,6 +15,10 @@ author = "agent"
 task = "workflow.run"
 args = "WhatsApp Bot"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "QR Code Server"
+
 [[workflows.workflow]]
 name = "Run Bot"
 author = 40502297
@@ -38,6 +42,21 @@ task = "packager.installForAll"
 task = "shell.exec"
 args = "node src/index.js"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "QR Code Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node src/qr-generator.js"
+waitForPort = 5001
 
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
