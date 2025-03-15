@@ -20,15 +20,16 @@ const AUTH_DIR = './auth_info_simple';
 // Create auth directory if it doesn't exist
 if (!fs.existsSync(AUTH_DIR)) {
     fs.mkdirSync(AUTH_DIR, { recursive: true });
-} else {
-    // Clear auth directory to force new QR code
-    fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-    fs.mkdirSync(AUTH_DIR, { recursive: true });
 }
 
 // Global state
 let qrText = '';
 let webQR = '';
+let isConnecting = false;
+let connectionLock = false;
+let retryCount = 0;
+const MAX_RETRIES = 5;
+let reconnectTimer = null;
 
 // Serve QR code via simple web server
 app.get('/', (req, res) => {
@@ -128,13 +129,18 @@ server.listen(PORT, '0.0.0.0', () => {
 
 // Connect to WhatsApp
 async function connectToWhatsApp() {
+    if (isConnecting || connectionLock) {
+        console.log('[Connection] Connection attempt already in progress, skipping...');
+        return null;
+    }
+
     try {
-        // Clear session first
-        console.log('[Auth] Preparing fresh session');
-        
-        // Get auth state
+        isConnecting = true;
+        connectionLock = true;
+
+        // Get auth state - don't clear existing auth unless necessary
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-        
+
         // Connect to WhatsApp with minimal settings for reliable QR code generation
         const sock = makeWASocket({
             auth: state,
@@ -143,20 +149,23 @@ async function connectToWhatsApp() {
             version: [2, 2323, 4],
             defaultQueryTimeoutMs: 60000,
             connectTimeoutMs: 60000,
+            keepAliveIntervalMs: 10000,
+            retryRequestDelayMs: 2000,
+            emitOwnEvents: false
         });
-        
+
         // Handle connection updates
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            
+
             // Handle QR code updates
             if (qr) {
                 qrText = qr;
                 console.log('\n[QR] New QR code received. Displaying in terminal and web...\n');
-                
+
                 // Show QR in terminal
                 qrcode.generate(qr, { small: true });
-                
+
                 // Generate QR for web
                 try {
                     webQR = await qrcodeWeb.toDataURL(qr);
@@ -165,35 +174,96 @@ async function connectToWhatsApp() {
                     console.log('[QR] Error generating web QR:', error.message);
                 }
             }
-            
+
             // Handle connection state changes
             if (connection === 'open') {
                 console.log('\n[Connection] Successfully connected to WhatsApp!\n');
+                retryCount = 0;
+                isConnecting = false;
+                connectionLock = false;
+                clearReconnectTimer();
                 await saveCreds();
                 process.exit(0); // Exit once connected
             }
-            
+
             if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
                 console.log(`\n[Connection] Connection closed due to ${lastDisconnect?.error?.output?.payload?.message || 'unknown reason'}`);
-                
-                if (shouldReconnect) {
-                    console.log('[Connection] Reconnecting...');
-                    startConnection();
+
+                if (statusCode === DisconnectReason.loggedOut || 
+                    statusCode === DisconnectReason.connectionClosed ||
+                    statusCode === DisconnectReason.connectionLost ||
+                    statusCode === DisconnectReason.connectionReplaced ||
+                    statusCode === DisconnectReason.timedOut) {
+
+                    if (retryCount >= MAX_RETRIES) {
+                        console.log('[Connection] Max retries reached, clearing session and restarting...');
+                        clearSession();
+                        process.exit(1);
+                        return;
+                    }
+
+                    retryCount++;
+                    const retryDelay = Math.min(5000 * Math.pow(2, retryCount - 1), 300000);
+                    console.log(`[Connection] Retry attempt ${retryCount}/${MAX_RETRIES} in ${retryDelay/1000} seconds`);
+
+                    clearReconnectTimer();
+                    reconnectTimer = setTimeout(() => {
+                        isConnecting = false;
+                        connectionLock = false;
+                        startConnection();
+                    }, retryDelay);
                 } else {
-                    console.log('[Connection] Not reconnecting - logged out');
+                    console.log('[Connection] Not reconnecting - non-recoverable error');
                     process.exit(1);
                 }
             }
         });
-        
+
         // Handle credentials update
         sock.ev.on('creds.update', saveCreds);
-        
+
         return sock;
     } catch (error) {
         console.log('[Error]', error);
-        setTimeout(startConnection, 10000);
+
+        if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            const retryDelay = Math.min(5000 * Math.pow(2, retryCount - 1), 300000);
+            console.log(`[Connection] Retry attempt ${retryCount}/${MAX_RETRIES} in ${retryDelay/1000} seconds`);
+
+            clearReconnectTimer();
+            reconnectTimer = setTimeout(() => {
+                isConnecting = false;
+                connectionLock = false;
+                startConnection();
+            }, retryDelay);
+        } else {
+            console.log('[Connection] Max retries reached');
+            process.exit(1);
+        }
+    } finally {
+        isConnecting = false;
+        connectionLock = false;
+    }
+}
+
+function clearReconnectTimer() {
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+}
+
+function clearSession() {
+    try {
+        if (fs.existsSync(AUTH_DIR)) {
+            fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+            fs.mkdirSync(AUTH_DIR, { recursive: true });
+            console.log('[Auth] Session cleared successfully');
+        }
+    } catch (err) {
+        console.error('[Auth] Error clearing session:', err);
     }
 }
 
@@ -205,3 +275,18 @@ function startConnection() {
         setTimeout(startConnection, 10000);
     });
 }
+
+// Handle process termination
+process.on('SIGINT', async () => {
+    console.log('Received SIGINT, cleaning up...');
+    clearReconnectTimer();
+    clearSession();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('Received SIGTERM, cleaning up...');
+    clearReconnectTimer();
+    clearSession();
+    process.exit(0);
+});
