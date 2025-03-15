@@ -7,10 +7,11 @@
   "env": {
     "PREFIX": {
       "description": "Bot command prefix",
-      "value": "!"
+      "value": ".",
+      "required": false
     },
     "OWNER_NUMBER": {
-      "description": "Your WhatsApp number WITH country code but WITHOUT + symbol (e.g., 491234567890 for Germany, 14155552671 for US). The country code is required for proper functioning.",
+      "description": "Your WhatsApp number WITH country code but WITHOUT + symbol (e.g., 491234567890 for Germany)",
       "value": "",
       "required": true
     },
@@ -18,20 +19,9 @@
       "description": "Environment for Node.js",
       "value": "production"
     },
-    "OPENWEATHERMAP_API_KEY": {
-      "description": "API key for weather functionality",
-      "required": false
-    },
-    "TWILIO_ACCOUNT_SID": {
-      "description": "Twilio Account SID for SMS notifications",
-      "required": false
-    },
-    "TWILIO_AUTH_TOKEN": {
-      "description": "Twilio Auth Token for SMS notifications",
-      "required": false
-    },
-    "TWILIO_PHONE_NUMBER": {
-      "description": "Twilio Phone Number for sending SMS",
+    "AUTH_DIR": {
+      "description": "Directory to store auth files",
+      "value": "auth_info_baileys",
       "required": false
     }
   },
@@ -51,5 +41,6 @@
       "quantity": 1,
       "size": "eco"
     }
-  }
+  },
+  "stack": "heroku-22"
 }
