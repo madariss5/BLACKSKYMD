@@ -1,6 +1,6 @@
 # Translation Completeness Report
 
-**Total missing translations: 14**
+**Total missing translations: 15**
 
 ## basic (13 missing)
 
@@ -25,6 +25,12 @@
 | Path | English Text | Suggestion |
 |------|-------------|------------|
 | `reactions.categories.fastfurious` | Fast & Furious | Fast & Furious |
+
+## user (1 missing)
+
+| Path | English Text | Suggestion |
+|------|-------------|------------|
+| `user.level` | Level | Level |
 
 ## How to Add Missing Translations
 
