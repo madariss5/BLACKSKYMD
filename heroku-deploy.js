@@ -72,16 +72,16 @@ async function saveSessionData(sessionData) {
         // First convert to safe string format
         const sessionString = sessionToString(sessionData);
         if (!sessionString) return false;
-        
+
         // Save to file
         fs.writeFileSync(SESSION_PATH, sessionString);
         console.log('Session data saved to file');
-        
+
         // Also store in environment variable for Heroku persistence
         // Note: This won't actually work in Heroku as env vars are read-only at runtime
         // This is just shown as an example of the concept
         process.env.SESSION_DATA = sessionString;
-        
+
         return true;
     } catch (error) {
         console.error('Error saving session data:', error);
@@ -103,7 +103,7 @@ async function loadSessionData() {
                 return sessionData;
             }
         }
-        
+
         // Fall back to filesystem
         if (fs.existsSync(SESSION_PATH)) {
             console.log('Found session data file');
@@ -114,7 +114,7 @@ async function loadSessionData() {
                 return sessionData;
             }
         }
-        
+
         console.log('No valid session data found');
         return null;
     } catch (error) {
@@ -132,28 +132,28 @@ async function connectToWhatsApp() {
         if (!fs.existsSync(AUTH_DIR)) {
             fs.mkdirSync(AUTH_DIR, { recursive: true });
         }
-        
+
         // Initialize auth state
         let authState;
-        
+
         // Try to load session data first
         const savedSession = await loadSessionData();
         if (savedSession && savedSession.creds) {
             console.log('Restoring from saved session');
-            
+
             // Write creds to auth file
             fs.writeFileSync(path.join(AUTH_DIR, 'creds.json'), JSON.stringify(savedSession.creds, null, 2));
-            
+
             // Initialize from file
             console.log('Initializing from auth file');
         }
-        
+
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-        
+
         // Generate a unique browser ID for Heroku
-        const browserId = `BLACKSKY-HEROKU-${Date.now().toString().slice(-6)}`;
+        const browserId = `BLACKSKY-HEROKU-${Date.now().toString(36)}`;
         console.log('Using browser ID:', browserId);
-        
+
         // Create WhatsApp socket with optimized settings for Heroku
         sock = makeWASocket({
             auth: state,
@@ -170,30 +170,30 @@ async function connectToWhatsApp() {
             fireAndForget: true,
             retryRequestDelayMs: 1000
         });
-        
+
         // Handle connection events
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            
+
             if (qr) {
                 // Generate QR code and store it
                 qrCodeDataURL = await qrcode.toDataURL(qr);
                 console.log('New QR code generated');
             }
-            
+
             if (connection) {
                 connectionStatus = connection;
                 console.log('Connection status:', connection);
             }
-            
+
             if (connection === 'open') {
                 console.log('Connection established successfully');
-                
+
                 // On successful connection, save credentials
                 try {
                     await saveCreds();
                     console.log('Credentials saved to filesystem');
-                    
+
                     // Try to make a more permanent backup of the session
                     if (sock.authState && sock.authState.creds) {
                         // Create session data object
@@ -202,22 +202,22 @@ async function connectToWhatsApp() {
                             timestamp: Date.now(),
                             version: '1.0'
                         };
-                        
+
                         // Save to more permanent storage
                         await saveSessionData(sessionData);
                         console.log('Session data backed up successfully');
-                        
+
                         // Log successful connection details
                         console.log('Connected as:', sock.user.id.split(':')[0]);
                     }
                 } catch (err) {
                     console.error('Error saving credentials:', err);
                 }
-                
+
                 // Initialize message handler now that we're connected
                 if (messageHandler) {
                     console.log('Initializing message handler');
-                    
+
                     sock.ev.on('messages.upsert', async ({ messages, type }) => {
                         if (type === 'notify') {
                             for (const message of messages) {
@@ -231,14 +231,14 @@ async function connectToWhatsApp() {
                     });
                 } else {
                     console.warn('No message handler available');
-                    
+
                     // Try to load it dynamically
                     try {
                         const { messageHandler: handler } = require('./src/handlers/messageHandler');
                         if (handler) {
                             messageHandler = handler;
                             console.log('Successfully loaded message handler dynamically');
-                            
+
                             sock.ev.on('messages.upsert', async ({ messages, type }) => {
                                 if (type === 'notify') {
                                     for (const message of messages) {
@@ -256,12 +256,12 @@ async function connectToWhatsApp() {
                     }
                 }
             }
-            
+
             if (connection === 'close') {
                 // Handle disconnection
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 console.log(`Connection closed with status code: ${statusCode}`);
-                
+
                 // Only attempt reconnection if not logged out
                 if (statusCode !== DisconnectReason.loggedOut) {
                     console.log('Attempting to reconnect...');
@@ -271,11 +271,11 @@ async function connectToWhatsApp() {
                 }
             }
         });
-        
+
         // Save credentials when they update
         sock.ev.on('creds.update', async (creds) => {
             await saveCreds();
-            
+
             // Update our session backup
             if (sessionData) {
                 sessionData.creds = creds;
@@ -292,7 +292,7 @@ async function connectToWhatsApp() {
             }
             console.log('Credentials updated and backed up');
         });
-        
+
         return sock;
     } catch (error) {
         console.error('Connection error:', error);
@@ -309,13 +309,13 @@ function getUptime() {
     const minutes = Math.floor(uptime / (1000 * 60)) % 60;
     const hours = Math.floor(uptime / (1000 * 60 * 60)) % 24;
     const days = Math.floor(uptime / (1000 * 60 * 60 * 24));
-    
+
     let uptimeString = '';
     if (days > 0) uptimeString += `${days}d `;
     if (hours > 0) uptimeString += `${hours}h `;
     if (minutes > 0) uptimeString += `${minutes}m `;
     uptimeString += `${seconds}s`;
-    
+
     return uptimeString;
 }
 
@@ -324,7 +324,7 @@ function getUptime() {
  */
 async function start() {
     // Set up Express endpoints
-    
+
     // Home page with status info
     app.get('/', (req, res) => {
         res.send(`
@@ -368,24 +368,24 @@ async function start() {
                     <p><strong>Uptime:</strong> ${getUptime()}</p>
                     <p><strong>Server Time:</strong> ${new Date().toLocaleString()}</p>
                 </div>
-                
+
                 <div class="card">
                     <h2>Connection</h2>
-                    ${qrCodeDataURL 
+                    ${qrCodeDataURL
                         ? `<p>Scan this QR code with WhatsApp:</p><img src="${qrCodeDataURL}" alt="WhatsApp QR Code" />`
-                        : connectionStatus === 'connected' 
+                        : connectionStatus === 'connected'
                             ? '<p>Bot is connected to WhatsApp</p>'
                             : '<p>Waiting for connection...</p>'
                     }
                 </div>
-                
+
                 <div class="card">
                     <h2>Bot Information</h2>
                     <p><strong>Version:</strong> 1.0.0</p>
                     <p><strong>Environment:</strong> ${process.env.NODE_ENV || 'development'}</p>
                     <p><strong>Session Backup:</strong> ${sessionData ? 'Available' : 'Not available'}</p>
                 </div>
-                
+
                 <footer>
                     &copy; 2025 BLACKSKY WhatsApp Bot - Running on Heroku
                 </footer>
@@ -393,7 +393,7 @@ async function start() {
             </html>
         `);
     });
-    
+
     // QR code endpoint
     app.get('/qr', (req, res) => {
         if (qrCodeDataURL) {
@@ -439,7 +439,7 @@ async function start() {
                     <div class="qr-container">
                         <h1>WhatsApp QR Code</h1>
                         <img src="${qrCodeDataURL}" alt="WhatsApp QR Code" />
-                        
+
                         <div class="instructions">
                             <h3>How to connect:</h3>
                             <ol>
@@ -449,7 +449,7 @@ async function start() {
                                 <li>Point your phone at this screen to scan the QR code</li>
                             </ol>
                         </div>
-                        
+
                         <p class="refresh-note">This page will automatically refresh every 30 seconds.</p>
                     </div>
                 </body>
@@ -495,9 +495,9 @@ async function start() {
                 <body>
                     <div class="message-container">
                         <h1>WhatsApp QR Code</h1>
-                        
+
                         <div class="status">
-                            ${connectionStatus === 'connected' 
+                            ${connectionStatus === 'connected'
                                 ? 'Already connected to WhatsApp. No QR code needed.'
                                 : 'Waiting for QR code generation. This page will refresh automatically.'}
                         </div>
@@ -507,7 +507,7 @@ async function start() {
             `);
         }
     });
-    
+
     // Status endpoint for monitoring
     app.get('/status', (req, res) => {
         res.json({
@@ -518,12 +518,12 @@ async function start() {
             hasSession: !!sessionData
         });
     });
-    
+
     // Start the web server
     server.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running on port ${PORT}`);
         console.log(`Open http://localhost:${PORT} in your browser`);
-        
+
         // Start WhatsApp connection
         connectToWhatsApp();
     });

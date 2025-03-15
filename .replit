@@ -36,8 +36,8 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner/workspace && node --no-warnings src/qr-web-server.js"
-waitForPort = 5007
+args = "node heroku-deploy.js"
+waitForPort = 5000
 
 [deployment]
 run = ["sh", "-c", "node src/index.js"]

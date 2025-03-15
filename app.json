@@ -11,11 +11,28 @@
     },
     "OWNER_NUMBER": {
       "description": "Your WhatsApp number without + or country code (e.g., 1234567890)",
-      "value": ""
+      "value": "",
+      "required": true
     },
     "NODE_ENV": {
       "description": "Environment for Node.js",
       "value": "production"
+    },
+    "OPENWEATHERMAP_API_KEY": {
+      "description": "API key for weather functionality",
+      "required": false
+    },
+    "TWILIO_ACCOUNT_SID": {
+      "description": "Twilio Account SID for SMS notifications",
+      "required": false
+    },
+    "TWILIO_AUTH_TOKEN": {
+      "description": "Twilio Auth Token for SMS notifications",
+      "required": false
+    },
+    "TWILIO_PHONE_NUMBER": {
+      "description": "Twilio Phone Number for sending SMS",
+      "required": false
     }
   },
   "buildpacks": [
@@ -27,12 +44,6 @@
     },
     {
       "url": "https://github.com/clhuang/heroku-buildpack-webp-binaries.git"
-    }
-  ],
-  "addons": [
-    {
-      "plan": "heroku-redis:hobby-dev",
-      "as": "REDIS"
     }
   ],
   "formation": {
