@@ -15,9 +15,24 @@
         "New Arrival"
       ],
       "customTitle": "",
-      "warnings": 0,
-      "profilePic": null,
-      "theme": "default"
+      "warnings": 0
+    },
+    "120363407638585565@g.us": {
+      "name": "Martin",
+      "age": 21,
+      "xp": 0,
+      "level": 1,
+      "coins": 100,
+      "bio": "",
+      "language": "en",
+      "registeredAt": "2025-03-15T10:57:08.783Z",
+      "lastDaily": null,
+      "inventory": [],
+      "achievements": [
+        "New Arrival"
+      ],
+      "customTitle": "",
+      "warnings": 0
     }
   },
   "games": {},
@@ -28,5 +43,11 @@
   "afk": {},
   "streaks": {},
   "checkins": {},
-  "lottery": []
+  "lottery": [],
+  "_meta": {
+    "version": 1,
+    "savedAt": "2025-03-15T11:11:39.673Z",
+    "profileCount": 2,
+    "invalidProfileCount": 0
+  }
 }

@@ -538,7 +538,15 @@ const userCommands = {
         try {
             const sender = message.key.remoteJid;
             const targetUser = args[0]?.replace(/[^0-9]/g, '') || sender;
-            const profile = userDatabase.getUserProfile(targetUser);
+            
+            // Get the profile with defensive error handling
+            let profile = null;
+            try {
+                profile = userDatabase.getUserProfile(targetUser);
+            } catch (profileErr) {
+                logger.error(`Error getting user profile for ${formatJidForLogging(targetUser)}:`, profileErr);
+                // Continue with null profile to trigger the not found error message
+            }
 
             if (!profile) {
                 await safeSendText(sock, sender, targetUser === sender ? 
@@ -548,13 +556,35 @@ const userCommands = {
                 return;
             }
 
-            // Get level progress
-            const progress = levelingSystem.getLevelProgress(targetUser);
+            // Ensure profile has required fields with sensible defaults
+            profile.achievements = profile.achievements || [];
+            profile.coins = profile.coins || 0;
+            profile.level = profile.level || 1;
+            profile.xp = profile.xp || 0;
+            profile.bio = profile.bio || '';
+            profile.customTitle = profile.customTitle || '';
+            profile.theme = profile.theme || 'default';
+            profile.registeredAt = profile.registeredAt || new Date().toISOString();
+
+            // Get level progress with error handling
+            let progress = { progressBar: '░░░░░░░░░░░░░░░░░░░░ 0%', requiredXP: 100 };
+            try {
+                progress = levelingSystem.getLevelProgress(targetUser);
+            } catch (progressErr) {
+                logger.error(`Error getting level progress for ${formatJidForLogging(targetUser)}:`, progressErr);
+                // Continue with default progress
+            }
             
             // Calculate rank if available
-            const leaderboard = levelingSystem.getLeaderboard(100);
-            const rank = leaderboard.findIndex(u => u.id === targetUser) + 1;
-            const rankText = rank > 0 ? `*🏆 Rank:* #${rank}` : '';
+            let rankText = '';
+            try {
+                const leaderboard = levelingSystem.getLeaderboard(100);
+                const rank = leaderboard.findIndex(u => u.id === targetUser) + 1;
+                rankText = rank > 0 ? `*🏆 Rank:* #${rank}` : '';
+            } catch (rankErr) {
+                logger.error(`Error calculating rank for ${formatJidForLogging(targetUser)}:`, rankErr);
+                // Continue without rank information
+            }
 
             // Create detailed profile text
             const profileText = `
@@ -575,16 +605,27 @@ ${rankText}
 *🕒 Registered:* ${new Date(profile.registeredAt).toLocaleDateString()}`;
 
             // Send profile text
-            await safeSendText(sock, sender, profileText.trim() );
+            await safeSendText(sock, sender, profileText.trim());
             
-            // Generate and send profile card
+            // Generate and send profile card with robust error handling
             try {
                 // First try to generate a custom profile card
-                let cardPath = await createProfileCard(profile, null, sender);
+                let cardPath = null;
+                try {
+                    cardPath = await createProfileCard(profile, null, sender);
+                } catch (cardErr) {
+                    logger.error(`Error creating profile card for ${formatJidForLogging(targetUser)}:`, cardErr);
+                    // Will try fallback
+                }
                 
                 // If that fails, fall back to level card
                 if (!cardPath) {
-                    cardPath = await levelingSystem.generateLevelCard(targetUser, profile);
+                    try {
+                        cardPath = await levelingSystem.generateLevelCard(targetUser, profile);
+                    } catch (levelCardErr) {
+                        logger.error(`Error generating level card for ${formatJidForLogging(targetUser)}:`, levelCardErr);
+                        // Both card methods failed
+                    }
                 }
                 
                 if (cardPath) {
@@ -596,14 +637,24 @@ ${rankText}
                         image: { url: cardPath },
                         caption: caption
                     });
+                } else {
+                    // Inform the user that profile card generation failed but profile info was displayed
+                    await safeSendText(sock, sender, 
+                        '*Note:* Unable to generate profile card image, but your profile information is displayed above.'
+                    );
                 }
             } catch (err) {
-                logger.error(`Error generating profile card for ${formatJidForLogging(sender)}:`, err);
+                logger.error(`Error in profile card generation for ${formatJidForLogging(sender)}:`, err);
                 // Continue execution even if card generation fails
+                await safeSendText(sock, sender, 
+                    '*Note:* Unable to generate profile card image, but your profile information is displayed above.'
+                );
             }
         } catch (err) {
             logger.error(`Error in profile command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
-            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to fetch profile. Please try again.'
+            await safeSendText(sock, message.key.remoteJid, 
+                '*❌ Error:* Failed to fetch profile. Please try again.\n\n' +
+                'If this error persists, please try registering with .register [name] [age]'
             );
         }
     },

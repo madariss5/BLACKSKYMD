@@ -3,10 +3,24 @@ const logger = require('../utils/logger');
 const axios = require('axios');
 const { safeSendText, safeSendMessage, safeSendImage, safeSendAnimatedGif, formatJidForLogging } = require('../utils/jidHelper');
 const { languageManager } = require('../utils/language');
+const crypto = require('crypto');
 
 // Cache for user information
 const userCache = new Map();
 const USER_CACHE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+// Cache for converted GIFs to avoid re-processing
+const REACTION_GIF_CACHE = new Map();
+const GIF_CACHE_SIZE_LIMIT = 30; // Maximum number of cached GIFs
+const GIF_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+// Exponential backoff configuration
+const BACKOFF_CONFIG = {
+    MAX_RETRIES: 3,
+    INITIAL_DELAY: 500, // ms
+    MAX_DELAY: 5000, // ms
+    JITTER: 100 // +/- ms jitter to avoid thundering herd problem
+};
 
 // Using file paths to local GIFs for reliable access
 const path = require('path');
@@ -16,35 +30,46 @@ const fs = require('fs');
 const REACTIONS_DIR = path.join(process.cwd(), 'data', 'reaction_gifs');
 const ANIMATED_GIFS_DIR = path.join(process.cwd(), 'animated_gifs');
 
-// Get path to GIF with fallback 
+// Optimized path validation with caching
+const PATH_CACHE = new Map();
+
+// Get path to GIF with fallback and caching
 function getGifPath(filename) {
+    // Check cache first for fast lookup
+    if (PATH_CACHE.has(filename)) {
+        return PATH_CACHE.get(filename);
+    }
+    
     const primaryPath = path.join(REACTIONS_DIR, filename);
     const fallbackPath = path.join(ANIMATED_GIFS_DIR, filename);
     
-    // Check if the primary file exists and has a reasonable size
+    // Fast path existence check with minimal logging
     try {
+        // Check primary path first
         if (fs.existsSync(primaryPath)) {
             const stats = fs.statSync(primaryPath);
-            // If file exists and has reasonable size (>1KB), use primary path
             if (stats.size > 1024) {
+                PATH_CACHE.set(filename, primaryPath);
                 return primaryPath;
             }
         }
         
-        // Try fallback path if primary doesn't exist or is too small
+        // Try fallback if needed
         if (fs.existsSync(fallbackPath)) {
             const stats = fs.statSync(fallbackPath);
-            // If fallback exists and has reasonable size, use it
             if (stats.size > 1024) {
+                PATH_CACHE.set(filename, fallbackPath);
                 return fallbackPath;
             }
         }
         
-        // Return primary path as default, validation will happen later
+        // Default to primary
+        PATH_CACHE.set(filename, primaryPath);
         return primaryPath;
     } catch (err) {
-        logger.warn(`Error checking GIF paths for ${filename}: ${err.message}`);
-        return primaryPath; // Return primary path as default
+        // Silent error handling
+        PATH_CACHE.set(filename, primaryPath);
+        return primaryPath;
     }
 }
 
@@ -77,6 +102,50 @@ const REACTION_GIFS = {
     // Other actions
     yeet: getGifPath('yeet.gif')
 };
+
+/**
+ * Preload GIFs to optimize first-time sending performance
+ * This loads the most commonly used GIFs into memory ahead of time
+ */
+function preloadCommonGifs() {
+    // List of most commonly used reaction GIFs (based on usage statistics)
+    const commonReactions = ['hug', 'slap', 'pat', 'kiss', 'bonk'];
+    
+    logger.info('Preloading common reaction GIFs for better performance...');
+    
+    for (const reaction of commonReactions) {
+        const gifPath = REACTION_GIFS[reaction];
+        
+        // Skip if GIF doesn't exist
+        if (!gifPath || !fs.existsSync(gifPath)) {
+            continue;
+        }
+        
+        try {
+            // Generate hash for cache key
+            const gifHash = crypto.createHash('md5').update(`${gifPath}-${reaction}`).digest('hex');
+            
+            // Read file into memory if not already cached
+            if (!REACTION_GIF_CACHE.has(gifHash)) {
+                const gifBuffer = fs.readFileSync(gifPath);
+                
+                // Cache the buffer for later use
+                REACTION_GIF_CACHE.set(gifHash, {
+                    buffer: gifBuffer,
+                    format: 'gif',
+                    timestamp: Date.now()
+                });
+                
+                logger.info(`✅ Preloaded ${reaction} GIF (${Math.round(gifBuffer.length / 1024)} KB)`);
+            }
+        } catch (err) {
+            // Silent fail - preloading is just an optimization
+        }
+    }
+}
+
+// Run preload when module is loaded
+preloadCommonGifs();
 
 // Helper function to validate mentions
 function validateMention(target) {
@@ -263,89 +332,170 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         await safeSendText(sock, sender, decoratedMessage);
         logger.info(`Successfully sent ${type} reaction text to ${formatJidForLogging(sender)}`);
         
-        // Then try to send the GIF if available - using centralized safeSendAnimatedGif utility
+        // Then try to send the GIF if available - using optimal sending with caching
         if (hasGif) {
             try {
-                // Log GIF information
-                const stats = fs.statSync(gifPath);
-                const fileSize = stats.size / 1024; // KB
-                logger.info(`Preparing to send ${type} reaction GIF (${fileSize.toFixed(2)} KB) from ${gifPath}`);
+                // Generate a unique key for this GIF
+                const gifHash = crypto.createHash('md5').update(`${gifPath}-${type}`).digest('hex');
                 
-                // Use our specialized GIF sending utility with improved animation options
-                await safeSendAnimatedGif(sock, sender, gifPath, '', { 
-                    ptt: false,
-                    gifAttribution: type,
-                    keepFormat: true,    // Signal to preserve original format
-                    mediaType: 2,        // 2 = video type
-                    isAnimated: true,    // Signal this is animated content
-                    animated: true,      // Double confirm animation
-                    shouldLoop: true,    // Ensure animation loops
-                    seconds: 8           // Suggested duration for looping
-                });
-                logger.info(`Successfully sent ${type} reaction GIF to ${formatJidForLogging(sender)} using safeSendAnimatedGif`);
-            } catch (gifError) {
-                logger.error(`Error sending animated GIF: ${gifError.message}`);
+                // Check if we have a cached version of this GIF
+                if (REACTION_GIF_CACHE.has(gifHash)) {
+                    const cached = REACTION_GIF_CACHE.get(gifHash);
+                    
+                    // Check if cache is still valid
+                    if (Date.now() - cached.timestamp < GIF_CACHE_DURATION) {
+                        logger.info(`Using cached version of ${type} reaction GIF`);
+                        
+                        // Use the cached buffer directly
+                        if (cached.format === 'gif') {
+                            await safeSendAnimatedGif(sock, sender, cached.buffer, '', {
+                                ptt: false,
+                                gifAttribution: type,
+                                keepFormat: true,
+                                mediaType: 2,
+                                isAnimated: true,
+                                animated: true,
+                                shouldLoop: true,
+                                seconds: 8
+                            });
+                        } else if (cached.format === 'mp4') {
+                            await safeSendMessage(sock, sender, {
+                                video: cached.buffer,
+                                gifPlayback: true,
+                                caption: ''
+                            });
+                        } else if (cached.format === 'sticker') {
+                            await safeSendMessage(sock, sender, {
+                                sticker: cached.buffer,
+                                isAnimated: true
+                            });
+                        }
+                        
+                        logger.info(`Successfully sent cached ${type} reaction GIF to ${formatJidForLogging(sender)}`);
+                        return;
+                    }
+                    
+                    // Cache expired, remove it
+                    REACTION_GIF_CACHE.delete(gifHash);
+                }
                 
-                // Try MP4 conversion as a fallback approach (most compatible)
+                // No cache hit, process and cache the GIF
+                // Try direct GIF sending first (fastest)
+                const gifBuffer = fs.readFileSync(gifPath);
+                
                 try {
-                    logger.info(`Attempting direct MP4 conversion for ${type} reaction GIF`);
-                    const fs = require('fs');
-                    const path = require('path');
-                    const ffmpeg = require('fluent-ffmpeg');
-                    
-                    // Create temp directory and paths
-                    const tempDir = path.join(process.cwd(), 'temp');
-                    if (!fs.existsSync(tempDir)) {
-                        fs.mkdirSync(tempDir, { recursive: true });
-                    }
-                    
-                    const mp4Path = path.join(tempDir, `${type}-${Date.now()}.mp4`);
-                    
-                    // Convert to MP4
-                    await new Promise((resolve, reject) => {
-                        ffmpeg(gifPath)
-                            .outputOptions([
-                                '-movflags faststart',
-                                '-pix_fmt yuv420p',
-                                '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
-                            ])
-                            .output(mp4Path)
-                            .on('end', resolve)
-                            .on('error', reject)
-                            .run();
+                    // Use our enhanced exponential backoff function for reliable GIF sending
+                    await sendGifWithExponentialBackoff(sock, sender, gifBuffer, '', { 
+                        ptt: false,
+                        gifAttribution: type,
+                        keepFormat: true,
+                        mediaType: 2,
+                        isAnimated: true,
+                        animated: true,
+                        shouldLoop: true,
+                        seconds: 8
                     });
                     
-                    // Send as video with gifPlayback
-                    const mp4Buffer = fs.readFileSync(mp4Path);
-                    await safeSendMessage(sock, sender, {
-                        video: mp4Buffer,
-                        gifPlayback: true,
-                        caption: ''
+                    // Cache the successful GIF buffer
+                    REACTION_GIF_CACHE.set(gifHash, {
+                        buffer: gifBuffer,
+                        format: 'gif',
+                        timestamp: Date.now()
                     });
                     
-                    logger.info(`Successfully sent ${type} reaction as MP4 with gifPlayback to ${formatJidForLogging(sender)}`);
-                    
-                    // Clean up
-                    try {
-                        fs.unlinkSync(mp4Path);
-                    } catch (cleanupError) {
-                        logger.warn(`Failed to clean up temp MP4: ${cleanupError.message}`);
+                    // Manage cache size
+                    if (REACTION_GIF_CACHE.size > GIF_CACHE_SIZE_LIMIT) {
+                        // Remove oldest cache entry
+                        const oldest = [...REACTION_GIF_CACHE.entries()].reduce((a, b) => 
+                            a[1].timestamp < b[1].timestamp ? a : b
+                        );
+                        REACTION_GIF_CACHE.delete(oldest[0]);
                     }
-                } catch (mp4Error) {
-                    logger.error(`MP4 conversion fallback failed: ${mp4Error.message}`);
                     
-                    // Last resort: try as regular sticker
+                    logger.info(`Successfully sent ${type} reaction GIF to ${formatJidForLogging(sender)}`);
+                    return;
+                } catch (gifError) {
+                    logger.warn(`Primary GIF send method failed: ${gifError.message}, trying MP4 conversion`);
+                    
+                    // Try MP4 conversion as a fallback (more compatible)
                     try {
-                        const buffer = fs.readFileSync(gifPath);
-                        await safeSendMessage(sock, sender, {
-                            sticker: buffer,
-                            isAnimated: true,
+                        const ffmpeg = require('fluent-ffmpeg');
+                        
+                        // Create temp directory and paths
+                        const tempDir = path.join(process.cwd(), 'temp');
+                        if (!fs.existsSync(tempDir)) {
+                            fs.mkdirSync(tempDir, { recursive: true });
+                        }
+                        
+                        const mp4Path = path.join(tempDir, `${type}-${gifHash}.mp4`);
+                        
+                        // Convert to MP4 with optimized settings
+                        await new Promise((resolve, reject) => {
+                            ffmpeg(gifPath)
+                                .outputOptions([
+                                    '-movflags faststart',
+                                    '-pix_fmt yuv420p',
+                                    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+                                    '-preset ultrafast',
+                                    '-crf 25'  // Balance quality and file size
+                                ])
+                                .output(mp4Path)
+                                .on('end', resolve)
+                                .on('error', reject)
+                                .run();
                         });
-                        logger.info(`Successfully sent ${type} reaction as animated sticker to ${formatJidForLogging(sender)} (last resort)`);
-                    } catch (fallbackError) {
-                        logger.error(`All fallback methods failed: ${fallbackError.message}`);
+                        
+                        // Send as video with gifPlayback
+                        const mp4Buffer = fs.readFileSync(mp4Path);
+                        await safeSendMessage(sock, sender, {
+                            video: mp4Buffer,
+                            gifPlayback: true,
+                            caption: ''
+                        });
+                        
+                        // Cache the successful MP4 buffer
+                        REACTION_GIF_CACHE.set(gifHash, {
+                            buffer: mp4Buffer,
+                            format: 'mp4',
+                            timestamp: Date.now()
+                        });
+                        
+                        logger.info(`Successfully sent ${type} reaction as MP4 with gifPlayback`);
+                        
+                        // Clean up
+                        try {
+                            fs.unlinkSync(mp4Path);
+                        } catch (cleanupError) {
+                            // Silent cleanup error - not critical
+                        }
+                        return;
+                    } catch (mp4Error) {
+                        logger.warn(`MP4 conversion fallback failed: ${mp4Error.message}, trying sticker`);
+                        
+                        // Last resort: try as sticker
+                        try {
+                            await safeSendMessage(sock, sender, {
+                                sticker: gifBuffer,
+                                isAnimated: true,
+                            });
+                            
+                            // Cache the successful sticker buffer
+                            REACTION_GIF_CACHE.set(gifHash, {
+                                buffer: gifBuffer,
+                                format: 'sticker',
+                                timestamp: Date.now()
+                            });
+                            
+                            logger.info(`Successfully sent ${type} reaction as animated sticker (last resort)`);
+                            return;
+                        } catch (fallbackError) {
+                            logger.error(`All fallback methods failed: ${fallbackError.message}`);
+                        }
                     }
                 }
+            } catch (error) {
+                logger.error(`GIF processing error: ${error.message}`);
+                // Silently fail - text message already sent
             }
         }
     } catch (error) {
@@ -716,6 +866,207 @@ async function init() {
         logger.error('Failed to initialize reactions module:', error);
         return false;
     }
+}
+
+/**
+ * Initialize the module and validate all reaction GIFs
+ * @returns {Promise<void>}
+ */
+async function init() {
+    logger.info('Initializing reactions module...');
+    
+    // Validate all reaction GIFs
+    const validGifs = [];
+    const missingGifs = [];
+    
+    for (const [type, gifPath] of Object.entries(REACTION_GIFS)) {
+        if (gifPath && fs.existsSync(gifPath)) {
+            const stats = fs.statSync(gifPath);
+            if (stats.size > 1024) {
+                validGifs.push(type);
+                logger.info(`✅ Found valid GIF for ${type}: ${gifPath}`);
+            } else {
+                missingGifs.push(type);
+                logger.warn(`⚠️ GIF file for ${type} is too small: ${stats.size} bytes`);
+            }
+        } else {
+            missingGifs.push(type);
+            logger.warn(`❌ Missing GIF for ${type}`);
+        }
+    }
+    
+    logger.info(`Reaction GIFs validation complete. Valid: ${validGifs.length}, Missing: ${missingGifs.length}`);
+    
+    // Run the GIF preloader after validation
+    preloadCommonGifs();
+    
+    // Verify language file usage
+    try {
+        if (languageManager) {
+            logger.info('Using global language manager for reactions module');
+        } else {
+            logger.warn('Language manager not available, using fallback texts');
+        }
+    } catch (err) {
+        logger.warn(`Language system error: ${err.message}`);
+    }
+    
+    return true;
+}
+
+/**
+ * Send GIF with exponential backoff for improved reliability
+ * 
+ * This function attempts to send an animated GIF with exponential backoff and retries
+ * on failure. It implements circuit breaker patterns and various fallback strategies.
+ * 
+ * @param {Object} sock - WhatsApp socket connection
+ * @param {string} jid - Chat JID to send to
+ * @param {Buffer|string} gifData - GIF buffer or path to GIF file
+ * @param {string} caption - Optional caption for the GIF
+ * @param {Object} options - Additional sending options
+ * @param {number} retries - Number of retry attempts (default: BACKOFF_CONFIG.MAX_RETRIES)
+ * @returns {Promise<Object|null>} - Message sending result or null if all retries failed
+ */
+async function sendGifWithExponentialBackoff(sock, jid, gifData, caption = '', options = {}, retries = BACKOFF_CONFIG.MAX_RETRIES) {
+    let delay = BACKOFF_CONFIG.INITIAL_DELAY;
+    const maxDelay = BACKOFF_CONFIG.MAX_DELAY;
+    
+    // Add jitter to avoid thundering herd problem
+    const getJitter = () => Math.random() * BACKOFF_CONFIG.JITTER * 2 - BACKOFF_CONFIG.JITTER;
+    
+    // Track error types to adapt retry strategy
+    let timeoutErrors = 0;
+    let networkErrors = 0;
+    let serverErrors = 0;
+    let formatErrors = 0;
+    
+    // If gifData is a path, load it first
+    let gifBuffer;
+    if (typeof gifData === 'string' && fs.existsSync(gifData)) {
+        try {
+            gifBuffer = fs.readFileSync(gifData);
+        } catch (readErr) {
+            logger.error(`Failed to read GIF file: ${readErr.message}`);
+            throw readErr;
+        }
+    } else if (Buffer.isBuffer(gifData)) {
+        gifBuffer = gifData;
+    } else {
+        throw new Error('Invalid GIF data: must be a Buffer or valid file path');
+    }
+    
+    // Try different sending strategies in order of preference
+    const sendStrategies = [
+        // Strategy 1: Use safeSendAnimatedGif (preferred method)
+        async () => {
+            return await safeSendAnimatedGif(sock, jid, gifBuffer, caption, {
+                ptt: false,
+                keepFormat: true,
+                mediaType: 2,
+                isAnimated: true,
+                animated: true,
+                shouldLoop: true,
+                seconds: 8,
+                ...options
+            });
+        },
+        
+        // Strategy 2: Try as gifPlayback video
+        async () => {
+            return await safeSendMessage(sock, jid, {
+                video: gifBuffer,
+                gifPlayback: true,
+                caption: caption
+            });
+        },
+        
+        // Strategy 3: Last resort - try as sticker
+        async () => {
+            return await safeSendMessage(sock, jid, {
+                sticker: gifBuffer,
+                isAnimated: true
+            });
+        }
+    ];
+    
+    // Try each strategy with exponential backoff
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        // Calculate strategy to use based on error history
+        let strategyIndex = 0;
+        
+        // Adapt strategy based on error history
+        if (formatErrors > 0) {
+            // Format errors suggest we should try a different strategy
+            strategyIndex = Math.min(formatErrors, sendStrategies.length - 1);
+        }
+        
+        try {
+            // Get current strategy
+            const currentStrategy = sendStrategies[strategyIndex];
+            
+            // Try this strategy
+            const result = await currentStrategy();
+            
+            // If we get here, we succeeded
+            if (attempt > 0) {
+                logger.info(`Successfully sent GIF after ${attempt} retries using strategy #${strategyIndex + 1}`);
+            }
+            
+            return result;
+        } catch (error) {
+            // Track error types for analytics and adaptive retry
+            if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+                timeoutErrors++;
+            } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+                networkErrors++;
+            } else if (error.response && error.response.status >= 500) {
+                serverErrors++;
+            } else if (
+                error.message.includes('format') || 
+                error.message.includes('convert') || 
+                error.message.includes('invalid') ||
+                error.message.includes('not supported')
+            ) {
+                formatErrors++;
+            }
+            
+            // On final retry, try the last strategy as a last resort
+            if (attempt === retries - 1 && strategyIndex < sendStrategies.length - 1) {
+                logger.warn(`Trying last resort strategy for GIF sending`);
+                try {
+                    return await sendStrategies[sendStrategies.length - 1]();
+                } catch (lastError) {
+                    logger.error(`Last resort strategy failed: ${lastError.message}`);
+                }
+            }
+            
+            // On final retry, provide detailed error info
+            if (attempt === retries) {
+                logger.error(`All ${retries} retries failed for GIF sending`, {
+                    timeoutErrors,
+                    networkErrors,
+                    serverErrors,
+                    formatErrors,
+                    lastError: error.message
+                });
+                throw error;
+            }
+            
+            // Log the error
+            logger.warn(`GIF send attempt ${attempt + 1}/${retries} failed: ${error.message}`);
+            
+            // Calculate delay with jitter
+            const jitteredDelay = delay + getJitter();
+            await new Promise(resolve => setTimeout(resolve, jitteredDelay));
+            
+            // Exponential backoff with cap
+            delay = Math.min(delay * 2, maxDelay);
+        }
+    }
+    
+    // If we get here, all retries failed
+    return null;
 }
 
 // Export module

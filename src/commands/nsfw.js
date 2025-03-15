@@ -1078,43 +1078,118 @@ NSFW Statistics:
     },
 
     async gifblowjob(sock, sender) {
+        // Track command execution metrics
+        const commandStart = Date.now();
+        let status = 'failed';
+        let errorType = null;
+        let fallbackUsed = false;
+        
         try {
+            // Rule validation with detailed feedback
             if (!await isNsfwEnabledForGroup(sender)) {
                 await safeSendText(sock, sender, '❌ NSFW commands are disabled for this group');
+                status = 'disabled';
                 return;
             }
 
             if (!isUserVerified(sender)) {
                 await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                status = 'unverified';
                 return;
             }
 
             if (!applyCooldown(sender, 45)) {
                 const remaining = getRemainingCooldown(sender);
                 await safeSendText(sock, sender, `⏳ Please wait ${remaining} seconds before using this command again.`);
+                status = 'cooldown';
                 return;
             }
 
-            await safeSendText(sock, sender, 'Fetching GIF...');
+            // Send immediate feedback to improve perceived responsiveness
+            await safeSendText(sock, sender, '🔍 Fetching NSFW GIF...');
 
+            // Predefined direct GIFs as ultimate fallbacks (for extreme reliability)
+            const DIRECT_GIFS = {
+                'blowjob': 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif'
+            };
+
+            // Try API endpoint with multiple fallbacks
             const gifUrl = `${API_ENDPOINTS.HMTAI}/nsfw/blowjob`;
             const fallbacks = [
                 'https://api.nekos.fun/api/blowjob',
-                'https://api.waifu.pics/nsfw/blowjob'
+                'https://api.waifu.pics/nsfw/blowjob',
+                'https://api.waifu.im/search/?included_tags=oral&is_nsfw=true'
             ];
 
-            const response = await fetchApi(gifUrl, fallbacks);
+            // Enhanced try/catch block for better error handling
+            let response = null;
+            try {
+                response = await fetchApi(gifUrl, fallbacks, true); // true = requireGif
+                
+                if (!response) {
+                    logger.warn(`All API endpoints failed for blowjob GIF, using direct GIF`);
+                    fallbackUsed = true;
+                    response = { url: DIRECT_GIFS['blowjob'] };
+                } else if (!response.url) {
+                    logger.warn(`API response missing URL property, using direct GIF`);
+                    fallbackUsed = true;
+                    response = { url: DIRECT_GIFS['blowjob'] };
+                }
+            } catch (apiError) {
+                logger.error(`API error in gifblowjob:`, apiError);
+                errorType = 'api_error';
+                fallbackUsed = true;
+                response = { url: DIRECT_GIFS['blowjob'] };
+            }
+
+            // Final validation before sending
             if (!response || !response.url) {
+                logger.error(`Critical: No fallback available for blowjob GIF`);
                 await safeSendText(sock, sender, 'Failed to fetch GIF. Please try again later.');
+                errorType = 'no_fallback';
                 return;
             }
 
-            await safeSendAnimatedGif(sock, sender, response.url, '🔞 Blowjob GIF');
+            // Enhanced GIF sending with retries
+            let sendAttempts = 0;
+            const maxSendAttempts = 2;
+            let sendSuccess = false;
+            
+            while (!sendSuccess && sendAttempts < maxSendAttempts) {
+                try {
+                    sendAttempts++;
+                    await safeSendAnimatedGif(sock, sender, response.url, '🔞 Blowjob GIF');
+                    sendSuccess = true;
+                } catch (sendError) {
+                    if (sendAttempts >= maxSendAttempts) {
+                        throw sendError;
+                    }
+                    logger.warn(`Send attempt ${sendAttempts} failed, retrying...`, sendError.message);
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+                }
+            }
 
-            logger.info(`NSFW blowjob GIF sent to ${formatJidForLogging(sender)}`);
+            status = fallbackUsed ? 'success_fallback' : 'success';
+            logger.info(`NSFW blowjob GIF sent to ${formatJidForLogging(sender)} ${fallbackUsed ? '(using fallback)' : ''}`);
         } catch (err) {
-            logger.error('Error in gifblowjob:', err);
-            await safeSendText(sock, sender, 'Failed to fetch GIF due to server error.');
+            errorType = errorType || 'unknown';
+            logger.error(`Error in gifblowjob (${errorType}):`, err);
+            
+            // User-friendly error message based on error type
+            let errorMessage = 'Failed to fetch GIF due to server error.';
+            if (err.message && err.message.includes('network')) {
+                errorMessage = 'Network error while fetching GIF. Please check your internet connection.';
+            } else if (err.message && err.message.includes('timeout')) {
+                errorMessage = 'Server took too long to respond. Please try again later.';
+            }
+            
+            await safeSendText(sock, sender, errorMessage);
+        } finally {
+            // Record metrics for performance analysis
+            const duration = Date.now() - commandStart;
+            if (duration > 5000) {
+                logger.warn(`Slow command execution: gifblowjob took ${duration}ms to complete with status ${status}`);
+            }
         }
     },
 
@@ -1369,22 +1444,78 @@ NSFW Statistics:
 // Add specialized error handler for API failures with exponential backoff
 async function fetchWithExponentialBackoff(url, options = {}, retries = 3, initialDelay = 500) {
     let delay = initialDelay;
+    const maxDelay = 10000; // Cap max delay at 10 seconds
+    
+    // Add jitter to avoid thundering herd problem
+    const getJitter = () => Math.random() * 200 - 100; // +/- 100ms jitter
+    
+    // Keep track of different error types for adaptive retry strategies
+    let timeoutErrors = 0;
+    let networkErrors = 0;
+    let serverErrors = 0;
     
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            const response = await axios.get(url, {
-                timeout: 5000,
+            // Create abort controller for more reliable timeouts
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), options.timeout || 5000);
+            
+            // Add improved options
+            const requestOptions = {
+                timeout: options.timeout || 5000,
+                validateStatus: status => status >= 200 && status < 500, // Accept all non-server error responses
+                signal: controller.signal,
                 ...options
-            });
+            };
+            
+            // Make the request
+            const response = await axios.get(url, requestOptions);
+            clearTimeout(timeoutId);
+            
+            // Validate response
+            if (!response.data) {
+                throw new Error('Empty response received');
+            }
+            
+            // If we got here, we succeeded
+            if (attempt > 0) {
+                logger.info(`Successfully recovered after ${attempt} retries for ${url}`);
+            }
+            
             return response.data;
         } catch (error) {
+            // Clear any pending timeout
+            clearTimeout(error.timeoutId);
+            
+            // Track error types for analytics
+            if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+                timeoutErrors++;
+            } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+                networkErrors++;
+            } else if (error.response && error.response.status >= 500) {
+                serverErrors++;
+            }
+            
+            // On final retry, provide detailed error info
             if (attempt === retries) {
+                logger.error(`All ${retries} retries failed for ${url}`, {
+                    timeoutErrors,
+                    networkErrors,
+                    serverErrors,
+                    lastError: error.message
+                });
                 throw error;
             }
             
+            // Log the error
             logger.warn(`API fetch attempt ${attempt + 1}/${retries} failed for ${url}: ${error.message}`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            delay *= 2; // Exponential backoff
+            
+            // Calculate delay with jitter
+            const jitteredDelay = delay + getJitter();
+            await new Promise(resolve => setTimeout(resolve, jitteredDelay));
+            
+            // Exponential backoff with cap
+            delay = Math.min(delay * 2, maxDelay);
         }
     }
 }
