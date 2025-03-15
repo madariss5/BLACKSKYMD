@@ -1,9 +1,11 @@
 // Import required modules
 const logger = require('../utils/logger');
 const axios = require('axios');
-const { safeSendText, safeSendMessage, safeSendImage, safeSendAnimatedGif, formatJidForLogging } = require('../utils/jidHelper');
+const { safeSendText, safeSendMessage, safeSendImage, safeSendAnimatedGif, formatJidForLogging, formatPhoneForMention, isJidGroup } = require('../utils/jidHelper');
 const { languageManager } = require('../utils/language');
 const crypto = require('crypto');
+const { optimizeImage, optimizeGif } = require('../utils/imageOptimizer');
+const commandOptimizer = require('../command-optimizer');
 
 // Cache for user information
 const userCache = new Map();
@@ -11,8 +13,13 @@ const USER_CACHE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 // Cache for converted GIFs to avoid re-processing
 const REACTION_GIF_CACHE = new Map();
-const GIF_CACHE_SIZE_LIMIT = 30; // Maximum number of cached GIFs
-const GIF_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+const GIF_CACHE_SIZE_LIMIT = 50; // Increased size for better performance
+const GIF_CACHE_DURATION = 120 * 60 * 1000; // 2 hours (increased for better caching)
+
+// Performance optimization settings
+const USE_OPTIMIZED_GIFS = true;      // Whether to use the optimized GIFs
+const PRELOAD_POPULAR_GIFS = true;    // Whether to preload popular GIFs for faster access
+const POPULAR_REACTIONS = ['hug', 'kiss', 'slap', 'pat', 'punch']; // Most frequently used
 
 // Exponential backoff configuration
 const BACKOFF_CONFIG = {
@@ -463,9 +470,6 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         let targetMentionFormat = "";
         
         try {
-            // Import formatPhoneForMention from helpers if needed
-            const { formatPhoneForMention } = require('../utils/helpers');
-            
             // Handle group chat scenario
             const isGroup = sender.endsWith('@g.us');
             const actualSenderJid = isGroup && message.key.participant ? message.key.participant : sender;
@@ -477,12 +481,12 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             
             // Prioritize the rawSenderName from getUserName which tries to get contact names first
             // This ensures we use the saved contact name for notifications outside of chat
-            senderName = rawSenderName || senderFormatted.mentionName || "User";
+            senderName = rawSenderName || "User";
             logger.info(`Using sender name: ${senderName} for ${actualSenderJid}`);
             
             // Always use international format with + prefix for the number part
-            senderPhone = senderFormatted.mentionNumber ? 
-                        senderFormatted.mentionNumber.replace(/[()]/g, '') : 
+            senderPhone = (senderFormatted && senderFormatted.international) ? 
+                        `+${senderFormatted.international}` : 
                         `+${actualSenderJid.split('@')[0]}`;
                         
             // Store the full standard format for message display
@@ -490,7 +494,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             senderMentionFormat = `user ${senderName} ${senderPhone}`;
             
             // Also save WhatsApp-specific mention format for notifications outside chat
-            const senderWhatsAppMention = senderFormatted.whatsappMention || `@${actualSenderJid.split('@')[0]}`;
+            const senderWhatsAppMention = `@${actualSenderJid.split('@')[0]}`;
             logger.info(`WhatsApp mention format for sender: ${senderWhatsAppMention}`);
             
             // Additional logging for debugging group messages
@@ -507,12 +511,12 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                 
                 // Prioritize the rawTargetName from getUserName which tries to get contact names first
                 // This ensures we use the saved contact name for notifications outside of chat
-                targetName = rawTargetName || targetFormatted.mentionName || "Someone";
+                targetName = rawTargetName || "Someone";
                 logger.info(`Using target name: ${targetName} for ${targetJid}`);
                 
                 // Always use international format with + prefix for the number part
-                targetPhone = targetFormatted.mentionNumber ? 
-                            targetFormatted.mentionNumber.replace(/[()]/g, '') : 
+                targetPhone = (targetFormatted && targetFormatted.international) ? 
+                            `+${targetFormatted.international}` : 
                             `+${targetJid.split('@')[0]}`;
                             
                 // Store the full standard MD-style format for target as well
@@ -541,6 +545,11 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             }
         }
 
+        // Define senderJid early to avoid initialization errors
+        // Using 'let' instead of 'const' to prevent variable redeclaration errors
+        // This variable is used throughout the function for proper mention formatting
+        let senderJid = message.key.participant || message.key.remoteJid;
+        
         // Generate message text with better grammar and internationalization
         let messageText;
         if (target) {
@@ -549,20 +558,28 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             const toTargetKey = `reactions.${type}.toTarget`;
             
             if (targetName === 'everyone' || targetName === 'all') {
-                // Use the new MD-style mentionFormat field for consistent formatting
-                // This ensures we follow the exact format: "user saved_name +xxx action everyone"
-                // Use the pre-defined mentionFormat from our enhanced formatter
-                const senderWithPhone = senderMentionFormat || 
-                    (senderName !== "User" ? 
-                    `user ${senderName} ${senderPhone}` : 
-                    `user ${senderName} ${senderPhone}`);
+                // We need to ensure we have a valid sender JID before proceeding
+                // First, determine sender JID from message object, which is most reliable
+                const messageSenderJid = message.key && message.key.participant ? 
+                                       message.key.participant : 
+                                       (message.key && message.key.remoteJid ? message.key.remoteJid : sender);
                 
-                // Using exact format "user saved_name +xxx action everyone" 
-                messageText = languageManager.getText(toEveryoneKey, null, senderWithPhone, emoji) || 
-                             `${senderWithPhone} ${type}s everyone ${emoji}`;
+                // Get the phone number from the JID
+                const senderPhoneNumber = messageSenderJid.split('@')[0];
                 
-                // Log the formatted message structure for verification
-                logger.debug(`Everyone reaction format: ${messageText}`);
+                // Use WhatsApp's standard @mention format for everyone reactions
+                // This ensures proper mention recognition by WhatsApp
+                const senderMention = `@${senderPhoneNumber}`;
+                
+                // Use standard WhatsApp @mention format for better notification delivery
+                messageText = languageManager.getText(toEveryoneKey, null, senderMention, emoji) || 
+                             `${senderMention} ${type}s everyone ${emoji}`;
+                
+                // Log the formatted message structure for verification 
+                logger.debug(`Everyone reaction format with WhatsApp mention: ${messageText}`);
+                
+                // Debug log to help troubleshoot sender JID issues
+                logger.info(`Using sender JID for everyone reaction: ${messageSenderJid} (${senderMention})`);
             } else {
                 // Use the enhanced mentionFormat fields for consistent "user saved_name +xxx" format
                 // Follows the strict format: "user saved_name +xxx action user saved_name +xxx" 
@@ -576,9 +593,14 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                     `user ${targetName} ${targetPhone}` : 
                     `user ${targetName} ${targetPhone}`);
                 
-                // Using exact format "user saved_name +xxx action user saved_name +xxx"
-                messageText = languageManager.getText(toTargetKey, null, senderWithPhone, targetWithPhone, emoji) || 
-                             `${senderWithPhone} ${type}s ${targetWithPhone} ${emoji}`;
+                // Create message with standard WhatsApp @mention format instead of MD-style
+                // This ensures WhatsApp properly recognizes mentions by using @phonenumber format
+                const senderMention = `@${senderJid.split('@')[0]}`;
+                const targetMention = `@${targetJid.split('@')[0]}`;
+                
+                // Use translations with WhatsApp standard @mentions for better compatibility
+                messageText = languageManager.getText(toTargetKey, null, senderMention, targetMention, emoji) || 
+                             `${senderMention} ${type}s ${targetMention} ${emoji}`;
                 
                 // Log the formatted message structure for verification
                 logger.debug(`Target reaction format: ${messageText}`);
@@ -598,16 +620,22 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                 wave: 'waving'
             };
             
-            // Use the enhanced mentionFormat field for consistent "user saved_name +xxx" format
-            // Follows the strict format: "user saved_name +xxx action"
-            const senderWithPhone = senderMentionFormat || 
-                (senderName !== "User" ? 
-                `user ${senderName} ${senderPhone}` : 
-                `user ${senderName} ${senderPhone}`);
+            // We need to ensure we have a valid sender JID before proceeding
+            // First, determine sender JID from message object, which is most reliable
+            const messageSenderJid = message.key && message.key.participant ? 
+                                   message.key.participant : 
+                                   (message.key && message.key.remoteJid ? message.key.remoteJid : sender);
+            
+            // Use WhatsApp's standard @mention format for self-reactions
+            // This ensures proper mention recognition by WhatsApp
+            const senderMention = `@${messageSenderJid.split('@')[0]}`;
                 
-            // Using exact format "user saved_name +xxx action" for self-reactions
-            messageText = languageManager.getText(selfKey, null, senderWithPhone, emoji) || 
-                         `${senderWithPhone} is ${actionMap[type] || type}ing ${emoji}`;
+            // Use translations with WhatsApp-style mentions for better compatibility
+            messageText = languageManager.getText(selfKey, null, senderMention, emoji) || 
+                         `${senderMention} is ${actionMap[type] || type}ing ${emoji}`;
+                         
+            // Debug log to help troubleshoot sender JID issues
+            logger.info(`Using sender JID for self reaction: ${messageSenderJid} (${senderMention})`);
         }
 
         // Add fun anime-inspired text messages based on reaction type
@@ -642,7 +670,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         let mentionTags = [];
         
         // Always add the sender to mentions for self-notifications
-        const senderJid = message.key.participant || message.key.remoteJid;
+        // The senderJid was defined at the top of the function to avoid initialization errors
         mentionTags.push({
             tag: '@sender',
             jid: senderJid
@@ -658,32 +686,80 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         }
         
         // Replace any occurrence of the target's name with proper WhatsApp mention format
-        // This format ensures the message shows up in notification previews
+        // This format ensures the message shows up in notification previews and WhatsApp recognizes mentions
         let processedMessageText = messageText;
         
         // Create mention-formatted tags that WhatsApp will recognize for notifications
         mentionTags.forEach(({tag, jid}) => {
-            // First get formatted information for this JID
-            const formatted = formatPhoneForMention(jid);
+            // Get properly formatted information for this JID
+            const formattedPhone = formatPhoneForMention(jid);
+            if (!formattedPhone || !formattedPhone.international) {
+                logger.warn(`Failed to format phone for mention: ${formatJidForLogging(jid)}`);
+            }
             
-            // Replace any occurrence of the JID with WhatsApp's proper mention format 
-            // This ensures notifications will be delivered even when the user isn't in the chat
+            // Get phone number for WhatsApp's standard mention format
+            const phoneForMention = formattedPhone?.international || jid.split('@')[0];
+            
+            // Create the WhatsApp standard @mention format that triggers notifications
+            const mentionText = `@${phoneForMention}`;
+            
+            // Log for troubleshooting mention issues
+            if (jid === targetJid && targetName) {
+                logger.info(`WhatsApp mention format for target: ${mentionText}`);
+                logger.info(`Target JID: ${formatJidForLogging(jid)}, Name: ${targetName}`);
+            } else {
+                // This is likely the sender mention
+                const name = jid === senderJid ? senderName : "user";
+                logger.info(`WhatsApp mention format for sender: ${mentionText}`);
+                logger.info(`Formatted phone: ${formattedPhone?.formatted}, Name: ${name}`);
+                
+                // For group messages, participant JID is important to log
+                if (isJidGroup(message.key.remoteJid) && message.key.participant) {
+                    logger.info(`Group message detected. Using participant JID: ${formatJidForLogging(message.key.participant)} for sender`);
+                }
+            }
+            
+            // Replace any occurrence of the JID or mention patterns with WhatsApp's proper format
+            // This ensures the mention is properly recognized by WhatsApp like a manual mention
             processedMessageText = processedMessageText.replace(
-                new RegExp(`@${jid.split('@')[0]}`, 'g'), 
-                formatted.whatsappMention
+                new RegExp(`@${phoneForMention}`, 'g'), 
+                mentionText
             );
             
+            // Also handle specialized patterns if present (for target users)
+            if (jid === targetJid && targetName) {
+                // Replace any occurrence of the full name pattern
+                processedMessageText = processedMessageText.replace(
+                    new RegExp(`user ${targetName}`, 'g'),
+                    mentionText
+                );
+                
+                // Also replace phone-based patterns
+                processedMessageText = processedMessageText.replace(
+                    new RegExp(`\\+${phoneForMention}`, 'g'),
+                    mentionText
+                );
+            }
+            
             // Log the mention to help with debugging
-            logger.info(`Adding WhatsApp-recognized mention format for ${formatJidForLogging(jid)}: ${formatted.whatsappMention}`);
+            logger.info(`Added properly formatted WhatsApp mention for ${formatJidForLogging(jid)}`);
         });
         
         // Create the decorated message with emoji and quotes
         const decoratedMessage = `*${processedMessageText}*\n\n_"${randomReactionText}"_ ${emoji}`;
         
         // Message content with proper mention structure for notifications
+        // Format message to ensure WhatsApp recognizes mentions properly
         let messageContent = {
             text: decoratedMessage,
-            mentions: mentionTags.map(m => m.jid)
+            mentions: mentionTags.map(m => m.jid),
+            // Explicitly add WhatsApp's required mention formatting parameters
+            extendedTextMessage: {
+                text: decoratedMessage,
+                contextInfo: {
+                    mentionedJid: mentionTags.map(m => m.jid)
+                }
+            }
         };
 
         // Check if we have a GIF for this reaction type

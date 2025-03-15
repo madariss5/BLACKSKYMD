@@ -1,117 +1,122 @@
-# Deployment Guide for BLACKSKY-MD WhatsApp Bot
+# Deployment Guide for WhatsApp Bot
 
-This guide will help you deploy your WhatsApp bot to various platforms.
+This deployment guide provides simple, straightforward instructions for deploying your WhatsApp bot to Heroku, with a focus on using the Safari connection method for maximum reliability.
 
-## Deployment on Replit
+## 📋 Step-by-Step Deployment
 
-1. **Create a new Repl**
-   - Go to [Replit](https://replit.com/)
-   - Click on "Create Repl"
-   - Select "Import from GitHub" and paste your repository URL
-   - Choose "Node.js" as the language
+### Prerequisites
 
-2. **Set up environment variables**
-   - Go to the "Secrets" tab in your Repl
-   - Add all the variables from your `.env` file
+Before you begin, make sure you have:
+- A Heroku account
+- Git installed on your computer
+- Your WhatsApp number
 
-3. **Configure the run command**
-   - In the `.replit` file, set your run command to:
-   ```
-   run = "node src/index.js"
-   ```
+### Step 1: Set up your local repository
 
-4. **Start the bot**
-   - Click the "Run" button
-   - The QR code will be accessible via the Replit webview on port 5000
+Clone the repository and navigate to it:
 
-## Deployment on Heroku
+```bash
+git clone https://github.com/yourusername/whatsapp-bot.git
+cd whatsapp-bot
+```
 
-1. **Create a new Heroku app**
-   ```bash
-   heroku create your-whatsapp-bot-name
-   ```
+### Step 2: Create a Heroku app
 
-2. **Set up environment variables**
-   All required environment variables are configured in `app.json`. You can override them using:
-   ```bash
-   heroku config:set PREFIX=.
-   heroku config:set OWNER_NUMBER=491234567890
-   # Set any other custom environment variables...
-   ```
+```bash
+# Login to Heroku
+heroku login
 
-3. **Deploy your application**
-   ```bash
-   git push heroku main
-   ```
+# Create a new Heroku app
+heroku create your-whatsapp-bot-name
+```
 
-   The deployment will automatically:
-   - Set up required buildpacks
-   - Install dependencies
-   - Configure PostgreSQL database
-   - Run post-deployment tasks
+### Step 3: Configure environment variables
 
-4. **Monitor deployment**
+```bash
+# Set essential environment variables
+heroku config:set NODE_ENV=production
+heroku config:set PREFIX=.
+heroku config:set OWNER_NUMBER=your_number_here
+heroku config:set PLATFORM=heroku
+heroku config:set AUTH_DIR=auth_info_safari
+heroku config:set CONNECTION_METHOD=safari
+```
+
+### Step 4: Deploy to Heroku
+
+```bash
+# Add Heroku remote
+heroku git:remote -a your-app-name
+
+# Push to Heroku
+git push heroku main
+```
+
+### Step 5: Connect your WhatsApp
+
+After deployment:
+
+1. View the Heroku logs to see the QR code:
    ```bash
    heroku logs --tail
    ```
 
-For detailed Heroku deployment instructions, see [HEROKU-DEPLOY.md](./HEROKU-DEPLOY.md)
+2. Scan the QR code with your WhatsApp
 
-## Setup with Custom Domain
+3. Once connected, the bot will send authentication credentials to your WhatsApp as backup
 
-If you want to use a custom domain for your QR code:
+## 🔄 Reconnection Process
 
-1. **For Replit:**
-   - Go to "Settings" > "Custom Domains"
-   - Add your domain and follow the DNS configuration instructions
+If your Heroku dyno restarts or the bot disconnects:
 
-2. **For Heroku:**
+1. The bot will attempt to reconnect automatically using stored credentials
+2. If that fails, a new QR code will be generated in the logs
+3. If you need to restore credentials, forward the `creds.json` file the bot previously sent to you
+
+## ⚠️ Troubleshooting Common Issues
+
+### Connection Errors (Status Code 405)
+
+This error is common in cloud environments due to WhatsApp's restrictions. Our Safari connection method is specially designed to bypass this limitation. If you still encounter this error:
+
+1. Ensure all environment variables are set correctly
+2. Try restarting the dyno: `heroku restart`
+3. Check the logs for specific error messages: `heroku logs --tail`
+
+### Authentication Issues
+
+If the bot keeps generating new QR codes after every restart:
+
+1. Forward the backup `creds.json` file (that the bot sent to your WhatsApp) back to the bot
+2. The file will be automatically detected and used for authentication
+
+### Heroku Free Tier Sleeping
+
+Heroku free tier dynos sleep after 30 minutes of inactivity. To keep your bot running:
+
+1. Upgrade to a hobby or paid dyno
+2. Use a service like UptimeRobot to ping your app URL every 20 minutes
+
+## 🔒 Security Considerations
+
+1. Never share your `creds.json` file or QR code publicly
+2. Set strong access controls for your bot's admin commands
+3. Regularly check connected devices in your WhatsApp
+
+## 📱 Maintaining Your Bot
+
+To keep your bot up to date:
+
+1. Pull the latest changes from the repository
+2. Push to Heroku:
    ```bash
-   heroku domains:add yourdomain.com
-   ```
-   - Follow the DNS configuration instructions provided by Heroku
-
-## Keeping the Bot Running 24/7
-
-For uninterrupted operation:
-
-1. **Using UptimeRobot**
-   - Create an account at [UptimeRobot](https://uptimerobot.com/)
-   - Add a new monitor
-   - Set the URL to your deployed bot's domain
-   - Set check interval to 5 minutes
-
-2. **Using always-on feature in Replit**
-   - If you have Replit Pro, enable the always-on feature in your Repl settings
-
-## Updating the Bot
-
-1. **Pull latest changes from GitHub**
-   ```bash
-   git pull origin main
+   git push heroku main
    ```
 
-2. **Install any new dependencies**
-   ```bash
-   npm install
-   ```
+## 🆘 Need Help?
 
-3. **Restart the bot**
-   - For Replit, just press the "Run" button again
-   - For Heroku: `heroku restart`
+If you encounter any issues:
 
-## Troubleshooting
-
-If you encounter connection issues:
-
-1. **Check logs**
-   - Replit: View the console output
-   - Heroku: `heroku logs --tail`
-
-2. **Clear auth data**
-   - Delete the `auth_info_baileys` directory
-   - Restart the bot and scan a new QR code
-
-3. **Network issues**
-   - Ensure your server has stable internet access
-   - Some platforms might block WhatsApp connections, consider using a VPN
+1. Check the detailed logs: `heroku logs --tail`
+2. Look for specific error messages in the logs
+3. Refer to the more detailed documentation in HEROKU-SAFARI.md for advanced troubleshooting

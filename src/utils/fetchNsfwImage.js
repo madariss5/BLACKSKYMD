@@ -1,10 +1,19 @@
 /**
  * Enhanced NSFW Image Fetch Utility 
  * Optimized for faster performance with smart caching and parallel requests
+ * Version 2.0 - With advanced image optimization and prefetching
  */
 
 const axios = require('axios');
 const logger = require('./logger');
+const { optimizeImage, optimizeGif } = require('./imageOptimizer');
+
+// Constants for performance tuning
+const FETCH_TIMEOUT = 4000;           // Fetch timeout in milliseconds
+const SIMULTANEOUS_REQUESTS = 2;       // Number of API endpoints to try in parallel
+const PREFETCH_CATEGORIES = ['waifu', 'neko', 'boobs', 'gifhentai']; // Popular categories to prefetch
+const MAX_RETRIES = 2;                 // Maximum number of retries per request
+const USE_OPTIMIZED_IMAGES = true;     // Whether to optimize images before sending
 
 // API endpoints for fetching NSFW content
 const API_ENDPOINTS = {

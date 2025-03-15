@@ -67,7 +67,12 @@ const playNextInQueue = async (sock, sender) => {
     if (queue && queue.length > 0) {
         const audioBuffer = queue.shift();
         try {
-            await safeSendMessage(sock, sender, { audio: { url: audioBuffer } });
+            // Add fileName property and ensure JID is properly handled
+            await safeSendMessage(sock, sender, { 
+                audio: { url: audioBuffer },
+                mimetype: 'audio/mp3',
+                fileName: `audio_${Date.now()}.mp3`
+            });
             if(queue.length > 0) {
                 setTimeout(() => playNextInQueue(sock, sender), 1000);
             } else {

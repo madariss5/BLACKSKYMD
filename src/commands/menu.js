@@ -119,26 +119,72 @@ const menuCommands = {
             menuText += `\n✦ Use *${prefix}help <command>* for detailed info\n`;
             menuText += `✦ Example: *${prefix}help sticker*\n`;
 
-            // Send menu with image if possible
+            // Send menu with custom image
             try {
-                // First try with local image file if available, then fallback to URL
-                const localImagePath = path.join(process.cwd(), 'generated-icon.png');
+                // Use the custom image from attached assets
+                const customImagePath = path.join(process.cwd(), 'attached_assets', 'images (1).jpeg');
                 
-                // Check if local image exists
                 try {
-                    await fs.access(localImagePath);
-                    // Local image exists, use it
+                    // Check if the image exists
+                    await fs.access(customImagePath);
+                    
+                    // Image exists, use it
                     await safeSendMessage(sock, sender, {
-                        image: { url: localImagePath },
+                        image: { url: customImagePath },
                         caption: menuText
                     });
-                } catch (accessErr) {
-                    // Local file doesn't exist, try URL
-                    // The URL method can cause issues, use safeSendImage method instead
-                    await safeSendImage(sock, sender, 'https://i.ibb.co/Wn0nczF/BLACKSKY-icon.png', menuText);
+                    
+                    logger.info(`Menu sent with custom image: ${path.basename(customImagePath)}`);
+                } catch (imageErr) {
+                    // If custom image fails, try Fast and Furious GIFs as fallback
+                    const fastFuriousGifs = [
+                        path.join(process.cwd(), 'fast_furious_gifs', 'highfive.gif'),
+                        path.join(process.cwd(), 'fast_furious_gifs', 'bonk.gif'),
+                        path.join(process.cwd(), 'fast_furious_gifs', 'yeet.gif')
+                    ];
+                    
+                    // Try each GIF in sequence until one works
+                    let sentSuccessfully = false;
+                    for (const gifPath of fastFuriousGifs) {
+                        try {
+                            // Check if GIF exists
+                            await fs.access(gifPath);
+                            
+                            // GIF exists, use it
+                            await safeSendMessage(sock, sender, {
+                                video: { url: gifPath },
+                                gifPlayback: true,
+                                caption: menuText
+                            });
+                            
+                            sentSuccessfully = true;
+                            logger.info(`Menu sent with Fast and Furious GIF fallback: ${path.basename(gifPath)}`);
+                            break;
+                        } catch (gifErr) {
+                            // This GIF failed, try next one
+                            continue;
+                        }
+                    }
+                    
+                    // If all GIFs failed, fallback to original icon
+                    if (!sentSuccessfully) {
+                        const localImagePath = path.join(process.cwd(), 'generated-icon.png');
+                        
+                        try {
+                            await fs.access(localImagePath);
+                            // Local image exists, use it
+                            await safeSendMessage(sock, sender, {
+                                image: { url: localImagePath },
+                                caption: menuText
+                            });
+                        } catch (accessErr) {
+                            // Local file doesn't exist, try URL
+                            await safeSendImage(sock, sender, 'https://i.ibb.co/Wn0nczF/BLACKSKY-icon.png', menuText);
+                        }
+                    }
                 }
             } catch (imgErr) {
-                logger.warn('Failed to send menu with image, sending text-only', imgErr);
+                logger.warn('Failed to send menu with image/GIF, sending text-only', imgErr);
                 await safeSendText(sock, sender, menuText);
             }
 
@@ -179,7 +225,63 @@ const menuCommands = {
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
         
-                await safeSendText(sock, sender, helpText);
+                // Try to send help text with custom image
+                try {
+                    // Use the custom image from attached assets
+                    const customImagePath = path.join(process.cwd(), 'attached_assets', 'images (1).jpeg');
+                    
+                    try {
+                        // Check if the image exists
+                        await fs.access(customImagePath);
+                        
+                        // Image exists, use it
+                        await safeSendMessage(sock, sender, {
+                            image: { url: customImagePath },
+                            caption: helpText
+                        });
+                        
+                        logger.info(`Help menu sent with custom image: ${path.basename(customImagePath)}`);
+                    } catch (imageErr) {
+                        // If custom image fails, try Fast and Furious GIFs as fallback
+                        const fastFuriousGifs = [
+                            path.join(process.cwd(), 'fast_furious_gifs', 'bonk.gif'),  // Different order from menu for variety
+                            path.join(process.cwd(), 'fast_furious_gifs', 'yeet.gif'),
+                            path.join(process.cwd(), 'fast_furious_gifs', 'highfive.gif')
+                        ];
+                        
+                        // Try each GIF in sequence until one works
+                        let sentSuccessfully = false;
+                        for (const gifPath of fastFuriousGifs) {
+                            try {
+                                // Check if GIF exists
+                                await fs.access(gifPath);
+                                
+                                // GIF exists, use it
+                                await safeSendMessage(sock, sender, {
+                                    video: { url: gifPath },
+                                    gifPlayback: true,
+                                    caption: helpText
+                                });
+                                
+                                sentSuccessfully = true;
+                                logger.info(`Help menu sent with Fast and Furious GIF fallback: ${path.basename(gifPath)}`);
+                                break;
+                            } catch (gifErr) {
+                                // This GIF failed, try next one
+                                continue;
+                            }
+                        }
+                        
+                        // If all GIFs failed, fallback to text only
+                        if (!sentSuccessfully) {
+                            await safeSendText(sock, sender, helpText);
+                        }
+                    }
+                } catch (err) {
+                    // If anything goes wrong, just send text
+                    await safeSendText(sock, sender, helpText);
+                }
+                
                 return;
             }
         
@@ -246,7 +348,62 @@ const menuCommands = {
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
         
-                await safeSendText(sock, sender, helpText);
+                // Try to send command help with custom image
+                try {
+                    // Use the custom image from attached assets
+                    const customImagePath = path.join(process.cwd(), 'attached_assets', 'images (1).jpeg');
+                    
+                    try {
+                        // Check if the image exists
+                        await fs.access(customImagePath);
+                        
+                        // Image exists, use it
+                        await safeSendMessage(sock, sender, {
+                            image: { url: customImagePath },
+                            caption: helpText
+                        });
+                        
+                        logger.info(`Command help sent with custom image: ${path.basename(customImagePath)}`);
+                    } catch (imageErr) {
+                        // If custom image fails, try Fast and Furious GIFs as fallback
+                        const fastFuriousGifs = [
+                            path.join(process.cwd(), 'fast_furious_gifs', 'yeet.gif'),  // Different order for variety
+                            path.join(process.cwd(), 'fast_furious_gifs', 'highfive.gif'),
+                            path.join(process.cwd(), 'fast_furious_gifs', 'bonk.gif')
+                        ];
+                        
+                        // Try each GIF in sequence until one works
+                        let sentSuccessfully = false;
+                        for (const gifPath of fastFuriousGifs) {
+                            try {
+                                // Check if GIF exists
+                                await fs.access(gifPath);
+                                
+                                // GIF exists, use it
+                                await safeSendMessage(sock, sender, {
+                                    video: { url: gifPath },
+                                    gifPlayback: true,
+                                    caption: helpText
+                                });
+                                
+                                sentSuccessfully = true;
+                                logger.info(`Command help sent with Fast and Furious GIF fallback: ${path.basename(gifPath)}`);
+                                break;
+                            } catch (gifErr) {
+                                // This GIF failed, try next one
+                                continue;
+                            }
+                        }
+                        
+                        // If all GIFs failed, fallback to text only
+                        if (!sentSuccessfully) {
+                            await safeSendText(sock, sender, helpText);
+                        }
+                    }
+                } catch (err) {
+                    // If anything goes wrong, just send text
+                    await safeSendText(sock, sender, helpText);
+                }
             } else {
                 await safeSendText(sock, sender, languageManager.getText('menu.command_not_found', userLang, commandName, prefix)
                 );

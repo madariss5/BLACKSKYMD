@@ -202,13 +202,31 @@ async function safeSendMessage(sock, jid, content) {
             }).filter(Boolean); // Remove any empty/invalid JIDs
         }
         
+        // Enhanced handling for audio files to fix JID errors
+        if (content.audio) {
+            // Ensure we have proper fileName for audio messages
+            if (!content.fileName && content.audio.url) {
+                content.fileName = `audio_${Date.now()}.${content.mimetype === 'audio/mp3' ? 'mp3' : 'mp4'}`;
+            }
+            
+            // Ensure proper mimetype for audio messages
+            if (!content.mimetype) {
+                content.mimetype = 'audio/mp3';
+            }
+            
+            logger.info(`Sending audio message to ${formatJidForLogging(normalizedJid)}`);
+        }
+        
         return await sock.sendMessage(normalizedJid, content);
     } catch (err) {
         logger.error('Error in safeSendMessage:', err);
-        // Log more details to help with debugging
+        // Improved error logging for debugging
         logger.error('JID type:', typeof jid);
         if (jid && typeof jid === 'object') {
             logger.error('JID is object with keys:', Object.keys(jid));
+        }
+        if (content && content.audio) {
+            logger.error('Attempted to send audio message');
         }
         return null;
     }
@@ -547,6 +565,51 @@ async function safeSendContact(sock, jid, displayName, vcard) {
     return await safeSendMessage(sock, jid, content);
 }
 
+/**
+ * Format a phone number for WhatsApp @mentions
+ * This function returns both the international format and a formatted display version
+ * @param {string} phoneNumber - Phone number to format
+ * @returns {Object} - Object with international and formatted properties
+ */
+function formatPhoneForMention(phoneNumber) {
+    try {
+        // Handle null/undefined input
+        if (!phoneNumber) {
+            return {
+                international: '',
+                formatted: ''
+            };
+        }
+
+        // If it's a JID, extract just the number part
+        let number = phoneNumber;
+        if (typeof phoneNumber === 'string' && phoneNumber.includes('@')) {
+            number = phoneNumber.split('@')[0];
+        }
+        
+        // Ensure it's a string
+        number = String(number);
+        
+        // Strip any non-digit characters
+        const digits = number.replace(/\D/g, '');
+        
+        // Format with country code based on prefix - for display purposes
+        let formattedNumber = digits;
+        
+        // Return both versions for flexible usage
+        return {
+            international: digits,  // Raw digits for JID construction
+            formatted: formattedNumber  // Formatted for display
+        };
+    } catch (err) {
+        logger.error(`Error formatting phone for mention: ${err.message}`);
+        return {
+            international: String(phoneNumber || ''),
+            formatted: String(phoneNumber || '')
+        };
+    }
+}
+
 module.exports = {
     isJidGroup,
     isJidUser,
@@ -554,6 +617,7 @@ module.exports = {
     ensureJidString,
     extractUserIdFromJid,
     formatJidForLogging,
+    formatPhoneForMention,
     safeSendMessage,
     safeSendText,
     safeSendImage,

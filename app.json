@@ -21,7 +21,12 @@
     },
     "AUTH_DIR": {
       "description": "Directory to store auth files",
-      "value": "auth_info_baileys",
+      "value": "auth_info_safari",
+      "required": false
+    },
+    "CONNECTION_METHOD": {
+      "description": "WhatsApp connection method to use (safari recommended for Heroku)",
+      "value": "safari",
       "required": false
     },
     "PLATFORM": {

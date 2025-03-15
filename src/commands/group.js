@@ -81,7 +81,7 @@ const groupCommands = {
             const metadata = await sock.groupMetadata(remoteJid);
             const { participants, subject } = metadata;
             
-            // Create mentions array for everyone
+            // Create mentions array for everyone - ensuring proper JID format for notifications
             const mentions = participants.map(p => p.id);
             
             // Get custom message if provided
@@ -90,25 +90,36 @@ const groupCommands = {
             // Create BocchiBot-style everyone message with arrow pointers
             let formattedText = `┏━━\n┃❏『 *EVERYONE* 』❏\n┗━━\n\n${customMessage}\n\n`;
             
-            // Add each participant with arrow pointer - with simplified display
+            // Add each participant with proper WhatsApp mention format for notification delivery
             for (const participant of participants) {
-                // Use proper phone number formatting with country code
+                // Get the phone number from participant's JID
                 const phoneNumber = participant.id.split('@')[0];
-                // Format the phone number
-                const formattedPhone = formatPhoneForMention(participant.id);
                 
-                // Format with full international phone number for consistent display
-                formattedText += `┃➤ @${formattedPhone.international}\n`;
+                // Create the mention tag that WhatsApp will properly recognize for notifications
+                // This uses the standard @mention format required by WhatsApp for proper notification delivery
+                const mentionText = `@${phoneNumber}`;
+                
+                // Add proper mention for each participant that will trigger notifications
+                formattedText += `┃➤ ${mentionText}\n`;
             }
             
             // Add footer
             formattedText += `\n『 *BLACKSKY-MD* 』`;
             
-            // Send the formatted message with mentions
+            // Send the formatted message with proper mentions structure for reliable notifications
             await safeSendMessage(sock, remoteJid, {
                 text: formattedText,
-                mentions
+                mentions: mentions,
+                // Explicitly add WhatsApp's required mention formatting parameters in contextInfo
+                extendedTextMessage: {
+                    text: formattedText,
+                    contextInfo: {
+                        mentionedJid: mentions
+                    }
+                }
             });
+
+            logger.info(`Everyone command executed in ${subject} (${remoteJid}) with ${mentions.length} participants tagged`);
 
         } catch (err) {
             logger.error('Error in everyone command:', err);
@@ -137,7 +148,7 @@ const groupCommands = {
             const metadata = await sock.groupMetadata(remoteJid);
             const { participants, subject } = metadata;
             
-            // Create mentions array for everyone
+            // Create mentions array for everyone - ensuring proper JID format for notifications
             const mentions = participants.map(p => p.id);
             
             // Get custom message if provided
@@ -146,21 +157,32 @@ const groupCommands = {
             // Format in BocchiBot style exactly as seen in screenshots
             let formattedText = `『 *${customMessage || 'MENTION'}* 』\n\n`;
             
-            // Add each participant with arrow pointer like in the screenshot
+            // Add each participant with proper WhatsApp mention format for notification delivery
             for (const participant of participants) {
-                // Extract the full phone number from participant's JID
+                // Get the phone number from participant's JID
                 const phoneNumber = participant.id.split('@')[0];
-                // Format the phone number with proper international format
-                const formattedPhone = formatPhoneForMention(participant.id);
                 
-                formattedText += `➤ @${formattedPhone.international}\n`;
+                // Create the mention tag that WhatsApp will properly recognize for notifications
+                const mentionText = `@${phoneNumber}`;
+                
+                // Add proper mention for each participant that will trigger notifications
+                formattedText += `➤ ${mentionText}\n`;
             }
             
-            // Send the formatted message with mentions
+            // Send the formatted message with proper mentions structure for reliable notifications
             await safeSendMessage(sock, remoteJid, {
                 text: formattedText,
-                mentions
+                mentions: mentions,
+                // Explicitly add WhatsApp's required mention formatting parameters in contextInfo
+                extendedTextMessage: {
+                    text: formattedText,
+                    contextInfo: {
+                        mentionedJid: mentions
+                    }
+                }
             });
+
+            logger.info(`Bocchi command executed in ${subject} (${remoteJid}) with ${mentions.length} participants tagged`);
 
         } catch (err) {
             logger.error('Error in bocchi command:', err);
@@ -189,7 +211,7 @@ const groupCommands = {
             const metadata = await sock.groupMetadata(remoteJid);
             const { participants, subject } = metadata;
             
-            // Create mentions array for everyone
+            // Create mentions array for everyone - ensuring proper JID format for notifications
             const mentions = participants.map(p => p.id);
             
             // Get custom message if provided
@@ -201,21 +223,32 @@ const groupCommands = {
             
             let formattedText = `${emoji} *Hier ${emoji}*\n\n${customMessage}\n\n`;
             
-            // Add each participant with a simple @ mention - simplified display
+            // Add each participant with proper WhatsApp mention format for notification delivery
             participants.forEach(participant => {
-                // Extract the full phone number from participant's JID
+                // Get the phone number from participant's JID
                 const phoneNumber = participant.id.split('@')[0];
-                // Format the phone number with proper international format
-                const formattedPhone = formatPhoneForMention(participant.id);
                 
-                formattedText += `@${formattedPhone.international}\n`;
+                // Create the mention tag that WhatsApp will properly recognize for notifications
+                const mentionText = `@${phoneNumber}`;
+                
+                // Add proper mention for each participant that will trigger notifications
+                formattedText += `${mentionText}\n`;
             });
             
-            // Send the formatted message with mentions
+            // Send the formatted message with proper mentions structure for reliable notifications
             await safeSendMessage(sock, remoteJid, {
                 text: formattedText,
-                mentions
+                mentions: mentions,
+                // Explicitly add WhatsApp's required mention formatting parameters in contextInfo
+                extendedTextMessage: {
+                    text: formattedText,
+                    contextInfo: {
+                        mentionedJid: mentions
+                    }
+                }
             });
+
+            logger.info(`Hier command executed in ${subject} (${remoteJid}) with ${mentions.length} participants tagged`);
 
         } catch (err) {
             logger.error('Error in hier command:', err);

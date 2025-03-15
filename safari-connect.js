@@ -16,11 +16,13 @@ const os = require('os');
 const { promisify } = require('util');
 
 // Configuration
-const AUTH_FOLDER = './auth_info_safari';
+const AUTH_FOLDER = process.env.AUTH_DIR || './auth_info_safari';
 const MAIN_AUTH_FOLDER = './auth_info_baileys';
 const VERSION = '1.1.0';
 const MAX_QR_RETRIES = 3;
 const CREDENTIAL_BACKUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+const PORT = process.env.PORT || 5000; // For Heroku dynamic port binding
+const IS_HEROKU = process.env.PLATFORM === 'heroku';
 const BROWSER_FINGERPRINTS = [
   ['Safari', '17.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'],
   ['Chrome', '110.0.0.0', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'],
@@ -791,11 +793,24 @@ async function startConnection() {
     const { version } = await fetchLatestBaileysVersion();
     LOGGER.info(`Using Baileys version: ${version.join('.')}`);
     
-    // Create socket
+    // For Heroku deployment, always use Safari browser fingerprint
+    // as it's the most reliable for cloud environments
+    const browser = IS_HEROKU ? 
+      ['BLACKSKY-SAFARI-' + Date.now(), 'Safari', '17.0'] : 
+      ['BLACKSKY-' + Date.now(), 'Chrome', '120.0.0.0'];
+    
+    if (IS_HEROKU) {
+      LOGGER.info('Using Safari browser fingerprint (optimized for Heroku)');
+    }
+    
+    // Create socket with Heroku-optimized settings
     sock = makeWASocket({
       version,
+      browser,
       auth: state,
       printQRInTerminal: true, // Also print in terminal for backup
+      connectTimeoutMs: IS_HEROKU ? 60000 : 30000, // Longer timeout for Heroku
+      keepAliveIntervalMs: IS_HEROKU ? 25000 : 10000, // More frequent keepalive for Heroku
       logger: LOGGER,
       connectTimeoutMs: 60000,
       browser: [generateDeviceId(), ...SAFARI_FINGERPRINT.slice(0, 2)],
