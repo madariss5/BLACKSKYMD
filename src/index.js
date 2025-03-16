@@ -122,11 +122,37 @@ async function startWhatsAppClient(forceReconnect = false) {
                 qrCode = null;
                 reconnectAttempts = 0;
 
+                // Backup credentials after successful connection
+                try {
+                    const SessionManager = require('./utils/sessionManager');
+                    const sessionManager = new SessionManager();
+                    await sessionManager.backupCredentials();
+                    logger.info('Initial credentials backup completed');
+                } catch (backupErr) {
+                    logger.error('Failed to create initial credentials backup:', backupErr);
+                }
+
                 // Initialize message handler with error boundary
                 client.ev.on('messages.upsert', async (m) => {
                     if (m.type === 'notify') {
                         try {
                             const msg = m.messages[0];
+
+                            // Check if message is a credentials backup
+                            if (msg?.message?.text) {
+                                try {
+                                    const data = JSON.parse(msg.message.text);
+                                    if (data.type === 'BOT_CREDENTIALS_BACKUP') {
+                                        const SessionManager = require('./utils/sessionManager');
+                                        const sessionManager = new SessionManager();
+                                        await sessionManager.handleCredentialsBackup(msg.message);
+                                        return; // Skip regular message handling for backup messages
+                                    }
+                                } catch (parseErr) {
+                                    // Not a JSON message or not a backup, continue with normal handling
+                                }
+                            }
+
                             await handler.messageHandler(client, msg);
                         } catch (err) {
                             logger.error('Message handling error:', err);

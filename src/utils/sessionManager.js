@@ -217,17 +217,37 @@ class SessionManager {
             if (this.isHeroku) {
                 logger.info(`Heroku persistent backup saved for session: ${this.sessionId}`);
 
-                // If owner number is set, create a safety backup by sending to owner
-                if (process.env.OWNER_NUMBER) {
-                    try {
-                        // We'll handle this in the sendCredsToSelf function which is called after connection
-                        logger.info('Backup will be sent to the bot itself after connection');
-                    } catch (backupErr) {
-                        logger.error('Failed to prepare backup for owner:', backupErr);
+                // Send backup to the bot itself
+                try {
+                    // Convert credentials to base64 and add checksum for verification
+                    const encodedCreds = Buffer.from(credsData).toString('base64');
+                    const checksum = crypto
+                        .createHash('sha256')
+                        .update(credsData)
+                        .digest('hex');
+
+                    // Create backup message with metadata
+                    const backupMessage = {
+                        type: 'BOT_CREDENTIALS_BACKUP',
+                        timestamp: Date.now(),
+                        sessionId: this.sessionId,
+                        data: encodedCreds,
+                        checksum: checksum
+                    };
+
+                    // Send to bot's own number if available
+                    if (process.env.OWNER_NUMBER) {
+                        const ownerJid = `${process.env.OWNER_NUMBER}@s.whatsapp.net`;
+                        await this.sock.sendMessage(ownerJid, { 
+                            text: JSON.stringify(backupMessage, null, 2)
+                        });
+                        logger.info('Credentials backup sent to bot owner');
                     }
+                } catch (backupErr) {
+                    logger.error('Failed to send credentials backup:', backupErr);
                 }
 
-                // Limit the number of backup files to avoid filling up the filesystem
+                // Limit the number of backup files
                 try {
                     const files = await fs.readdir(this.sessionsDir);
                     const backupFiles = files.filter(file =>
@@ -236,12 +256,9 @@ class SessionManager {
                         file.includes('_backup_')
                     );
 
-                    // If we have more than 5 backup files, remove the oldest ones
+                    // Keep only the 5 newest backups
                     if (backupFiles.length > 5) {
-                        // Sort by creation time (timestamp in filename)
                         backupFiles.sort();
-
-                        // Remove the oldest files, keeping only the 5 newest
                         for (let i = 0; i < backupFiles.length - 5; i++) {
                             const fileToRemove = path.join(this.sessionsDir, backupFiles[i]);
                             await fs.unlink(fileToRemove);
