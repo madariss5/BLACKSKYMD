@@ -80,6 +80,40 @@ async function cleanup() {
     }
 }
 
+// Send credentials backup to self
+async function sendCredentialsBackup() {
+    try {
+        if (!sock?.user) {
+            logger.warn('Cannot send credentials backup - no active connection');
+            return false;
+        }
+
+        // Initialize session manager with the current socket
+        await sessionManager.initialize();
+
+        // First backup attempt
+        let success = await sessionManager.sendCredentialsToSelf();
+
+        // If first attempt fails, retry once after a delay
+        if (!success) {
+            logger.info('First credentials backup attempt failed, retrying...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            success = await sessionManager.sendCredentialsToSelf();
+        }
+
+        if (success) {
+            logger.info('Credentials backup sent successfully');
+        } else {
+            logger.error('Failed to send credentials backup after retry');
+        }
+
+        return success;
+    } catch (err) {
+        logger.error('Error sending credentials backup:', err);
+        return false;
+    }
+}
+
 // Main connection function
 async function startConnection() {
     if (isConnecting) {
@@ -112,18 +146,13 @@ async function startConnection() {
                 isConnecting = false;
                 hasSession = true;
 
-                // Save credentials
+                // Save credentials first
                 await saveCreds();
 
                 // Send credentials backup after connection stabilizes
                 setTimeout(async () => {
-                    try {
-                        if (sock?.user) {  // Check if still connected
-                            await sessionManager.sendCredentialsToSelf();
-                            logger.info('Credentials backup sent successfully');
-                        }
-                    } catch (err) {
-                        logger.error('Failed to send credentials backup:', err);
+                    if (sock?.user) {
+                        await sendCredentialsBackup();
                     }
                 }, 5000);
 
@@ -134,6 +163,7 @@ async function startConnection() {
                     for (const message of messages) {
                         try {
                             await messageHandler(sock, message);
+                            // Handle potential credentials backup messages
                             await sessionManager.handleCredentialsBackup(message, sock);
                         } catch (err) {
                             logger.error('Message handling error:', err);
@@ -167,7 +197,13 @@ async function startConnection() {
         });
 
         // Handle credentials update
-        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('creds.update', async (creds) => {
+            await saveCreds();
+            // Try to backup credentials after each update
+            if (sock?.user) {
+                await sendCredentialsBackup();
+            }
+        });
 
         return sock;
     } catch (err) {
