@@ -32,7 +32,22 @@ async function startServer() {
                 if (m.type === 'notify') {
                     try {
                         for (const msg of m.messages) {
-                            await messageHandlerModule.messageHandler(sock, msg);
+                            // Check if message handler module is initialized
+                            if (messageHandlerModule.isInitialized && messageHandlerModule.isInitialized()) {
+                                await messageHandlerModule.messageHandler(sock, msg);
+                            } else {
+                                // Basic command prefix detection as fallback
+                                const msgType = Object.keys(msg.message || {})[0];
+                                const msgText = msgType === 'conversation' ? msg.message.conversation :
+                                    msgType === 'extendedTextMessage' ? msg.message.extendedTextMessage.text : '';
+                                
+                                if (msgText && msgText.startsWith('!')) {
+                                    logger.info(`Received command: ${msgText}`);
+                                    // Simply respond that the bot is starting up
+                                    const sender = msg.key.remoteJid;
+                                    await sock.sendMessage(sender, { text: '⚙️ Bot is starting up. Please try again in a moment.' });
+                                }
+                            }
                         }
                     } catch (err) {
                         logger.error(`Error handling message: ${err.message}`);

@@ -123,32 +123,35 @@ class SessionManager {
                 keys: null
             },
             printQRInTerminal: false,
-            browser: ['Chrome (Linux)', '', ''],
+            browser: ['Firefox (Linux)', 'Firefox', '109'], // Use Firefox browser fingerprint
             markOnlineOnConnect: true,
-            generateHighQualityLinkPreview: true,
+            generateHighQualityLinkPreview: false, // Disable for better performance
             syncFullHistory: false,
             userDevicesCache: false,
+            disableDBCache: true, // Disable database cache to prevent disk issues
+            usePairingCode: false, // Disable pairing code for QR connection
             transactionOpts: {
-                maxCommitRetries: 10,
-                delayBetweenTriesMs: 3000
+                maxCommitRetries: 15, // Increased retries
+                delayBetweenTriesMs: 2000 // Shorter delay between retries
             },
             patchMessageBeforeSending: true,
             getMessage: async () => {
                 return { conversation: 'Please update your WhatsApp' };
             },
             shouldIgnoreJid: jid => jid.includes('broadcast'),
-            fireInitQueries: true,
-            retryRequestDelayMs: 2000,
+            fireInitQueries: false, // Disable init queries for better stability
+            retryRequestDelayMs: 1500, // Faster retry
             emitOwnEvents: true,
-            defaultQueryTimeoutMs: 60000, // 60 seconds (longer for stability)
+            defaultQueryTimeoutMs: 90000, // 90 seconds timeout (increased for cloud environments)
             customUploadHosts: ['upload.whatsapp.com'],
-            mediaCache: true,
-            logger: {
-                level: 'info',
-                printLogs: true
-            },
+            mediaCache: false, // Disable media cache for better performance
             shouldSyncHistoryMessage: () => false,
-            linkPreviewImageThumbnailWidth: 300
+            linkPreviewImageThumbnailWidth: 192, // Smaller thumbnails
+            options: {
+                maxReconnectTries: 12, // More reconnect attempts
+                maxReconnectTime: 180000, // 3 minutes max reconnect time
+                connectTimeoutMs: 60000 // 60 seconds connection timeout
+            }
         };
     }
 
