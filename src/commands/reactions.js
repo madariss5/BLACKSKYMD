@@ -174,32 +174,28 @@ async function handleReaction(sock, message, type, args) {
         // Send the GIF if we found one
         if (gifFound && gifBuffer) {
             try {
-                // Send as video with gifPlayback enabled (modern method)
+                // Send as video with enhanced GIF playback settings
                 await sock.sendMessage(jid, {
                     video: gifBuffer,
                     gifPlayback: true,
                     caption: '',
+                    mimetype: 'video/mp4',
+                    gifAttribution: 'GIPHY', // Add attribution for better playback
                     ptt: false
                 });
-                
+
                 logger.info(`Sent animated GIF for reaction: ${type}`);
             } catch (gifError) {
                 logger.error(`Error sending GIF for ${type}: ${gifError.message}`);
-                
-                // Fallback - try as a standard image
-                try {
-                    await sock.sendMessage(jid, {
-                        image: gifBuffer,
-                        caption: `${type} reaction`
-                    });
-                    
-                    logger.info(`Sent fallback image for reaction: ${type}`);
-                } catch (imgError) {
-                    logger.error(`Failed to send fallback image for ${type}: ${imgError.message}`);
-                }
+                await safeSendMessage(sock, jid, { 
+                    text: `❌ Failed to send ${type} reaction GIF` 
+                });
             }
         } else {
             logger.warn(`Missing GIF for reaction: ${type}`);
+            await safeSendMessage(sock, jid, { 
+                text: `❌ Could not find GIF for ${type} reaction` 
+            });
         }
     } catch (error) {
         logger.error(`Error in ${type} command: ${error.message}`);
