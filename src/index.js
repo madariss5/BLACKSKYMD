@@ -34,7 +34,7 @@ let qrCode = null;
 let connectionState = 'disconnected';
 
 // Constants
-const SESSION_PATH = './sessions';
+const SESSION_PATH = path.join(__dirname, '..', 'sessions', 'blacksky-session');
 const MAX_RETRIES = 5;
 
 // Ensure session directory exists
@@ -50,11 +50,11 @@ async function startWhatsAppClient() {
 
         // Venom-bot configuration with enhanced error handling
         const venomOptions = {
+            session: 'blacksky-session',
             folderNameToken: SESSION_PATH,
-            mkdirFolderToken: true,
             disableWelcome: true,
-            debug: false,
-            logQR: false,
+            debug: true,
+            logQR: true,
             browserArgs: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -62,28 +62,35 @@ async function startWhatsAppClient() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--disable-software-rasterizer',
+                '--disable-extensions'
             ],
-            autoClose: 60000,
-            createPathFileToken: true,
+            puppeteerOptions: {
+                executablePath: process.env.CHROME_BIN || null,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox'
+                ],
+                headless: 'new'
+            },
+            autoClose: 0,
             waitForLogin: true,
-            updatesLog: true,
-        };
-
-        // Create WhatsApp client
-        client = await venom.create(
-            'BLACKSKY-BOT',
-            (base64Qr, asciiQR, attempts) => {
-                logger.info(`New QR code generated (Attempt: ${attempts})`);
+            catchQR: (base64Qr, asciiQR, attempt) => {
+                logger.info(`New QR code generated (Attempt: ${attempt})`);
                 qrCode = base64Qr;
                 connectionState = 'qr_ready';
-            },
-            (statusSession, session) => {
-                logger.info('Status Session:', statusSession);
-                logger.info('Session name:', session);
-            },
-            venomOptions
-        );
+            }
+        };
+
+        // Create WhatsApp client with better error handling
+        client = await venom
+            .create(venomOptions)
+            .catch((error) => {
+                logger.error('Error during client creation:', error);
+                connectionState = 'error';
+                throw error;
+            });
 
         // Connection successful
         logger.info('WhatsApp client connected successfully!');
@@ -107,12 +114,12 @@ async function startWhatsAppClient() {
             }
         });
 
-        // Handle disconnection
+        // Handle state changes
         client.onStateChange((state) => {
             logger.info('State changed:', state);
             if (state === 'DISCONNECTED') {
                 connectionState = 'disconnected';
-                // Venom will automatically try to reconnect
+                restartClient();
             } else if (state === 'CONNECTED') {
                 connectionState = 'connected';
             }
@@ -121,8 +128,8 @@ async function startWhatsAppClient() {
         // Handle errors
         client.onError(async (error) => {
             logger.error('Client error:', error);
-            if (error.includes('browser.close')) {
-                logger.info('Browser closed unexpectedly, attempting restart...');
+            if (error.includes('browser.close') || error.includes('ERR_INVALID_ARG_TYPE')) {
+                logger.info('Critical error detected, attempting restart...');
                 await restartClient();
             }
         });
@@ -134,14 +141,30 @@ async function startWhatsAppClient() {
     }
 }
 
-// Restart client function
+// Restart client function with improved cleanup
 async function restartClient() {
     logger.info('Attempting to restart client...');
     try {
         if (client) {
-            await client.close();
+            try {
+                await client.close();
+            } catch (closeErr) {
+                logger.warn('Error closing client:', closeErr);
+            }
             client = null;
         }
+
+        // Clean up session if there are persistent issues
+        if (fs.existsSync(SESSION_PATH)) {
+            try {
+                fs.rmSync(SESSION_PATH, { recursive: true, force: true });
+                fs.mkdirSync(SESSION_PATH, { recursive: true });
+                logger.info('Session directory cleaned');
+            } catch (cleanupErr) {
+                logger.warn('Error cleaning session directory:', cleanupErr);
+            }
+        }
+
         setTimeout(startWhatsAppClient, 5000);
     } catch (err) {
         logger.error('Error during client restart:', err);
@@ -235,7 +258,7 @@ app.get('/', (req, res) => {
                                 status.textContent = data.message;
                                 status.className = 'status ' + data.state;
 
-                                if (data.state === 'qr_ready') {
+                                if (data.state === 'qr_ready' && data.qrCode) {
                                     qrImage.src = data.qrCode;
                                     qrImage.style.display = 'block';
                                     loading.style.display = 'none';
