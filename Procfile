@@ -1,1 +1,1 @@
-web: node safari-connect.js
+web: node heroku-bot.js

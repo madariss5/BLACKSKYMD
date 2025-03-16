@@ -2,7 +2,13 @@
  * Safari-based WhatsApp Connection
  * Advanced connection system optimized for cloud environments
  * Features automatic credential backup and enhanced error recovery
- * Version: 1.2.2
+ * Version: 2.0.0
+ * 
+ * INSTRUCTION FOR BEST RESULTS:
+ * 1. First establish a connection on your local machine using local-connect.js
+ * 2. Upload the auth_info_baileys folder to your Replit project
+ * 3. Run import-session.js to copy credentials to auth_info_safari folder
+ * 4. Then start this Safari Connect workflow
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
@@ -13,6 +19,9 @@ const path = require('path');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const fsPromises = require('fs').promises;
+const dns = require('dns');
+const http = require('http');
+const https = require('https');
 
 // Initialize Express
 const app = express();
@@ -20,18 +29,21 @@ const port = process.env.PORT || 5000;
 
 // Configuration
 const AUTH_FOLDER = process.env.AUTH_DIR || './auth_info_safari';
-const VERSION = '1.2.2';
+const VERSION = '1.3.1';
 const MAX_RETRIES = 10;
-const HEARTBEAT_INTERVAL = 30000; // 30 seconds
-const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const RECONNECT_INTERVAL = 60000; // 1 minute base interval
 const QR_TIMEOUT = 60000; // 1 minute QR timeout
+const RECONNECT_BASE_DELAY = 5000; // 5 seconds base delay
+const MAX_RECONNECT_DELAY = 60000; // 1 minute max delay
+const HTTP_TIMEOUT = 10000; // 10 seconds HTTP timeout
+const MAX_HTTP_RETRIES = 3; // Maximum HTTP connection retries
+const CIRCUIT_BREAKER_THRESHOLD = 3; // Number of failures before circuit breaks
+const CIRCUIT_BREAKER_RESET_TIMEOUT = 30000; // 30 seconds before resetting circuit
 
 // Environment detection
 const IS_CLOUD_ENV = process.env.REPLIT_ID || process.env.HEROKU_APP_ID;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-// Setup logger with improved formatting
+// Setup logger with enhanced error tracking
 const LOGGER = pino({ 
   level: process.env.LOG_LEVEL || 'info',
   transport: {
@@ -45,31 +57,160 @@ const LOGGER = pino({
   }
 }).child({ name: 'BLACKSKY-MD' });
 
+// Connection state management
+const ConnectionState = {
+  DISCONNECTED: 'disconnected',
+  CONNECTING: 'connecting',
+  CONNECTED: 'connected',
+  AUTHENTICATING: 'authenticating',
+  AWAITING_QR: 'awaiting_qr',
+  ERROR: 'error',
+  RETRYING: 'retrying',
+  CIRCUIT_OPEN: 'circuit_open'
+};
+
+// Browser fingerprints with enhanced variety
+const BROWSER_FINGERPRINTS = [
+  // Added specialized cloud-friendly fingerprints
+  {
+    device: 'Safari on MacOS',
+    platform: 'darwin',
+    browser: ['Safari', '17.0'],
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+  },
+  {
+    device: 'Chrome on Windows', // Windows fingerprints often work better on cloud
+    platform: 'win32',
+    browser: ['Chrome', '120.0.0.0'],
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  },
+  {
+    device: 'Firefox on Windows',
+    platform: 'win32',
+    browser: ['Firefox', '110.0'],
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:110.0) Gecko/20100101 Firefox/110.0'
+  },
+  {
+    device: 'Edge on Windows',
+    platform: 'win32',
+    browser: ['Edge', '120.0.0.0'],
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'
+  },
+  // These two fingerprints have shown better acceptance rates on cloud platforms
+  {
+    device: 'Chrome on Linux',
+    platform: 'linux',
+    browser: ['Chrome', '110.0.0.0'],
+    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'
+  },
+  {
+    device: 'Chromium on Ubuntu',
+    platform: 'linux',
+    browser: ['Chrome', '111.0.0.0'],
+    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/111.0.5563.146 Chrome/111.0.5563.146 Safari/537.36'
+  },
+  {
+    device: 'Firefox Mobile',
+    platform: 'android',
+    browser: ['Firefox', '120.0'],
+    userAgent: 'Mozilla/5.0 (Android 13; Mobile; rv:120.0) Gecko/120.0 Firefox/120.0'
+  },
+  {
+    device: 'Chrome Mobile',
+    platform: 'android',
+    browser: ['Chrome', '121.0.0.0'],
+    userAgent: 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36'
+  }
+];
+
+// WhatsApp endpoint configurations with health tracking
+const WA_ENDPOINTS = [
+  'web.whatsapp.com',
+  'web-v2.whatsapp.com', 
+  'web-v3.whatsapp.com'
+].map(endpoint => ({
+  url: endpoint,
+  failures: 0,
+  lastFailure: null,
+  status: 'available'
+}));
+
 // Connection state
 let sock = null;
 let connectionRetries = 0;
-let reconnectTimer = null;
-let heartbeatTimer = null;
-let cleanupTimer = null;
 let qrDisplayTimer = null;
 let qrGenerated = false;
-let connectionState = 'disconnected';
+let connectionState = ConnectionState.DISCONNECTED;
 let lastDisconnectCode = null;
 let lastQRCode = null;
 let isReconnecting = false;
 let lastConnectTime = null;
-let connectionUptime = 0;
 let qrRetryCount = 0;
+let connectionErrors = [];
+let currentBrowserIndex = 0;
+let currentEndpointIndex = 0;
+let circuitBreakerFailures = 0;
+let circuitBreakerTimer = null;
 
-// Safari fingerprint (optimized for reliability)
-const SAFARI_FINGERPRINT = {
-  browser: ['Safari', '17.0'],
-  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
-};
+// Endpoint health tracking
+function markEndpointFailure(index, reason) {
+  const endpoint = WA_ENDPOINTS[index];
+  endpoint.failures++;
+  endpoint.lastFailure = new Date();
+  endpoint.status = endpoint.failures >= 3 ? 'unavailable' : 'degraded';
 
-// Setup Express routes
+  LOGGER.warn(`Endpoint ${endpoint.url} marked as ${endpoint.status} (Failures: ${endpoint.failures}, Reason: ${reason})`);
+}
+
+function resetEndpointStatus(index) {
+  const endpoint = WA_ENDPOINTS[index];
+  endpoint.failures = 0;
+  endpoint.lastFailure = null;
+  endpoint.status = 'available';
+
+  LOGGER.info(`Endpoint ${endpoint.url} reset to available status`);
+}
+
+// Get next available endpoint
+function getNextViableEndpoint() {
+  const startIndex = currentEndpointIndex;
+  let attempts = 0;
+
+  while (attempts < WA_ENDPOINTS.length) {
+    currentEndpointIndex = (currentEndpointIndex + 1) % WA_ENDPOINTS.length;
+    const endpoint = WA_ENDPOINTS[currentEndpointIndex];
+
+    if (endpoint.status !== 'unavailable') {
+      LOGGER.info(`Switching to endpoint: ${endpoint.url} (Status: ${endpoint.status})`);
+      return endpoint;
+    }
+    attempts++;
+  }
+
+  // If all endpoints are unavailable, reset the first one and use it
+  currentEndpointIndex = startIndex;
+  resetEndpointStatus(currentEndpointIndex);
+  return WA_ENDPOINTS[currentEndpointIndex];
+}
+
+// Proxy and connection optimization for cloud environments
+const PROXY_CONFIG = IS_CLOUD_ENV ? {
+  agent: undefined,
+  fetchAgent: undefined,
+  connectTimeoutMs: 60000,
+  useProxy: true,
+  proxyTimeout: 30000,
+  maxIdleTimeMs: 60000,
+  maxRetries: 5,
+  defaultQueryTimeoutMs: 60000,
+  syncFullHistory: false
+} : {};
+
+// Express routes for monitoring
 app.get('/', (req, res) => {
   const uptime = lastConnectTime ? Math.floor((Date.now() - lastConnectTime) / 1000) : 0;
+  const currentEndpoint = WA_ENDPOINTS[currentEndpointIndex];
+
   res.json({
     status: connectionState,
     retries: connectionRetries,
@@ -80,161 +221,440 @@ app.get('/', (req, res) => {
     version: VERSION,
     uptime: uptime,
     isReconnecting,
-    totalUptime: connectionUptime
+    currentBrowser: BROWSER_FINGERPRINTS[currentBrowserIndex].device,
+    currentEndpoint: currentEndpoint.url,
+    endpointStatus: currentEndpoint.status,
+    circuitBreakerStatus: circuitBreakerFailures >= CIRCUIT_BREAKER_THRESHOLD ? 'OPEN' : 'CLOSED',
+    recentErrors: connectionErrors.slice(-5),
+    endpoints: WA_ENDPOINTS.map(e => ({
+      url: e.url,
+      status: e.status,
+      failures: e.failures,
+      lastFailure: e.lastFailure
+    }))
   });
 });
 
-app.get('/status', (req, res) => {
-  res.json({
-    state: connectionState,
-    qrGenerated,
-    retries: connectionRetries,
-    qrRetries: qrRetryCount,
-    lastError: lastDisconnectCode,
-    environment: IS_CLOUD_ENV ? 'cloud' : 'local',
-    timestamp: new Date().toISOString(),
-    lastConnectTime: lastConnectTime ? new Date(lastConnectTime).toISOString() : null
-  });
-});
-
-// Start Express server
-const server = app.listen(port, '0.0.0.0', () => {
-  LOGGER.info(`Status monitor running on port ${port}`);
-});
-
-// Display QR code with proper formatting
-function displayQRCode(qr) {
-  console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
-  console.log('█                   SCAN QR CODE TO CONNECT                      █');
-  console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
-
-  // Generate QR in terminal
-  qrcode.generate(qr, { small: true });
-
-  console.log('\n▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
-  console.log(`█  Scan within ${QR_TIMEOUT/1000} seconds. Attempt ${qrRetryCount + 1} of ${MAX_RETRIES}   █`);
-  console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n');
-
-  // Set QR timeout
-  if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
-  qrDisplayTimer = setTimeout(() => {
-    if (connectionState === 'awaiting_scan') {
-      LOGGER.info('QR code expired, generating new one...');
-      qrRetryCount++;
-      if (qrRetryCount < MAX_RETRIES) {
-        handleReconnection('QR timeout');
-      } else {
-        LOGGER.error('Max QR retry attempts reached');
-        process.exit(1); // Force restart in cloud environment
-      }
-    }
-  }, QR_TIMEOUT);
-}
-
-// Initialize connection
-async function initializeConnection() {
-  // Clear all existing auth folders to prevent conflicts
-  const authFolders = [
-    './auth_info_baileys',
-    './auth_info_terminal',
-    './auth_info_safari',
-    './auth_info_web'
-  ];
-
-  for (const folder of authFolders) {
-    if (fs.existsSync(folder)) {
-      LOGGER.info(`Cleaning up auth folder: ${folder}`);
-      fs.rmSync(folder, { recursive: true, force: true });
-    }
-  }
-
-  // Create fresh auth folder
-  fs.mkdirSync(AUTH_FOLDER, { recursive: true });
-  LOGGER.info('Fresh auth folder created');
-
-  // Reset QR state
-  qrRetryCount = 0;
-  lastQRCode = null;
-  if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
-}
-
-// Heartbeat mechanism
-function startHeartbeat() {
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
-
-  heartbeatTimer = setInterval(async () => {
-    if (sock && sock.user) {
-      try {
-        await sock.sendPresenceUpdate('available');
-        LOGGER.debug('Heartbeat sent successfully');
-
-        // Update connection uptime
-        if (lastConnectTime) {
-          connectionUptime = Math.floor((Date.now() - lastConnectTime) / 1000);
-        }
-      } catch (err) {
-        LOGGER.warn('Heartbeat failed:', err.message);
-        if (!isReconnecting) {
-          handleReconnection('Heartbeat failure');
-        }
-      }
-    }
-  }, HEARTBEAT_INTERVAL);
-}
-
-// Cleanup mechanism
-function startCleanup() {
-  if (cleanupTimer) clearInterval(cleanupTimer);
-
-  cleanupTimer = setInterval(async () => {
-    if (sock && sock.user) {
-      try {
-        // Clear any pending messages
-        await sock.sendPresenceUpdate('unavailable');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await sock.sendPresenceUpdate('available');
-
-        LOGGER.debug('Cleanup completed successfully');
-      } catch (err) {
-        LOGGER.warn('Cleanup failed:', err.message);
-      }
-    }
-  }, CLEANUP_INTERVAL);
-}
-
-// Handle reconnection
-async function handleReconnection(reason) {
-  if (isReconnecting) {
-    LOGGER.info('Reconnection already in progress, skipping...');
-    return;
-  }
-
-  isReconnecting = true;
-  connectionState = 'reconnecting';
-
+// Enhanced auth file validation
+async function validateAuthFiles() {
   try {
-    LOGGER.info(`Initiating reconnection due to: ${reason}`);
+    LOGGER.info('Validating authentication files...');
 
-    // Clear existing timers
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
-    if (cleanupTimer) clearInterval(cleanupTimer);
-    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (!fs.existsSync(AUTH_FOLDER)) {
+      LOGGER.info('Auth folder not found');
+      return false;
+    }
 
-    // Wait before attempting reconnection
-    const delay = Math.min(Math.pow(2, connectionRetries) * 1000, RECONNECT_INTERVAL);
-    LOGGER.info(`Waiting ${delay/1000}s before reconnection attempt...`);
+    const files = await fsPromises.readdir(AUTH_FOLDER);
+    LOGGER.info(`Found ${files.length} files in auth folder`);
 
-    await new Promise(resolve => setTimeout(resolve, delay));
+    if (files.length === 0) {
+      LOGGER.info('Auth folder is empty');
+      return false;
+    }
 
-    // Initialize fresh connection
-    await initializeConnection();
-    await startConnection();
+    // Check critical files
+    const hasCredsJson = files.includes('creds.json');
+    LOGGER.info(`creds.json present: ${hasCredsJson}`);
+
+    const authFiles = files.filter(f => f.startsWith('auth_'));
+    LOGGER.info(`Auth files found: ${authFiles.length}`);
+
+    if (!hasCredsJson || authFiles.length === 0) {
+      LOGGER.warn('Missing critical auth files');
+      return false;
+    }
+
+    // Validate creds.json content
+    try {
+      const credsPath = path.join(AUTH_FOLDER, 'creds.json');
+      const credsContent = await fsPromises.readFile(credsPath, 'utf8');
+      const creds = JSON.parse(credsContent);
+
+      LOGGER.info('Validating creds.json structure...');
+      const requiredKeys = ['noiseKey', 'signedIdentityKey', 'signedPreKey', 'registrationId'];
+      const missingKeys = requiredKeys.filter(key => !creds[key]);
+
+      if (missingKeys.length > 0) {
+        LOGGER.warn(`Invalid creds.json: Missing keys: ${missingKeys.join(', ')}`);
+        return false;
+      }
+
+      LOGGER.info('creds.json validation successful');
+      return true;
+    } catch (err) {
+      LOGGER.error('Error validating creds.json:', err);
+      return false;
+    }
   } catch (err) {
-    LOGGER.error('Error during reconnection:', err);
-    connectionState = 'error';
-  } finally {
-    isReconnecting = false;
+    LOGGER.error('Error during auth validation:', err);
+    return false;
   }
+}
+
+// Enhanced network diagnostics
+async function checkNetworkConnectivity() {
+  if (isCircuitBroken()) {
+    LOGGER.warn('Circuit breaker is open, skipping network check');
+    return false;
+  }
+
+  LOGGER.info('Running network diagnostics...');
+
+  const currentEndpoint = WA_ENDPOINTS[currentEndpointIndex];
+  LOGGER.info(`Testing endpoint ${currentEndpoint.url} (Status: ${currentEndpoint.status})`);
+
+  // DNS resolution with detailed logging
+  try {
+    const addresses = await new Promise((resolve, reject) => {
+      dns.resolve4(currentEndpoint.url, (err, addrs) => {
+        if (err) reject(err);
+        else resolve(addrs);
+      });
+    });
+
+    LOGGER.info(`DNS resolution successful for ${currentEndpoint.url}:`, addresses);
+  } catch (err) {
+    LOGGER.error(`DNS resolution failed for ${currentEndpoint.url}:`, err);
+    markEndpointFailure(currentEndpointIndex, 'DNS_FAILURE');
+    getNextViableEndpoint();
+    return false;
+  }
+
+  // HTTP connectivity check with detailed diagnostics
+  try {
+    LOGGER.info(`Testing HTTP connectivity to https://${currentEndpoint.url}`);
+
+    const response = await new Promise((resolve, reject) => {
+      const req = https.get(`https://${currentEndpoint.url}`, { 
+        timeout: HTTP_TIMEOUT,
+        ...PROXY_CONFIG
+      }, res => {
+        LOGGER.info(`HTTP response from ${currentEndpoint.url}: ${res.statusCode}`);
+        res.destroy();
+        resolve(res);
+      });
+
+      req.on('error', err => {
+        LOGGER.error(`HTTP request failed for ${currentEndpoint.url}:`, err);
+        reject(err);
+      });
+
+      req.on('timeout', () => {
+        LOGGER.error(`HTTP request timed out for ${currentEndpoint.url}`);
+        req.destroy();
+        reject(new Error('Timeout'));
+      });
+    });
+
+    if (response.statusCode === 405) {
+      LOGGER.warn(`Endpoint ${currentEndpoint.url} returned 405 - marking as degraded`);
+      markEndpointFailure(currentEndpointIndex, 'STATUS_405');
+      getNextViableEndpoint();
+      return false;
+    }
+
+    if (response.statusCode >= 400) {
+      LOGGER.warn(`Endpoint ${currentEndpoint.url} returned ${response.statusCode}`);
+      markEndpointFailure(currentEndpointIndex, `STATUS_${response.statusCode}`);
+      getNextViableEndpoint();
+      return false;
+    }
+
+    LOGGER.info(`Successfully connected to ${currentEndpoint.url}`);
+    resetEndpointStatus(currentEndpointIndex);
+    return true;
+  } catch (err) {
+    LOGGER.error(`Connection failed to ${currentEndpoint.url}:`, err);
+    markEndpointFailure(currentEndpointIndex, 'CONNECTION_ERROR');
+    getNextViableEndpoint();
+    return false;
+  }
+}
+
+// Initialize connection with enhanced validation
+async function initializeConnection() {
+  try {
+    LOGGER.info('Initializing connection...');
+    connectionState = ConnectionState.CONNECTING;
+
+    // Check network connectivity first
+    const networkOk = await checkNetworkConnectivity();
+    if (!networkOk) {
+      LOGGER.error('Network connectivity check failed');
+      throw new Error('Network connectivity check failed');
+    }
+
+    // Validate existing auth state
+    const hasValidAuth = await validateAuthFiles();
+    LOGGER.info(`Auth validation result: ${hasValidAuth}`);
+
+    if (!hasValidAuth) {
+      LOGGER.info('Clearing invalid auth state...');
+      if (fs.existsSync(AUTH_FOLDER)) {
+        // Backup existing auth files before clearing
+        const backupFolder = `${AUTH_FOLDER}_backup_${Date.now()}`;
+        await fsPromises.cp(AUTH_FOLDER, backupFolder, { recursive: true })
+          .catch(err => LOGGER.warn('Failed to create auth backup:', err));
+
+        await fsPromises.rm(AUTH_FOLDER, { recursive: true, force: true });
+      }
+      await fsPromises.mkdir(AUTH_FOLDER, { recursive: true });
+    }
+
+    // Reset connection state
+    qrRetryCount = 0;
+    lastQRCode = null;
+    if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
+
+  } catch (err) {
+    LOGGER.error('Error in initialization:', err);
+    connectionErrors.push({
+      timestamp: new Date().toISOString(),
+      type: 'INIT_ERROR',
+      error: err.message,
+      stack: err.stack
+    });
+    throw err;
+  }
+}
+
+// Start connection with enhanced error handling
+async function startConnection() {
+  try {
+    if (isCircuitBroken()) {
+      LOGGER.warn('Circuit breaker is open, delaying connection attempt');
+      return;
+    }
+
+    connectionState = ConnectionState.CONNECTING;
+    LOGGER.info(`Starting WhatsApp connection (Attempt ${connectionRetries + 1}/${MAX_RETRIES})`);
+
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+    const { version } = await fetchLatestBaileysVersion();
+
+    const currentEndpoint = WA_ENDPOINTS[currentEndpointIndex];
+    const fingerprint = BROWSER_FINGERPRINTS[currentBrowserIndex];
+
+    LOGGER.info(`Using endpoint: ${currentEndpoint.url}`);
+    LOGGER.info(`Using browser fingerprint: ${fingerprint.device}`);
+
+    sock = makeWASocket({
+      version,
+      auth: state,
+      printQRInTerminal: false,
+      browser: [generateDeviceId(), ...fingerprint.browser],
+      browserDescription: [fingerprint.device, fingerprint.platform, VERSION],
+      userAgent: fingerprint.userAgent,
+      connectTimeoutMs: 60000,
+      qrTimeout: QR_TIMEOUT,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 10000,
+      emitOwnEvents: false,
+      markOnlineOnConnect: false,
+      logger: LOGGER,
+      customUploadHosts: ['media-sin1-1.cdn.whatsapp.net'],
+      syncFullHistory: false,
+      ...PROXY_CONFIG
+    });
+
+    sock.ev.on('connection.update', handleConnectionUpdate);
+    sock.ev.on('creds.update', async (creds) => {
+      LOGGER.info('Credentials updated, saving...');
+      await saveCreds();
+    });
+
+  } catch (err) {
+    LOGGER.error('Error in connection:', err);
+    connectionErrors.push({
+      timestamp: new Date().toISOString(),
+      type: 'CONNECTION_ERROR',
+      error: err.message,
+      stack: err.stack
+    });
+
+    recordFailure();
+
+    if (connectionRetries < MAX_RETRIES && !isCircuitBroken()) {
+      connectionRetries++;
+      const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, connectionRetries - 1), MAX_RECONNECT_DELAY);
+      LOGGER.info(`Retrying in ${delay/1000}s (Attempt ${connectionRetries}/${MAX_RETRIES})`);
+      setTimeout(startConnection, delay);
+    } else {
+      LOGGER.error('Max retries reached or circuit breaker open');
+      process.exit(1);
+    }
+  }
+}
+
+// Circuit breaker implementation
+function isCircuitBroken() {
+  return circuitBreakerFailures >= CIRCUIT_BREAKER_THRESHOLD;
+}
+
+function recordFailure() {
+  circuitBreakerFailures++;
+  if (circuitBreakerFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+    LOGGER.warn('Circuit breaker opened due to multiple failures');
+    connectionState = ConnectionState.CIRCUIT_OPEN;
+
+    if (circuitBreakerTimer) clearTimeout(circuitBreakerTimer);
+    circuitBreakerTimer = setTimeout(() => {
+      LOGGER.info('Circuit breaker reset timeout reached, resetting failures');
+      circuitBreakerFailures = 0;
+      connectionState = ConnectionState.DISCONNECTED;
+    }, CIRCUIT_BREAKER_RESET_TIMEOUT);
+  }
+}
+
+function resetCircuitBreaker() {
+  circuitBreakerFailures = 0;
+  if (circuitBreakerTimer) {
+    clearTimeout(circuitBreakerTimer);
+    circuitBreakerTimer = null;
+  }
+}
+
+// Handle connection updates with comprehensive error handling
+async function handleConnectionUpdate(update) {
+  try {
+    const { connection, lastDisconnect, qr } = update;
+
+    LOGGER.debug('Connection update:', {
+      connection,
+      state: connectionState,
+      retries: connectionRetries,
+      hasQR: !!qr,
+      errorCode: lastDisconnect?.error?.output?.statusCode,
+      endpoint: WA_ENDPOINTS[currentEndpointIndex].url
+    });
+
+    if (qr) {
+      qrGenerated = true;
+      lastQRCode = qr;
+      connectionState = ConnectionState.AWAITING_QR;
+      displayQRCode(qr);
+    }
+
+    if (connection === 'close') {
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const reason = lastDisconnect?.error?.message || 'Unknown';
+
+      lastDisconnectCode = statusCode;
+      connectionState = ConnectionState.DISCONNECTED;
+      lastConnectTime = null;
+
+      connectionErrors.push({
+        timestamp: new Date().toISOString(),
+        type: 'DISCONNECT',
+        code: statusCode,
+        reason: reason,
+        endpoint: WA_ENDPOINTS[currentEndpointIndex].url
+      });
+
+      LOGGER.info(`Connection closed (Code: ${statusCode}). Reason: ${reason}`);
+
+      if (statusCode === DisconnectReason.loggedOut || 
+          (lastDisconnect?.error instanceof Boom && lastDisconnect.error.output.statusCode === 440)) {
+        LOGGER.warn('Session expired or logged out');
+        await handleReconnection('Session expired', true);
+      } else if (statusCode === 405) {
+        LOGGER.warn(`Rate limit (405) detected on endpoint ${WA_ENDPOINTS[currentEndpointIndex].url}`);
+        markEndpointFailure(currentEndpointIndex, 'STATUS_405');
+        getNextViableEndpoint();
+        await handleReconnection('Rate limit', false);
+      } else {
+        await handleReconnection('Generic error', false);
+      }
+    } else if (connection === 'open') {
+      connectionState = ConnectionState.CONNECTED;
+      lastQRCode = null;
+      qrRetryCount = 0;
+      connectionRetries = 0;
+      lastConnectTime = Date.now();
+      connectionErrors = [];
+      resetCircuitBreaker();
+      resetEndpointStatus(currentEndpointIndex);
+
+      if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
+
+      LOGGER.info('✅ SUCCESSFULLY CONNECTED TO WHATSAPP!');
+      LOGGER.info(`📱 Connected as: ${sock.user?.id || 'Unknown'}`);
+      LOGGER.info(`📡 Using endpoint: ${WA_ENDPOINTS[currentEndpointIndex].url}`);
+
+      try {
+        if (sock?.user) {
+          await sock.sendMessage(sock.user.id, { 
+            text: `🤖 *BLACKSKY-MD Bot Connected!*\n\n` +
+                  `_Connection Time: ${new Date().toLocaleString()}_\n` +
+                  `_Version: ${VERSION}_\n` +
+                  `_Endpoint: ${WA_ENDPOINTS[currentEndpointIndex].url}_\n\n` +
+                  `Send *!help* to see available commands.` 
+          });
+          LOGGER.info('Welcome message sent');
+        }
+      } catch (err) {
+        LOGGER.error('Error sending welcome message:', err);
+      }
+    }
+  } catch (err) {
+    LOGGER.error('Error in connection update handler:', err);
+    connectionErrors.push({
+      timestamp: new Date().toISOString(),
+      type: 'UPDATE_HANDLER_ERROR',
+      error: err.message,
+      stack: err.stack
+    });
+  }
+}
+
+// Display QR code with simplified reliable generation
+function displayQRCode(qr) {
+    try {
+        LOGGER.info(`Generating QR code (Attempt ${qrRetryCount + 1}/${MAX_RETRIES})`);
+
+        // Header
+        console.log('\n█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█');
+        console.log('█                   SCAN QR CODE TO CONNECT                      █');
+        console.log('█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█\n');
+
+        // Generate QR directly to terminal
+        qrcode.generate(qr, { type: 'terminal', small: true });
+
+        // Footer
+        console.log('\n█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█');
+        console.log(`█  Scan within ${QR_TIMEOUT/1000} seconds. Attempt ${qrRetryCount + 1} of ${MAX_RETRIES}   █`);
+        console.log('█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█\n');
+
+        // Set QR timeout
+        if (qrDisplayTimer) clearTimeout(qrDisplayTimer);
+        qrDisplayTimer = setTimeout(() => {
+            if (connectionState === ConnectionState.AWAITING_QR) {
+                LOGGER.warn('QR code expired, initiating new QR generation');
+                qrRetryCount++;
+                if (qrRetryCount < MAX_RETRIES) {
+                    handleReconnection('QR timeout');
+                } else {
+                    LOGGER.error('Max QR retry attempts reached');
+                    process.exit(1);
+                }
+            }
+        }, QR_TIMEOUT);
+
+    } catch (err) {
+        LOGGER.error('QR generation failed:', err);
+
+        // Direct fallback output
+        console.log('\n█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█');
+        console.log('█                    DIRECT QR CODE DATA                         █');
+        console.log('█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█\n');
+
+        // Format QR data in clean lines
+        const lines = qr.match(/.{1,32}/g) || [];
+        lines.forEach(line => console.log(line));
+
+        console.log('\n█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█');
+    }
 }
 
 // Generate unique device ID
@@ -244,758 +664,117 @@ function generateDeviceId() {
   return `BLACKSKY-MD-${timestamp}-${randomString}`;
 }
 
-// Handle connection updates
-async function handleConnectionUpdate(update) {
-  const { connection, lastDisconnect, qr } = update;
-
-  if (qr) {
-    qrGenerated = true;
-    lastQRCode = qr;
-    LOGGER.info(`QR Code received (Attempt ${qrRetryCount + 1}/${MAX_RETRIES})`);
-    connectionState = 'awaiting_scan';
-    displayQRCode(qr);
+// Handle reconnection with exponential backoff
+async function handleReconnection(reason, resetRetries = false) {
+  if (isReconnecting) {
+    LOGGER.info('Reconnection already in progress');
+    return;
   }
 
-  if (connection === 'close') {
-    const statusCode = lastDisconnect?.error?.output?.statusCode;
-    const reason = lastDisconnect?.error?.message || 'Unknown';
+  try {
+    isReconnecting = true;
+    connectionState = ConnectionState.RETRYING;
 
-    lastDisconnectCode = statusCode;
-    connectionState = 'disconnected';
-    lastConnectTime = null;
-
-    LOGGER.info(`Connection closed (Code: ${statusCode}). Reason: ${reason}`);
-
-    // Handle specific error cases
-    if (statusCode === DisconnectReason.loggedOut || 
-        (lastDisconnect?.error instanceof Boom && lastDisconnect.error.output.statusCode === 440)) {
-      LOGGER.warn('Session expired or logged out, clearing auth state');
+    if (resetRetries) {
       connectionRetries = 0;
-      qrRetryCount = 0; // Reset QR retries on logout
-      handleReconnection('Session expired');
-    } else if (statusCode === 405) {
-      LOGGER.warn('405 error detected - adjusting connection parameters');
-      if (connectionRetries < MAX_RETRIES) {
-        connectionRetries++;
-        handleReconnection('Rate limit (405)');
-      } else {
-        LOGGER.error('Max retries reached - restarting process');
-        process.exit(1); // Force restart in cloud environment
-      }
-    } else {
-      // Generic reconnection logic
-      if (connectionRetries < MAX_RETRIES) {
-        connectionRetries++;
-        handleReconnection('Generic error');
-      } else {
-        LOGGER.error('Max retries reached - restarting process');
-        process.exit(1); // Force restart in cloud environment
-      }
-    }
-  } else if (connection === 'open') {
-    connectionState = 'connected';
-    lastQRCode = null;
-    qrRetryCount = 0;
-    connectionRetries = 0;
-    lastConnectTime = Date.now();
-
-    // Clear QR timeout if it exists
-    if (qrDisplayTimer) {
-      clearTimeout(qrDisplayTimer);
-      qrDisplayTimer = null;
+      qrRetryCount = 0;
     }
 
-    LOGGER.info('✅ SUCCESSFULLY CONNECTED TO WHATSAPP!');
-    LOGGER.info(`📱 Connected as: ${sock.user?.id || 'Unknown'}`);
-
-    // Start monitoring systems
-    startHeartbeat();
-    startCleanup();
-
-    try {
-      // Send welcome message
-      if (sock && sock.user) {
-        await sock.sendMessage(sock.user.id, { 
-          text: `🤖 *BLACKSKY-MD Bot Connected!*\n\n` +
-                `_Connection Time: ${new Date().toLocaleString()}_\n` +
-                `_Version: ${VERSION}_\n\n` +
-                `Send *!help* to see available commands.` 
-        });
-        LOGGER.info('Welcome message sent');
-      }
-    } catch (err) {
-      LOGGER.error('Error sending welcome message:', err);
+    if (connectionRetries >= MAX_RETRIES || isCircuitBroken()) {
+      LOGGER.error('Max retries reached or circuit breaker open');
+      process.exit(1);
+      return;
     }
-  }
-}
 
-// Utility function to send typing indicator
-async function showTypingIndicator(sock, jid, durationMs = 1000) {
-  try {
-    await sock.presenceSubscribe(jid);
-    await sock.sendPresenceUpdate('composing', jid);
-    
-    // Wait for the specified duration
-    await new Promise(resolve => setTimeout(resolve, durationMs));
-    
-    // Stop typing indicator
-    await sock.sendPresenceUpdate('paused', jid);
-    return true;
+    connectionRetries++;
+    const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, connectionRetries - 1), MAX_RECONNECT_DELAY);
+
+    LOGGER.info(`Reconnecting in ${delay/1000}s (Attempt ${connectionRetries}/${MAX_RETRIES})`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    await initializeConnection();
+    await startConnection();
+
   } catch (err) {
-    LOGGER.error(`Error showing typing indicator: ${err.message}`);
-    return false;
-  }
-}
-
-// Copy auth files to main auth folder with verification
-async function copyAuthToMain() {
-  try {
-    const mainAuthFolder = './auth_info_baileys';
-    if (!fs.existsSync(mainAuthFolder)) {
-      fs.mkdirSync(mainAuthFolder, { recursive: true });
-    }
-    
-    // Clear any existing files in the main folder
-    const existingFiles = fs.readdirSync(mainAuthFolder);
-    for (const file of existingFiles) {
-      const filePath = path.join(mainAuthFolder, file);
-      if (fs.statSync(filePath).isFile()) {
-        fs.unlinkSync(filePath);
-      }
-    }
-    
-    if (fs.existsSync(AUTH_FOLDER)) {
-      // Get the list of source files
-      const files = fs.readdirSync(AUTH_FOLDER);
-      LOGGER.info(`Copying ${files.length} auth files to main folder...`);
-      
-      // Copy each file
-      let copiedCount = 0;
-      for (const file of files) {
-        const srcPath = path.join(AUTH_FOLDER, file);
-        const destPath = path.join(mainAuthFolder, file);
-        if (fs.statSync(srcPath).isFile()) {
-          fs.copyFileSync(srcPath, destPath);
-          copiedCount++;
-        }
-      }
-      
-      // Verify the copy was successful
-      const verifyFiles = fs.readdirSync(mainAuthFolder);
-      LOGGER.info(`Auth files copied: ${copiedCount}/${files.length}, verified: ${verifyFiles.length} files present in target folder`);
-      
-      // Make sure essential files were copied
-      const essentialFiles = ['creds.json'];
-      for (const essential of essentialFiles) {
-        const essentialPath = path.join(mainAuthFolder, essential);
-        if (!fs.existsSync(essentialPath)) {
-          LOGGER.warn(`Essential file ${essential} not found in target folder!`);
-          
-          // Try to copy it directly
-          const srcEssential = path.join(AUTH_FOLDER, essential);
-          if (fs.existsSync(srcEssential)) {
-            fs.copyFileSync(srcEssential, essentialPath);
-            LOGGER.info(`Re-copied essential file ${essential}`);
-          } else {
-            LOGGER.error(`Essential file ${essential} not found in source!`);
-          }
-        }
-      }
-      
-      LOGGER.info('Auth files copied to main folder successfully');
-      return true;
-    }
-    return false;
-  } catch (error) {
-    LOGGER.error('Error copying auth files:', error);
-    return false;
-  }
-}
-
-// Send credentials backup to the bot's own number
-async function sendCredsBackup(sock) {
-  try {
-    // Get the bot's own JID
-    const ownJid = sock.user.id;
-    LOGGER.info(`Preparing to send credentials backup to ${ownJid.replace(/@.+/, '@...')}`);
-    
-    // Path to creds.json file
-    const credsPath = path.join(AUTH_FOLDER, 'creds.json');
-    
-    // Verify creds file exists and has content
-    if (!fs.existsSync(credsPath)) {
-      LOGGER.error('Cannot send credentials backup: creds.json not found');
-      return false;
-    }
-    
-    const credsSize = fs.statSync(credsPath).size;
-    if (credsSize === 0) {
-      LOGGER.error('Cannot send credentials backup: creds.json is empty');
-      return false;
-    }
-    
-    // Read the file as a buffer
-    const credsBuffer = fs.readFileSync(credsPath);
-    
-    // Send the credentials file
-    await sock.sendMessage(ownJid, {
-      document: credsBuffer,
-      fileName: 'creds.json',
-      mimetype: 'application/json',
-      caption: '🔐 *WhatsApp Credentials Backup*\n\nThis file is needed for Heroku deployment. Keep it safe and do not share it with anyone.'
+    LOGGER.error('Error during reconnection:', err);
+    connectionErrors.push({
+      timestamp: new Date().toISOString(),
+      type: 'RECONNECTION_ERROR',
+      error: err.message,
+      stack: err.stack
     });
-    
-    LOGGER.info('Credentials backup sent successfully');
-    
-    // Also backup the session files that are crucial for reconnection
-    const sessionFiles = fs.readdirSync(AUTH_FOLDER).filter(file => file.startsWith('session-'));
-    if (sessionFiles.length > 0) {
-      // Create a temporary zip file with all session files
-      const AdmZip = require('adm-zip');
-      const zip = new AdmZip();
-      
-      for (const file of sessionFiles) {
-        const filePath = path.join(AUTH_FOLDER, file);
-        zip.addLocalFile(filePath);
-      }
-      
-      // Generate zip buffer
-      const zipBuffer = zip.toBuffer();
-      
-      // Send the session backup
-      await sock.sendMessage(ownJid, {
-        document: zipBuffer,
-        fileName: 'session_backup.zip',
-        mimetype: 'application/zip',
-        caption: '📁 *WhatsApp Session Backup*\n\nAdditional session files for complete restoration.'
+    recordFailure();
+  } finally {
+    isReconnecting = false;
+  }
+}
+
+// Start Express server
+async function startServer() {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(port, '0.0.0.0')
+      .once('error', (err) => {
+        LOGGER.error('Server error:', err);
+        reject(err);
+      })
+      .once('listening', () => {
+        LOGGER.info(`Server started on port ${port}`);
+        resolve(server);
       });
-      
-      LOGGER.info('Session backup sent successfully');
-    }
-    
-    return true;
-  } catch (error) {
-    LOGGER.error('Error sending credentials backup:', error);
-    return false;
-  }
-}
-
-
-// Set up message handler with enhanced reliability
-function setupMessageHandler() {
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
-    
-    LOGGER.info(`Received message event of type: ${type} with ${messages.length} messages`);
-    
-    for (const message of messages) {
-      try {
-        // Check if message is valid
-        if (!message.message) {
-          LOGGER.info('Received message without content, skipping');
-          continue;
-        }
-        
-        // Skip non-command messages from self to avoid unnecessary processing
-        if (message.key.fromMe) {
-          const messageText = message.message?.conversation || 
-                             message.message?.extendedTextMessage?.text || 
-                             message.message?.imageMessage?.caption || '';
-          
-          if (!messageText.startsWith('!')) {
-            LOGGER.info('Skipping non-command message from self');
-            continue;
-          }
-          // Only process our own commands
-          LOGGER.info('Processing command from self');
-        }
-        
-        // Extract JID and message content with safer extraction
-        const remoteJid = message.key.remoteJid;
-        if (!remoteJid) {
-          LOGGER.warn('Message missing remoteJid, skipping');
-          continue;
-        }
-        
-        // Track message receipt for analytics
-        LOGGER.debug(`Message received from ${remoteJid.replace(/@.+/, '@...')} with ID: ${message.key.id}`);
-        
-        // Send read receipt to improve user experience
-        await sock.readMessages([message.key]);
-        
-        // Safely extract message text
-        const messageText = message.message?.conversation || 
-                           message.message?.extendedTextMessage?.text || 
-                           message.message?.imageMessage?.caption ||
-                           '';
-                        
-        // Log incoming message with safe JID formatting
-        const formattedJid = remoteJid.replace(/@.+/, '@...');
-        LOGGER.info(`New message from ${formattedJid}: ${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}`);
-        
-        // Handle commands
-        if (messageText.startsWith('!')) {
-          const command = messageText.slice(1).trim().split(' ')[0].toLowerCase();
-          const args = messageText.slice(1).trim().split(' ').slice(1);
-          
-          LOGGER.info(`Processing command: ${command} with args: ${args.join(' ')}`);
-          
-          // First try to process command through command modules
-          try {
-            // Check if command exists in loaded modules
-            if (Object.keys(cachedCommands).length > 0) {
-              const commandHandled = await processModuleCommand(sock, message, command, args);
-              
-              // If the command was handled by modules, continue to next message
-              if (commandHandled) {
-                LOGGER.info(`Command ${command} was handled by command modules`);
-                continue;
-              }
-            }
-            
-            // If command modules didn't handle it, use built-in commands
-            LOGGER.info(`Command ${command} not found in modules, using built-in commands`);
-            
-            // Basic command handler for built-in commands
-            switch(command) {
-              case 'ping':
-                // Show typing indicator and send response
-                await showTypingIndicator(sock, remoteJid, 1000);
-                await safeSendText(sock, remoteJid, 'Pong! 🏓 Bot is working properly.');
-                LOGGER.info('Responded to ping command');
-                break;
-                
-              case 'help':
-                // Show typing indicator for a longer help message
-                await showTypingIndicator(sock, remoteJid, 2000);
-                
-                // Get command count from modules
-                const totalModuleCommands = Object.keys(cachedCommands).length;
-                const moduleCommandsInfo = totalModuleCommands > 0 
-                  ? `\n\n📚 *${totalModuleCommands} Additional Commands*\nType !help <category> to see more commands.` 
-                  : '';
-                
-                // Send help message
-                await safeSendMessage(sock, remoteJid, { 
-                  text: `📋 *BLACKSKY-MD Commands*\n\n` +
-                        `!ping - Check if bot is online\n` +
-                        `!info - Show bot information\n` +
-                        `!help - Show this help message\n` +
-                        `!test - Test the bot's response\n` +
-                        `!backup - Create credentials backup for Heroku deployment${moduleCommandsInfo}`
-                });
-                
-                LOGGER.info('Responded to help command');
-                break;
-                
-              case 'info':
-                // Show typing indicator for info message (takes a bit to calculate)
-                await showTypingIndicator(sock, remoteJid, 1500);
-                
-                // Calculate uptime for display
-                const uptime = process.uptime();
-                const uptimeStr = Math.floor(uptime / 3600) + 'h ' + 
-                                  Math.floor((uptime % 3600) / 60) + 'm ' + 
-                                  Math.floor(uptime % 60) + 's';
-                
-                // Get module stats
-                const moduleCount = Object.keys(commandModules).length;
-                const commandCount = Object.keys(cachedCommands).length;
-                
-                // Send info message
-                await safeSendMessage(sock, remoteJid, { 
-                  text: `🤖 *Bot Information*\n\n` +
-                        `• *Name:* BLACKSKY-MD\n` +
-                        `• *Status:* Online\n` +
-                        `• *Uptime:* ${uptimeStr}\n` +
-                        `• *Version:* ${VERSION}\n` +
-                        `• *Connection:* Safari\n` +
-                        `• *Environment:* ${IS_CLOUD_ENV ? 'Cloud' : 'Local'}\n` +
-                        `• *Connected:* ${new Date(Date.now()).toLocaleString()}\n` +
-                        `• *User ID:* ${sock.user.id.split('@')[0]}\n` +
-                        `• *Heroku Ready:* ✅\n` +
-                        `• *Modules Loaded:* ${moduleCount}\n` +
-                        `• *Commands Available:* ${commandCount + 5}`
-                });
-                
-                LOGGER.info('Responded to info command');
-                break;
-                
-              case 'test':
-                // Show typing indicator
-                await showTypingIndicator(sock, remoteJid, 800);
-                
-                // Send test message
-                await safeSendText(sock, remoteJid, '✅ Test successful! The bot is working correctly.');
-                LOGGER.info('Responded to test command');
-                break;
-                
-              case 'modules':
-                // Show typing indicator
-                await showTypingIndicator(sock, remoteJid, 1000);
-                
-                // Generate list of loaded modules
-                const modules = Object.keys(commandModules);
-                if (modules.length > 0) {
-                  const moduleList = modules.map(m => `• ${m}`).join('\n');
-                  await safeSendText(sock, remoteJid, `📚 *Loaded Modules (${modules.length})*\n\n${moduleList}`);
-                } else {
-                  await safeSendText(sock, remoteJid, '❌ No command modules loaded.');
-                }
-                LOGGER.info('Responded to modules command');
-                break;
-                
-              case 'backup':
-                LOGGER.info('Manual backup requested by user');
-                
-                // Show typing indicator while processing request
-                await showTypingIndicator(sock, remoteJid, 1000);
-                
-                // Initial backup message with status
-                await safeSendText(sock, remoteJid, '🔄 Creating a credentials backup for Heroku deployment...');
-                
-                // Check if user is requesting backup to their own number
-                const isOwn = remoteJid === sock.user.id;
-                
-                if (isOwn) {
-                  // Show typing indicator for processing backup
-                  await showTypingIndicator(sock, remoteJid, 2000);
-                  
-                  // Send backup directly
-                  const backupSuccess = await sendCredsBackup(sock);
-                  if (backupSuccess) {
-                    await safeSendText(sock, remoteJid, '✅ Credentials backup complete! You can use these files for Heroku deployment.');
-                  } else {
-                    await safeSendText(sock, remoteJid, '❌ Error creating credentials backup. Please try again later or check logs.');
-                  }
-                } else {
-                  // Send to user's number and owner number
-                  try {
-                    // Notify the owner about the request
-                    await showTypingIndicator(sock, sock.user.id, 1000);
-                    await safeSendText(sock, sock.user.id, `🔔 User ${remoteJid.replace(/@.+/, '')} requested a credentials backup.`);
-                    
-                    // Process backup request
-                    const backupSuccess = await sendCredsBackup(sock);
-                    
-                    // Notify the user
-                    await safeSendText(sock, remoteJid, '✅ Credentials backup sent to bot owner. Only the bot owner can receive the actual credential files for security reasons.');
-                  } catch (backupErr) {
-                    LOGGER.error('Error in manual backup process:', backupErr);
-                    await safeSendText(sock, remoteJid, '❌ Error creating credentials backup. Please try again later.');
-                  }
-                }
-                break;
-                
-              default:
-                // Check for command lists from modules
-                if (command === 'cmds' || command === 'commands') {
-                  // Show list of all available commands from modules
-                  await showTypingIndicator(sock, remoteJid, 1000);
-                  
-                  const commandsList = Object.keys(cachedCommands).sort().join(', ');
-                  await safeSendText(sock, remoteJid, `📋 *Available Commands*\n\n${commandsList || 'No commands loaded.'}`);
-                  LOGGER.info('Responded to commands list request');
-                } else {
-                  // Show typing indicator for unknown command
-                  await showTypingIndicator(sock, remoteJid, 500);
-                  
-                  // Send unknown command message
-                  await safeSendText(sock, remoteJid, `⚠️ Unknown command: ${command}\nType !help to see available commands.`);
-                  LOGGER.info(`Responded to unknown command: ${command}`);
-                }
-                break;
-            }
-          } catch (cmdError) {
-            LOGGER.error(`Error processing command ${command}:`, cmdError);
-            
-            // Send error message to user
-            try {
-              await safeSendText(sock, remoteJid, `❌ Error processing command: ${cmdError.message}`);
-            } catch (notifyErr) {
-              LOGGER.error('Error sending error notification:', notifyErr);
-            }
-          }
-        }
-      } catch (err) {
-        LOGGER.error(`Error processing message: ${err.message}`);
-        // Try to notify the user about the error if possible
-        try {
-          if (message.key.remoteJid) {
-            await sock.sendMessage(message.key.remoteJid, { 
-              text: '❌ Sorry, there was an error processing your message. Please try again.' 
-            });
-          }
-        } catch (notifyErr) {
-          LOGGER.error(`Error sending error notification: ${notifyErr.message}`);
-        }
-      }
-    }
-  });
-  
-  // Also register for group events
-  sock.ev.on('groups.update', async (updates) => {
-    LOGGER.info(`Received group update: ${JSON.stringify(updates)}`);
-  });
-  
-  sock.ev.on('group-participants.update', async (update) => {
-    LOGGER.info(`Group participants update in ${update.id}: ${update.action} for ${update.participants.length} participants`);
   });
 }
 
-// Command module storage
-const commandModules = {};
-const cachedCommands = {};
-
-// Load all command modules from the src/commands directory
-async function loadCommandModules() {
+// Main startup sequence
+async function startup() {
   try {
-    const commandsPath = path.join(process.cwd(), 'src', 'commands');
-    
-    // Check if directory exists
-    if (!fs.existsSync(commandsPath)) {
-      LOGGER.warn(`Commands directory not found: ${commandsPath}`);
-      return false;
-    }
-    
-    // Function to recursively get all command files
-    async function getAllCommandFiles(dir) {
-      const entries = await fsPromises.readdir(dir, { withFileTypes: true });
-      const files = await Promise.all(entries.map(async entry => {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          return getAllCommandFiles(fullPath);
-        } else if (entry.name.endsWith('.js') && entry.name !== 'index.js') {
-          return fullPath;
-        }
-        return [];
-      }));
-      return files.flat();
-    }
-    
-    // Get all command files
-    const commandFiles = await getAllCommandFiles(commandsPath);
-    LOGGER.info(`Found ${commandFiles.length} command files to load`);
-    
-    // Load each command file
-    for (const filePath of commandFiles) {
-      try {
-        // Clear cache to ensure fresh module
-        delete require.cache[require.resolve(filePath)];
-        
-        // Load the module
-        const module = require(filePath);
-        
-        // Skip invalid modules
-        if (!module || typeof module !== 'object') {
-          LOGGER.warn(`Invalid module format in ${filePath}`);
-          continue;
-        }
-        
-        // Determine module name based on file path
-        const relativePath = path.relative(commandsPath, filePath);
-        const moduleName = relativePath.replace(/\.js$/, '');
-        
-        // Check if module has .commands property or is direct command map
-        const commands = module.commands || module;
-        
-        // Skip modules without commands
-        if (!commands || typeof commands !== 'object') {
-          LOGGER.warn(`No commands found in ${filePath}`);
-          continue;
-        }
-        
-        // Store commands in our registry
-        commandModules[moduleName] = module;
-        
-        // Cache flattened command list for quick lookup
-        Object.keys(commands).forEach(cmdName => {
-          const handler = commands[cmdName];
-          
-          // Only add valid handlers
-          if (typeof handler === 'function') {
-            // Store with both normal and prefixed versions to handle different command styles
-            cachedCommands[cmdName.toLowerCase()] = {
-              handler,
-              module: moduleName,
-              name: cmdName 
-            };
-          }
-        });
-        
-        // Initialize module if it has init function
-        if (typeof module.init === 'function') {
-          try {
-            await module.init();
-            LOGGER.info(`Initialized module: ${moduleName}`);
-          } catch (initError) {
-            LOGGER.error(`Error initializing module ${moduleName}:`, initError);
-          }
-        }
-        
-        LOGGER.info(`Loaded module ${moduleName} with ${Object.keys(commands).length} commands`);
-      } catch (moduleError) {
-        LOGGER.error(`Error loading module ${filePath}:`, moduleError);
-      }
-    }
-    
-    const totalCommands = Object.keys(cachedCommands).length;
-    if (totalCommands > 0) {
-      LOGGER.info(`Successfully loaded ${totalCommands} commands from ${Object.keys(commandModules).length} modules`);
-      return true;
-    } else {
-      LOGGER.warn('No commands were loaded!');
-      return false;
-    }
-  } catch (error) {
-    LOGGER.error('Error loading command modules:', error);
-    return false;
-  }
-}
+    // Start server first
+    const server = await startServer();
 
-// Safely send a message with proper JID validation
-async function safeSendMessage(sock, jid, content) {
-  try {
-    if (!jid || typeof jid !== 'string') {
-      LOGGER.error('Invalid JID provided to safeSendMessage:', jid);
-      return null;
-    }
-    
-    return await sock.sendMessage(jid, content);
-  } catch (error) {
-    LOGGER.error(`Error in safeSendMessage to ${jid?.replace?.(/@.+/, '@...')}:`, error.message);
-    return null;
-  }
-}
-
-// Safely send text with proper JID validation
-async function safeSendText(sock, jid, text) {
-  return safeSendMessage(sock, jid, { text });
-}
-
-// Process command from command modules
-async function processModuleCommand(sock, message, command, args) {
-  try {
-    const commandData = cachedCommands[command.toLowerCase()];
-    if (!commandData) {
-      // Command not found in modules
-      return false;
-    }
-    
-    const { handler, module: moduleName, name: cmdName } = commandData;
-    LOGGER.info(`Executing command ${cmdName} from module ${moduleName}`);
-    
-    // Execute the command handler
-    await handler(sock, message, args);
-    return true;
-  } catch (error) {
-    LOGGER.error(`Error executing command ${command}:`, error);
-    
-    // Try to send error message
-    try {
-      const jid = message.key.remoteJid;
-      await safeSendText(sock, jid, `❌ Error executing command: ${error.message}`);
-    } catch (notifyError) {
-      LOGGER.error('Error sending error notification:', notifyError);
-    }
-    
-    return true; // Mark as handled to prevent fallback
-  }
-}
-
-// Start connection
-async function startConnection() {
-  try {
-    // Update connection state
-    connectionState = 'connecting';
-    LOGGER.info(`Starting WhatsApp connection (Attempt ${connectionRetries + 1}/${MAX_RETRIES})...`);
-    
-    // Get auth state
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-    
-    // Get Baileys version
-    const { version } = await fetchLatestBaileysVersion();
-    LOGGER.info(`Using Baileys version: ${version.join('.')}`);
-    
-    // Create socket with optimized settings
-    sock = makeWASocket({
-      version,
-      auth: state,
-      printQRInTerminal: false, // We handle QR code display ourselves
-      browser: [generateDeviceId(), ...SAFARI_FINGERPRINT.browser],
-      userAgent: SAFARI_FINGERPRINT.userAgent,
-      connectTimeoutMs: 60000,
-      qrTimeout: QR_TIMEOUT,
-      defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 10000,
-      emitOwnEvents: false,
-      syncFullHistory: false,
-      markOnlineOnConnect: false,
-      logger: LOGGER,
-      // Cloud environment optimizations
-      retryRequestDelayMs: IS_CLOUD_ENV ? 5000 : 2000,
-      fireAndRetry: IS_CLOUD_ENV,
-      maxRetries: IS_CLOUD_ENV ? 5 : 3,
-      patchMessageBeforeSending: msg=> msg
+    // Handle shutdown
+    process.on('SIGTERM', () => {
+      LOGGER.info('Received SIGTERM');
+      server.close(() => {
+        LOGGER.info('Server closed');
+        process.exit(0);
+      });
     });
-    
-    // Handle connection updates
-    sock.ev.on('connection.update', handleConnectionUpdate);
-    
-    // Save credentials when updated
-    sock.ev.on('creds.update', saveCreds);
-    setupMessageHandler();
-    // Load command modules
-    LOGGER.info('Loading command modules...');
-    await loadCommandModules();
-    
+
+    process.on('SIGINT', () => {
+      LOGGER.info('Received SIGINT');
+      server.close(() => {
+        LOGGER.info('Server closed');
+        process.exit(0);
+      });
+    });
+
+    // Then initialize WhatsApp connection
+    await initializeConnection();
+    await startConnection();
   } catch (err) {
-    LOGGER.error('Error in connection:', err);
-    connectionState = 'error';
-    
-    if (connectionRetries < MAX_RETRIES) {
-      connectionRetries++;
-      const delay = Math.min(Math.pow(2, connectionRetries) * 1000, 10000);
-      LOGGER.info(`Retrying after error in ${delay/1000}s (Attempt ${connectionRetries}/${MAX_RETRIES})`);
-      setTimeout(startConnection, delay);
-    } else {
-      LOGGER.error('Max retries reached after errors');
-      process.exit(1); // Force restart in cloud environment
-    }
+    LOGGER.error('Startup error:', err);
+    process.exit(1);
   }
 }
 
-// Initialize and start
-initializeConnection().then(() => {
-  startConnection();
-}).catch(err => {
-  LOGGER.error('Failed to initialize:', err);
-  process.exit(1);
-});
-
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-  LOGGER.info('Shutting down...');
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
-  if (cleanupTimer) clearInterval(cleanupTimer);
-  if (reconnectTimer) clearTimeout(reconnectTimer);
-  if (sock) {
-    sock.end();
-  }
-  server.close(() => {
-    LOGGER.info('Server closed');
-    process.exit(0);
-  });
-});
+// Start the application
+startup();
 
 // Export connection state for monitoring
 module.exports = {
   getConnectionState: () => ({
     state: connectionState,
     retries: connectionRetries,
+    maxRetries: MAX_RETRIES,
     lastError: lastDisconnectCode,
     qrGenerated,
     hasQR: !!lastQRCode,
-    uptime: lastConnectTime ? Math.floor((Date.now() - lastConnectTime) / 1000) : 0
+    uptime: lastConnectTime ? Math.floor((Date.now() - lastConnectTime) / 1000) : 0,
+    currentEndpoint: WA_ENDPOINTS[currentEndpointIndex].url,
+    endpoints: WA_ENDPOINTS.map(e => ({
+      url: e.url,
+      status: e.status,
+      failures: e.failures
+    })),
+    recentErrors: connectionErrors.slice(-5)
   })
 };

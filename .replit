@@ -13,27 +13,27 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "WhatsApp Bot"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Terminal QR"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Web QR"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Safari Connect"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Connected Bot"
+args = "QR Code Server"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "QR Code Server"
+args = "Persistent Connection"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "WhatsApp Bot"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Heroku Test"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Heroku Web Server"
 
 [[workflows.workflow]]
 name = "Run Bot"
@@ -43,51 +43,6 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node src/index.js"
-
-[[workflows.workflow]]
-name = "WhatsApp Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node src/index.js"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Terminal QR"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node src/terminal-qr.js"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Web QR"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node src/web-qr.js"
-waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Safari Connect"
@@ -105,21 +60,6 @@ args = "node safari-connect.js"
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "Connected Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node connected-bot.js"
-waitForPort = 5004
-
-[[workflows.workflow]]
 name = "QR Code Server"
 author = "agent"
 
@@ -134,8 +74,75 @@ task = "shell.exec"
 args = "node src/qr-generator.js"
 waitForPort = 5003
 
+[[workflows.workflow]]
+name = "Persistent Connection"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node persistent-connection.js"
+waitForPort = 5500
+
+[[workflows.workflow]]
+name = "WhatsApp Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node easy-start.js"
+
+[[workflows.workflow]]
+name = "Heroku Test"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node heroku-bot.js"
+waitForPort = 8000
+
+[[workflows.workflow]]
+name = "Heroku Web Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=5001 node heroku-bot.js"
+waitForPort = 5001
+
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
+
+[[ports]]
+localPort = 3000
+externalPort = 8081
+
+[[ports]]
+localPort = 3200
+externalPort = 8099
 
 [[ports]]
 localPort = 5000
@@ -176,3 +183,19 @@ externalPort = 6000
 [[ports]]
 localPort = 5009
 externalPort = 6800
+
+[[ports]]
+localPort = 5050
+externalPort = 8000
+
+[[ports]]
+localPort = 5090
+externalPort = 8008
+
+[[ports]]
+localPort = 5500
+externalPort = 8080
+
+[[ports]]
+localPort = 8000
+externalPort = 9000

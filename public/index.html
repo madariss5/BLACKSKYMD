@@ -1,129 +1,177 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp QR Code</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        .container {
-            background-color: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            max-width: 600px;
-            width: 100%;
-        }
-        h1 {
-            color: #128C7E; /* WhatsApp green */
-        }
-        .qr-container {
-            margin: 20px 0;
-            padding: 15px;
-            border: 2px dashed #ddd;
-            border-radius: 8px;
-            background-color: white;
-            display: inline-block;
-        }
-        .status {
-            margin: 20px 0;
-            padding: 10px;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        .connected {
-            background-color: #DFF2BF;
-            color: #4F8A10;
-        }
-        .disconnected {
-            background-color: #FEEFB3;
-            color: #9F6000;
-        }
-        .error {
-            background-color: #FFD2D2;
-            color: #D8000C;
-        }
-        .instructions {
-            text-align: left;
-            margin: 20px 0;
-            background-color: #e9f7fe;
-            padding: 15px;
-            border-radius: 5px;
-            color: #3a87ad;
-        }
-        img {
-            max-width: 100%;
-            height: auto;
-        }
-        .timer {
-            font-size: 14px;
-            color: #666;
-            margin-top: 5px;
-        }
-    </style>
+  <title>WhatsApp Pairing Code</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f0f0f0;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .code {
+      font-size: 40px;
+      text-align: center;
+      letter-spacing: 8px;
+      padding: 20px;
+      background: #f8f8f8;
+      border-radius: 5px;
+      margin: 20px 0;
+      font-weight: bold;
+    }
+    .status {
+      padding: 10px;
+      background: #eaffea;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+    h1 {
+      color: #075e54;
+      text-align: center;
+    }
+    .info {
+      color: #555;
+      margin-bottom: 5px;
+    }
+    button {
+      background: #075e54;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+    .steps {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 5px;
+    }
+    .steps p {
+      margin: 5px 0;
+    }
+    .loader {
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #075e54;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>BLACKSKY-MD WhatsApp QR Code</h1>
-        <div class="instructions">
-            <h3>Anleitung:</h3>
-            <ol>
-                <li>Öffne WhatsApp auf deinem Smartphone</li>
-                <li>Tippe auf Einstellungen oder Menü und wähle "Verknüpfte Geräte"</li>
-                <li>Tippe auf "Gerät verknüpfen"</li>
-                <li>Scanne den QR-Code mit deinem Smartphone</li>
-            </ol>
-        </div>
-        <div class="qr-container">
-            <img id="qrcode" src="/qrcode.png" alt="QR Code">
-            <div class="timer">Der QR-Code aktualisiert sich automatisch alle 20 Sekunden</div>
-        </div>
-        <div id="status" class="status disconnected">
-            Status: Warte auf Scan des QR-Codes...
-        </div>
+  <div class="container">
+    <h1>WhatsApp Pairing Code</h1>
+    <div id="loading">
+      <p class="info">Connecting to WhatsApp...</p>
+      <div class="loader"></div>
     </div>
+    
+    <div id="code-display" style="display: none;">
+      <p class="info">Enter this code in your WhatsApp mobile app:</p>
+      <div class="code" id="pairing-code">Loading...</div>
+      <div class="steps">
+        <p><strong>How to connect:</strong></p>
+        <p>1. Open WhatsApp on your phone</p>
+        <p>2. Go to Settings > Linked Devices</p>
+        <p>3. Tap "Link a Device"</p>
+        <p>4. When prompted, enter the code shown above</p>
+      </div>
+    </div>
+    
+    <div class="status">
+      <p><strong>Status:</strong> <span id="status">disconnected</span></p>
+      <p><strong>Phone:</strong> <span id="phone">Loading...</span></p>
+      <p><strong>Uptime:</strong> <span id="uptime">0 seconds</span></p>
+    </div>
+    
+    <div id="error-container" class="error" style="display: none;">
+      <p id="error-message"></p>
+    </div>
+    
+    <p style="margin-top: 20px; text-align: center;">
+      <button onclick="restartConnection()">Restart Connection</button>
+    </p>
+  </div>
 
-    <script>
-        // Auto-refresh the QR code image every 5 seconds
-        setInterval(() => {
-            const img = document.getElementById('qrcode');
-            const timestamp = new Date().getTime();
-            img.src = '/qrcode.png?t=' + timestamp;
-            
-            // Also check connection status
-            fetch('/status')
-                .then(response => response.json())
-                .then(data => {
-                    const statusElement = document.getElementById('status');
-                    statusElement.textContent = 'Status: ' + data.message;
-                    
-                    // Remove old classes
-                    statusElement.classList.remove('connected', 'disconnected', 'error');
-                    
-                    // Add appropriate class
-                    if (data.state === 'connected') {
-                        statusElement.classList.add('connected');
-                    } else if (data.state === 'error') {
-                        statusElement.classList.add('error');
-                    } else {
-                        statusElement.classList.add('disconnected');
-                    }
-                })
-                .catch(err => console.error('Error fetching status:', err));
-        }, 5000);
-    </script>
+  <script>
+    // Start time for uptime calculation
+    const startTime = new Date();
+    
+    // Update status periodically
+    function updateStatus() {
+      fetch('/status')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('status').textContent = data.status;
+          document.getElementById('phone').textContent = data.phone;
+          
+          // Calculate uptime
+          const uptime = Math.floor((new Date() - startTime) / 1000);
+          const minutes = Math.floor(uptime / 60);
+          const seconds = uptime % 60;
+          document.getElementById('uptime').textContent = `${minutes} minutes, ${seconds} seconds`;
+          
+          // Show error if any
+          if (data.error) {
+            document.getElementById('error-container').style.display = 'block';
+            document.getElementById('error-message').textContent = `Error: ${data.error}`;
+          } else {
+            document.getElementById('error-container').style.display = 'none';
+          }
+          
+          // Show pairing code if available
+          if (data.pairingCode) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('code-display').style.display = 'block';
+            document.getElementById('pairing-code').textContent = data.pairingCode;
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching status:', error);
+        });
+    }
+    
+    // Restart connection
+    function restartConnection() {
+      fetch('/restart')
+        .then(() => {
+          document.getElementById('loading').style.display = 'block';
+          document.getElementById('code-display').style.display = 'none';
+          document.getElementById('pairing-code').textContent = 'Loading...';
+          document.getElementById('status').textContent = 'reconnecting';
+        })
+        .catch(error => {
+          console.error('Error restarting connection:', error);
+        });
+    }
+    
+    // Update status immediately and then every 3 seconds
+    updateStatus();
+    setInterval(updateStatus, 3000);
+  </script>
 </body>
 </html>

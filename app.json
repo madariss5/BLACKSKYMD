@@ -1,54 +1,48 @@
 {
   "name": "BLACKSKY-MD WhatsApp Bot",
-  "description": "Advanced WhatsApp Multi-Device Bot with enhanced connection stability",
-  "repository": "https://github.com/yourusername/blacksky-md",
-  "logo": "https://raw.githubusercontent.com/yourusername/blacksky-md/main/generated-icon.png",
-  "keywords": ["whatsapp", "bot", "baileys", "node", "javascript"],
+  "description": "A sophisticated WhatsApp multi-device bot with enhanced connection reliability and 490+ commands",
+  "repository": "https://github.com/yourusername/blacksky-whatsapp-bot",
+  "logo": "https://raw.githubusercontent.com/yourusername/blacksky-whatsapp-bot/main/public/logo.png",
+  "keywords": ["node", "whatsapp", "bot", "baileys", "multi-device", "heroku", "commands"],
   "env": {
-    "PREFIX": {
-      "description": "Bot command prefix",
-      "value": ".",
-      "required": false
-    },
-    "OWNER_NUMBER": {
-      "description": "Your WhatsApp number WITH country code but WITHOUT + symbol (e.g., 491234567890 for Germany)",
-      "value": "",
+    "ADMIN_NUMBER": {
+      "description": "Your WhatsApp number without the + sign (e.g., 1234567890)",
       "required": true
     },
-    "NODE_ENV": {
-      "description": "Environment for Node.js",
-      "value": "production"
-    },
-    "AUTH_DIR": {
-      "description": "Directory to store auth files",
-      "value": "auth_info_safari",
-      "required": false
-    },
-    "CONNECTION_METHOD": {
-      "description": "WhatsApp connection method to use (safari recommended for Heroku)",
-      "value": "safari",
-      "required": false
-    },
-    "PLATFORM": {
-      "description": "Deployment platform identifier",
-      "value": "heroku",
-      "required": false
-    },
     "LOG_LEVEL": {
-      "description": "Logging level (error, warn, info, debug)",
-      "value": "info",
-      "required": false
+      "description": "Logging level (info, warn, error, debug)",
+      "required": false,
+      "value": "info"
+    },
+    "ENABLE_COMMANDS": {
+      "description": "Enable or disable command processing (true/false)",
+      "required": false,
+      "value": "true"
+    },
+    "MAX_RETRIES": {
+      "description": "Maximum reconnection attempts for WhatsApp",
+      "required": false,
+      "value": "10"
+    },
+    "RECONNECT_INTERVAL": {
+      "description": "Base reconnection interval in seconds (will use exponential backoff)",
+      "required": false,
+      "value": "5"
+    },
+    "PORT": {
+      "description": "Port for the web dashboard",
+      "required": false,
+      "value": "5000"
+    },
+    "NODE_ENV": {
+      "description": "Node environment",
+      "required": false,
+      "value": "production"
     }
   },
   "buildpacks": [
     {
       "url": "heroku/nodejs"
-    },
-    {
-      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
-    },
-    {
-      "url": "https://github.com/clhuang/heroku-buildpack-webp-binaries.git"
     }
   ],
   "formation": {
@@ -57,15 +51,9 @@
       "size": "eco"
     }
   },
-  "stack": "heroku-22",
-  "success_url": "/",
-  "addons": [
-    {
-      "plan": "heroku-postgresql:mini",
-      "as": "DATABASE"
-    }
-  ],
   "scripts": {
-    "postdeploy": "npm run db:migrate"
-  }
+    "postdeploy": "echo 'IMPORTANT: You must manually copy auth_info_baileys contents to auth_info_heroku folder!'"
+  },
+  "success_url": "/",
+  "addons": []
 }

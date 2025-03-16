@@ -1,5 +1,33 @@
 {
-  "private": true,
-  "description": "This file has been deprecated. Please refer to package.json and app.json for deployment configuration.",
-  "note": "All configuration is now handled through app.json for better maintainability"
+  "name": "whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot optimized for Heroku deployment",
+  "main": "heroku-bot.js",
+  "scripts": {
+    "start": "node heroku-bot.js",
+    "dev": "nodemon heroku-bot.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.5.0",
+    "dotenv": "^16.3.1",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "pino": "^8.15.1",
+    "pino-pretty": "^10.2.0",
+    "qrcode": "^1.5.3",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "baileys",
+    "heroku"
+  ],
+  "author": "",
+  "license": "MIT"
 }
