@@ -3,7 +3,8 @@
  * Designed for maximum reliability
  */
 
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = fs.promises;
 const path = require('path');
 const logger = console;
 
@@ -41,14 +42,14 @@ async function loadCommandConfigs() {
         
         // Check if config directory exists
         try {
-            await fs.access(configDir);
+            await fsPromises.access(configDir);
         } catch (err) {
             logger.error('Config directory does not exist:', configDir);
             return configsMap;
         }
         
         // Read all JSON config files
-        const configFiles = await fs.readdir(configDir);
+        const configFiles = await fsPromises.readdir(configDir);
         logger.log(`Found ${configFiles.length} config files in ${configDir}`);
         
         for (const file of configFiles) {
@@ -504,6 +505,55 @@ async function init() {
 
         // Add fallback commands
         addFallbackCommands();
+        
+        // Explicitly load the reactions module to ensure it's registered
+        try {
+            const reactionsPath = path.join(process.cwd(), 'src/commands/reactions.js');
+            logger.log(`Attempting to load reactions module from: ${reactionsPath}`);
+            
+            if (fs.existsSync(reactionsPath)) {
+                // Clear cache first to ensure we get the latest version
+                delete require.cache[require.resolve(reactionsPath)];
+                const reactionsModule = require(reactionsPath);
+                
+                if (reactionsModule && reactionsModule.commands) {
+                    const reactionCommands = Object.keys(reactionsModule.commands)
+                        .filter(cmd => cmd !== 'init');
+                    
+                    logger.log(`Found ${reactionCommands.length} reaction commands in module`);
+                    
+                    // Register each reaction command
+                    reactionCommands.forEach(cmdName => {
+                        if (!commands.has(cmdName)) {
+                            commands.set(cmdName, {
+                                execute: reactionsModule.commands[cmdName],
+                                description: `Reaction: ${cmdName}`,
+                                usage: `!${cmdName} @user`,
+                                category: 'reactions',
+                                cooldown: 5,
+                                groupOnly: false,
+                                permissions: ['user'],
+                                enabled: true,
+                                isStub: false
+                            });
+                            logger.log(`✅ Registered reaction command: ${cmdName}`);
+                        }
+                    });
+                    
+                    // Initialize the reactions module
+                    if (typeof reactionsModule.init === 'function') {
+                        await reactionsModule.init();
+                        logger.log('✅ Reactions module initialized successfully');
+                    }
+                } else {
+                    logger.warn('Reactions module found but does not export commands object');
+                }
+            } else {
+                logger.warn(`Reactions module not found at path: ${reactionsPath}`);
+            }
+        } catch (error) {
+            logger.error(`Error loading reactions module: ${error.message}`);
+        }
 
         // Verify commands are loaded
         const totalCommands = commands.size;

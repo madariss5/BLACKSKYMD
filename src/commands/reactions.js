@@ -9,94 +9,54 @@ const fs = require('fs');
 const logger = require('../utils/logger');
 const { safeSendMessage } = require('../utils/jidHelper');
 
-// Paths to reaction GIFs directories
+// Path to reaction GIFs directory - only using data/reaction_gifs
 const REACTIONS_DIR = path.join(process.cwd(), 'data', 'reaction_gifs');
-const ANIMATED_GIFS_DIR = path.join(process.cwd(), 'animated_gifs');
-const ATTACHED_ASSETS_DIR = path.join(process.cwd(), 'attached_assets');
 
-// GIF mapping to ensure correct GIFs for each reaction
-const REACTION_GIF_MAPPING = {
-    // Self-reactions
-    'smile': 'heavenly-joy-jerkins-i-am-so-excited.gif', // Happy smiling animation
-    'happy': 'heavenly-joy-jerkins-i-am-so-excited.gif', // Happy excitement
-    'dance': 'B6ya.gif', // Dance animation
-    'cry': 'long-tears.gif', // Crying animation
-    'blush': '0fd379b81bc8023064986c9c45f22253_w200.gif', // Blushing animation
-    'laugh': 'laugh.gif', // Updated laugh animation with person laughing
-    
-    // Target-reactions
-    'hug': 'tumblr_cdeb20431732069e4456c4ab66b9534f_8178dd55_500.gif', // Hugging animation
-    'pat': 'pat.gif', // Updated patting animation with Stitch
-    'kiss': 'tumblr_435925615ecd34c607dd730ab836eacf_4e338a28_540.gif', // Kissing animation
-    'cuddle': 'icegif-890.gif', // Cuddling animation
-    'wave': 'wave.gif', // Updated waving animation with character waving
-    'wink': 'wink.gif', // Updated winking animation with person winking
-    'poke': 'poke.gif', // Updated poking animation with chickens
-    'slap': 'slap.gif', // Slapping animation
-    'bonk': 'icegif-255.gif', // Bonking animation
-    'bite': '15d3d956bd674096c4e68f1d011e8023.gif', // Biting-like animation
-    'punch': '2Lmc.gif', // Punching animation
-    'highfive': 'BT_L5v.gif', // High fiving (waving) animation
-    'yeet': '15d3d956bd674096c4e68f1d011e8023.gif', // Throwing (bite-like) animation
-    'kill': 'giphy.gif' // Intense animation for "kill" command
-};
+// Import the REACTION_GIF_MAPPING from the enhanced-reaction-fix to ensure consistency
+const enhancedReactionFix = require('../enhanced-reaction-fix');
+const REACTION_GIF_MAPPING = enhancedReactionFix.REACTION_GIF_MAPPING;
 
-// Create directories if they don't exist
+// Create reaction GIFs directory if it doesn't exist
 function ensureDirectoriesExist() {
-    const dirs = [REACTIONS_DIR, ANIMATED_GIFS_DIR];
-    
-    for (const dir of dirs) {
-        if (!fs.existsSync(dir)) {
-            logger.info(`Creating reaction GIFs directory: ${dir}`);
-            fs.mkdirSync(dir, { recursive: true });
-        }
+    if (!fs.existsSync(REACTIONS_DIR)) {
+        logger.info(`Creating reaction GIFs directory: ${REACTIONS_DIR}`);
+        fs.mkdirSync(REACTIONS_DIR, { recursive: true });
     }
 }
 
-// Ensure reaction GIFs are correctly mapped
-function ensureReactionGifs() {
-    Object.entries(REACTION_GIF_MAPPING).forEach(([command, sourceFileName]) => {
-        const sourcePath = path.join(ATTACHED_ASSETS_DIR, sourceFileName);
-        const targetPath = path.join(REACTIONS_DIR, `${command}.gif`);
+// Verify reaction GIFs exist in data/reaction_gifs directory only
+function verifyReactionGifs() {
+    // Log that we're only using data/reaction_gifs directory
+    logger.info(`Using ONLY data/reaction_gifs directory for reaction commands`);
+    console.log(`Using ONLY data/reaction_gifs directory for reaction commands`);
+    
+    // Process each command to ensure the GIF exists in data/reaction_gifs
+    Object.keys(commands).forEach(command => {
+        if (command === 'init') return; // Skip init function
         
-        // Check if source file exists
-        if (fs.existsSync(sourcePath)) {
-            // Check if target needs updating
-            let needsUpdate = true;
-            
-            if (fs.existsSync(targetPath)) {
-                try {
-                    const sourceStats = fs.statSync(sourcePath);
-                    const targetStats = fs.statSync(targetPath);
-                    
-                    // If the target file is newer than the source and not empty, we don't need to update
-                    if (targetStats.size > 1024 && targetStats.mtimeMs >= sourceStats.mtimeMs) {
-                        needsUpdate = false;
-                    }
-                } catch (err) {
-                    logger.warn(`Error checking file stats for ${command}.gif: ${err.message}`);
+        const gifPath = path.join(REACTIONS_DIR, `${command}.gif`);
+        
+        // Check if GIF exists
+        if (fs.existsSync(gifPath)) {
+            try {
+                const stats = fs.statSync(gifPath);
+                if (stats.size > 1024) {
+                    logger.info(`✅ Verified ${command}.gif exists in data/reaction_gifs (${stats.size} bytes)`);
+                } else {
+                    logger.warn(`⚠️ GIF for ${command} exists but is too small: ${stats.size} bytes`);
                 }
-            }
-            
-            if (needsUpdate) {
-                try {
-                    // Copy the source file to the target
-                    fs.copyFileSync(sourcePath, targetPath);
-                    logger.info(`✅ Updated GIF for ${command} from ${sourceFileName}`);
-                } catch (err) {
-                    logger.error(`❌ Failed to update GIF for ${command}: ${err.message}`);
-                }
+            } catch (err) {
+                logger.error(`Error checking GIF for ${command}: ${err.message}`);
             }
         } else {
-            logger.warn(`⚠️ Source GIF not found: ${sourcePath}`);
+            logger.warn(`❌ Missing GIF for ${command} in data/reaction_gifs directory`);
         }
     });
 }
 
 // Ensure directories exist when module loads
 ensureDirectoriesExist();
-// Ensure reaction GIFs are correctly mapped
-ensureReactionGifs();
+// We'll verify GIFs in the init() function to avoid the "commands not initialized" error
 
 // GIF buffer cache to improve performance
 const gifCache = new Map();
@@ -191,41 +151,24 @@ async function handleReaction(sock, message, type, args) {
             mentions: mentionedJids
         });
         
-        // First try to get the GIF directly from the attachedAssets folder (source of truth)
-        // This ensures we always use the correct GIF for the command
+        // Only get the GIF from the data/reaction_gifs directory
         let gifBuffer = null;
         let gifFound = false;
         
-        // Check if we have a mapping for this reaction type
-        if (REACTION_GIF_MAPPING[type]) {
-            // Get the source file path from the mapping
-            const sourceFilePath = path.join(ATTACHED_ASSETS_DIR, REACTION_GIF_MAPPING[type]);
-            
-            if (fs.existsSync(sourceFilePath)) {
-                try {
-                    // Read directly from the source file
-                    gifBuffer = fs.readFileSync(sourceFilePath);
-                    gifFound = true;
-                    logger.info(`Using direct source GIF for ${type} from ${REACTION_GIF_MAPPING[type]}`);
-                } catch (err) {
-                    logger.error(`Error reading source GIF for ${type}: ${err.message}`);
-                }
-            }
-        }
+        // Load only from the reaction_gifs directory
+        const gifPath = path.join(REACTIONS_DIR, `${type}.gif`);
         
-        // Fallback to the reaction_gifs directory if direct method failed
-        if (!gifFound) {
-            const gifPath = path.join(REACTIONS_DIR, `${type}.gif`);
-            
-            if (fs.existsSync(gifPath)) {
-                try {
-                    gifBuffer = fs.readFileSync(gifPath);
-                    gifFound = true;
-                    logger.info(`Using fallback GIF path for ${type}: ${gifPath}`);
-                } catch (err) {
-                    logger.error(`Error reading fallback GIF for ${type}: ${err.message}`);
-                }
+        if (fs.existsSync(gifPath)) {
+            try {
+                gifBuffer = fs.readFileSync(gifPath);
+                gifFound = true;
+                logger.info(`===== REACTION SOURCE ===== Using GIF from data/reaction_gifs for ${type}: ${gifPath}`);
+                console.log(`===== REACTION SOURCE ===== Using GIF from data/reaction_gifs for ${type}: ${gifPath}`);
+            } catch (err) {
+                logger.error(`Error reading GIF from data/reaction_gifs for ${type}: ${err.message}`);
             }
+        } else {
+            logger.warn(`GIF for ${type} not found in data/reaction_gifs directory`);
         }
         
         // Send the GIF if we found one
@@ -302,6 +245,10 @@ async function init() {
     // Make sure directories exist
     ensureDirectoriesExist();
     
+    // Verify that GIFs exist in data/reaction_gifs directory
+    // This must be called after commands are defined
+    verifyReactionGifs();
+    
     // Validate all reaction GIFs
     const validGifs = [];
     const missingGifs = [];
@@ -327,6 +274,13 @@ async function init() {
     });
     
     logger.info(`Reaction GIFs validation complete. Valid: ${validGifs.length}, Missing: ${missingGifs.length}`);
+    
+    // Log all available reaction commands for troubleshooting
+    const allReactionCommands = Object.keys(commands).filter(cmd => cmd !== 'init');
+    logger.info(`Total reaction commands available: ${allReactionCommands.length}`);
+    logger.info(`Available reaction commands: ${allReactionCommands.join(', ')}`);
+    console.log(`[REACTIONS] Total reaction commands available: ${allReactionCommands.length}`);
+    console.log(`[REACTIONS] Available reaction commands: ${allReactionCommands.join(', ')}`);
     
     return true;
 }

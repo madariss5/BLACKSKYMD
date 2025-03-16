@@ -136,16 +136,16 @@ const menuCommands = {
                     
                     logger.info(`Menu sent with custom image: ${path.basename(customImagePath)}`);
                 } catch (imageErr) {
-                    // If custom image fails, try Fast and Furious GIFs as fallback
-                    const fastFuriousGifs = [
-                        path.join(process.cwd(), 'fast_furious_gifs', 'highfive.gif'),
-                        path.join(process.cwd(), 'fast_furious_gifs', 'bonk.gif'),
-                        path.join(process.cwd(), 'fast_furious_gifs', 'yeet.gif')
+                    // If custom image fails, try reaction GIFs as fallback
+                    const reactionGifs = [
+                        path.join(process.cwd(), 'data', 'reaction_gifs', 'highfive.gif'),
+                        path.join(process.cwd(), 'data', 'reaction_gifs', 'bonk.gif'),
+                        path.join(process.cwd(), 'data', 'reaction_gifs', 'yeet.gif')
                     ];
                     
                     // Try each GIF in sequence until one works
                     let sentSuccessfully = false;
-                    for (const gifPath of fastFuriousGifs) {
+                    for (const gifPath of reactionGifs) {
                         try {
                             // Check if GIF exists
                             await fs.access(gifPath);
@@ -158,7 +158,7 @@ const menuCommands = {
                             });
                             
                             sentSuccessfully = true;
-                            logger.info(`Menu sent with Fast and Furious GIF fallback: ${path.basename(gifPath)}`);
+                            logger.info(`Menu sent with reaction GIF: ${path.basename(gifPath)}`);
                             break;
                         } catch (gifErr) {
                             // This GIF failed, try next one
@@ -242,16 +242,16 @@ const menuCommands = {
                         
                         logger.info(`Help menu sent with custom image: ${path.basename(customImagePath)}`);
                     } catch (imageErr) {
-                        // If custom image fails, try Fast and Furious GIFs as fallback
-                        const fastFuriousGifs = [
-                            path.join(process.cwd(), 'fast_furious_gifs', 'bonk.gif'),  // Different order from menu for variety
-                            path.join(process.cwd(), 'fast_furious_gifs', 'yeet.gif'),
-                            path.join(process.cwd(), 'fast_furious_gifs', 'highfive.gif')
+                        // If custom image fails, try reaction GIFs as fallback
+                        const reactionGifs = [
+                            path.join(process.cwd(), 'data', 'reaction_gifs', 'bonk.gif'),  // Different order for variety
+                            path.join(process.cwd(), 'data', 'reaction_gifs', 'yeet.gif'),
+                            path.join(process.cwd(), 'data', 'reaction_gifs', 'highfive.gif')
                         ];
                         
                         // Try each GIF in sequence until one works
                         let sentSuccessfully = false;
-                        for (const gifPath of fastFuriousGifs) {
+                        for (const gifPath of reactionGifs) {
                             try {
                                 // Check if GIF exists
                                 await fs.access(gifPath);
@@ -264,7 +264,7 @@ const menuCommands = {
                                 });
                                 
                                 sentSuccessfully = true;
-                                logger.info(`Help menu sent with Fast and Furious GIF fallback: ${path.basename(gifPath)}`);
+                                logger.info(`Help menu sent with reaction GIF: ${path.basename(gifPath)}`);
                                 break;
                             } catch (gifErr) {
                                 // This GIF failed, try next one
@@ -365,16 +365,16 @@ const menuCommands = {
                         
                         logger.info(`Command help sent with custom image: ${path.basename(customImagePath)}`);
                     } catch (imageErr) {
-                        // If custom image fails, try Fast and Furious GIFs as fallback
-                        const fastFuriousGifs = [
-                            path.join(process.cwd(), 'fast_furious_gifs', 'yeet.gif'),  // Different order for variety
-                            path.join(process.cwd(), 'fast_furious_gifs', 'highfive.gif'),
-                            path.join(process.cwd(), 'fast_furious_gifs', 'bonk.gif')
+                        // If custom image fails, try reaction GIFs as fallback
+                        const reactionGifs = [
+                            path.join(process.cwd(), 'data', 'reaction_gifs', 'yeet.gif'),  // Different order for variety
+                            path.join(process.cwd(), 'data', 'reaction_gifs', 'highfive.gif'),
+                            path.join(process.cwd(), 'data', 'reaction_gifs', 'bonk.gif')
                         ];
                         
                         // Try each GIF in sequence until one works
                         let sentSuccessfully = false;
-                        for (const gifPath of fastFuriousGifs) {
+                        for (const gifPath of reactionGifs) {
                             try {
                                 // Check if GIF exists
                                 await fs.access(gifPath);
@@ -387,7 +387,7 @@ const menuCommands = {
                                 });
                                 
                                 sentSuccessfully = true;
-                                logger.info(`Command help sent with Fast and Furious GIF fallback: ${path.basename(gifPath)}`);
+                                logger.info(`Command help sent with reaction GIF: ${path.basename(gifPath)}`);
                                 break;
                             } catch (gifErr) {
                                 // This GIF failed, try next one

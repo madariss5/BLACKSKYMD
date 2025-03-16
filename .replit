@@ -54,11 +54,11 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node src/qr-web-server.js"
-waitForPort = 5007
+args = "cd /home/runner/workspace && node src/qr-web-server.js"
+waitForPort = 5000
 
 [deployment]
-run = ["sh", "-c", "node src/qr-web-server.js"]
+run = ["sh", "-c", "cd /home/runner/workspace && node src/qr-web-server.js"]
 
 [[ports]]
 localPort = 3000

@@ -59,38 +59,17 @@ const verifyReactionGifs = async () => {
 
     // Always run enhanced fix to ensure correct GIF mapping
     // This ensures that not only missing GIFs are fixed but also that 
-    // all GIFs properly match their commands semantically
+    // Verify all GIFs exist in data/reaction_gifs directory only
     try {
-        // First try the new enhanced reaction fix script
-        let enhancedFixApplied = false;
+        // Apply enhanced reaction verification (only using data/reaction_gifs)
         try {
             const enhancedFixModule = require('./enhanced-reaction-fix');
             await enhancedFixModule.fixReactionGifs();
-            logger.info('Enhanced reaction GIF fix applied successfully');
-            enhancedFixApplied = true;
+            logger.info('Enhanced reaction GIF verification completed successfully');
+            logger.info('Using ONLY data/reaction_gifs directory for all reactions');
+            console.log('Using ONLY data/reaction_gifs directory for all reactions');
         } catch (enhancedErr) {
-            logger.warn(`Could not apply enhanced reaction GIF fix: ${enhancedErr.message}`);
-        }
-        
-        // If enhanced fix failed or missing GIFs still exist, try the original fix
-        if (!enhancedFixApplied || missingGifs.length > 0) {
-            try {
-                const reloadModule = require('./reload-reaction-gifs');
-                await reloadModule.reloadReactionGifs();
-                logger.info('Fallback reaction GIF fix applied');
-            } catch (reloadErr) {
-                logger.error(`Could not load reload-reaction-gifs module: ${reloadErr.message}`);
-                
-                // Last resort - try direct-gif-fix.js if it exists
-                try {
-                    const directFixModule = require('./direct-gif-fix');
-                    await directFixModule.fixReactionGifs();
-                    logger.info('Direct GIF fix applied as last resort');
-                } catch (directErr) {
-                    logger.error(`All reaction GIF fix methods failed: ${directErr.message}`);
-                    throw new Error('Failed to fix reaction GIFs using any available method');
-                }
-            }
+            logger.warn(`Could not complete reaction GIF verification: ${enhancedErr.message}`);
         }
         
         logger.info('Reaction GIFs verified and fixed on startup');
@@ -102,7 +81,7 @@ const verifyReactionGifs = async () => {
 // Create Express app
 const app = express();
 const server = http.createServer(app);
-const PORT = 5007; // Using port 5007 to match workflow configuration
+const PORT = 5000; // Using port 5000 to match Replit requirements
 
 // QR code state
 let latestQR = null;
@@ -319,7 +298,13 @@ app.get('/', (req, res) => {
                         <li><code>!ping</code> - Check if bot is responding</li>
                         <li><code>!menu</code> - View all available commands</li>
                         <li><code>!help</code> - Get help with using the bot</li>
+                        <li><code>!hug @user</code> - Send a reaction GIF to someone</li>
                     </ul>
+                    <p style="margin-top:10px;">
+                        <a href="/reaction-commands" style="color:#128C7E;text-decoration:none;font-weight:bold;">
+                            View All Reaction Commands →
+                        </a>
+                    </p>
                 </div>
             ` : `
                 <button class="refresh-button" onclick="location.reload()">Refresh</button>
@@ -569,6 +554,263 @@ app.get('/status', (req, res) => {
         commandsConfigured: configuredCommandCount,
         qrAvailable: latestQR !== null
     });
+});
+
+// UI endpoint to display all reaction commands with visuals
+app.get('/reaction-commands', (req, res) => {
+    try {
+        const reactionGifsDir = path.join(process.cwd(), 'data', 'reaction_gifs');
+        const reactionsModule = require('./commands/reactions');
+        
+        // Get all reaction commands from the module
+        const reactionCommands = Object.keys(reactionsModule.commands)
+            .filter(cmd => cmd !== 'init')
+            .sort();
+            
+        // Build array of available reactions
+        const availableReactions = reactionCommands.map(cmd => {
+            const gifPath = path.join(reactionGifsDir, `${cmd}.gif`);
+            const exists = fs.existsSync(gifPath);
+            let size = 0;
+            let sizeFormatted = 'N/A';
+            
+            if (exists) {
+                try {
+                    const stats = fs.statSync(gifPath);
+                    size = stats.size;
+                    sizeFormatted = (stats.size / 1024).toFixed(2) + ' KB';
+                } catch (err) {
+                    // Ignore errors
+                }
+            }
+            
+            return {
+                name: cmd,
+                exists,
+                size,
+                sizeFormatted,
+                url: `/test-reaction?type=${cmd}`
+            };
+        });
+        
+        // Create HTML for the reaction commands page
+        const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>WhatsApp Bot Reaction Commands</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    background-color: #f0f4f7;
+                    margin: 0;
+                    padding: 20px;
+                }
+                h1 {
+                    color: #128C7E;
+                    text-align: center;
+                }
+                .reactions-container {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                    gap: 20px;
+                    max-width: 1200px;
+                    margin: 0 auto;
+                }
+                .reaction-card {
+                    background-color: white;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    transition: transform 0.3s ease;
+                }
+                .reaction-card:hover {
+                    transform: translateY(-5px);
+                }
+                .reaction-gif {
+                    height: 150px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background-color: #f0f0f0;
+                }
+                .reaction-gif img {
+                    max-width: 100%;
+                    max-height: 150px;
+                    object-fit: contain;
+                }
+                .reaction-details {
+                    padding: 15px;
+                }
+                .reaction-name {
+                    font-weight: bold;
+                    font-size: 1.1em;
+                    margin: 0 0 5px 0;
+                    color: #128C7E;
+                }
+                .reaction-size {
+                    color: #888;
+                    font-size: 0.9em;
+                    margin-bottom: 10px;
+                }
+                .reaction-command {
+                    background-color: #f0f8ff;
+                    padding: 8px;
+                    border-radius: 5px;
+                    font-family: monospace;
+                    font-size: 0.9em;
+                }
+                .not-available {
+                    color: #d32f2f;
+                    font-style: italic;
+                }
+                .stats {
+                    background-color: white;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    padding: 15px;
+                    margin: 0 auto 20px auto;
+                    max-width: 1200px;
+                }
+                .stats-title {
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                }
+                .stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 10px;
+                }
+                .stat-item {
+                    padding: 10px;
+                    background-color: #f0f8ff;
+                    border-radius: 5px;
+                }
+                .back-button {
+                    display: block;
+                    margin: 20px auto;
+                    padding: 10px 20px;
+                    background-color: #128C7E;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    text-decoration: none;
+                    text-align: center;
+                    width: 200px;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>WhatsApp Bot Reaction Commands</h1>
+            
+            <div class="stats">
+                <div class="stats-title">Reaction Commands Statistics</div>
+                <div class="stats-grid">
+                    <div class="stat-item">Total Commands: ${reactionCommands.length}</div>
+                    <div class="stat-item">Available GIFs: ${availableReactions.filter(r => r.exists).length}</div>
+                    <div class="stat-item">Missing GIFs: ${availableReactions.filter(r => !r.exists).length}</div>
+                </div>
+            </div>
+            
+            <div class="reactions-container">
+                ${availableReactions.map(reaction => `
+                    <div class="reaction-card">
+                        <div class="reaction-gif">
+                            ${reaction.exists 
+                              ? `<img src="${reaction.url}" alt="${reaction.name}" title="${reaction.name}">`
+                              : `<span class="not-available">GIF not available</span>`}
+                        </div>
+                        <div class="reaction-details">
+                            <div class="reaction-name">${reaction.name}</div>
+                            <div class="reaction-size">Size: ${reaction.sizeFormatted}</div>
+                            <div class="reaction-command">!${reaction.name} @user</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <a href="/" class="back-button">Back to Main Page</a>
+        </body>
+        </html>
+        `;
+        
+        res.send(html);
+    } catch (err) {
+        logger.error(`Error in /reaction-commands endpoint: ${err.message}`);
+        res.status(500).send(`<h1>Error</h1><p>${err.message}</p><a href="/">Back to Home</a>`);
+    }
+});
+
+// API endpoint to list all available reaction commands
+app.get('/reactions', (req, res) => {
+    try {
+        const reactionGifsDir = path.join(process.cwd(), 'data', 'reaction_gifs');
+        const reactionsModule = require('./commands/reactions');
+        
+        // Get all reaction commands from the module
+        const reactionCommands = Object.keys(reactionsModule.commands)
+            .filter(cmd => cmd !== 'init')
+            .sort();
+            
+        // Check which GIFs actually exist in the directory
+        const availableGifs = [];
+        const missingGifs = [];
+        
+        reactionCommands.forEach(cmd => {
+            const gifPath = path.join(reactionGifsDir, `${cmd}.gif`);
+            if (fs.existsSync(gifPath)) {
+                const stats = fs.statSync(gifPath);
+                availableGifs.push({
+                    name: cmd,
+                    path: `/test-reaction?type=${cmd}`,
+                    size: stats.size,
+                    sizeFormatted: (stats.size / 1024).toFixed(2) + ' KB'
+                });
+            } else {
+                missingGifs.push(cmd);
+            }
+        });
+        
+        // Return JSON with reaction command information
+        return res.json({
+            success: true,
+            total: reactionCommands.length,
+            available: availableGifs.length,
+            missing: missingGifs.length,
+            reactions: availableGifs,
+            missingReactions: missingGifs
+        });
+    } catch (err) {
+        logger.error(`Error in /reactions endpoint: ${err.message}`);
+        return res.status(500).json({ error: `Error loading reactions: ${err.message}` });
+    }
+});
+
+// API endpoint to test reaction GIFs - only use data/reaction_gifs directory
+app.get('/test-reaction', (req, res) => {
+    const type = req.query.type || 'laugh';
+    const reactionGifsDir = path.join(process.cwd(), 'data', 'reaction_gifs');
+    const gifPath = path.join(reactionGifsDir, `${type}.gif`);
+    
+    if (fs.existsSync(gifPath)) {
+        try {
+            const gifBuffer = fs.readFileSync(gifPath);
+            logger.info(`===== API ENDPOINT ===== Using GIF from data/reaction_gifs for ${type}: ${gifPath}`);
+            console.log(`===== API ENDPOINT ===== Using GIF from data/reaction_gifs for ${type}: ${gifPath}`);
+            res.setHeader('Content-Type', 'image/gif');
+            return res.send(gifBuffer);
+        } catch (err) {
+            logger.error(`Error reading GIF for ${type}: ${err.message}`);
+            return res.status(500).json({ error: `Error reading GIF: ${err.message}` });
+        }
+    } else {
+        // If the GIF doesn't exist in data/reaction_gifs, return 404
+        return res.status(404).json({ error: `GIF for reaction ${type} not found in data/reaction_gifs directory` });
+    }
 });
 
 // Test command endpoint for debugging

@@ -1,13 +1,9 @@
 {
-  "timestamp": "2025-03-16T20:15:59.896Z",
+  "timestamp": "2025-03-16T20:56:40.415Z",
   "results": {
-    "successful": [],
-    "failed": [],
-    "missing": [],
-    "skipped": [
+    "valid": [
       {
         "type": "smile",
-        "sourceFile": "heavenly-joy-jerkins-i-am-so-excited.gif",
         "targetFile": "smile.gif",
         "size": 203404,
         "formattedSize": "198.64 KB",
@@ -15,7 +11,6 @@
       },
       {
         "type": "happy",
-        "sourceFile": "heavenly-joy-jerkins-i-am-so-excited.gif",
         "targetFile": "happy.gif",
         "size": 203404,
         "formattedSize": "198.64 KB",
@@ -23,7 +18,6 @@
       },
       {
         "type": "dance",
-        "sourceFile": "B6ya.gif",
         "targetFile": "dance.gif",
         "size": 901246,
         "formattedSize": "880.12 KB",
@@ -31,7 +25,6 @@
       },
       {
         "type": "cry",
-        "sourceFile": "long-tears.gif",
         "targetFile": "cry.gif",
         "size": 322626,
         "formattedSize": "315.06 KB",
@@ -39,7 +32,6 @@
       },
       {
         "type": "blush",
-        "sourceFile": "0fd379b81bc8023064986c9c45f22253_w200.gif",
         "targetFile": "blush.gif",
         "size": 299152,
         "formattedSize": "292.14 KB",
@@ -47,7 +39,6 @@
       },
       {
         "type": "laugh",
-        "sourceFile": "laugh.gif",
         "targetFile": "laugh.gif",
         "size": 122820,
         "formattedSize": "119.94 KB",
@@ -55,7 +46,6 @@
       },
       {
         "type": "hug",
-        "sourceFile": "tumblr_cdeb20431732069e4456c4ab66b9534f_8178dd55_500.gif",
         "targetFile": "hug.gif",
         "size": 1021013,
         "formattedSize": "997.08 KB",
@@ -63,7 +53,6 @@
       },
       {
         "type": "pat",
-        "sourceFile": "pat.gif",
         "targetFile": "pat.gif",
         "size": 862748,
         "formattedSize": "842.53 KB",
@@ -71,7 +60,6 @@
       },
       {
         "type": "kiss",
-        "sourceFile": "tumblr_435925615ecd34c607dd730ab836eacf_4e338a28_540.gif",
         "targetFile": "kiss.gif",
         "size": 8357788,
         "formattedSize": "7.97 MB",
@@ -79,7 +67,6 @@
       },
       {
         "type": "cuddle",
-        "sourceFile": "icegif-890.gif",
         "targetFile": "cuddle.gif",
         "size": 2113299,
         "formattedSize": "2.02 MB",
@@ -87,7 +74,6 @@
       },
       {
         "type": "wave",
-        "sourceFile": "wave.gif",
         "targetFile": "wave.gif",
         "size": 41304,
         "formattedSize": "40.34 KB",
@@ -95,7 +81,6 @@
       },
       {
         "type": "wink",
-        "sourceFile": "wink.gif",
         "targetFile": "wink.gif",
         "size": 228284,
         "formattedSize": "222.93 KB",
@@ -103,7 +88,6 @@
       },
       {
         "type": "poke",
-        "sourceFile": "poke.gif",
         "targetFile": "poke.gif",
         "size": 111691,
         "formattedSize": "109.07 KB",
@@ -111,7 +95,6 @@
       },
       {
         "type": "slap",
-        "sourceFile": "slap.gif",
         "targetFile": "slap.gif",
         "size": 660864,
         "formattedSize": "645.38 KB",
@@ -119,7 +102,6 @@
       },
       {
         "type": "bonk",
-        "sourceFile": "icegif-255.gif",
         "targetFile": "bonk.gif",
         "size": 424428,
         "formattedSize": "414.48 KB",
@@ -127,7 +109,6 @@
       },
       {
         "type": "bite",
-        "sourceFile": "15d3d956bd674096c4e68f1d011e8023.gif",
         "targetFile": "bite.gif",
         "size": 1047514,
         "formattedSize": "1022.96 KB",
@@ -135,7 +116,6 @@
       },
       {
         "type": "punch",
-        "sourceFile": "2Lmc.gif",
         "targetFile": "punch.gif",
         "size": 913942,
         "formattedSize": "892.52 KB",
@@ -143,7 +123,6 @@
       },
       {
         "type": "highfive",
-        "sourceFile": "BT_L5v.gif",
         "targetFile": "highfive.gif",
         "size": 970665,
         "formattedSize": "947.92 KB",
@@ -151,7 +130,6 @@
       },
       {
         "type": "yeet",
-        "sourceFile": "15d3d956bd674096c4e68f1d011e8023.gif",
         "targetFile": "yeet.gif",
         "size": 1047514,
         "formattedSize": "1022.96 KB",
@@ -159,12 +137,13 @@
       },
       {
         "type": "kill",
-        "sourceFile": "giphy.gif",
         "targetFile": "kill.gif",
         "size": 10174760,
         "formattedSize": "9.70 MB",
         "checksum": "9db2b063a06c35921babf8db81be8bcb"
       }
-    ]
+    ],
+    "missing": [],
+    "invalid": []
   }
 }

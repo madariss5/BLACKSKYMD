@@ -122,10 +122,12 @@ function directCopyFile(sourcePath, targetPath) {
 }
 
 /**
- * Fix reaction GIFs by copying from source to target
+ * Verify reaction GIFs are correctly set up in data/reaction_gifs directory
+ * No longer copies from attached_assets - only verifies GIFs in the target directory
  */
 async function fixReactionGifs() {
-    console.log('Starting Enhanced Reaction GIF Fixer...');
+    console.log('Starting Enhanced Reaction GIF Verification (data/reaction_gifs only)...');
+    console.log('NOTE: No longer copying from attached_assets - only using data/reaction_gifs directory');
     
     // Create target directory if it doesn't exist
     if (!fs.existsSync(TARGET_DIR)) {
@@ -139,88 +141,57 @@ async function fixReactionGifs() {
     }
     
     const results = {
-        successful: [],
-        failed: [],
+        valid: [],
         missing: [],
-        skipped: []
+        invalid: []
     };
     
     // Process each reaction type
-    Object.entries(REACTION_GIF_MAPPING).forEach(([reactionType, sourceFileName]) => {
-        // Determine file paths
-        const sourcePath = path.join(SOURCE_DIR, sourceFileName);
+    Object.keys(REACTION_GIF_MAPPING).forEach(reactionType => {
+        // We're only using the target path now
         const targetPath = path.join(TARGET_DIR, `${reactionType}.gif`);
         
-        console.log(`\nProcessing: ${reactionType} -> ${sourceFileName}`);
+        console.log(`\nVerifying: ${reactionType}.gif`);
         
-        // Check if source file exists
-        if (!fs.existsSync(sourcePath)) {
-            console.error(`  ❌ Source file not found: ${sourcePath}`);
-            results.missing.push({
-                type: reactionType,
-                sourceFile: sourceFileName,
-                reason: 'Source file not found'
-            });
-            return;
-        }
-        
-        // Check if target needs updating
-        let needsUpdate = true;
-        
+        // Check if GIF exists in target directory
         if (fs.existsSync(targetPath)) {
             try {
-                const sourceStats = fs.statSync(sourcePath);
-                const targetStats = fs.statSync(targetPath);
-                const sourceChecksum = calculateFileChecksum(sourcePath);
-                const targetChecksum = calculateFileChecksum(targetPath);
+                const stats = fs.statSync(targetPath);
+                const checksum = calculateFileChecksum(targetPath);
                 
-                // If checksums match, no need to update
-                if (targetStats.size > 1024 && sourceChecksum === targetChecksum) {
-                    console.log(`  ✓ GIF already up to date: ${reactionType}.gif (${formatFileSize(targetStats.size)})`);
-                    results.skipped.push({
+                // Validate the GIF file size
+                if (stats.size > 1024) {
+                    console.log(`  ✅ Valid GIF found: ${reactionType}.gif (${formatFileSize(stats.size)})`);
+                    results.valid.push({
                         type: reactionType,
-                        sourceFile: sourceFileName,
                         targetFile: `${reactionType}.gif`,
-                        size: targetStats.size,
-                        formattedSize: formatFileSize(targetStats.size),
-                        checksum: targetChecksum
+                        size: stats.size,
+                        formattedSize: formatFileSize(stats.size),
+                        checksum: checksum
                     });
-                    needsUpdate = false;
+                } else {
+                    console.warn(`  ⚠️ GIF file too small: ${reactionType}.gif (${formatFileSize(stats.size)})`);
+                    results.invalid.push({
+                        type: reactionType,
+                        targetFile: `${reactionType}.gif`,
+                        size: stats.size,
+                        reason: 'File too small'
+                    });
                 }
             } catch (err) {
-                console.warn(`  ⚠️ Error checking file stats, will force update: ${err.message}`);
-            }
-        }
-        
-        if (needsUpdate) {
-            console.log(`  Updating ${reactionType}.gif from ${sourceFileName}...`);
-            
-            const copyResult = directCopyFile(sourcePath, targetPath);
-            
-            if (copyResult.success) {
-                console.log(`  ✅ Successfully updated ${reactionType}.gif (${copyResult.formattedSize})`);
-                if (!copyResult.checksumMatch) {
-                    console.warn(`  ⚠️ Warning: Checksum mismatch after copy!`);
-                }
-                
-                results.successful.push({
+                console.error(`  ❌ Error checking GIF: ${err.message}`);
+                results.invalid.push({
                     type: reactionType,
-                    sourceFile: sourceFileName,
                     targetFile: `${reactionType}.gif`,
-                    size: copyResult.targetSize,
-                    formattedSize: copyResult.formattedSize,
-                    checksumMatch: copyResult.checksumMatch,
-                    checksum: copyResult.targetChecksum
-                });
-            } else {
-                console.error(`  ❌ Failed to update ${reactionType}.gif: ${copyResult.error}`);
-                
-                results.failed.push({
-                    type: reactionType,
-                    sourceFile: sourceFileName,
-                    reason: copyResult.error
+                    reason: err.message
                 });
             }
+        } else {
+            console.error(`  ❌ GIF not found: ${reactionType}.gif`);
+            results.missing.push({
+                type: reactionType,
+                reason: 'File not found in data/reaction_gifs'
+            });
         }
     });
     
@@ -238,12 +209,11 @@ async function fixReactionGifs() {
     }
     
     // Print summary
-    console.log('\n=== Reaction GIF Fix Summary ===');
+    console.log('\n=== Reaction GIF Verification Summary ===');
     console.log(`Total reactions: ${Object.keys(REACTION_GIF_MAPPING).length}`);
-    console.log(`Successful: ${results.successful.length}`);
-    console.log(`Skipped (already up to date): ${results.skipped.length}`);
-    console.log(`Failed: ${results.failed.length}`);
-    console.log(`Missing sources: ${results.missing.length}`);
+    console.log(`Valid GIFs: ${results.valid.length}`);
+    console.log(`Missing GIFs: ${results.missing.length}`);
+    console.log(`Invalid GIFs: ${results.invalid.length}`);
     console.log('===============================');
 }
 
@@ -254,4 +224,7 @@ if (require.main === module) {
     });
 }
 
-module.exports = { fixReactionGifs };
+module.exports = { 
+    fixReactionGifs,
+    REACTION_GIF_MAPPING
+};

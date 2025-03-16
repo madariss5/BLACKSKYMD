@@ -9,20 +9,15 @@ const logger = console;
 
 // Constants
 const REACTIONS_DIR = path.join(process.cwd(), 'data', 'reaction_gifs');
-const ANIMATED_GIFS_DIR = path.join(process.cwd(), 'animated_gifs');
 const MIN_VALID_GIF_SIZE = 1024; // 1KB
 
-// Ensure directories exist
+// Ensure the reactions directory exists
 function ensureDirectoriesExist() {
-    const dirs = [REACTIONS_DIR, ANIMATED_GIFS_DIR];
-    
-    for (const dir of dirs) {
-        if (!fs.existsSync(dir)) {
-            logger.log(`Creating directory: ${dir}`);
-            fs.mkdirSync(dir, { recursive: true });
-        } else {
-            logger.log(`Directory exists: ${dir}`);
-        }
+    if (!fs.existsSync(REACTIONS_DIR)) {
+        logger.log(`Creating directory: ${REACTIONS_DIR}`);
+        fs.mkdirSync(REACTIONS_DIR, { recursive: true });
+    } else {
+        logger.log(`Directory exists: ${REACTIONS_DIR}`);
     }
 }
 
@@ -30,7 +25,7 @@ function ensureDirectoriesExist() {
 const REACTION_TYPES = [
     'hug', 'pat', 'kiss', 'cuddle',
     'smile', 'happy', 'wave', 'dance', 'cry', 'blush', 'laugh', 'wink',
-    'poke', 'slap', 'bonk', 'bite', 'punch', 'highfive', 'yeet'
+    'poke', 'slap', 'bonk', 'bite', 'punch', 'highfive', 'yeet', 'kill'
 ];
 
 // Check all reaction GIFs and report status
@@ -41,26 +36,17 @@ function validateReactionGifs() {
     const missingGifs = [];
     
     for (const type of REACTION_TYPES) {
-        const primaryPath = path.join(REACTIONS_DIR, `${type}.gif`);
-        const fallbackPath = path.join(ANIMATED_GIFS_DIR, `${type}.gif`);
+        const gifPath = path.join(REACTIONS_DIR, `${type}.gif`);
         
         let found = false;
         let size = 0;
         let location = '';
         
-        // Check primary path
-        if (fs.existsSync(primaryPath)) {
-            const stats = fs.statSync(primaryPath);
+        // Check if the GIF exists in the reactions directory
+        if (fs.existsSync(gifPath)) {
+            const stats = fs.statSync(gifPath);
             size = stats.size;
-            location = primaryPath;
-            found = size >= MIN_VALID_GIF_SIZE;
-        }
-        
-        // If not valid in primary, check fallback
-        if (!found && fs.existsSync(fallbackPath)) {
-            const stats = fs.statSync(fallbackPath);
-            size = stats.size;
-            location = fallbackPath;
+            location = gifPath;
             found = size >= MIN_VALID_GIF_SIZE;
         }
         
