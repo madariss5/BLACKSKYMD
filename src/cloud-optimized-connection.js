@@ -55,7 +55,7 @@ async function createFreshSession() {
 function getConnectionConfig() {
     return {
         printQRInTerminal: false,
-        browser: ['Chrome (Linux)', 'Chrome', '112'],
+        browser: ['Safari (Mac)', 'Safari', '611.1.21.161.7'],
         markOnlineOnConnect: true,
         generateHighQualityLinkPreview: false,
         syncFullHistory: false,
