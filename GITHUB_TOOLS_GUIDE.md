@@ -4,7 +4,25 @@ This guide explains the various GitHub-related tools available in this project t
 
 ## Available Tools
 
-### 1. GitHub File Editor (`github-file-editor.js`)
+### 1. Simple GitHub Editor (`simple-github-editor.js`) - RECOMMENDED
+
+A streamlined, user-friendly GitHub editor designed specifically for reliability and ease of use. This is the recommended tool for most GitHub editing tasks.
+
+**Features:**
+- Simplified interface with improved error handling
+- Clear, color-coded output
+- Browse repository with intuitive navigation
+- View file contents with line numbers
+- Edit files with straightforward text input
+- Create new files quickly
+- Detailed error messages and troubleshooting guidance
+
+**Usage:**
+```bash
+node simple-github-editor.js
+```
+
+### 2. GitHub File Editor (`github-file-editor.js`)
 
 An interactive command-line tool that allows you to browse, edit, create, and delete files in the repository directly without using the GitHub web interface.
 
@@ -21,7 +39,7 @@ An interactive command-line tool that allows you to browse, edit, create, and de
 node github-file-editor.js
 ```
 
-### 2. GitHub Browser Debug (`github-browser-debug.js`)
+### 3. GitHub Browser Debug (`github-browser-debug.js`)
 
 A diagnostic tool to help identify and fix common GitHub browser interface issues.
 
@@ -39,7 +57,7 @@ A diagnostic tool to help identify and fix common GitHub browser interface issue
 node github-browser-debug.js
 ```
 
-### 3. GitHub Permissions Fix (`github-permissions-fix.js`)
+### 4. GitHub Permissions Fix (`github-permissions-fix.js`)
 
 Diagnoses and fixes repository permission issues.
 
@@ -55,7 +73,7 @@ Diagnoses and fixes repository permission issues.
 node github-permissions-fix.js
 ```
 
-### 4. GitHub Update (`github-update.js`)
+### 5. GitHub Update (`github-update.js`)
 
 Automates pushing changes to GitHub.
 
@@ -71,7 +89,7 @@ Automates pushing changes to GitHub.
 node github-update.js
 ```
 
-### 5. Test GitHub Editing (`test-github-editing.js`)
+### 6. Test GitHub Editing (`test-github-editing.js`)
 
 A simple tool to test direct file editing via the GitHub API.
 
