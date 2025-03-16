@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const pino = require('pino');
 const logger = require('./utils/logger');
-const SessionManager = require('./utils/sessionManager');
+const { SessionManager } = require('./utils/sessionManager');
 
 // Global state management
 let sock = null;
@@ -26,11 +26,11 @@ try {
     logger.warn('Message handler not loaded yet');
 }
 
-// Browser configuration - Using Safari which has proven more stable
+// Browser configuration
 const browserConfig = {
     browser: ['BLACKSKY-MD', 'Safari', '17.0'],
     browserDescription: ['Safari on Mac', 'Desktop', '17.0'],
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15'
 };
 
 // Enhanced connection configuration
@@ -53,33 +53,6 @@ const connectionConfig = {
     emitOwnEvents: false
 };
 
-// Clean up connection and state
-async function cleanup() {
-    try {
-        if (sock) {
-            logger.info('Cleaning up connection...');
-            // Remove all listeners first
-            sock.ev.removeAllListeners('connection.update');
-            sock.ev.removeAllListeners('messages.upsert');
-            sock.ev.removeAllListeners('creds.update');
-
-            // Then attempt graceful logout
-            try {
-                await sock.logout();
-            } catch (logoutErr) {
-                logger.warn('Logout error:', logoutErr);
-            }
-
-            sock = null;
-        }
-        isConnecting = false;
-    } catch (err) {
-        logger.error('Cleanup error:', err);
-        sock = null;
-        isConnecting = false;
-    }
-}
-
 // Send credentials backup to self
 async function sendCredentialsBackup() {
     try {
@@ -90,6 +63,7 @@ async function sendCredentialsBackup() {
 
         // Initialize session manager with the current socket
         await sessionManager.initialize();
+        sessionManager.sock = sock; // Ensure socket is set
 
         // First backup attempt
         let success = await sessionManager.sendCredentialsToSelf();
@@ -111,6 +85,29 @@ async function sendCredentialsBackup() {
     } catch (err) {
         logger.error('Error sending credentials backup:', err);
         return false;
+    }
+}
+
+// Clean up connection and state
+async function cleanup() {
+    try {
+        if (sock) {
+            logger.info('Cleaning up connection...');
+            sock.ev.removeAllListeners('connection.update');
+            sock.ev.removeAllListeners('messages.upsert');
+            sock.ev.removeAllListeners('creds.update');
+            try {
+                await sock.logout();
+            } catch (logoutErr) {
+                logger.warn('Logout error:', logoutErr);
+            }
+            sock = null;
+        }
+        isConnecting = false;
+    } catch (err) {
+        logger.error('Cleanup error:', err);
+        sock = null;
+        isConnecting = false;
     }
 }
 
@@ -149,15 +146,11 @@ async function startConnection() {
                 // Save credentials first
                 await saveCreds();
 
-                // Send credentials backup after connection stabilizes
-                setTimeout(async () => {
-                    if (sock?.user) {
-                        await sendCredentialsBackup();
-                    }
-                }, 5000);
+                // Send credentials backup immediately after successful connection
+                await sendCredentialsBackup();
 
                 // Handle messages
-                const handleMessage = async ({ messages, type }) => {
+                sock.ev.on('messages.upsert', async ({ messages, type }) => {
                     if (type !== 'notify' || !messageHandler) return;
 
                     for (const message of messages) {
@@ -169,10 +162,7 @@ async function startConnection() {
                             logger.error('Message handling error:', err);
                         }
                     }
-                };
-
-                // Add message handler
-                sock.ev.on('messages.upsert', handleMessage);
+                });
             }
 
             if (connection === 'close') {
@@ -188,7 +178,6 @@ async function startConnection() {
                     return;
                 }
 
-                // For other disconnections, wait a bit and try reconnecting once
                 setTimeout(async () => {
                     await cleanup();
                     await startConnection();
@@ -197,12 +186,10 @@ async function startConnection() {
         });
 
         // Handle credentials update
-        sock.ev.on('creds.update', async (creds) => {
+        sock.ev.on('creds.update', async () => {
             await saveCreds();
             // Try to backup credentials after each update
-            if (sock?.user) {
-                await sendCredentialsBackup();
-            }
+            await sendCredentialsBackup();
         });
 
         return sock;
@@ -210,7 +197,6 @@ async function startConnection() {
         logger.error('Connection error:', err);
         isConnecting = false;
 
-        // Single retry after error
         setTimeout(async () => {
             await startConnection();
         }, 3000);

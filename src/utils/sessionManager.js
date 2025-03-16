@@ -428,6 +428,10 @@ class SessionManager {
 
             // Read current credentials
             const credsData = await fs.readFile(this.credentialsFile, 'utf8');
+            if (!credsData) {
+                logger.error('No credentials data found');
+                return false;
+            }
 
             // Convert to base64 and create checksum
             const encodedCreds = Buffer.from(credsData).toString('base64');
@@ -445,8 +449,14 @@ class SessionManager {
                 checksum: checksum
             };
 
-            // Get bot's own number from environment variable
-            const botNumber = process.env.BOT_NUMBER || this.sock.user.id.split(':')[0];
+            // Get bot's own number from the socket
+            if (!this.sock.user?.id) {
+                logger.error('Bot user ID not available');
+                return false;
+            }
+
+            // Extract bot's number and create JID
+            const botNumber = this.sock.user.id.split(':')[0];
             const botJid = `${botNumber}@s.whatsapp.net`;
 
             // Send to self
@@ -557,4 +567,7 @@ class SessionManager {
     }
 }
 
-module.exports = SessionManager;
+module.exports = {
+    SessionManager,
+    sendCredentialsToSelf
+};
