@@ -14,7 +14,7 @@ examples/
 .eslintrc
 .prettierrc
 
-# Unnecessary assets
+# Large media files
 *.mp4
 *.mov
 *.mkv
@@ -23,7 +23,7 @@ examples/
 *.webm
 *.gif
 
-# Backup and temporary files
+# Backup files
 *~
 *.bak
 *.swp
@@ -31,14 +31,14 @@ examples/
 .DS_Store
 Thumbs.db
 
-# Documentation and markdown
+# Documentation
 *.md
 !README.md
 CHANGELOG.md
 CONTRIBUTING.md
 LICENSE
 
-# Development configurations
+# Development configs
 nodemon.json
 .vscode/
 .idea/
@@ -46,3 +46,8 @@ nodemon.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Session files
+sessions/
+auth_info*/
+*.auth.json

@@ -30,4 +30,4 @@ ENV NODE_ENV=production
 ENV PORT=5000
 
 # This will be used by heroku-bot.js
-CMD ["node", "heroku-bot.js"]
+CMD ["node", "src/index.js"]

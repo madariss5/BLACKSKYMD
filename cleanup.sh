@@ -24,46 +24,23 @@ cp -r auth_info_heroku backups/auth_backups/
 
 echo "Backups completed successfully"
 
-echo "Removing unnecessary JavaScript files..."
-# Core files to keep
-KEEP_FILES=(
-  "safari-connect.js"
-  "easy-start.js"
-  "heroku-bot.js"
-  "persistent-connection.js"
-  "package.json"
-  "package-lock.json"
-)
+echo "Removing unnecessary files..."
 
-# Delete JS files except for the ones we want to keep
-for file in *.js; do
-  if [[ ! " ${KEEP_FILES[@]} " =~ " ${file} " ]]; then
-    echo "Removing $file"
-    rm "$file"
-  fi
-done
+# Remove old Heroku files
+rm -f HEROKU-ADVANCED.md
+rm -f HEROKU-APTFILE-GUIDE.md
+rm -f HEROKU-DEPLOY.md
+rm -f HEROKU-DEPLOYMENT.md
+rm -f HEROKU-DOCKER-GUIDE.md
+rm -f HEROKU-SAFARI.md
+rm -f Aptfile
+rm -f DEPLOYMENT_GUIDE.md
+rm -f DEPLOYMENT_OPTIONS.md
+rm -f DEPLOYMENT_SUMMARY.md
 
-echo "Removing test scripts..."
-rm -rf test_scripts
-
-echo "Removing unnecessary markdown files..."
-# Keep only important documentation
-KEEP_MD=(
-  "README.md"
-  "CLOUD_ENVIRONMENT_GUIDE.md"
-  "CONNECTION_README.md"
-)
-
-for file in *.md; do
-  if [[ ! " ${KEEP_MD[@]} " =~ " ${file} " ]]; then
-    echo "Removing $file"
-    rm "$file"
-  fi
-done
-
-echo "Cleaning up Safari auth backup folders..."
-# Keep only the most recent 3 Safari auth backups
-ls -dt auth_info_safari_backup_* | tail -n +4 | xargs rm -rf
+# Remove old deployment configs
+rm -f heroku-deploy.yml
+rm -f heroku-config.json
+rm -f heroku-postbuild.js
 
 echo "Cleanup completed successfully!"
-echo "The essential files have been preserved, and backups are available in the 'backups' directory."
