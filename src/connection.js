@@ -1,5 +1,5 @@
 /**
- * Enhanced WhatsApp Connection Manager with Stable Connection Handling
+ * Simplified WhatsApp Connection Manager
  */
 
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
@@ -9,14 +9,9 @@ const pino = require('pino');
 const logger = require('./utils/logger');
 const SessionManager = require('./utils/sessionManager');
 
-// Global state management
+// Global state
 let sock = null;
-let connectionAttempts = 0;
-const MAX_RETRIES = 3;
-const RETRY_INTERVAL = 3000;
 const AUTH_FOLDER = 'auth_info_baileys';
-
-// Initialize session manager
 const sessionManager = new SessionManager();
 
 // Import message handler
@@ -28,30 +23,30 @@ try {
     logger.warn('Message handler not loaded yet');
 }
 
-// Socket configuration
+// Connection configuration
 const connectionConfig = {
     printQRInTerminal: true,
-    browser: ['BLACKSKY-MD', 'Chrome', '108.0.0.0'],
+    browser: ['BLACKSKY-MD', 'Safari', '17.0'],
     version: [2, 2323, 4],
     logger: pino({ level: 'silent' }),
     auth: undefined,
     markOnlineOnConnect: false,
-    defaultQueryTimeoutMs: 30000,
-    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 20000,
+    connectTimeoutMs: 30000,
     fireInitQueries: false,
-    downloadHistory: false
+    downloadHistory: false,
+    syncFullHistory: false
 };
 
 // Clean up existing connection
 async function cleanup() {
-    if (!sock) return;
-
     try {
-        logger.info('Cleaning up existing connection...');
-        sock.ev.removeAllListeners();
-        await sock.logout().catch(() => {});
-        sock = null;
-        logger.info('Cleanup completed');
+        if (sock) {
+            logger.info('Cleaning up existing connection...');
+            sock.ev.removeAllListeners();
+            await sock.logout().catch(() => {});
+            sock = null;
+        }
     } catch (err) {
         logger.error('Cleanup error:', err);
         sock = null;
@@ -81,7 +76,6 @@ async function startConnection() {
 
             if (connection === 'open') {
                 logger.info('Connection established');
-                connectionAttempts = 0;
 
                 // Save credentials
                 await saveCreds();
@@ -97,8 +91,8 @@ async function startConnection() {
                 }, 5000);
 
                 // Handle messages
-                sock.ev.on('messages.upsert', async ({ messages, type }) => {
-                    if (type !== 'notify' || !messageHandler) return;
+                const messageHandler = async ({ messages, type }) => {
+                    if (type !== 'notify') return;
 
                     for (const message of messages) {
                         try {
@@ -108,28 +102,34 @@ async function startConnection() {
                             logger.error('Message handling error:', err);
                         }
                     }
-                });
+                };
+
+                // Attach message handler only once
+                sock.ev.on('messages.upsert', messageHandler);
             }
 
             if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
 
-                if (shouldReconnect && connectionAttempts < MAX_RETRIES) {
-                    connectionAttempts++;
-                    logger.info(`Connection attempt ${connectionAttempts}/${MAX_RETRIES}`);
-
-                    setTimeout(async () => {
-                        await startConnection();
-                    }, RETRY_INTERVAL * connectionAttempts);
-                } else {
-                    if (lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
-                        logger.info('Connection closed - logged out');
-                        process.exit(0);
-                    } else {
-                        logger.error('Max retries reached');
-                        process.exit(1);
-                    }
+                // Don't reconnect if logged out
+                if (statusCode === DisconnectReason.loggedOut) {
+                    logger.info('Connection closed - logged out');
+                    process.exit(0);
+                    return;
                 }
+
+                // Don't reconnect on connection takeover
+                if (statusCode === DisconnectReason.connectionReplaced) {
+                    logger.info('Connection replaced');
+                    process.exit(0);
+                    return;
+                }
+
+                logger.info('Connection closed, cleaning up...');
+                await cleanup();
+
+                // Start fresh connection
+                process.nextTick(startConnection);
             }
         });
 
@@ -139,16 +139,10 @@ async function startConnection() {
         return sock;
     } catch (err) {
         logger.error('Connection error:', err);
+        await cleanup();
 
-        if (connectionAttempts < MAX_RETRIES) {
-            connectionAttempts++;
-            setTimeout(async () => {
-                await startConnection();
-            }, RETRY_INTERVAL * connectionAttempts);
-        } else {
-            logger.error('Max retries reached');
-            process.exit(1);
-        }
+        // Retry connection after a delay
+        setTimeout(startConnection, 3000);
     }
 }
 
