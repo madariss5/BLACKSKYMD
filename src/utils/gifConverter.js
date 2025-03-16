@@ -15,38 +15,62 @@ async function convertGifToMp4(gifBuffer) {
         const tempGifPath = path.join(os.tmpdir(), `temp_${Date.now()}.gif`);
         const tempMp4Path = path.join(os.tmpdir(), `temp_${Date.now()}.mp4`);
 
-        // Write the GIF buffer to a temporary file
-        fs.writeFileSync(tempGifPath, gifBuffer);
+        try {
+            // Write the GIF buffer to a temporary file
+            fs.writeFileSync(tempGifPath, gifBuffer);
+            logger.info(`Temporary GIF saved to: ${tempGifPath}`);
 
-        ffmpeg(tempGifPath)
-            .toFormat('mp4')
-            .addOptions([
-                '-movflags faststart',
-                '-pix_fmt yuv420p',
-                '-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2"',
-                '-preset ultrafast',
-                '-y'
-            ])
-            .save(tempMp4Path)
-            .on('end', () => {
-                // Read the converted file
-                const mp4Buffer = fs.readFileSync(tempMp4Path);
-                
-                // Cleanup temporary files
-                fs.unlinkSync(tempGifPath);
-                fs.unlinkSync(tempMp4Path);
-                
-                resolve(mp4Buffer);
-            })
-            .on('error', (err) => {
-                logger.error(`Error converting GIF to MP4: ${err.message}`);
-                
-                // Cleanup temporary files
-                if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
-                if (fs.existsSync(tempMp4Path)) fs.unlinkSync(tempMp4Path);
-                
-                reject(err);
-            });
+            // Configure ffmpeg with simpler settings
+            ffmpeg(tempGifPath)
+                .outputOptions([
+                    '-movflags faststart',
+                    '-pix_fmt yuv420p',
+                    '-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2"'
+                ])
+                .toFormat('mp4')
+                .on('start', (commandLine) => {
+                    logger.info(`Starting ffmpeg conversion: ${commandLine}`);
+                })
+                .on('progress', (progress) => {
+                    logger.info(`Processing: ${progress.percent}% done`);
+                })
+                .on('end', () => {
+                    logger.info('Conversion completed successfully');
+                    try {
+                        // Read the converted file
+                        const mp4Buffer = fs.readFileSync(tempMp4Path);
+
+                        // Cleanup temporary files
+                        fs.unlinkSync(tempGifPath);
+                        fs.unlinkSync(tempMp4Path);
+
+                        resolve(mp4Buffer);
+                    } catch (readError) {
+                        logger.error(`Error reading converted file: ${readError.message}`);
+                        reject(readError);
+                    }
+                })
+                .on('error', (err) => {
+                    logger.error(`Error in ffmpeg conversion: ${err.message}`);
+                    logger.error(`ffmpeg stderr: ${err.stderr || 'No stderr output'}`);
+
+                    // Cleanup temporary files
+                    if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
+                    if (fs.existsSync(tempMp4Path)) fs.unlinkSync(tempMp4Path);
+
+                    reject(err);
+                })
+                .save(tempMp4Path);
+
+        } catch (err) {
+            logger.error(`Error in convertGifToMp4: ${err.message}`);
+
+            // Cleanup temporary files
+            if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
+            if (fs.existsSync(tempMp4Path)) fs.unlinkSync(tempMp4Path);
+
+            reject(err);
+        }
     });
 }
 

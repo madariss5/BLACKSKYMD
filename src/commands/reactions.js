@@ -171,21 +171,30 @@ async function handleReaction(sock, message, type, args) {
         // Send the GIF if we found one
         if (gifFound && gifBuffer) {
             try {
-                // Convert GIF to MP4
-                const videoBuffer = await convertGifToMp4(gifBuffer);
+                // First try to send as a video with MP4 conversion
+                try {
+                    const videoBuffer = await convertGifToMp4(gifBuffer);
+                    await sock.sendMessage(jid, {
+                        video: videoBuffer,
+                        gifPlayback: true,
+                        caption: '',
+                        mimetype: 'video/mp4',
+                        ptt: false
+                    });
+                    logger.info(`Sent animated reaction for: ${type}`);
+                } catch (conversionError) {
+                    logger.error(`GIF conversion failed for ${type}: ${conversionError.message}`);
 
-                // Send as video with enhanced playback settings
-                await sock.sendMessage(jid, {
-                    video: videoBuffer,
-                    gifPlayback: true,
-                    caption: '',
-                    mimetype: 'video/mp4',
-                    ptt: false
-                });
-
-                logger.info(`Sent animated reaction for: ${type}`);
-            } catch (gifError) {
-                logger.error(`Error sending reaction for ${type}: ${gifError.message}`);
+                    // Fallback to sending as image if conversion fails
+                    await sock.sendMessage(jid, {
+                        image: gifBuffer,
+                        caption: '',
+                        mimetype: 'image/gif'
+                    });
+                    logger.info(`Sent reaction as image for: ${type} (fallback)`);
+                }
+            } catch (sendError) {
+                logger.error(`Error sending reaction for ${type}: ${sendError.message}`);
                 await safeSendMessage(sock, jid, {
                     text: `❌ Failed to send ${type} reaction animation`
                 });
