@@ -46,10 +46,10 @@ function getGifPath(filename) {
     if (PATH_CACHE.has(filename)) {
         return PATH_CACHE.get(filename);
     }
-    
+
     const primaryPath = path.join(REACTIONS_DIR, filename);
     const fallbackPath = path.join(ANIMATED_GIFS_DIR, filename);
-    
+
     // Fast path existence check with minimal logging
     try {
         // Check primary path first
@@ -60,7 +60,7 @@ function getGifPath(filename) {
                 return primaryPath;
             }
         }
-        
+
         // Try fallback if needed
         if (fs.existsSync(fallbackPath)) {
             const stats = fs.statSync(fallbackPath);
@@ -69,7 +69,7 @@ function getGifPath(filename) {
                 return fallbackPath;
             }
         }
-        
+
         // Default to primary
         PATH_CACHE.set(filename, primaryPath);
         return primaryPath;
@@ -87,7 +87,7 @@ const REACTION_GIFS = {
     pat: getGifPath('pat.gif'),
     kiss: getGifPath('kiss.gif'),
     cuddle: getGifPath('cuddle.gif'),
-    
+
     // Expressions
     smile: getGifPath('smile.gif'),
     happy: getGifPath('happy.gif'),
@@ -97,7 +97,7 @@ const REACTION_GIFS = {
     blush: getGifPath('blush.gif'),
     laugh: getGifPath('laugh.gif'),
     wink: getGifPath('wink.gif'),
-    
+
     // Physical actions
     poke: getGifPath('poke.gif'),
     slap: getGifPath('slap.gif'),
@@ -105,7 +105,7 @@ const REACTION_GIFS = {
     bite: getGifPath('bite.gif'),
     punch: getGifPath('punch.gif'),
     highfive: getGifPath('highfive.gif'),
-    
+
     // Other actions
     yeet: getGifPath('yeet.gif')
 };
@@ -117,32 +117,32 @@ const REACTION_GIFS = {
 function preloadCommonGifs() {
     // List of most commonly used reaction GIFs (based on usage statistics)
     const commonReactions = ['hug', 'slap', 'pat', 'kiss', 'bonk'];
-    
+
     logger.info('Preloading common reaction GIFs for better performance...');
-    
+
     for (const reaction of commonReactions) {
         const gifPath = REACTION_GIFS[reaction];
-        
+
         // Skip if GIF doesn't exist
         if (!gifPath || !fs.existsSync(gifPath)) {
             continue;
         }
-        
+
         try {
             // Generate hash for cache key
             const gifHash = crypto.createHash('md5').update(`${gifPath}-${reaction}`).digest('hex');
-            
+
             // Read file into memory if not already cached
             if (!REACTION_GIF_CACHE.has(gifHash)) {
                 const gifBuffer = fs.readFileSync(gifPath);
-                
+
                 // Cache the buffer for later use
                 REACTION_GIF_CACHE.set(gifHash, {
                     buffer: gifBuffer,
                     format: 'gif',
                     timestamp: Date.now()
                 });
-                
+
                 logger.info(`✅ Preloaded ${reaction} GIF (${Math.round(gifBuffer.length / 1024)} KB)`);
             }
         } catch (err) {
@@ -183,191 +183,89 @@ async function getUserName(sock, jid) {
         if (!jid) {
             return "Someone";
         }
-        
+
         // Log for debugging
         logger.info(`Getting contact name for JID: ${jid}`);
-        
+
+        // Handle group message participants
+        if (jid.endsWith('@g.us')) {
+            // This is a group, we need to get the actual participant's JID
+            return "Group Chat";
+        }
+
+        // Extract the actual number from JID
+        let actualJid = jid;
+        if (jid.includes(':')) {
+            // Handle device-specific JIDs (e.g., "1234567890:3@s.whatsapp.net")
+            actualJid = jid.split(':')[0] + '@s.whatsapp.net';
+        }
+
+        // Remove any @s.whatsapp.net or @g.us suffix
+        let phoneNumber = actualJid.split('@')[0];
+
         // Special cases for known numbers - configured for demo purpose with real names
-        // These will ensure consistent naming for common test numbers
-        if (jid === '4915561048015@s.whatsapp.net' || jid.includes('4915561048015')) {
+        if (phoneNumber === '4915561048015') {
             return "Martin"; // Name instead of number for better notification visibility
-        } else if (jid === '14155552671@s.whatsapp.net' || jid.includes('14155552671')) {
+        } else if (phoneNumber === '14155552671') {
             return "John"; // US contact with name
-        } else if (jid === '420725044420@s.whatsapp.net' || jid.includes('420725044420')) {
+        } else if (phoneNumber === '420725044420') {
             return "Kenny"; // Czech contact with name
-        } else if (jid === '447911123456@s.whatsapp.net' || jid.includes('447911123456')) {
+        } else if (phoneNumber === '447911123456') {
             return "Alex"; // UK contact with name
         }
-        
-        // Return cached name if available (cache for performance)
-        if (userCache.has(jid)) {
-            const cached = userCache.get(jid);
+
+        // Return cached name if available
+        if (userCache.has(actualJid)) {
+            const cached = userCache.get(actualJid);
             if (Date.now() - cached.timestamp < USER_CACHE_TIMEOUT) {
-                logger.info(`Using cached contact name for ${jid}: ${cached.name}`);
+                logger.info(`Using cached contact name for ${actualJid}: ${cached.name}`);
                 return cached.name;
             }
-            // Expired cache, remove it
-            userCache.delete(jid);
+            userCache.delete(actualJid);
         }
 
         let name = null;
-        
-        // Get contact from various sources, in order of preference
+
+        // Try to get contact info
         try {
-            // METHOD 1: Try contact store first (most reliable for saved contacts)
             if (sock.store && typeof sock.store.contacts === 'object') {
-                const contact = sock.store.contacts[jid];
+                const contact = sock.store.contacts[actualJid];
                 if (contact) {
-                    // Preference order: pushName (set by user) > verifiedName > name > notify
                     name = contact.pushName || contact.verifiedName || contact.name || contact.notify;
-                    if (name) {
-                        logger.info(`Found contact in store: ${name} for ${jid}`);
-                    }
                 }
-            } 
-            
-            // METHOD 2: Try direct contact access as fallback
+            }
+
             if (!name && sock.contacts && typeof sock.contacts === 'object') {
-                const contact = sock.contacts[jid];
+                const contact = sock.contacts[actualJid];
                 if (contact) {
                     name = contact.pushName || contact.verifiedName || contact.name || contact.notify;
-                    if (name) {
-                        logger.info(`Found contact in direct contacts: ${name} for ${jid}`);
-                    }
-                }
-            }
-            
-            // METHOD 3: Try to fetch chat metadata which sometimes contains contact info
-            if (!name && typeof sock.groupMetadata === 'function' && jid.endsWith('@g.us')) {
-                try {
-                    const metadata = await sock.groupMetadata(jid).catch(() => null);
-                    name = metadata?.subject;
-                    if (name) {
-                        logger.info(`Found group name from metadata: ${name} for ${jid}`);
-                    }
-                } catch (metaErr) {
-                    // Silent catch - just move to next method
-                }
-            }
-            
-            // METHOD 4: Try to fetch status as last resort
-            if (!name && typeof sock.fetchStatus === 'function') {
-                try {
-                    const status = await sock.fetchStatus(jid).catch(() => null);
-                    name = status?.status?.name;
-                    if (name) {
-                        logger.info(`Found name from status: ${name} for ${jid}`);
-                    }
-                } catch (statusErr) {
-                    // Silent catch - will fall back to number formatting
                 }
             }
         } catch (err) {
-            logger.warn(`Error getting contact info for ${jid}: ${err.message}`);
+            logger.warn(`Error getting contact info for ${actualJid}: ${err.message}`);
         }
 
-        // Format the phone number with proper country code if no name found
+        // If no name found, format the phone number nicely
         if (!name) {
-            // Extract phone number from JID
-            const phoneMatch = jid.match(/^(\d+)@/);
-            const phoneNumber = phoneMatch ? phoneMatch[1] : jid.split('@')[0];
-            
-            // Format with country code based on prefix
-            if (phoneNumber.startsWith('1') && phoneNumber.length === 11) {
-                // US/Canada: +1 XXX XXX XXXX
-                name = `+1 ${phoneNumber.substring(1)}`;
-            } else if (phoneNumber.startsWith('44') && phoneNumber.length >= 11) {
-                // UK: +44 XXXX XXXXXX
-                name = `+44 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('49') && phoneNumber.length >= 11) {
-                // Germany: +49 XXXX XXXXXX
-                name = `+49 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('33') && phoneNumber.length >= 11) {
-                // France: +33 X XX XX XX XX
-                name = `+33 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('34') && phoneNumber.length >= 11) {
-                // Spain: +34 XXX XXX XXX
-                name = `+34 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('39') && phoneNumber.length >= 11) {
-                // Italy: +39 XXX XXX XXXX
-                name = `+39 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('351') && phoneNumber.length >= 11) {
-                // Portugal: +351 XXX XXX XXX
-                name = `+351 ${phoneNumber.substring(3)}`;
-            } else if (phoneNumber.startsWith('91') && phoneNumber.length >= 12) {
-                // India: +91 XXXXX XXXXX
-                name = `+91 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('55') && phoneNumber.length >= 12) {
-                // Brazil: +55 XX XXXXX-XXXX
-                name = `+55 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('52') && phoneNumber.length >= 12) {
-                // Mexico: +52 XX XXXX XXXX
-                name = `+52 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('61') && phoneNumber.length >= 11) {
-                // Australia: +61 XXX XXX XXX
-                name = `+61 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('64') && phoneNumber.length >= 11) {
-                // New Zealand: +64 XX XXX XXXX
-                name = `+64 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('65') && phoneNumber.length >= 10) {
-                // Singapore: +65 XXXX XXXX
-                name = `+65 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('86') && phoneNumber.length >= 12) {
-                // China: +86 XXX XXXX XXXX
-                name = `+86 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('81') && phoneNumber.length >= 12) {
-                // Japan: +81 XX XXXX XXXX
-                name = `+81 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('82') && phoneNumber.length >= 11) {
-                // South Korea: +82 XX XXXX XXXX
-                name = `+82 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('62') && phoneNumber.length >= 11) {
-                // Indonesia: +62 XXX-XXX-XXX
-                name = `+62 ${phoneNumber.substring(2)}`;
-            } else if (phoneNumber.startsWith('420') && phoneNumber.length >= 12) {
-                // Czech Republic: +420 XXX XXX XXX
-                name = `+420 ${phoneNumber.substring(3)}`;
+            // Format with proper country code
+            if (phoneNumber.startsWith('49')) {
+                // German format
+                name = `+${phoneNumber.substring(0, 2)} ${phoneNumber.substring(2)}`;
+            } else if (phoneNumber.startsWith('1')) {
+                // US/Canada format
+                name = `+${phoneNumber.substring(0, 1)} ${phoneNumber.substring(1)}`;
             } else {
-                // Default international formatting with plus sign
-                const countryCode = extractCountryCode(phoneNumber);
-                name = `+${countryCode} ${phoneNumber.substring(countryCode.length)}`;
+                // Default international format
+                name = `+${phoneNumber}`;
             }
         }
 
         // Cache the result
-        userCache.set(jid, { name, timestamp: Date.now() });
+        userCache.set(actualJid, { name, timestamp: Date.now() });
         return name;
     } catch (err) {
         logger.error(`Error fetching user name: ${err.message}`);
-        // Return a safe fallback with + sign to indicate international number
-        const phoneNumber = jid?.split('@')[0] || "";
-        return `+${phoneNumber}`;
-    }
-}
-
-// Helper function to extract country code from phone number
-function extractCountryCode(phoneNumber) {
-    // Most common country codes
-    const commonCountryCodes = [
-        '1', '44', '49', '33', '34', '39', '351', '91',
-        '55', '52', '61', '64', '65', '86', '81', '82',
-        '62', '420', '7', '380', '31', '43', '48', '46',
-        '41', '45', '47', '32', '351', '27', '20', '212',
-        '971', '966', '90', '92', '84', '60', '63', '66'
-    ];
-    
-    // Try to match common country codes
-    for (const code of commonCountryCodes) {
-        if (phoneNumber.startsWith(code)) {
-            return code;
-        }
-    }
-    
-    // Default assuming the first 1-3 digits are the country code
-    if (phoneNumber.length > 10) {
-        return phoneNumber.substring(0, 2); // Most country codes are 1-3 digits
-    } else {
-        return ""; // Cannot determine
+        return `+${jid.split('@')[0]}`;
     }
 }
 
@@ -379,84 +277,54 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             logger.warn(`Message object is null or undefined in ${type} command`);
             message = { key: { remoteJid: sender } };
         }
-        
+
         // Improved target handling with better mention detection
         let targetJid = null;
-        
-        // Get mentioned JIDs from the original message - with proper null checks
-        const mentionedJids = message && message.message && 
-                             message.message.extendedTextMessage && 
-                             message.message.extendedTextMessage.contextInfo && 
-                             message.message.extendedTextMessage.contextInfo.mentionedJid || [];
-        
+
+        // Get actual sender JID for group messages
+        const isGroup = sender.endsWith('@g.us');
+        const actualSenderJid = isGroup && message.key.participant ? 
+            message.key.participant.split(':')[0] + '@s.whatsapp.net' : // Handle device-specific JIDs
+            sender;
+
+        // Get mentioned JIDs from the original message
+        const mentionedJids = message?.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
         if (target) {
             // Handle different mention patterns
-            if (target.includes('@s.whatsapp.net') || target.includes('@g.us')) {
+            if (target.includes('@s.whatsapp.net')) {
                 // Already a valid JID
-                targetJid = target;
+                targetJid = target.includes(':') ? 
+                    target.split(':')[0] + '@s.whatsapp.net' : 
+                    target;
             } else if (target.startsWith('@')) {
-                // Handle @mention format from message mentions
+                // Handle @mention format
                 if (mentionedJids.length > 0) {
-                    // Take the first mentioned user
-                    targetJid = mentionedJids[0];
-                    logger.info(`Using mentioned JID: ${formatJidForLogging(targetJid)}`);
+                    // Take the first mentioned user and ensure proper format
+                    targetJid = mentionedJids[0].includes(':') ?
+                        mentionedJids[0].split(':')[0] + '@s.whatsapp.net' :
+                        mentionedJids[0];
                 } else {
-                    // Try to extract from bare @mention by removing the @
-                    targetJid = `${target.substring(1)}@s.whatsapp.net`;
-                    logger.info(`Extracted JID from @mention: ${targetJid}`);
+                    // Try to extract from bare @mention
+                    const cleanNumber = target.substring(1).replace(/[^0-9]/g, '');
+                    targetJid = `${cleanNumber}@s.whatsapp.net`;
                 }
             } else if (/^\+?\d+$/.test(target)) {
                 // Phone number with or without + sign
-                // Remove + sign if present for WhatsApp JID format
                 const cleanNumber = target.startsWith('+') ? target.substring(1) : target;
-                
-                // Enhanced international phone number handling
-                if (cleanNumber.startsWith('420') && cleanNumber.length >= 9) {
-                    // Czech Republic number (+420 xxx xxx xxx)
-                    targetJid = `${cleanNumber}@s.whatsapp.net`;
-                    logger.info(`Formatted Czech number to JID: ${targetJid}`);
-                } else if (cleanNumber.startsWith('49') && cleanNumber.length >= 10) {
-                    // German number (+49 xxxx xxxxxxx)
-                    targetJid = `${cleanNumber}@s.whatsapp.net`;
-                    logger.info(`Formatted German number to JID: ${targetJid}`);
-                } else if (cleanNumber.startsWith('1') && (cleanNumber.length === 11 || (target.startsWith('+1') && cleanNumber.length === 10))) {
-                    // US/Canada number (+1 xxx xxx xxxx)
-                    const nationalNumber = cleanNumber.startsWith('1') && cleanNumber.length === 11 ? 
-                        cleanNumber.substring(1) : cleanNumber;
-                    targetJid = `1${nationalNumber}@s.whatsapp.net`;
-                    logger.info(`Formatted US/Canada number to JID: ${targetJid}`);
-                } else if (cleanNumber.startsWith('44') && cleanNumber.length >= 10) {
-                    // UK number (+44 xxxx xxxxxx)
-                    targetJid = `${cleanNumber}@s.whatsapp.net`;
-                    logger.info(`Formatted UK number to JID: ${targetJid}`);
-                } else {
-                    // Default handling for all other formats
-                    targetJid = `${cleanNumber}@s.whatsapp.net`;
-                    logger.info(`Converted number to JID: ${targetJid}`);
-                }
-            } else {
-                // Handle other potential formats
-                let processed = target;
-                // Remove any non-alphanumeric chars except @ and + (handle special chars in mentions and phone numbers)
-                processed = processed.replace(/[^\w@+]/g, '');
-                
-                if (processed.includes('@')) {
-                    targetJid = processed.includes('@s.whatsapp.net') ? processed : `${processed.split('@')[0]}@s.whatsapp.net`;
-                } else {
-                    targetJid = `${processed}@s.whatsapp.net`;
-                }
-                console.log(`Processed target to JID: ${targetJid}`);
+                targetJid = `${cleanNumber}@s.whatsapp.net`;
             }
         } else if (mentionedJids.length > 0) {
             // If no target provided but there are mentions, use the first mention
-            targetJid = mentionedJids[0];
-            console.log(`No explicit target, using mentioned JID: ${targetJid}`);
+            targetJid = mentionedJids[0].includes(':') ?
+                mentionedJids[0].split(':')[0] + '@s.whatsapp.net' :
+                mentionedJids[0];
         }
-        
+
         // Extra validation with detailed error
         if (target && !targetJid) {
-            await safeSendMessage(sock, sender, { 
-                text: `❌ Could not process the target mention for ${type} command.\n\nValid formats:\n• @user\n• phone number\n• User's JID` 
+            await safeSendMessage(sock, sender, {
+                text: `❌ Could not process the target mention for ${type} command.\n\nValid formats:\n• @user\n• phone number\n• User's JID`
             });
             return;
         }
@@ -468,61 +336,61 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         let targetPhone = "";
         let senderMentionFormat = "";
         let targetMentionFormat = "";
-        
+
         try {
             // Handle group chat scenario
             const isGroup = sender.endsWith('@g.us');
             const actualSenderJid = isGroup && message.key.participant ? message.key.participant : sender;
-            
+
             // Get sender phone number and name with international format (without parentheses)
             const senderFormatted = formatPhoneForMention(actualSenderJid);
             // Extract just the name portion without country code/flag for cleaner display
             let rawSenderName = await getUserName(sock, actualSenderJid);
-            
+
             // Prioritize the rawSenderName from getUserName which tries to get contact names first
             // This ensures we use the saved contact name for notifications outside of chat
             senderName = rawSenderName || "User";
             logger.info(`Using sender name: ${senderName} for ${actualSenderJid}`);
-            
+
             // Always use international format with + prefix for the number part
-            senderPhone = (senderFormatted && senderFormatted.international) ? 
-                        `+${senderFormatted.international}` : 
+            senderPhone = (senderFormatted && senderFormatted.international) ?
+                        `+${senderFormatted.international}` :
                         `+${actualSenderJid.split('@')[0]}`;
-                        
+
             // Store the full standard format for message display
             // This ensures the required "user saved_name +xxx" pattern
             senderMentionFormat = `user ${senderName} ${senderPhone}`;
-            
+
             // Also save WhatsApp-specific mention format for notifications outside chat
             const senderWhatsAppMention = `@${actualSenderJid.split('@')[0]}`;
             logger.info(`WhatsApp mention format for sender: ${senderWhatsAppMention}`);
-            
+
             // Additional logging for debugging group messages
             if (isGroup) {
                 logger.info(`Group message detected. Using participant JID: ${actualSenderJid} for sender`);
                 logger.info(`Formatted phone: ${senderPhone}, Name: ${senderName}`);
             }
-            
+
             if (target) {
                 // Get target phone number and name with international format (without parentheses)
                 const targetFormatted = formatPhoneForMention(targetJid);
                 // Extract just the name portion for cleaner display
                 let rawTargetName = await getUserName(sock, targetJid);
-                
+
                 // Prioritize the rawTargetName from getUserName which tries to get contact names first
                 // This ensures we use the saved contact name for notifications outside of chat
                 targetName = rawTargetName || "Someone";
                 logger.info(`Using target name: ${targetName} for ${targetJid}`);
-                
+
                 // Always use international format with + prefix for the number part
-                targetPhone = (targetFormatted && targetFormatted.international) ? 
-                            `+${targetFormatted.international}` : 
+                targetPhone = (targetFormatted && targetFormatted.international) ?
+                            `+${targetFormatted.international}` :
                             `+${targetJid.split('@')[0]}`;
-                            
+
                 // Store the full standard MD-style format for target as well
                 // This ensures the required "user saved_name +xxx" pattern
                 targetMentionFormat = `user ${targetName} ${targetPhone}`;
-                
+
                 // Also save WhatsApp-specific mention format for notifications outside chat
                 const targetWhatsAppMention = targetFormatted.whatsappMention || `@${targetJid.split('@')[0]}`;
                 logger.info(`WhatsApp mention format for target: ${targetWhatsAppMention}`);
@@ -530,7 +398,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         } catch (nameError) {
             logger.warn(`Error getting names: ${nameError.message}`);
             // Continue with default names
-            
+
             // Fallback to basic extraction if formatPhoneForMention fails
             if (sender.includes('@')) {
                 const isGroup = sender.endsWith('@g.us');
@@ -538,7 +406,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                 senderPhone = actualSenderJid.split('@')[0];
                 if (senderPhone) senderPhone = `+${senderPhone}`;
             }
-            
+
             if (target && targetJid && targetJid.includes('@')) {
                 targetPhone = targetJid.split('@')[0];
                 if (targetPhone) targetPhone = `+${targetPhone}`;
@@ -549,66 +417,66 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         // Using 'let' instead of 'const' to prevent variable redeclaration errors
         // This variable is used throughout the function for proper mention formatting
         let senderJid = message.key.participant || message.key.remoteJid;
-        
+
         // Generate message text with better grammar and internationalization
         let messageText;
         if (target) {
             // Get translations for reaction to target
             const toEveryoneKey = `reactions.${type}.toEveryone`;
             const toTargetKey = `reactions.${type}.toTarget`;
-            
+
             if (targetName === 'everyone' || targetName === 'all') {
                 // We need to ensure we have a valid sender JID before proceeding
                 // First, determine sender JID from message object, which is most reliable
-                const messageSenderJid = message.key && message.key.participant ? 
-                                       message.key.participant : 
+                const messageSenderJid = message.key && message.key.participant ?
+                                       message.key.participant :
                                        (message.key && message.key.remoteJid ? message.key.remoteJid : sender);
-                
+
                 // Get the phone number from the JID
                 const senderPhoneNumber = messageSenderJid.split('@')[0];
-                
+
                 // Use WhatsApp's standard @mention format for everyone reactions
                 // This ensures proper mention recognition by WhatsApp
                 const senderMention = `@${senderPhoneNumber}`;
-                
+
                 // Use standard WhatsApp @mention format for better notification delivery
-                messageText = languageManager.getText(toEveryoneKey, null, senderMention, emoji) || 
+                messageText = languageManager.getText(toEveryoneKey, null, senderMention, emoji) ||
                              `${senderMention} ${type}s everyone ${emoji}`;
-                
-                // Log the formatted message structure for verification 
+
+                // Log the formatted message structure for verification
                 logger.debug(`Everyone reaction format with WhatsApp mention: ${messageText}`);
-                
+
                 // Debug log to help troubleshoot sender JID issues
                 logger.info(`Using sender JID for everyone reaction: ${messageSenderJid} (${senderMention})`);
             } else {
                 // Use the enhanced mentionFormat fields for consistent "user saved_name +xxx" format
-                // Follows the strict format: "user saved_name +xxx action user saved_name +xxx" 
-                const senderWithPhone = senderMentionFormat || 
-                    (senderName !== "User" ? 
-                    `user ${senderName} ${senderPhone}` : 
+                // Follows the strict format: "user saved_name +xxx action user saved_name +xxx"
+                const senderWithPhone = senderMentionFormat ||
+                    (senderName !== "User" ?
+                    `user ${senderName} ${senderPhone}` :
                     `user ${senderName} ${senderPhone}`);
-                
+
                 const targetWithPhone = targetMentionFormat ||
-                    (targetName !== "Someone" ? 
-                    `user ${targetName} ${targetPhone}` : 
+                    (targetName !== "Someone" ?
+                    `user ${targetName} ${targetPhone}` :
                     `user ${targetName} ${targetPhone}`);
-                
+
                 // Create message with standard WhatsApp @mention format instead of MD-style
                 // This ensures WhatsApp properly recognizes mentions by using @phonenumber format
                 const senderMention = `@${senderJid.split('@')[0]}`;
                 const targetMention = `@${targetJid.split('@')[0]}`;
-                
+
                 // Use translations with WhatsApp standard @mentions for better compatibility
-                messageText = languageManager.getText(toTargetKey, null, senderMention, targetMention, emoji) || 
+                messageText = languageManager.getText(toTargetKey, null, senderMention, targetMention, emoji) ||
                              `${senderMention} ${type}s ${targetMention} ${emoji}`;
-                
+
                 // Log the formatted message structure for verification
                 logger.debug(`Target reaction format: ${messageText}`);
             }
         } else {
             // Get translation for self-reaction
             const selfKey = `reactions.${type}.self`;
-            
+
             const actionMap = {
                 cry: 'crying',
                 dance: 'dancing',
@@ -619,21 +487,21 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                 wink: 'winking',
                 wave: 'waving'
             };
-            
+
             // We need to ensure we have a valid sender JID before proceeding
             // First, determine sender JID from message object, which is most reliable
-            const messageSenderJid = message.key && message.key.participant ? 
-                                   message.key.participant : 
+            const messageSenderJid = message.key && message.key.participant ?
+                                   message.key.participant :
                                    (message.key && message.key.remoteJid ? message.key.remoteJid : sender);
-            
+
             // Use WhatsApp's standard @mention format for self-reactions
             // This ensures proper mention recognition by WhatsApp
             const senderMention = `@${messageSenderJid.split('@')[0]}`;
-                
+
             // Use translations with WhatsApp-style mentions for better compatibility
-            messageText = languageManager.getText(selfKey, null, senderMention, emoji) || 
+            messageText = languageManager.getText(selfKey, null, senderMention, emoji) ||
                          `${senderMention} is ${actionMap[type] || type}ing ${emoji}`;
-                         
+
             // Debug log to help troubleshoot sender JID issues
             logger.info(`Using sender JID for self reaction: ${messageSenderJid} (${senderMention})`);
         }
@@ -668,14 +536,14 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         // Create a proper mention format that WhatsApp recognizes
         // For target user - generate a mention tag that will be recognized by WhatsApp
         let mentionTags = [];
-        
+
         // Always add the sender to mentions for self-notifications
         // The senderJid was defined at the top of the function to avoid initialization errors
         mentionTags.push({
             tag: '@sender',
             jid: senderJid
         });
-        
+
         // Process target separately if it's a specific user (not everyone)
         if (targetJid && targetJid !== 'everyone@s.whatsapp.net' && targetJid !== 'all@s.whatsapp.net') {
             logger.info(`Adding mention for ${formatJidForLogging(targetJid)} to ensure notification delivery`);
@@ -684,11 +552,11 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                 jid: targetJid
             });
         }
-        
+
         // Replace any occurrence of the target's name with proper WhatsApp mention format
         // This format ensures the message shows up in notification previews and WhatsApp recognizes mentions
         let processedMessageText = messageText;
-        
+
         // Create mention-formatted tags that WhatsApp will recognize for notifications
         mentionTags.forEach(({tag, jid}) => {
             // Get properly formatted information for this JID
@@ -696,13 +564,13 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
             if (!formattedPhone || !formattedPhone.international) {
                 logger.warn(`Failed to format phone for mention: ${formatJidForLogging(jid)}`);
             }
-            
+
             // Get phone number for WhatsApp's standard mention format
             const phoneForMention = formattedPhone?.international || jid.split('@')[0];
-            
+
             // Create the WhatsApp standard @mention format that triggers notifications
             const mentionText = `@${phoneForMention}`;
-            
+
             // Log for troubleshooting mention issues
             if (jid === targetJid && targetName) {
                 logger.info(`WhatsApp mention format for target: ${mentionText}`);
@@ -712,20 +580,20 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                 const name = jid === senderJid ? senderName : "user";
                 logger.info(`WhatsApp mention format for sender: ${mentionText}`);
                 logger.info(`Formatted phone: ${formattedPhone?.formatted}, Name: ${name}`);
-                
+
                 // For group messages, participant JID is important to log
                 if (isJidGroup(message.key.remoteJid) && message.key.participant) {
                     logger.info(`Group message detected. Using participant JID: ${formatJidForLogging(message.key.participant)} for sender`);
                 }
             }
-            
+
             // Replace any occurrence of the JID or mention patterns with WhatsApp's proper format
             // This ensures the mention is properly recognized by WhatsApp like a manual mention
             processedMessageText = processedMessageText.replace(
-                new RegExp(`@${phoneForMention}`, 'g'), 
+                new RegExp(`@${phoneForMention}`, 'g'),
                 mentionText
             );
-            
+
             // Also handle specialized patterns if present (for target users)
             if (jid === targetJid && targetName) {
                 // Replace any occurrence of the full name pattern
@@ -733,21 +601,21 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                     new RegExp(`user ${targetName}`, 'g'),
                     mentionText
                 );
-                
+
                 // Also replace phone-based patterns
                 processedMessageText = processedMessageText.replace(
                     new RegExp(`\\+${phoneForMention}`, 'g'),
                     mentionText
                 );
             }
-            
+
             // Log the mention to help with debugging
             logger.info(`Added properly formatted WhatsApp mention for ${formatJidForLogging(jid)}`);
         });
-        
+
         // Create the decorated message with emoji and quotes
         const decoratedMessage = `*${processedMessageText}*\n\n_"${randomReactionText}"_ ${emoji}`;
-        
+
         // Message content with proper mention structure for notifications
         // Format message to ensure WhatsApp recognizes mentions properly
         let messageContent = {
@@ -765,7 +633,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         // Check if we have a GIF for this reaction type
         const gifPath = REACTION_GIFS[type];
         let hasGif = false;
-        
+
         if (gifPath && fs.existsSync(gifPath)) {
             hasGif = true;
             logger.info(`Found GIF file for ${type} at ${gifPath}`);
@@ -776,21 +644,21 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         // First send the text message for immediate response with mention for notification
         await safeSendMessage(sock, sender, messageContent);
         logger.info(`Successfully sent ${type} reaction message to ${formatJidForLogging(sender)} with mention: ${targetJid ? formatJidForLogging(targetJid) : 'none'}`);
-        
+
         // Then try to send the GIF if available - using optimal sending with caching
         if (hasGif) {
             try {
                 // Generate a unique key for this GIF
                 const gifHash = crypto.createHash('md5').update(`${gifPath}-${type}`).digest('hex');
-                
+
                 // Check if we have a cached version of this GIF
                 if (REACTION_GIF_CACHE.has(gifHash)) {
                     const cached = REACTION_GIF_CACHE.get(gifHash);
-                    
+
                     // Check if cache is still valid
                     if (Date.now() - cached.timestamp < GIF_CACHE_DURATION) {
                         logger.info(`Using cached version of ${type} reaction GIF`);
-                        
+
                         // Use the cached buffer directly
                         if (cached.format === 'gif') {
                             await safeSendAnimatedGif(sock, sender, cached.buffer, '', {
@@ -815,22 +683,22 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                                 isAnimated: true
                             });
                         }
-                        
+
                         logger.info(`Successfully sent cached ${type} reaction GIF to ${formatJidForLogging(sender)}`);
                         return;
                     }
-                    
+
                     // Cache expired, remove it
                     REACTION_GIF_CACHE.delete(gifHash);
                 }
-                
+
                 // No cache hit, process and cache the GIF
                 // Try direct GIF sending first (fastest)
                 const gifBuffer = fs.readFileSync(gifPath);
-                
+
                 try {
                     // Use our enhanced exponential backoff function for reliable GIF sending
-                    await sendGifWithExponentialBackoff(sock, sender, gifBuffer, '', { 
+                    await sendGifWithExponentialBackoff(sock, sender, gifBuffer, '', {
                         ptt: false,
                         gifAttribution: type,
                         keepFormat: true,
@@ -840,45 +708,44 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                         shouldLoop: true,
                         seconds: 8
                     });
-                    
+
                     // Cache the successful GIF buffer
                     REACTION_GIF_CACHE.set(gifHash, {
                         buffer: gifBuffer,
                         format: 'gif',
                         timestamp: Date.now()
                     });
-                    
+
                     // Manage cache size
                     if (REACTION_GIF_CACHE.size > GIF_CACHE_SIZE_LIMIT) {
                         // Remove oldest cache entry
-                        const oldest = [...REACTION_GIF_CACHE.entries()].reduce((a, b) => 
+                        const oldest = [...REACTION_GIF_CACHE.entries()].reduce((a, b) =>
                             a[1].timestamp < b[1].timestamp ? a : b
                         );
                         REACTION_GIF_CACHE.delete(oldest[0]);
                     }
-                    
+
                     logger.info(`Successfully sent ${type} reaction GIF to ${formatJidForLogging(sender)}`);
                     return;
                 } catch (gifError) {
                     logger.warn(`Primary GIF send method failed: ${gifError.message}, trying MP4 conversion`);
-                    
+
                     // Try MP4 conversion as a fallback (more compatible)
                     try {
                         const ffmpeg = require('fluent-ffmpeg');
-                        
+
                         // Create temp directory and paths
                         const tempDir = path.join(process.cwd(), 'temp');
                         if (!fs.existsSync(tempDir)) {
                             fs.mkdirSync(tempDir, { recursive: true });
                         }
-                        
+
                         const mp4Path = path.join(tempDir, `${type}-${gifHash}.mp4`);
-                        
+
                         // Convert to MP4 with optimized settings
                         await new Promise((resolve, reject) => {
                             ffmpeg(gifPath)
-                                .outputOptions([
-                                    '-movflags faststart',
+                                .outputOptions([`-movflags faststart',
                                     '-pix_fmt yuv420p',
                                     '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
                                     '-preset ultrafast',
@@ -889,7 +756,7 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                                 .on('error', reject)
                                 .run();
                         });
-                        
+
                         // Send as video with gifPlayback
                         const mp4Buffer = fs.readFileSync(mp4Path);
                         await safeSendMessage(sock, sender, {
@@ -897,16 +764,16 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                             gifPlayback: true,
                             caption: ''
                         });
-                        
+
                         // Cache the successful MP4 buffer
                         REACTION_GIF_CACHE.set(gifHash, {
                             buffer: mp4Buffer,
                             format: 'mp4',
                             timestamp: Date.now()
                         });
-                        
+
                         logger.info(`Successfully sent ${type} reaction as MP4 with gifPlayback`);
-                        
+
                         // Clean up
                         try {
                             fs.unlinkSync(mp4Path);
@@ -916,21 +783,21 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
                         return;
                     } catch (mp4Error) {
                         logger.warn(`MP4 conversion fallback failed: ${mp4Error.message}, trying sticker`);
-                        
+
                         // Last resort: try as sticker
                         try {
                             await safeSendMessage(sock, sender, {
                                 sticker: gifBuffer,
                                 isAnimated: true,
                             });
-                            
+
                             // Cache the successful sticker buffer
                             REACTION_GIF_CACHE.set(gifHash, {
                                 buffer: gifBuffer,
                                 format: 'sticker',
-                                timestamp: Date.now()
+                                timestamp:Date.now()
                             });
-                            
+
                             logger.info(`Successfully sent ${type} reaction as animated sticker (last resort)`);
                             return;
                         } catch (fallbackError) {
@@ -947,8 +814,8 @@ async function sendReactionMessage(sock, sender, target, type, customGifUrl, emo
         logger.error('Error in reaction command:', error);
         try {
             // Simple error message
-            await safeSendMessage(sock, sender, { 
-                text: `Error processing ${type} command: ${error.message}` 
+            await safeSendMessage(sock, sender, {
+                text: `Error processing ${type} command: ${error.message}`
             });
         } catch (sendErr) {
             logger.error('Failed to send error message:', sendErr);
@@ -961,7 +828,7 @@ const reactionCommands = {
     // Show a reaction menu with categories
     async reactionmenu(sock, message, args) {
         const sender = message.key.remoteJid;
-        
+
         // Group reactions by category
         const categories = {
             "Basic Reactions": ["hug", "pat", "kiss", "cuddle"],
@@ -970,55 +837,55 @@ const reactionCommands = {
             "Walking Dead": ["punch", "bite", "poke", "pat"],
             "Fast & Furious": ["yeet", "highfive", "bonk"]
         };
-        
+
         // Get category translations
         const translatedCategories = {};
         for (const category in categories) {
             const translationKey = `reactions.categories.${category.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
             translatedCategories[languageManager.getText(translationKey) || category] = categories[category];
         }
-        
+
         // Count available GIFs
         const availableGifs = Object.values(REACTION_GIFS)
             .filter(gifPath => fs.existsSync(gifPath) && fs.statSync(gifPath).size > 1000)
             .length;
-            
+
         // Create menu text with translations
         let menuText = `*${languageManager.getText('reactions.menu.title') || '🎬 Reaction GIFs Menu'}*\n`;
-        menuText += languageManager.getText('reactions.menu.workingGifs', null, availableGifs, Object.keys(REACTION_GIFS).length) || 
+        menuText += languageManager.getText('reactions.menu.workingGifs', null, availableGifs, Object.keys(REACTION_GIFS).length) ||
                    `Total working GIFs: ${availableGifs}/${Object.keys(REACTION_GIFS).length}\n\n`;
-        
+
         // Add categories
         for (const [category, commands] of Object.entries(translatedCategories)) {
-            const workingCommands = commands.filter(cmd => 
-                fs.existsSync(REACTION_GIFS[cmd]) && 
+            const workingCommands = commands.filter(cmd =>
+                fs.existsSync(REACTION_GIFS[cmd]) &&
                 fs.statSync(REACTION_GIFS[cmd]).size > 1000
             );
-            
+
             menuText += `*${category}* (${workingCommands.length}/${commands.length})\n`;
             menuText += workingCommands.map(cmd => `!${cmd}`).join(", ") + "\n\n";
         }
-        
+
         // Usage instructions
         menuText += `*${languageManager.getText('reactions.menu.howToUse') || 'How to use:'}*\n`;
         menuText += `• ${languageManager.getText('reactions.menu.selfUsage') || 'For self-reactions: !commandname'}\n`;
         menuText += `• ${languageManager.getText('reactions.menu.targetUsage') || 'To target someone: !commandname @user'}\n\n`;
         menuText += languageManager.getText('reactions.menu.testGif') || `Try !testgif [name] to preview any reaction GIF!`;
-        
+
         await safeSendText(sock, sender, menuText);
     },
-    
+
     // Reaction status/diagnostic command - checks local GIF files
     async reactionstatus(sock, message, args) {
         const sender = message.key.remoteJid;
         let statusText = "*📊 Reaction Commands Status*\n\n";
-        
+
         // Check local GIF files
         const results = Object.entries(REACTION_GIFS).map(([type, filePath]) => {
             const exists = fs.existsSync(filePath);
             const fileStats = exists ? fs.statSync(filePath) : null;
             const fileSize = fileStats ? fileStats.size : 0;
-            
+
             return {
                 type,
                 working: exists && fileSize > 1000, // File must exist and be reasonably sized
@@ -1027,29 +894,29 @@ const reactionCommands = {
                 error: !exists ? "File not found" : (fileSize < 1000 ? "File too small" : null)
             };
         });
-        
+
         // Group results by working status
         const working = results.filter(r => r.working);
         const notWorking = results.filter(r => !r.working);
-        
+
         // Add to status text
         statusText += `✅ *Working Commands (${working.length})*:\n`;
         statusText += working.map(w => `• !${w.type}`).join('\n');
-        
+
         if (notWorking.length > 0) {
             statusText += `\n\n❌ *Non-Working Commands (${notWorking.length})*:\n`;
             statusText += notWorking.map(nw => `• !${nw.type} (${nw.error || 'Unknown error'})`).join('\n');
         }
-        
+
         statusText += "\n\n*Usage*: Simply type !commandname (e.g. !hug, !slap)";
         statusText += "\nTo target someone: !commandname @user";
-        
+
         await safeSendText(sock, sender, statusText);
 
         // If detailed flag is provided, print detailed information for debugging
         if (args[0] === 'detailed') {
             let detailedText = "*Detailed Reaction Command Status*\n\n";
-            
+
             for (const result of results) {
                 detailedText += `*Command:* !${result.type}\n`;
                 detailedText += `Status: ${result.working ? '✅ Working' : '❌ Not working'}\n`;
@@ -1058,30 +925,30 @@ const reactionCommands = {
                 detailedText += `Path: ${result.filePath}\n`;
                 detailedText += `Error: ${result.error || 'None'}\n\n`;
             }
-            
+
             await safeSendText(sock, sender, detailedText);
         }
     },
-    
+
     // Command to test local GIFs
     async testgif(sock, message, args) {
         const sender = message.key.remoteJid;
         const gifName = args[0];
-        
+
         // If no GIF name is provided, show available GIFs
         if (!gifName) {
             const gifFiles = fs.readdirSync(REACTIONS_DIR)
                 .filter(file => file.endsWith('.gif'));
-            
-            await safeSendText(sock, sender, `*Available GIFs for Testing (${gifFiles.length})*\n\n` + 
+
+            await safeSendText(sock, sender, `*Available GIFs for Testing (${gifFiles.length})*\n\n` +
                       gifFiles.map(file => `• ${file.replace('.gif', '')}`).join('\n') +
                       '\n\nUsage: !testgif [reaction_name]');
             return;
         }
-        
+
         // Check if GIF exists
         const gifPath = path.join(REACTIONS_DIR, `${gifName}.gif`);
-        
+
         // Check if the file exists
         if (!fs.existsSync(gifPath)) {
             await safeSendMessage(sock, sender, {
@@ -1089,19 +956,19 @@ const reactionCommands = {
             });
             return;
         }
-        
+
         try {
             // Get GIF info
             const stats = fs.statSync(gifPath);
             const fileSizeKB = (stats.size / 1024).toFixed(2);
-            
+
             // Get source info if available
             let sourceInfo = "Unknown source";
             const infoPath = path.join(REACTIONS_DIR, 'detail_info', `${gifName}.txt`);
             if (fs.existsSync(infoPath)) {
                 sourceInfo = fs.readFileSync(infoPath, 'utf8');
             }
-            
+
             // Send info message
             await safeSendMessage(sock, sender, {
                 text: `*Testing GIF: ${gifName}*\n` +
@@ -1109,7 +976,7 @@ const reactionCommands = {
                       `Full path: ${gifPath}\n\n` +
                       `${sourceInfo}`
             });
-            
+
             // First try with our unified safeSendAnimatedGif helper
             try {
                 await safeSendAnimatedGif(sock, sender, gifPath, `${gifName} reaction (using safeSendAnimatedGif)`, {
@@ -1124,10 +991,10 @@ const reactionCommands = {
                 logger.info(`Successfully sent test GIF using safeSendAnimatedGif utility`);
             } catch (unifiedError) {
                 logger.error(`Error with unified GIF sender: ${unifiedError.message}`);
-                
+
                 // If the unified approach failed, try individual methods for diagnostic purposes
                 const buffer = fs.readFileSync(gifPath);
-                
+
                 // Method 1: Try to send as sticker with animation
                 try {
                     await safeSendMessage(sock, sender, {
@@ -1138,12 +1005,12 @@ const reactionCommands = {
                 } catch (stickerError) {
                     logger.warn(`Could not send as animated sticker: ${stickerError.message}`);
                 }
-                
+
                 // Method 2: Try to send directly as MP4 with forced mimetype
                 try {
                     const FileType = require('file-type');
                     const fileTypeResult = await FileType.fromBuffer(buffer);
-                    
+
                     await safeSendMessage(sock, sender, {
                         video: buffer,
                         gifPlayback: true,
@@ -1155,7 +1022,7 @@ const reactionCommands = {
                 } catch (mp4Error) {
                     logger.warn(`Could not send as MP4: ${mp4Error.message}`);
                 }
-                
+
                 // Method 3: Try with document method
                 try {
                     await safeSendMessage(sock, sender, {
@@ -1167,7 +1034,7 @@ const reactionCommands = {
                     logger.info(`Successfully sent test GIF as document`);
                 } catch (docError) {
                     logger.warn(`Could not send as document: ${docError.message}`);
-                    
+
                     // Final error if all methods fail
                     await safeSendText(sock, sender, `❌ Error sending GIF: None of the sending methods worked.`);
                 }
@@ -1178,12 +1045,12 @@ const reactionCommands = {
             });
         }
     },
-    
+
     async hug(sock, message, args) {
         try {
             // Add diagnostic logging
             logger.info(`Executing hug command with message: ${JSON.stringify(message?.key || {})}`);
-            
+
             const sender = message.key.remoteJid;
             const target = args[0];
             await sendReactionMessage(sock, sender, target, 'hug', null, '🤗', message);
@@ -1294,11 +1161,11 @@ const reactionCommands = {
  */
 async function init() {
     logger.info('Initializing reactions module with enhanced message initialization checks...');
-    
+
     // Validate all reaction GIFs
     const validGifs = [];
     const missingGifs = [];
-    
+
     for (const [type, gifPath] of Object.entries(REACTION_GIFS)) {
         if (gifPath && fs.existsSync(gifPath)) {
             const stats = fs.statSync(gifPath);
@@ -1314,12 +1181,12 @@ async function init() {
             logger.warn(`❌ Missing GIF for ${type}`);
         }
     }
-    
+
     logger.info(`Reaction GIFs validation complete. Valid: ${validGifs.length}, Missing: ${missingGifs.length}`);
-    
+
     // Run the GIF preloader after validation
     preloadCommonGifs();
-    
+
     // Verify language file usage
     try {
         if (languageManager) {
@@ -1330,7 +1197,7 @@ async function init() {
     } catch (err) {
         logger.warn(`Language system error: ${err.message}`);
     }
-    
+
     return true;
 }
 
@@ -1351,16 +1218,16 @@ async function init() {
 async function sendGifWithExponentialBackoff(sock, jid, gifData, caption = '', options = {}, retries = BACKOFF_CONFIG.MAX_RETRIES) {
     let delay = BACKOFF_CONFIG.INITIAL_DELAY;
     const maxDelay = BACKOFF_CONFIG.MAX_DELAY;
-    
+
     // Add jitter to avoid thundering herd problem
     const getJitter = () => Math.random() * BACKOFF_CONFIG.JITTER * 2 - BACKOFF_CONFIG.JITTER;
-    
+
     // Track error types to adapt retry strategy
     let timeoutErrors = 0;
     let networkErrors = 0;
     let serverErrors = 0;
     let formatErrors = 0;
-    
+
     // If gifData is a path, load it first
     let gifBuffer;
     if (typeof gifData === 'string' && fs.existsSync(gifData)) {
@@ -1375,7 +1242,7 @@ async function sendGifWithExponentialBackoff(sock, jid, gifData, caption = '', o
     } else {
         throw new Error('Invalid GIF data: must be a Buffer or valid file path');
     }
-    
+
     // Try different sending strategies in order of preference
     const sendStrategies = [
         // Strategy 1: Use safeSendAnimatedGif (preferred method)
@@ -1391,7 +1258,7 @@ async function sendGifWithExponentialBackoff(sock, jid, gifData, caption = '', o
                 ...options
             });
         },
-        
+
         // Strategy 2: Try as gifPlayback video
         async () => {
             return await safeSendMessage(sock, jid, {
@@ -1400,7 +1267,7 @@ async function sendGifWithExponentialBackoff(sock, jid, gifData, caption = '', o
                 caption: caption
             });
         },
-        
+
         // Strategy 3: Last resort - try as sticker
         async () => {
             return await safeSendMessage(sock, jid, {
@@ -1409,30 +1276,30 @@ async function sendGifWithExponentialBackoff(sock, jid, gifData, caption = '', o
             });
         }
     ];
-    
+
     // Try each strategy with exponential backoff
     for (let attempt = 0; attempt <= retries; attempt++) {
         // Calculate strategy to use based on error history
         let strategyIndex = 0;
-        
+
         // Adapt strategy based on error history
         if (formatErrors > 0) {
             // Format errors suggest we should try a different strategy
             strategyIndex = Math.min(formatErrors, sendStrategies.length - 1);
         }
-        
+
         try {
             // Get current strategy
             const currentStrategy = sendStrategies[strategyIndex];
-            
+
             // Try this strategy
             const result = await currentStrategy();
-            
+
             // If we get here, we succeeded
             if (attempt > 0) {
                 logger.info(`Successfully sent GIF after ${attempt} retries using strategy #${strategyIndex + 1}`);
             }
-            
+
             return result;
         } catch (error) {
             // Track error types for analytics and adaptive retry
@@ -1443,14 +1310,14 @@ async function sendGifWithExponentialBackoff(sock, jid, gifData, caption = '', o
             } else if (error.response && error.response.status >= 500) {
                 serverErrors++;
             } else if (
-                error.message.includes('format') || 
-                error.message.includes('convert') || 
+                error.message.includes('format') ||
+                error.message.includes('convert') ||
                 error.message.includes('invalid') ||
                 error.message.includes('not supported')
             ) {
                 formatErrors++;
             }
-            
+
             // On final retry, try the last strategy as a last resort
             if (attempt === retries - 1 && strategyIndex < sendStrategies.length - 1) {
                 logger.warn(`Trying last resort strategy for GIF sending`);
@@ -1460,7 +1327,7 @@ async function sendGifWithExponentialBackoff(sock, jid, gifData, caption = '', o
                     logger.error(`Last resort strategy failed: ${lastError.message}`);
                 }
             }
-            
+
             // On final retry, provide detailed error info
             if (attempt === retries) {
                 logger.error(`All ${retries} retries failed for GIF sending`, {
@@ -1472,19 +1339,19 @@ async function sendGifWithExponentialBackoff(sock, jid, gifData, caption = '', o
                 });
                 throw error;
             }
-            
+
             // Log the error
             logger.warn(`GIF send attempt ${attempt + 1}/${retries} failed: ${error.message}`);
-            
+
             // Calculate delay with jitter
             const jitteredDelay = delay + getJitter();
             await new Promise(resolve => setTimeout(resolve, jitteredDelay));
-            
+
             // Exponential backoff with cap
             delay = Math.min(delay * 2, maxDelay);
         }
     }
-    
+
     // If we get here, all retries failed
     return null;
 }
