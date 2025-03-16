@@ -90,4 +90,5 @@ auth_*/
 !DEPLOYMENT_SUMMARY.md
 !LOCAL_CONNECTION_GUIDE.md
 !GITHUB_README.md
-!.github/
+!.github/*.tmp
+Thumbs.db
