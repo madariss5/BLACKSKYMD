@@ -1,32 +1,21 @@
 /**
  * BLACKSKY-MD WhatsApp Bot - Main Entry Point
- * Enhanced connection handling and QR display with integrated ConnectionMonitor
+ * Enhanced with Venom-bot for better stability and error handling
  */
 
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const venom = require('venom-bot');
 const express = require('express');
 const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
 const handler = require('./handlers/ultra-minimal-handler');
-const ConnectionMonitor = require('./utils/connectionMonitor');
-
-// Import credential backup system for more robust connection persistence
-try {
-    var { backupCredentials, restoreCredentials } = require('./utils/credentialsBackup');
-} catch (err) {
-    console.log('Credential backup system not available:', err.message);
-    // Create stub functions if the module is not available
-    backupCredentials = async () => null;
-    restoreCredentials = async () => null;
-}
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Configure logger with more detailed output
+// Configure logger
 const logger = pino({
     level: 'debug',
     transport: {
@@ -39,276 +28,124 @@ const logger = pino({
     }
 });
 
-// Constants
-const AUTH_DIR = './auth_info_baileys';
-const MAX_RETRIES = 5;
-const BASE_RETRY_INTERVAL = 3000;
-
 // Global state
-let sock = null;
+let client = null;
 let qrCode = null;
 let connectionState = 'disconnected';
-let retryCount = 0;
-let isConnecting = false;
 
-// Initialize connection monitor
-const monitor = new ConnectionMonitor({
-    checkIntervalMs: 30000,
-    maxReconnectAttempts: 10,
-    logFilePath: path.join(process.cwd(), 'connection-health.json'),
-    autoReconnect: true,
-    notifyDiscoveredIssues: true
-});
+// Constants
+const SESSION_PATH = './sessions';
+const MAX_RETRIES = 5;
 
-// Ensure auth directory exists
-if (!fs.existsSync(AUTH_DIR)) {
-    fs.mkdirSync(AUTH_DIR, { recursive: true });
+// Ensure session directory exists
+if (!fs.existsSync(SESSION_PATH)) {
+    fs.mkdirSync(SESSION_PATH, { recursive: true });
 }
 
-// Clear auth state for fresh start
-async function clearAuthState() {
+// Initialize WhatsApp client with Venom
+async function startWhatsAppClient() {
     try {
-        if (fs.existsSync(AUTH_DIR)) {
-            fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-            fs.mkdirSync(AUTH_DIR, { recursive: true });
-        }
-        logger.info('Auth state cleared successfully');
-    } catch (error) {
-        logger.error('Error clearing auth state:', error);
-    }
-}
-
-// Enhanced WhatsApp connection configuration with fixes for Connection Failure
-const connectionConfig = {
-    version: [2, 2323, 4], // Use a newer compatible version
-    browser: [`BLACKSKY-${Date.now()}`, 'Chrome', '110.0.0'], // Unique browser identifier
-    printQRInTerminal: true,
-    logger: logger.child({ level: 'silent' }),
-    connectTimeoutMs: 60000,
-    qrTimeout: 60000,
-    defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 10000, // Keep connection alive
-    retryRequestDelayMs: 2000, // More conservative retry settings
-    emitOwnEvents: false,
-    markOnlineOnConnect: false,
-    syncFullHistory: false,
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36' // Updated Chrome version
-};
-
-async function startWhatsAppConnection() {
-    if (isConnecting) {
-        logger.info('Connection attempt already in progress');
-        return;
-    }
-
-    try {
-        isConnecting = true;
+        logger.info('Starting WhatsApp client...');
         connectionState = 'connecting';
-        logger.info('Starting WhatsApp connection attempt...');
 
-        // If we're at max retries or seeing Connection Failure errors, try fallback approaches
-        if (retryCount >= MAX_RETRIES - 1) {
-            logger.info('Using fallback connection approach after multiple failed attempts');
-            
-            // Try to restore from backup if available
-            try {
-                const restoredCreds = await restoreCredentials();
-                if (restoredCreds) {
-                    logger.info('Successfully restored credentials from backup, using them for connection');
-                }
-            } catch (restoreErr) {
-                logger.warn('Failed to restore credentials from backup:', restoreErr.message);
-            }
-            
-            // Generate a completely unique browser ID for this attempt
-            connectionConfig.browser = [`BLACKSKY-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, 'Chrome', '110.0.0'];
-        }
+        // Venom-bot configuration with enhanced error handling
+        const venomOptions = {
+            folderNameToken: SESSION_PATH,
+            mkdirFolderToken: true,
+            disableWelcome: true,
+            debug: false,
+            logQR: false,
+            browserArgs: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu'
+            ],
+            autoClose: 60000,
+            createPathFileToken: true,
+            waitForLogin: true,
+            updatesLog: true,
+        };
 
-        // Clear auth state and initialize new session
-        await clearAuthState();
-        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-        connectionConfig.auth = state;
-
-        // Create socket
-        sock = makeWASocket(connectionConfig);
-        logger.info('Socket created, waiting for connection...');
-
-        // Handle connection updates
-        sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-            logger.debug('Connection update:', update);
-
-            if (qr) {
-                logger.info('New QR code received');
-                qrCode = qr;
+        // Create WhatsApp client
+        client = await venom.create(
+            'BLACKSKY-BOT',
+            (base64Qr, asciiQR, attempts) => {
+                logger.info(`New QR code generated (Attempt: ${attempts})`);
+                qrCode = base64Qr;
                 connectionState = 'qr_ready';
-                retryCount = 0;
-            }
+            },
+            (statusSession, session) => {
+                logger.info('Status Session:', statusSession);
+                logger.info('Session name:', session);
+            },
+            venomOptions
+        );
 
-            if (connection === 'open') {
-                logger.info('Connection established successfully!');
-                connectionState = 'connected';
-                isConnecting = false;
-                retryCount = 0;
-                qrCode = null;
+        // Connection successful
+        logger.info('WhatsApp client connected successfully!');
+        connectionState = 'connected';
+        qrCode = null;
 
-                // Backup credentials for recovery in case of future connection issues
+        // Handle incoming messages
+        client.onMessage(async (message) => {
+            try {
+                await handler.messageHandler(client, message);
+            } catch (err) {
+                logger.error('Error handling message:', err);
                 try {
-                    if (sock.authState && sock.authState.creds) {
-                        logger.info('Backing up credentials for future recovery');
-                        await backupCredentials(sock.authState.creds);
-                    }
-                } catch (backupErr) {
-                    logger.warn('Failed to backup credentials:', backupErr.message);
-                }
-
-                // Initialize message handler
-                sock.ev.on('messages.upsert', async (m) => {
-                    if (m.type === 'notify') {
-                        try {
-                            await handler.messageHandler(sock, m.messages[0]);
-                        } catch (err) {
-                            logger.error('Message handling error:', err);
-                        }
-                    }
-                });
-            }
-
-            if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const errorMessage = lastDisconnect?.error?.message || 'Unknown error';
-                const isConnectionFailure = errorMessage.includes('Connection Failure');
-                
-                // Handle different types of disconnect errors
-                const shouldReconnect = 
-                    statusCode !== DisconnectReason.loggedOut && 
-                    // Connection failure might require special handling
-                    (!isConnectionFailure || retryCount < 3);
-
-                logger.info(`Connection closed due to: ${errorMessage} (Status code: ${statusCode})`);
-                isConnecting = false;
-                connectionState = 'disconnected';
-                
-                // Let ConnectionMonitor know about the disconnection
-                if (monitor) {
-                    try {
-                        // Update connection monitor with status
-                        const healthInfo = monitor.getHealthStatus();
-                        logger.info(`Connection health: ${healthInfo.healthScore}/100`);
-                        
-                        // Check diagnostics if this is a persistent issue
-                        if (retryCount >= 2) {
-                            logger.info('Running connection diagnostics...');
-                            monitor.runDiagnostics()
-                                .then(diagnostics => {
-                                    logger.info('Diagnostic results:', diagnostics);
-                                    
-                                    // If diagnostics show network issues, log specific advice
-                                    if (!diagnostics.webWhatsappReachable) {
-                                        logger.warn('Network connectivity issues detected - check internet connection');
-                                    }
-                                    
-                                    if (!diagnostics.authFilesExist) {
-                                        logger.warn('Authentication files missing or corrupted');
-                                    }
-                                })
-                                .catch(err => logger.error('Diagnostics error:', err));
-                        }
-                    } catch (monitorErr) {
-                        logger.error('Error updating connection monitor:', monitorErr);
-                    }
-                }
-
-                if (shouldReconnect && retryCount < MAX_RETRIES) {
-                    retryCount++;
-                    // Use higher backoff for connection failures
-                    const multiplier = isConnectionFailure ? 2 : 1;
-                    const delay = BASE_RETRY_INTERVAL * Math.pow(2, retryCount - 1) * multiplier;
-                    
-                    logger.info(`Retrying connection in ${delay/1000}s (Attempt ${retryCount}/${MAX_RETRIES})`);
-                    
-                    // For connection failure specifically, try a different browser fingerprint each time
-                    if (isConnectionFailure) {
-                        logger.info('Connection failure detected, will use new browser fingerprint on next attempt');
-                        connectionConfig.browser = [`BLACKSKY-${Date.now()}`, 'Chrome', '110.0.0'];
-                    }
-                    
-                    setTimeout(() => {
-                        // Before reconnecting, check if the monitor recommends a different approach
-                        if (monitor && monitor.getHealthStatus().healthScore < 30) {
-                            logger.info('Low health score detected, using advanced recovery approach');
-                            
-                            // Try to restore from a backup first
-                            restoreCredentials()
-                                .then(restored => {
-                                    if (restored) {
-                                        logger.info('Successfully restored credentials from backup');
-                                    }
-                                    return startWhatsAppConnection();
-                                })
-                                .catch(() => startWhatsAppConnection());
-                        } else {
-                            startWhatsAppConnection();
-                        }
-                    }, delay);
-                } else {
-                    logger.info('Not reconnecting through standard method - preparing fallback options');
-                    
-                    // Check if ConnectionMonitor can provide specific advice
-                    if (monitor) {
-                        const healthStatus = monitor.getHealthStatus();
-                        if (healthStatus.diagnostics && Object.keys(healthStatus.diagnostics).length > 0) {
-                            logger.info('ConnectionMonitor diagnostics:', healthStatus.diagnostics);
-                        }
-                    }
-                    
-                    // Check if repeated Connection Failure errors, use special fallback
-                    if (isConnectionFailure && retryCount >= MAX_RETRIES - 1) {
-                        logger.info('⚠️ Persistent Connection Failure detected');
-                        logger.info('Starting specialized QR generator to bypass connection restrictions...');
-                        
-                        try {
-                            const { spawn } = require('child_process');
-                            
-                            // Launch the specialized QR generator in a separate process
-                            const qrProcess = spawn('node', [path.join(__dirname, 'qr-generator.js')], {
-                                detached: true,
-                                stdio: 'inherit'
-                            });
-                            
-                            logger.info(`Specialized QR generator launched (PID: ${qrProcess.pid})`);
-                            logger.info('Please visit http://localhost:5001 to scan the QR code');
-                            logger.info('After successful connection, restart this app to use the new credentials');
-                            
-                            // Don't attempt further connections from this process
-                            return;
-                        } catch (e) {
-                            logger.error('Failed to start specialized QR generator:', e);
-                        }
-                    }
-                    
-                    await clearAuthState();
-                    retryCount = 0;
-                    setTimeout(startWhatsAppConnection, 5000);
+                    await client.sendText(
+                        message.from,
+                        "Sorry, I encountered an error processing your message. Please try again."
+                    );
+                } catch (sendErr) {
+                    logger.error('Error sending error message:', sendErr);
                 }
             }
         });
 
-        // Handle credentials update
-        sock.ev.on('creds.update', saveCreds);
+        // Handle disconnection
+        client.onStateChange((state) => {
+            logger.info('State changed:', state);
+            if (state === 'DISCONNECTED') {
+                connectionState = 'disconnected';
+                // Venom will automatically try to reconnect
+            } else if (state === 'CONNECTED') {
+                connectionState = 'connected';
+            }
+        });
+
+        // Handle errors
+        client.onError(async (error) => {
+            logger.error('Client error:', error);
+            if (error.includes('browser.close')) {
+                logger.info('Browser closed unexpectedly, attempting restart...');
+                await restartClient();
+            }
+        });
 
     } catch (err) {
-        logger.error('Fatal error in connection:', err);
-        isConnecting = false;
+        logger.error('Error starting WhatsApp client:', err);
         connectionState = 'error';
+        setTimeout(restartClient, 5000);
+    }
+}
 
-        if (retryCount < MAX_RETRIES) {
-            retryCount++;
-            const delay = BASE_RETRY_INTERVAL * Math.pow(2, retryCount - 1);
-            setTimeout(startWhatsAppConnection, delay);
-        } else {
-            await clearAuthState();
+// Restart client function
+async function restartClient() {
+    logger.info('Attempting to restart client...');
+    try {
+        if (client) {
+            await client.close();
+            client = null;
         }
+        setTimeout(startWhatsAppClient, 5000);
+    } catch (err) {
+        logger.error('Error during client restart:', err);
+        setTimeout(startWhatsAppClient, 10000);
     }
 }
 
@@ -395,26 +232,19 @@ app.get('/', (req, res) => {
                                 const loading = document.getElementById('loading');
                                 const qrImage = document.getElementById('qr-image');
 
-                                status.textContent = data.message || 'Checking connection status...';
+                                status.textContent = data.message;
                                 status.className = 'status ' + data.state;
 
                                 if (data.state === 'qr_ready') {
-                                    qrImage.src = '/qr?' + new Date().getTime();
-                                    qrImage.onload = () => {
-                                        qrImage.style.display = 'block';
-                                        loading.style.display = 'none';
-                                        setTimeout(updateQR, 20000);
-                                    };
-                                    qrImage.onerror = () => {
-                                        qrImage.style.display = 'none';
-                                        loading.style.display = 'block';
-                                        setTimeout(updateQR, 3000);
-                                    };
+                                    qrImage.src = data.qrCode;
+                                    qrImage.style.display = 'block';
+                                    loading.style.display = 'none';
                                 } else {
                                     qrImage.style.display = 'none';
                                     loading.style.display = 'block';
-                                    setTimeout(updateQR, 3000);
                                 }
+
+                                setTimeout(updateQR, data.state === 'qr_ready' ? 20000 : 3000);
                             })
                             .catch(err => {
                                 console.error('Error:', err);
@@ -423,39 +253,18 @@ app.get('/', (req, res) => {
                     }
 
                     updateQR();
-                    setInterval(updateQR, 3000);
                 </script>
             </body>
         </html>
     `);
 });
 
-// QR code endpoint
-app.get('/qr', async (req, res) => {
-    try {
-        if (!qrCode) {
-            res.status(503).send('QR code not yet available');
-            return;
-        }
-
-        const qrImage = await qrcode.toBuffer(qrCode, {
-            errorCorrectionLevel: 'H',
-            margin: 1,
-            scale: 8,
-            width: 256
-        });
-        res.type('png').send(qrImage);
-    } catch (err) {
-        logger.error('Error generating QR code:', err);
-        res.status(500).send('Error generating QR code');
-    }
-});
-
-// Status endpoint
+// Status endpoint with QR code
 app.get('/status', (req, res) => {
     res.json({
         state: connectionState,
-        message: getStatusMessage()
+        message: getStatusMessage(),
+        qrCode: qrCode
     });
 });
 
@@ -469,59 +278,34 @@ function getStatusMessage() {
             return 'Connecting to WhatsApp...';
         case 'qr_ready':
             return 'Please scan the QR code with WhatsApp';
+        case 'error':
+            return 'Error connecting to WhatsApp. Retrying...';
         default:
             return 'Initializing...';
     }
 }
 
-// Add health monitoring endpoints
-app.get('/connection/health', (req, res) => {
-    const healthStatus = monitor.getHealthStatus();
-    res.json(healthStatus);
-});
-
-app.get('/connection/logs', (req, res) => {
-    const logs = monitor.getLogs();
-    res.json(logs);
-});
-
-app.get('/connection/diagnostics', async (req, res) => {
-    const diagnostics = await monitor.runDiagnostics();
-    res.json(diagnostics);
-});
-
-// Start server and connection
+// Start server and WhatsApp client
 app.listen(PORT, '0.0.0.0', async () => {
     logger.info(`Server running on port ${PORT}`);
-    logger.info('Starting WhatsApp connection...');
-    
-
-    // Start the connection
-    await startWhatsAppConnection();
-    
-
-    // Start monitoring once socket is created
-    if (sock) {
-        logger.info('Starting connection monitoring...');
-        monitor.startMonitoring(sock);
-    }
+    await startWhatsAppClient();
 });
 
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
     logger.info('Shutting down...');
-    monitor.stopMonitoring();
-    // Save any important state here
-    await monitor.saveLogs();
+    if (client) {
+        await client.close();
+    }
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
     logger.info('Shutting down...');
-    monitor.stopMonitoring();
-    // Save any important state here
-    await monitor.saveLogs();
+    if (client) {
+        await client.close();
+    }
     process.exit(0);
 });
 
-module.exports = { app, startWhatsAppConnection };
+module.exports = { app, startWhatsAppClient };
