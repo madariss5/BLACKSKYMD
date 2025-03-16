@@ -36,6 +36,7 @@ let connectionLock = false;
 let sessionInvalidated = false;
 let reconnectTimer = null;
 let latestQR = null;
+let isFullyConnected = false; // New flag to track full connection status
 
 // Enhanced connection configuration
 const connectionConfig = {
@@ -47,12 +48,10 @@ const connectionConfig = {
             options: { colorize: true }
         }
     }),
-    // Use a unique browser ID for each connection to prevent conflicts
     browser: [`BLACKSKY-MD-${Date.now().toString().slice(-6)}`, 'Chrome', '110.0.0'],
-    // Enhanced connection settings
-    connectTimeoutMs: 120000, // Increased timeout
-    defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 10000,
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 30000,
+    keepAliveIntervalMs: 15000,
     emitOwnEvents: false,
     retryRequestDelayMs: 2000,
     fireInitQueries: true,
@@ -60,11 +59,7 @@ const connectionConfig = {
     syncFullHistory: false,
     shouldSyncHistoryMessage: false,
     markOnlineOnConnect: false,
-    version: [2, 2323, 4],
-    transactionOpts: { 
-        maxCommitRetries: 5, 
-        delayBetweenTriesMs: 2000 
-    }
+    version: [2, 2323, 4]
 };
 
 async function startConnection() {
@@ -76,6 +71,7 @@ async function startConnection() {
     try {
         isConnecting = true;
         connectionLock = true;
+        isFullyConnected = false;
 
         // Initialize session manager
         await sessionManager.initialize();
@@ -98,45 +94,71 @@ async function startConnection() {
             }
 
             if (connection === 'open') {
+                if (isFullyConnected) {
+                    logger.warn('Received open event while already connected, ignoring...');
+                    return;
+                }
+
                 logger.info('Connection established successfully');
+                isFullyConnected = true;
                 retryCount = 0;
                 currentRetryInterval = INITIAL_RETRY_INTERVAL;
                 sessionInvalidated = false;
                 clearReconnectTimer();
+
+                // Save credentials first
                 await saveCreds();
 
-                // Send credentials backup to self after successful connection
-                try {
-                    await sessionManager.sendCredentialsToSelf();
-                    logger.info('Successfully sent credentials backup to self');
-                } catch (err) {
-                    logger.error('Failed to send credentials to self:', err);
-                }
-
                 // Initialize message handling after successful connection
-                sock.ev.on('messages.upsert', async ({ messages, type }) => {
-                    if (type === 'notify' && messageHandler) {
-                        for (const message of messages) {
-                            try {
-                                // Pass both sock and message to handler for credential backup support
-                                await messageHandler(sock, message);
+                sock.ev.process(
+                    // highlight-next-line
+                    async (events) => {
+                        if (events['messages.upsert']) {
+                            const { messages, type } = events['messages.upsert'];
+                            if (type === 'notify' && messageHandler) {
+                                for (const message of messages) {
+                                    try {
+                                        await messageHandler(sock, message);
 
-                                // Check if this is a credentials backup message
-                                await sessionManager.handleCredentialsBackup(message, sock);
-                            } catch (err) {
-                                logger.error('Error handling message:', err);
+                                        // Handle credentials backup separately
+                                        if (isFullyConnected) {
+                                            await sessionManager.handleCredentialsBackup(message, sock);
+                                        }
+                                    } catch (err) {
+                                        logger.error('Error handling message:', err);
+                                    }
+                                }
                             }
                         }
                     }
-                });
+                );
+
+                // Send credentials backup to self after a short delay
+                setTimeout(async () => {
+                    try {
+                        if (isFullyConnected) {
+                            await sessionManager.sendCredentialsToSelf();
+                            logger.info('Successfully sent credentials backup to self');
+                        }
+                    } catch (err) {
+                        logger.error('Failed to send credentials to self:', err);
+                    }
+                }, 5000);
 
                 isConnecting = false;
                 connectionLock = false;
             }
 
             if (connection === 'close') {
+                if (!isFullyConnected) {
+                    logger.warn('Connection closed before fully established');
+                }
+
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 logger.info(`Connection closed with status code: ${statusCode}`);
+
+                // Reset connection state
+                isFullyConnected = false;
 
                 // Handle critical errors
                 if (statusCode === DisconnectReason.loggedOut || 
@@ -182,6 +204,7 @@ async function startConnection() {
         return sock;
     } catch (err) {
         logger.error('Fatal error in startConnection:', err);
+        isFullyConnected = false;
 
         if (retryCount < MAX_RETRIES) {
             retryCount++;
