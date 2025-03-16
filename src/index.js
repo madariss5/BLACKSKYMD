@@ -1,9 +1,9 @@
 /**
  * BLACKSKY-MD WhatsApp Bot - Main Entry Point
- * Enhanced with Venom-bot for better stability and error handling
+ * Using @whiskeysockets/baileys for better compatibility
  */
 
-const venom = require('venom-bot');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const express = require('express');
 const qrcode = require('qrcode');
 const fs = require('fs');
@@ -42,133 +42,79 @@ if (!fs.existsSync(SESSION_PATH)) {
     fs.mkdirSync(SESSION_PATH, { recursive: true });
 }
 
-// Initialize WhatsApp client with Venom
+// Initialize WhatsApp client
 async function startWhatsAppClient() {
     try {
         logger.info('Starting WhatsApp client...');
+        logger.info('Session path:', SESSION_PATH);
         connectionState = 'connecting';
 
-        // Venom-bot configuration with enhanced error handling
-        const venomOptions = {
-            session: 'blacksky-session',
-            folderNameToken: SESSION_PATH,
-            disableWelcome: true,
-            debug: true,
-            logQR: true,
-            browserArgs: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--disable-software-rasterizer',
-                '--disable-extensions'
-            ],
-            puppeteerOptions: {
-                executablePath: process.env.CHROME_BIN || null,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox'
-                ],
-                headless: 'new'
-            },
-            autoClose: 0,
-            waitForLogin: true,
-            catchQR: (base64Qr, asciiQR, attempt) => {
-                logger.info(`New QR code generated (Attempt: ${attempt})`);
-                qrCode = base64Qr;
+        const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
+
+        // Create WhatsApp socket with minimal configuration
+        client = makeWASocket({
+            auth: state,
+            printQRInTerminal: true,
+            logger: logger.child({ level: 'silent' }),
+            browser: ['BLACKSKY-Bot', 'Chrome', '108.0.0'],
+            connectTimeoutMs: 60000,
+            qrTimeout: 60000
+        });
+
+        // Handle connection updates
+        client.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+            logger.debug('Connection update:', update);
+
+            if (qr) {
+                logger.info('New QR code received');
+                qrCode = qr;
                 connectionState = 'qr_ready';
             }
-        };
 
-        // Create WhatsApp client with better error handling
-        client = await venom
-            .create(venomOptions)
-            .catch((error) => {
-                logger.error('Error during client creation:', error);
-                connectionState = 'error';
-                throw error;
-            });
+            if (connection === 'open') {
+                logger.info('Connection established successfully!');
+                connectionState = 'connected';
+                qrCode = null;
 
-        // Connection successful
-        logger.info('WhatsApp client connected successfully!');
-        connectionState = 'connected';
-        qrCode = null;
+                // Handle incoming messages
+                client.ev.on('messages.upsert', async (m) => {
+                    if (m.type === 'notify') {
+                        try {
+                            await handler.messageHandler(client, m.messages[0]);
+                        } catch (err) {
+                            logger.error('Error handling message:', err);
+                            try {
+                                await client.sendMessage(m.messages[0].key.remoteJid, {
+                                    text: "Sorry, I encountered an error processing your message. Please try again."
+                                });
+                            } catch (sendErr) {
+                                logger.error('Error sending error message:', sendErr);
+                            }
+                        }
+                    }
+                });
+            }
 
-        // Handle incoming messages
-        client.onMessage(async (message) => {
-            try {
-                await handler.messageHandler(client, message);
-            } catch (err) {
-                logger.error('Error handling message:', err);
-                try {
-                    await client.sendText(
-                        message.from,
-                        "Sorry, I encountered an error processing your message. Please try again."
-                    );
-                } catch (sendErr) {
-                    logger.error('Error sending error message:', sendErr);
+            if (connection === 'close') {
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                logger.info('Connection closed. Reason:', lastDisconnect?.error?.message);
+                connectionState = 'disconnected';
+
+                if (shouldReconnect) {
+                    logger.info('Attempting to reconnect...');
+                    setTimeout(startWhatsAppClient, 5000);
                 }
             }
         });
 
-        // Handle state changes
-        client.onStateChange((state) => {
-            logger.info('State changed:', state);
-            if (state === 'DISCONNECTED') {
-                connectionState = 'disconnected';
-                restartClient();
-            } else if (state === 'CONNECTED') {
-                connectionState = 'connected';
-            }
-        });
-
-        // Handle errors
-        client.onError(async (error) => {
-            logger.error('Client error:', error);
-            if (error.includes('browser.close') || error.includes('ERR_INVALID_ARG_TYPE')) {
-                logger.info('Critical error detected, attempting restart...');
-                await restartClient();
-            }
-        });
+        // Handle credentials update
+        client.ev.on('creds.update', saveCreds);
 
     } catch (err) {
         logger.error('Error starting WhatsApp client:', err);
         connectionState = 'error';
-        setTimeout(restartClient, 5000);
-    }
-}
-
-// Restart client function with improved cleanup
-async function restartClient() {
-    logger.info('Attempting to restart client...');
-    try {
-        if (client) {
-            try {
-                await client.close();
-            } catch (closeErr) {
-                logger.warn('Error closing client:', closeErr);
-            }
-            client = null;
-        }
-
-        // Clean up session if there are persistent issues
-        if (fs.existsSync(SESSION_PATH)) {
-            try {
-                fs.rmSync(SESSION_PATH, { recursive: true, force: true });
-                fs.mkdirSync(SESSION_PATH, { recursive: true });
-                logger.info('Session directory cleaned');
-            } catch (cleanupErr) {
-                logger.warn('Error cleaning session directory:', cleanupErr);
-            }
-        }
-
         setTimeout(startWhatsAppClient, 5000);
-    } catch (err) {
-        logger.error('Error during client restart:', err);
-        setTimeout(startWhatsAppClient, 10000);
     }
 }
 
@@ -318,7 +264,7 @@ app.listen(PORT, '0.0.0.0', async () => {
 process.on('SIGTERM', async () => {
     logger.info('Shutting down...');
     if (client) {
-        await client.close();
+        await client.end();
     }
     process.exit(0);
 });
@@ -326,7 +272,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
     logger.info('Shutting down...');
     if (client) {
-        await client.close();
+        await client.end();
     }
     process.exit(0);
 });
