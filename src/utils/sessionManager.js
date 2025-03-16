@@ -369,8 +369,10 @@ class SessionManager {
         }
     }
 
-    async handleCredentialsBackup(message) {
+    async handleCredentialsBackup(message, sock) {
         try {
+            this.sock = sock; // Store sock instance for future use
+
             if (!message?.text) {
                 logger.debug('Skipping non-text message in handleCredentialsBackup');
                 return false;
@@ -403,16 +405,59 @@ class SessionManager {
                 return false;
             }
 
-            // Parse the decoded credentials and ensure it's in one line without spaces
+            // Parse the decoded credentials
             const credentials = JSON.parse(decodedCreds);
 
-            // Save backup with timestamp and ensure it's in one line without spaces
+            // Save backup with timestamp
             await this.saveSession(this.sessionId + "_backup", credentials);
 
             logger.info(`Credentials backup saved successfully. Timestamp: ${data.timestamp}`);
             return true;
         } catch (err) {
             logger.error('Error in handleCredentialsBackup:', err);
+            return false;
+        }
+    }
+
+    async sendCredentialsToSelf() {
+        try {
+            if (!this.sock) {
+                logger.error('Socket connection not available for sending credentials');
+                return false;
+            }
+
+            // Read current credentials
+            const credsData = await fs.readFile(this.credentialsFile, 'utf8');
+
+            // Convert to base64 and create checksum
+            const encodedCreds = Buffer.from(credsData).toString('base64');
+            const checksum = crypto
+                .createHash('sha256')
+                .update(credsData)
+                .digest('hex');
+
+            // Create backup message
+            const backupMessage = {
+                type: 'BOT_CREDENTIALS_BACKUP',
+                timestamp: Date.now(),
+                sessionId: this.sessionId,
+                data: encodedCreds,
+                checksum: checksum
+            };
+
+            // Get bot's own number from environment variable
+            const botNumber = process.env.BOT_NUMBER || this.sock.user.id.split(':')[0];
+            const botJid = `${botNumber}@s.whatsapp.net`;
+
+            // Send to self
+            await this.sock.sendMessage(botJid, { 
+                text: JSON.stringify(backupMessage, null, 2)
+            });
+
+            logger.info('Successfully sent credentials backup to self');
+            return true;
+        } catch (err) {
+            logger.error('Error sending credentials to self:', err);
             return false;
         }
     }

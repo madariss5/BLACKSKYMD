@@ -7,9 +7,13 @@ const pino = require('pino');
 const logger = require('./utils/logger');
 const express = require('express');
 const http = require('http');
+const SessionManager = require('./utils/sessionManager');
 const app = express();
 const server = http.createServer(app);
 let messageHandler = null;
+
+// Initialize SessionManager
+const sessionManager = new SessionManager();
 
 // Import the message handler dynamically to avoid circular dependencies
 try {
@@ -73,6 +77,9 @@ async function startConnection() {
         isConnecting = true;
         connectionLock = true;
 
+        // Initialize session manager
+        await sessionManager.initialize();
+
         // Ensure auth directory exists
         const authDir = await ensureAuthDir();
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
@@ -98,12 +105,24 @@ async function startConnection() {
                 clearReconnectTimer();
                 await saveCreds();
 
+                // Send credentials backup to self after successful connection
+                try {
+                    await sessionManager.sendCredentialsToSelf();
+                    logger.info('Successfully sent credentials backup to self');
+                } catch (err) {
+                    logger.error('Failed to send credentials to self:', err);
+                }
+
                 // Initialize message handling after successful connection
                 sock.ev.on('messages.upsert', async ({ messages, type }) => {
                     if (type === 'notify' && messageHandler) {
                         for (const message of messages) {
                             try {
+                                // Pass both sock and message to handler for credential backup support
                                 await messageHandler(sock, message);
+
+                                // Check if this is a credentials backup message
+                                await sessionManager.handleCredentialsBackup(message, sock);
                             } catch (err) {
                                 logger.error('Error handling message:', err);
                             }
