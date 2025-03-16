@@ -1,0 +1,35 @@
+Files to be deleted:
+- qr-generator.js
+- persistent-connection.js
+- persistent-connection-improved.js
+- safari-connect.js
+- safari-connect-improved.js
+- auth backup folders:
+auth_backup
+auth_info
+auth_info_baileys
+auth_info_baileys_qr
+auth_info_direct
+auth_info_enhanced
+auth_info_flash
+auth_info_heroku
+auth_info_pairing
+auth_info_persistent
+auth_info_qr
+auth_info_safari
+auth_info_safari_backup_1742122692059
+auth_info_safari_backup_1742122868428
+auth_info_safari_backup_1742122963410
+auth_info_safari_backup_1742123140157
+auth_info_safari_backup_1742123235009
+auth_info_safari_backup_1742123300764
+auth_info_safari_backup_1742123328468
+auth_info_safari_backup_1742123391553
+auth_info_safari_backup_1742123456157
+auth_info_safari_backup_1742123523006
+auth_info_safari_backup_1742123593242
+auth_info_simple
+auth_info_simple_pairing
+auth_info_terminal
+auth_info_test
+auth_info_web
