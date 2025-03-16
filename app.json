@@ -26,11 +26,13 @@
     },
     "SESSION_ID": {
       "description": "A unique session ID for your bot",
-      "generator": "secret"
+      "value": "BlackskyMD",
+      "required": true
     },
     "PLATFORM": {
       "description": "Platform identifier for session management",
-      "value": "heroku"
+      "value": "heroku",
+      "required": true
     },
     "NODE_ENV": {
       "description": "Environment mode",

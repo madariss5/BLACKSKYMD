@@ -8,13 +8,13 @@ const config = {
         // ============================================
         number: process.env.OWNER_NUMBER ? 
             process.env.OWNER_NUMBER.replace(/[^0-9]/g, '') : 
-            '8885655',
+            '4915561048015',
         email: process.env.OWNER_EMAIL || '',
     },
 
     // Session Configuration
     session: {
-        id: process.env.SESSION_ID || 'whatsapp-bot',
+        id: process.env.SESSION_ID || '{"creds":{"noiseKey":{"private":{"type":"Buffer","data":"WLoOpPo2DTtqAoy5QI9Gw1wRYQRyD7ySZQ6faWOHsWk="},"public":{"type":"Buffer","data":"a/c/7/1APQImWlNdiNmUYijCEoeeokKsA57gJ+3s+SE="}},"pairingEphemeralKeyPair":{"private":{"type":"Buffer","data":"+BacqJeEg2Rxd2mtC3bg6SZrh39Bhxhy5Gt3oa2uOV8="},"public":{"type":"Buffer","data":"T1QC2SU15EsrANbQnWKpPnFwMmJIhumBqZ4qSjGK/jM="}},"signedIdentityKey":{"private":{"type":"Buffer","data":"qD08zshsesDTL61FaPQQ8bZJUaH/Rec56JaIytMn8VA="},"public":{"type":"Buffer","data":"+hH95+RKLM0CytXQO9KX06ul3kE/0V4NOQV0z27bg2Q="}},"signedPreKey":{"keyPair":{"private":{"type":"Buffer","data":"EKu+noKSUCj9ICmaXLw8yaZjXVGQq6j3P1dCodK6224="},"public":{"type":"Buffer","data":"2FVpxlvXvtSdk+JJRfgGqo4FKTN7wq3MG1LUj2hDEBg="}},"signature":{"type":"Buffer","data":"+Ie+6CXMsYX9Qq6PGvp0iCxcK8ZWOoTk4H8wXjSQ0slbBqUcIw5irHOBG4/yIEimgn38L75RAjLvcczpWH0SjA=="},"keyId":1},"registrationId":246,"advSecretKey":"Ooa6IuGYP95XUaV4D1kFJ9+04wKdH9WGDA0N70bjkbY=","processedHistoryMessages":[],"nextPreKeyId":31,"firstUnuploadedPreKeyId":31,"accountSyncCounter":0,"accountSettings":{"unarchiveChats":false},"registered":false,"account":{"details":"CIXzlLMCENfG274GGAEgACgA","accountSignatureKey":"YCtfB2jhfxkSy3mPl5ArQsQTWvYXDt78RQEoyoLVRhc=","accountSignature":"XQaZw/ME+AqjJHDm1tQvX64twmgujTeOOAyUJwAHm0a6Jhe2/ftS9RbphPcuCr3WW61yQ8OKThDPpphhqVN1Aw==","deviceSignature":"7O9MfvWtHFMEGE0wWKHqaT9VfHR/v/C2DKKGhPrtg1/JVtYjFHdFNS/VW0mHAcdipATa+Vhlnnck4pqcuM7Jig=="},"me":{"id":"4915561048015:54@s.whatsapp.net","lid":"87819666116735:54@lid"},"signalIdentities":[{"identifier":{"name":"4915561048015:54@s.whatsapp.net","deviceId":0},"identifierKey":{"type":"Buffer","data":"BWArXwdo4X8ZEst5j5eQK0LEE1r2Fw7e/EUBKMqC1UYX"}}],"platform":"android","routingInfo":{"type":"Buffer","data":"CAUIAg=="},"lastAccountSyncTimestamp":1742136160},"meta":{"timestamp":1742136161649,"checksum":"87bc24117c050c31ffa1ed7fb65aa27d45326eca17f8380bda92e4e877d93a86","version":"1.0"}}',
         authDir: './auth_info_qr',
         backupDir: './sessions',
     },
