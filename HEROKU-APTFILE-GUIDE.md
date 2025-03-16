@@ -106,31 +106,57 @@ heroku logs --tail -a your-whatsapp-bot-name
 
 ## Troubleshooting
 
-### Deployment Failures
+### Canvas and Pangocairo Dependency Issues
 
-If you're still experiencing issues with the canvas dependency, try these additional steps:
+The most common error when deploying is related to the canvas library and its dependency on pangocairo:
 
-1. Set Node.js version explicitly in package.json:
+```
+Error: Package pangocairo was not found in the pkg-config search path.
+Perhaps you should add the directory containing `pangocairo.pc'
+to the PKG_CONFIG_PATH environment variable
+```
+
+To fix this issue:
+
+1. Make sure your Aptfile includes all required dependencies:
+   ```
+   libcairo2-dev
+   libpango1.0-dev
+   libjpeg-dev
+   libgif-dev
+   librsvg2-dev
+   build-essential
+   python3
+   ffmpeg
+   libpixman-1-dev
+   libpango1.0-0
+   libpangocairo-1.0-0
+   pkg-config
+   ```
+
+2. Set Node.js version explicitly in heroku-package.json:
    ```json
    "engines": {
      "node": "18.x"
    }
    ```
 
-2. Remove the canvas and chartjs-node-canvas dependencies if you don't absolutely need them:
-
-   ```bash
-   # Edit package.json to remove these dependencies
-   # Then push again
-   git push heroku main
+3. In heroku-package.json, use an older version of canvas that is more compatible with Heroku:
+   ```json
+   "canvas": "^2.11.2",
    ```
 
-3. Check if the Aptfile is being processed in the logs:
+4. Ensure both buildpacks are configured correctly:
+   ```bash
+   heroku buildpacks:clear -a your-whatsapp-bot-name
+   heroku buildpacks:add --index 1 heroku-community/apt -a your-whatsapp-bot-name
+   heroku buildpacks:add --index 2 heroku/nodejs -a your-whatsapp-bot-name
+   ```
 
+5. Check if the Aptfile is being processed in the logs:
    ```bash
    heroku logs --source app --tail -a your-whatsapp-bot-name
    ```
-
    You should see messages about installing the apt packages.
 
 ### Connection Issues
