@@ -172,6 +172,15 @@
       "cooldown": 5,
       "category": "reactions",
       "enabled": true
+    },
+    {
+      "name": "kill",
+      "description": "Kill someone!",
+      "usage": ".kill @user",
+      "aliases": ["murder", "slay"],
+      "cooldown": 10,
+      "category": "reactions",
+      "enabled": true
     }
   ]
 }

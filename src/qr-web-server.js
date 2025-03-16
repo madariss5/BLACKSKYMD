@@ -18,6 +18,7 @@ const {
     handleConnectionError, 
     resetConnectionStats 
 } = require('./utils/connectionErrorHandler');
+const { backupCredentials, sendCredsBackup } = require('./utils/credentialsBackup');
 
 // Create Express app
 const app = express();
@@ -30,16 +31,23 @@ let connectionStatus = 'disconnected';
 let sock = null;
 let qrGenerationAttempt = 0;
 
-// Auth directory
-const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info');
+// Use a unique auth directory to avoid conflicts with other sessions
+const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info_' + Date.now());
 
-// Ensure auth directory exists
-if (!fs.existsSync(AUTH_DIRECTORY)) {
-    fs.mkdirSync(AUTH_DIRECTORY, { recursive: true });
-} else {
-    // Don't clean auth directory - we want to keep existing credentials
-    logger.info('Auth directory already exists, using existing credentials');
+// Always create a fresh auth directory
+if (fs.existsSync(AUTH_DIRECTORY)) {
+    // Remove existing auth directory to start fresh
+    try {
+        fs.rmSync(AUTH_DIRECTORY, { recursive: true, force: true });
+        logger.info(`Removed existing auth directory: ${AUTH_DIRECTORY}`);
+    } catch (err) {
+        logger.error(`Failed to remove existing auth directory: ${err.message}`);
+    }
 }
+
+// Create fresh auth directory
+fs.mkdirSync(AUTH_DIRECTORY, { recursive: true });
+logger.info(`Created fresh auth directory: ${AUTH_DIRECTORY}`);
 
 // Serve static HTML page with QR code
 app.get('/', (req, res) => {
@@ -294,9 +302,37 @@ async function startConnection() {
                 
                 try {
                     const user = sock.user;
-                    logger.info('Connected as:', user.name || user.verifiedName || user.id.split(':')[0]);
+                    const userString = user.name || user.verifiedName || user.id.split(':')[0];
+                    logger.info('Connected as:', userString);
+                    
+                    // Backup credentials to file
+                    const credsBackupPath = path.join(AUTH_DIRECTORY, 'creds.json');
+                    if (fs.existsSync(credsBackupPath)) {
+                        const credsData = JSON.parse(fs.readFileSync(credsBackupPath, 'utf8'));
+                        await backupCredentials(credsData);
+                        logger.info('Credentials backup saved');
+                        
+                        // Send credentials backup to self for extra security
+                        try {
+                            // Extract bot's JID from user object
+                            const botNumber = user.id.split(':')[0];
+                            const botJid = `${botNumber}@s.whatsapp.net`;
+                            
+                            // Send backup to bot's own number
+                            const success = await sendCredsBackup(sock, botJid);
+                            if (success) {
+                                logger.info('Credentials backup sent to bot\'s own number');
+                            } else {
+                                logger.warn('Failed to send credentials backup to bot\'s own number');
+                            }
+                        } catch (backupError) {
+                            logger.error('Error sending credentials backup to self:', backupError.message);
+                        }
+                    } else {
+                        logger.warn('Could not find credentials file for backup');
+                    }
                 } catch (e) {
-                    logger.error('Could not get user details:', e.message);
+                    logger.error('Could not get user details or backup credentials:', e.message);
                 }
             }
 
@@ -329,7 +365,18 @@ async function startConnection() {
         });
 
         // Handle credentials update
-        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('creds.update', async (creds) => {
+            // Save using Baileys built-in method
+            await saveCreds();
+            
+            // Also backup using our utility
+            try {
+                await backupCredentials(creds);
+                logger.info('Credentials backed up after update');
+            } catch (err) {
+                logger.error('Failed to backup credentials after update:', err.message);
+            }
+        });
         
         // Wire up message handler
         sock.ev.on('messages.upsert', async (m) => {

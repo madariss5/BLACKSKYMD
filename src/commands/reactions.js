@@ -1,13 +1,12 @@
 /**
- * Reaction Commands for WhatsApp Bot
+ * Simplified Reaction Commands for WhatsApp Bot
  * Sends animated GIFs with proper mention formatting
  */
 
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
 const logger = require('../utils/logger');
-const { safeSendMessage, isJidGroup } = require('../utils/jidHelper');
+const { safeSendMessage } = require('../utils/jidHelper');
 
 // Paths to reaction GIFs directories
 const REACTIONS_DIR = path.join(process.cwd(), 'data', 'reaction_gifs');
@@ -28,70 +27,14 @@ function ensureDirectoriesExist() {
 // Ensure directories exist when module loads
 ensureDirectoriesExist();
 
-// Get path to GIF with fallback
-function getGifPath(filename) {
-    // Try primary path first
-    const primaryPath = path.join(REACTIONS_DIR, filename);
-    if (fs.existsSync(primaryPath) && fs.statSync(primaryPath).size > 1024) {
-        return primaryPath;
-    }
-    
-    // Try fallback path
-    const fallbackPath = path.join(ANIMATED_GIFS_DIR, filename);
-    if (fs.existsSync(fallbackPath) && fs.statSync(fallbackPath).size > 1024) {
-        return fallbackPath;
-    }
-    
-    // Return primary path even if it doesn't exist
-    return primaryPath;
-}
-
-// Map of reaction types to their corresponding GIF files
-const REACTION_GIFS = {
-    // Basic reactions
-    hug: getGifPath('hug.gif'),
-    pat: getGifPath('pat.gif'),
-    kiss: getGifPath('kiss.gif'),
-    cuddle: getGifPath('cuddle.gif'),
-    
-    // Expressions
-    smile: getGifPath('smile.gif'),
-    happy: getGifPath('happy.gif'),
-    wave: getGifPath('wave.gif'),
-    dance: getGifPath('dance.gif'),
-    cry: getGifPath('cry.gif'),
-    blush: getGifPath('blush.gif'),
-    laugh: getGifPath('laugh.gif'),
-    wink: getGifPath('wink.gif'),
-    
-    // Physical actions
-    poke: getGifPath('poke.gif'),
-    slap: getGifPath('slap.gif'),
-    bonk: getGifPath('bonk.gif'),
-    bite: getGifPath('bite.gif'),
-    punch: getGifPath('punch.gif'),
-    highfive: getGifPath('highfive.gif'),
-    
-    // Other actions
-    yeet: getGifPath('yeet.gif')
-};
-
-// Cache for GIF buffers
-const GIF_CACHE = new Map();
-
 // Helper function to get user name from message
 async function getUserName(sock, jid) {
     try {
-        // Handle null JID
         if (!jid) return "Someone";
-        
-        // Handle group JID
         if (jid.endsWith('@g.us')) return "Group Chat";
         
-        // Extract phone number from JID
         const phoneNumber = jid.split('@')[0];
         
-        // Try to get contact info
         let name = null;
         if (sock.store && sock.store.contacts) {
             const contact = sock.store.contacts[jid];
@@ -102,129 +45,127 @@ async function getUserName(sock, jid) {
         
         return name || `+${phoneNumber}`;
     } catch (err) {
-        logger.error(`Error getting user name: ${err.message}`);
         return "User";
     }
 }
 
-// Reaction message templates
-const REACTION_MESSAGES = {
-    hug: (sender, target) => `${sender} hugs ${target} 🤗`,
-    pat: (sender, target) => `${sender} pats ${target} 👋`,
-    kiss: (sender, target) => `${sender} kisses ${target} 😘`,
-    cuddle: (sender, target) => `${sender} cuddles with ${target} 🥰`,
-    smile: (sender) => `${sender} smiles 😊`,
-    happy: (sender) => `${sender} is happy 😄`,
-    wave: (sender, target) => `${sender} waves at ${target} 👋`,
-    dance: (sender) => `${sender} is dancing 💃`,
-    cry: (sender) => `${sender} is crying 😢`,
-    blush: (sender) => `${sender} is blushing 😳`,
-    laugh: (sender) => `${sender} is laughing 😂`,
-    wink: (sender, target) => `${sender} winks at ${target} 😉`,
-    poke: (sender, target) => `${sender} pokes ${target} 👉`,
-    slap: (sender, target) => `${sender} slaps ${target} 👋`,
-    bonk: (sender, target) => `${sender} bonks ${target} 🔨`,
-    bite: (sender, target) => `${sender} bites ${target} 😬`,
-    punch: (sender, target) => `${sender} punches ${target} 👊`,
-    highfive: (sender, target) => `${sender} high fives ${target} ✋`,
-    yeet: (sender, target) => `${sender} yeets ${target} 🚀`
-};
-
-// Common reaction command handler
-async function handleReactionCommand(sock, message, type, args) {
+// Simplified reaction command handler - with proper WhatsApp mentions
+async function handleReaction(sock, message, type, args) {
     try {
-        // Get sender JID
         const jid = message.key.remoteJid;
-        
-        // Get sender name
         const senderJid = message.key.participant || message.key.remoteJid;
         const senderName = await getUserName(sock, senderJid);
         
-        // Check if GIF exists
-        const gifPath = REACTION_GIFS[type];
-        if (!gifPath || !fs.existsSync(gifPath)) {
-            await safeSendMessage(sock, jid, { text: `❌ Sorry, the ${type} GIF is not available.` });
-            return;
-        }
-        
         // Get mentioned user or args as target
-        let targetJid = null;
         let targetName = "themselves";
+        let targetJid = null;
+        let mentionedJids = [];
         
         // Check if there's a mention
         const mentionedJid = message.message?.extendedTextMessage?.contextInfo?.mentionedJid;
         if (mentionedJid && mentionedJid.length > 0) {
             targetJid = mentionedJid[0];
             targetName = await getUserName(sock, targetJid);
+            mentionedJids.push(targetJid);
         } else if (args.length > 0) {
-            // Use args as name
             targetName = args.join(' ');
         }
         
-        // Get reaction message
+        // Add sender to mentions list for proper highlighting
+        mentionedJids.push(senderJid);
+        
+        // Define reaction message with proper mention formatting
         let reactionMessage;
-        if (['smile', 'happy', 'dance', 'cry', 'blush', 'laugh'].includes(type)) {
-            // Self-reactions don't need a target
-            reactionMessage = REACTION_MESSAGES[type](senderName);
-        } else {
-            // Regular reactions need a target
-            reactionMessage = REACTION_MESSAGES[type](senderName, targetName);
+        
+        // Format the sender name for mention
+        const formattedSender = `@${senderJid.split('@')[0]}`;
+        
+        // Format target for mention if we have their JID
+        const formattedTarget = targetJid ? `@${targetJid.split('@')[0]}` : targetName;
+        
+        switch (type) {
+            // Self-reactions (only mention the sender)
+            case 'smile': reactionMessage = `${formattedSender} smiles 😊`; break;
+            case 'happy': reactionMessage = `${formattedSender} is happy 😄`; break;
+            case 'dance': reactionMessage = `${formattedSender} is dancing 💃`; break;
+            case 'cry': reactionMessage = `${formattedSender} is crying 😢`; break;
+            case 'blush': reactionMessage = `${formattedSender} is blushing 😳`; break;
+            case 'laugh': reactionMessage = `${formattedSender} is laughing 😂`; break;
+            
+            // Target-reactions (mention both sender and target)
+            case 'hug': reactionMessage = `${formattedSender} hugs ${formattedTarget} 🤗`; break;
+            case 'pat': reactionMessage = `${formattedSender} pats ${formattedTarget} 👋`; break;
+            case 'kiss': reactionMessage = `${formattedSender} kisses ${formattedTarget} 😘`; break;
+            case 'cuddle': reactionMessage = `${formattedSender} cuddles with ${formattedTarget} 🥰`; break;
+            case 'wave': reactionMessage = `${formattedSender} waves at ${formattedTarget} 👋`; break;
+            case 'wink': reactionMessage = `${formattedSender} winks at ${formattedTarget} 😉`; break;
+            case 'poke': reactionMessage = `${formattedSender} pokes ${formattedTarget} 👉`; break;
+            case 'slap': reactionMessage = `${formattedSender} slaps ${formattedTarget} 👋`; break;
+            case 'bonk': reactionMessage = `${formattedSender} bonks ${formattedTarget} 🔨`; break;
+            case 'bite': reactionMessage = `${formattedSender} bites ${formattedTarget} 😬`; break;
+            case 'punch': reactionMessage = `${formattedSender} punches ${formattedTarget} 👊`; break;
+            case 'highfive': reactionMessage = `${formattedSender} high fives ${formattedTarget} ✋`; break;
+            case 'yeet': reactionMessage = `${formattedSender} yeets ${formattedTarget} 🚀`; break;
+            case 'kill': reactionMessage = `${formattedSender} kills ${formattedTarget} 💀`; break;
+            
+            default: reactionMessage = `${formattedSender} reacts with ${type}`; break;
         }
         
-        // Send the text message first
-        await safeSendMessage(sock, jid, { text: reactionMessage });
-        
-        // Load the GIF
-        let gifBuffer;
-        const gifHash = crypto.createHash('md5').update(gifPath).digest('hex');
-        
-        // Check cache first
-        if (GIF_CACHE.has(gifHash)) {
-            gifBuffer = GIF_CACHE.get(gifHash);
-        } else {
-            // Load and cache the GIF
-            gifBuffer = fs.readFileSync(gifPath);
-            GIF_CACHE.set(gifHash, gifBuffer);
-        }
-        
-        // Send the GIF
-        await safeSendMessage(sock, jid, {
-            video: gifBuffer,
-            gifPlayback: true,
-            caption: ''
+        // Send the text message with proper mentions
+        await safeSendMessage(sock, jid, { 
+            text: reactionMessage,
+            mentions: mentionedJids
         });
+        
+        // Send the GIF if available
+        const gifPath = path.join(REACTIONS_DIR, `${type}.gif`);
+        
+        if (fs.existsSync(gifPath)) {
+            const gifBuffer = fs.readFileSync(gifPath);
+            
+            await safeSendMessage(sock, jid, {
+                video: gifBuffer,
+                gifPlayback: true,
+                caption: ''
+            });
+        }
     } catch (error) {
         logger.error(`Error in ${type} command: ${error.message}`);
-        const jid = message.key.remoteJid;
-        await safeSendMessage(sock, jid, { text: `❌ Error sending ${type} reaction: ${error.message}` });
+        try {
+            const jid = message.key.remoteJid;
+            await safeSendMessage(sock, jid, { text: `❌ Could not send ${type} reaction` });
+        } catch (err) {
+            logger.error('Failed to send error message:', err);
+        }
     }
 }
 
-// Command implementation
-const reactionCommands = {
-    hug: async (sock, message, args) => await handleReactionCommand(sock, message, 'hug', args),
-    pat: async (sock, message, args) => await handleReactionCommand(sock, message, 'pat', args),
-    kiss: async (sock, message, args) => await handleReactionCommand(sock, message, 'kiss', args),
-    cuddle: async (sock, message, args) => await handleReactionCommand(sock, message, 'cuddle', args),
-    smile: async (sock, message, args) => await handleReactionCommand(sock, message, 'smile', args),
-    happy: async (sock, message, args) => await handleReactionCommand(sock, message, 'happy', args),
-    wave: async (sock, message, args) => await handleReactionCommand(sock, message, 'wave', args),
-    dance: async (sock, message, args) => await handleReactionCommand(sock, message, 'dance', args),
-    cry: async (sock, message, args) => await handleReactionCommand(sock, message, 'cry', args),
-    blush: async (sock, message, args) => await handleReactionCommand(sock, message, 'blush', args),
-    laugh: async (sock, message, args) => await handleReactionCommand(sock, message, 'laugh', args),
-    wink: async (sock, message, args) => await handleReactionCommand(sock, message, 'wink', args),
-    poke: async (sock, message, args) => await handleReactionCommand(sock, message, 'poke', args),
-    slap: async (sock, message, args) => await handleReactionCommand(sock, message, 'slap', args),
-    bonk: async (sock, message, args) => await handleReactionCommand(sock, message, 'bonk', args),
-    bite: async (sock, message, args) => await handleReactionCommand(sock, message, 'bite', args),
-    punch: async (sock, message, args) => await handleReactionCommand(sock, message, 'punch', args),
-    highfive: async (sock, message, args) => await handleReactionCommand(sock, message, 'highfive', args),
-    yeet: async (sock, message, args) => await handleReactionCommand(sock, message, 'yeet', args)
+// Command implementation with explicit commands
+const commands = {
+    hug: async (sock, message, args) => await handleReaction(sock, message, 'hug', args),
+    pat: async (sock, message, args) => await handleReaction(sock, message, 'pat', args),
+    kiss: async (sock, message, args) => await handleReaction(sock, message, 'kiss', args),
+    cuddle: async (sock, message, args) => await handleReaction(sock, message, 'cuddle', args),
+    smile: async (sock, message, args) => await handleReaction(sock, message, 'smile', args),
+    happy: async (sock, message, args) => await handleReaction(sock, message, 'happy', args),
+    wave: async (sock, message, args) => await handleReaction(sock, message, 'wave', args),
+    dance: async (sock, message, args) => await handleReaction(sock, message, 'dance', args),
+    cry: async (sock, message, args) => await handleReaction(sock, message, 'cry', args),
+    blush: async (sock, message, args) => await handleReaction(sock, message, 'blush', args),
+    laugh: async (sock, message, args) => await handleReaction(sock, message, 'laugh', args),
+    wink: async (sock, message, args) => await handleReaction(sock, message, 'wink', args),
+    poke: async (sock, message, args) => await handleReaction(sock, message, 'poke', args),
+    slap: async (sock, message, args) => await handleReaction(sock, message, 'slap', args),
+    bonk: async (sock, message, args) => await handleReaction(sock, message, 'bonk', args),
+    bite: async (sock, message, args) => await handleReaction(sock, message, 'bite', args),
+    punch: async (sock, message, args) => await handleReaction(sock, message, 'punch', args),
+    highfive: async (sock, message, args) => await handleReaction(sock, message, 'highfive', args),
+    yeet: async (sock, message, args) => await handleReaction(sock, message, 'yeet', args),
+    kill: async (sock, message, args) => await handleReaction(sock, message, 'kill', args)
 };
 
 /**
- * Initialize the module and validate all reaction GIFs
+ * Initialize the module - validate all reaction GIFs
  */
 async function init() {
     logger.info('Initializing reactions module...');
@@ -236,30 +177,34 @@ async function init() {
     const validGifs = [];
     const missingGifs = [];
     
-    for (const [type, gifPath] of Object.entries(REACTION_GIFS)) {
-        if (gifPath && fs.existsSync(gifPath)) {
+    Object.keys(commands).forEach(cmdName => {
+        if (cmdName === 'init') return;
+        
+        const gifPath = path.join(REACTIONS_DIR, `${cmdName}.gif`);
+        
+        if (fs.existsSync(gifPath)) {
             const stats = fs.statSync(gifPath);
             if (stats.size > 1024) {
-                validGifs.push(type);
-                logger.info(`✅ Found valid GIF for ${type}: ${gifPath}`);
+                validGifs.push(cmdName);
+                logger.info(`✅ Found valid GIF for ${cmdName}: ${gifPath}`);
             } else {
-                missingGifs.push(type);
-                logger.warn(`⚠️ GIF file for ${type} is too small: ${stats.size} bytes`);
+                missingGifs.push(cmdName);
+                logger.warn(`⚠️ GIF file for ${cmdName} is too small: ${stats.size} bytes`);
             }
         } else {
-            missingGifs.push(type);
-            logger.warn(`❌ Missing GIF for ${type}`);
+            missingGifs.push(cmdName);
+            logger.warn(`❌ Missing GIF for ${cmdName}`);
         }
-    }
+    });
     
     logger.info(`Reaction GIFs validation complete. Valid: ${validGifs.length}, Missing: ${missingGifs.length}`);
     
     return true;
 }
 
-// Export module
+// Export module with appropriate properties
 module.exports = {
-    commands: reactionCommands,
+    commands,
     category: 'reactions',
     init
 };
