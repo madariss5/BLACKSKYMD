@@ -15,6 +15,10 @@ author = "agent"
 task = "workflow.run"
 args = "WhatsApp Bot"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "GitHub Editor"
+
 [[workflows.workflow]]
 name = "Run Bot"
 author = 40502297
@@ -37,6 +41,20 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node src/qr-web-server.js"
+
+[[workflows.workflow]]
+name = "GitHub Editor"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace/github-tools && node minimal-github-editor.js"
 
 [deployment]
 run = ["sh", "-c", "node src/qr-web-server.js"]
