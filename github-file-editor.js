@@ -46,7 +46,7 @@ const colors = {
 };
 
 // Create readline interface for user input
-const rl = readline.createInterface({
+let rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
