@@ -14,7 +14,7 @@ const DEFAULT_COMMIT_MESSAGE = "Update WhatsApp Bot with improved configuration"
 const DEFAULT_BRANCH = "main";
 const DEFAULT_REMOTE = "origin";
 // Use a predefined repository URL instead of asking for input
-const REPO_URL = process.env.GITHUB_REPO_URL || "https://github.com/username/whatsapp-md-bot.git";
+const REPO_URL = "https://github.com/madariss5/BLACKSKY.git";
 
 // ANSI color codes for output
 const COLORS = {
