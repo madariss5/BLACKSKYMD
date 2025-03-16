@@ -36,7 +36,7 @@ let connectionLock = false;
 let sessionInvalidated = false;
 let reconnectTimer = null;
 let latestQR = null;
-let isFullyConnected = false; // New flag to track full connection status
+let isFullyConnected = false;
 
 // Enhanced connection configuration
 const connectionConfig = {
@@ -51,8 +51,8 @@ const connectionConfig = {
     browser: [`BLACKSKY-MD-${Date.now().toString().slice(-6)}`, 'Chrome', '110.0.0'],
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 30000,
-    keepAliveIntervalMs: 15000,
-    emitOwnEvents: false,
+    keepAliveIntervalMs: 25000,
+    emitOwnEvents: true,
     retryRequestDelayMs: 2000,
     fireInitQueries: true,
     downloadHistory: false,
@@ -62,6 +62,24 @@ const connectionConfig = {
     version: [2, 2323, 4]
 };
 
+async function cleanupConnection() {
+    try {
+        if (sock) {
+            // Remove all event listeners
+            sock.ev.removeAllListeners();
+            // Close the connection gracefully if possible
+            if (typeof sock.logout === 'function') {
+                await sock.logout();
+            }
+            sock = null;
+        }
+        isFullyConnected = false;
+        logger.info('Connection cleanup completed');
+    } catch (err) {
+        logger.error('Error during connection cleanup:', err);
+    }
+}
+
 async function startConnection() {
     if (isConnecting || connectionLock) {
         logger.info('Connection attempt already in progress, skipping...');
@@ -69,9 +87,9 @@ async function startConnection() {
     }
 
     try {
+        await cleanupConnection();
         isConnecting = true;
         connectionLock = true;
-        isFullyConnected = false;
 
         // Initialize session manager
         await sessionManager.initialize();
@@ -86,6 +104,7 @@ async function startConnection() {
             auth: state
         });
 
+        // Set up connection update handler
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
@@ -106,42 +125,32 @@ async function startConnection() {
                 sessionInvalidated = false;
                 clearReconnectTimer();
 
-                // Save credentials first
+                // Save credentials
                 await saveCreds();
 
-                // Initialize message handling after successful connection
-                sock.ev.process(
-                    // highlight-next-line
-                    async (events) => {
-                        if (events['messages.upsert']) {
-                            const { messages, type } = events['messages.upsert'];
-                            if (type === 'notify' && messageHandler) {
-                                for (const message of messages) {
-                                    try {
-                                        await messageHandler(sock, message);
-
-                                        // Handle credentials backup separately
-                                        if (isFullyConnected) {
-                                            await sessionManager.handleCredentialsBackup(message, sock);
-                                        }
-                                    } catch (err) {
-                                        logger.error('Error handling message:', err);
-                                    }
-                                }
+                // Handle messages
+                sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                    if (type === 'notify' && messageHandler && isFullyConnected) {
+                        for (const message of messages) {
+                            try {
+                                await messageHandler(sock, message);
+                                await sessionManager.handleCredentialsBackup(message, sock);
+                            } catch (err) {
+                                logger.error('Error handling message:', err);
                             }
                         }
                     }
-                );
+                });
 
-                // Send credentials backup to self after a short delay
+                // Send credentials backup after connection is stable
                 setTimeout(async () => {
-                    try {
-                        if (isFullyConnected) {
+                    if (isFullyConnected) {
+                        try {
                             await sessionManager.sendCredentialsToSelf();
-                            logger.info('Successfully sent credentials backup to self');
+                            logger.info('Credentials backup sent successfully');
+                        } catch (err) {
+                            logger.error('Failed to send credentials backup:', err);
                         }
-                    } catch (err) {
-                        logger.error('Failed to send credentials to self:', err);
                     }
                 }, 5000);
 
@@ -150,32 +159,22 @@ async function startConnection() {
             }
 
             if (connection === 'close') {
-                if (!isFullyConnected) {
-                    logger.warn('Connection closed before fully established');
+                if (!lastDisconnect?.error) {
+                    logger.warn('Connection closed without error');
+                    return;
                 }
 
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                logger.info(`Connection closed with status code: ${statusCode}`);
+                const statusCode = lastDisconnect.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
-                // Reset connection state
+                logger.info(`Connection closed with status ${statusCode}, shouldReconnect: ${shouldReconnect}`);
+
+                // Reset states
                 isFullyConnected = false;
+                isConnecting = false;
+                connectionLock = false;
 
-                // Handle critical errors
-                if (statusCode === DisconnectReason.loggedOut || 
-                    statusCode === DisconnectReason.connectionReplaced ||
-                    statusCode === DisconnectReason.connectionClosed ||
-                    statusCode === DisconnectReason.connectionLost ||
-                    statusCode === DisconnectReason.timedOut ||
-                    statusCode === 440) {
-
-                    if (retryCount >= MAX_RETRIES) {
-                        logger.error('Max retries reached, clearing session and restarting...');
-                        await cleanupSession();
-                        process.exit(1);
-                        return;
-                    }
-
-                    // Implement exponential backoff
+                if (shouldReconnect && retryCount < MAX_RETRIES) {
                     retryCount++;
                     currentRetryInterval = Math.min(
                         currentRetryInterval * 2,
@@ -186,25 +185,24 @@ async function startConnection() {
 
                     clearReconnectTimer();
                     reconnectTimer = setTimeout(async () => {
-                        isConnecting = false;
-                        connectionLock = false;
                         await startConnection();
                     }, currentRetryInterval);
                 } else {
-                    // For other errors, attempt immediate reconnection
-                    isConnecting = false;
-                    connectionLock = false;
-                    await startConnection();
+                    logger.error('Connection terminated, max retries reached or logged out');
+                    await cleanupSession();
                 }
             }
         });
 
+        // Set up creds update handler
         sock.ev.on('creds.update', saveCreds);
 
         return sock;
     } catch (err) {
         logger.error('Fatal error in startConnection:', err);
         isFullyConnected = false;
+        isConnecting = false;
+        connectionLock = false;
 
         if (retryCount < MAX_RETRIES) {
             retryCount++;
@@ -216,17 +214,12 @@ async function startConnection() {
             logger.info(`Retrying connection in ${currentRetryInterval/1000}s`);
             clearReconnectTimer();
             reconnectTimer = setTimeout(async () => {
-                isConnecting = false;
-                connectionLock = false;
                 await startConnection();
             }, currentRetryInterval);
         } else {
             await cleanupSession();
             process.exit(1);
         }
-    } finally {
-        isConnecting = false;
-        connectionLock = false;
     }
 }
 
