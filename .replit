@@ -19,6 +19,10 @@ args = "WhatsApp Bot"
 task = "workflow.run"
 args = "Heroku Web Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Index Connection"
+
 [[workflows.workflow]]
 name = "Run Bot"
 author = 40502297
@@ -56,6 +60,21 @@ task = "packager.installForAll"
 task = "shell.exec"
 args = "PORT=5000 node heroku-bot.js"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Index Connection"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node src/index.js"
+waitForPort = 5001
 
 [deployment]
 run = ["sh", "-c", "node src/index.js"]
