@@ -3,8 +3,7 @@
  * Designed for maximum reliability
  */
 
-const fs = require('fs');
-const fsPromises = fs.promises;
+const fs = require('fs').promises;
 const path = require('path');
 const logger = console;
 
@@ -42,14 +41,14 @@ async function loadCommandConfigs() {
         
         // Check if config directory exists
         try {
-            await fsPromises.access(configDir);
+            await fs.access(configDir);
         } catch (err) {
             logger.error('Config directory does not exist:', configDir);
             return configsMap;
         }
         
         // Read all JSON config files
-        const configFiles = await fsPromises.readdir(configDir);
+        const configFiles = await fs.readdir(configDir);
         logger.log(`Found ${configFiles.length} config files in ${configDir}`);
         
         for (const file of configFiles) {
@@ -91,39 +90,37 @@ async function loadCommandConfigs() {
 async function loadCommands() {
     try {
         const commandsPath = path.join(process.cwd(), 'src/commands');
-        const files = await getAllFiles(commandsPath);
-        let loadedCount = 0;
-        let stubCount = 0;
-
         logger.log('\nStarting command loading process...');
         logger.log('Loading commands from:', commandsPath);
-        
-        // Load all command configurations first
+
+        // Load command configurations first
         const commandConfigs = await loadCommandConfigs();
         logger.log(`Loaded ${commandConfigs.size} command configurations from JSON files`);
 
         // Track which commands are actually implemented
         const implementedCommands = new Set();
 
+        // Get all JavaScript files
+        const files = await getAllFiles(commandsPath);
+        let loadedCount = 0;
+        let stubCount = 0;
+
         // First pass - load all implemented commands
         for (const file of files) {
             if (file.endsWith('.js') && !['index.js'].includes(path.basename(file))) {
                 try {
                     logger.log(`\nProcessing file: ${path.relative(commandsPath, file)}`);
-                    const filePath = file;
-                    const moduleData = require(filePath);
+                    delete require.cache[require.resolve(file)]; // Clear cache
+                    const moduleData = require(file);
                     const fileBasename = path.basename(file, '.js');
                     const category = path.basename(path.dirname(file)) !== 'commands' 
                         ? path.basename(path.dirname(file)) 
                         : fileBasename;
 
-                    // Handle both direct commands and categorized commands
                     if (moduleData.commands) {
                         Object.entries(moduleData.commands).forEach(([name, func]) => {
                             if (typeof func === 'function' && name !== 'init') {
-                                // Get configuration for this command
                                 const config = commandConfigs.get(name);
-                                
                                 commands.set(name, {
                                     execute: async (sock, message, args) => {
                                         try {
@@ -142,7 +139,6 @@ async function loadCommands() {
                                     enabled: config?.enabled !== false,
                                     isStub: false
                                 });
-                                
                                 implementedCommands.add(name);
                                 loadedCount++;
                                 logger.log(`✓ Loaded command: ${name} (${config?.category || category})`);
@@ -195,7 +191,7 @@ async function loadCommands() {
                 }
             }
         }
-
+        
         // Second pass - create stubs for configured but unimplemented commands
         for (const [commandName, config] of commandConfigs.entries()) {
             if (!implementedCommands.has(commandName)) {
@@ -211,7 +207,7 @@ async function loadCommands() {
                         logger.error(`Error in stub command ${commandName}:`, err);
                     }
                 };
-
+                
                 commands.set(commandName, {
                     execute: stubHandler,
                     description: config.description || `Command: ${commandName}`,
@@ -223,12 +219,12 @@ async function loadCommands() {
                     enabled: config.enabled !== false,
                     isStub: true
                 });
-
+                
                 stubCount++;
                 logger.log(`⚠️ Created stub for command: ${commandName} (${config.category})`);
             }
         }
-
+        
         logger.log('\n✅ Command loading summary:');
         logger.log(`Total implemented commands loaded: ${loadedCount}`);
         logger.log(`Stub commands created: ${stubCount}`);
@@ -262,7 +258,7 @@ async function loadCommands() {
             .forEach(([category, count]) => {
                 logger.log(`- ${category}: ${count} commands`);
             });
-
+        
         if (loadedCount === 0 && stubCount === 0) {
             logger.error('⚠️ Warning: No commands were loaded!');
         }
@@ -273,12 +269,17 @@ async function loadCommands() {
 
 // Recursively get all files in directory
 async function getAllFiles(dir) {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    const files = await Promise.all(entries.map(entry => {
-        const fullPath = path.join(dir, entry.name);
-        return entry.isDirectory() ? getAllFiles(fullPath) : fullPath;
-    }));
-    return files.flat();
+    try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        const files = await Promise.all(entries.map(entry => {
+            const fullPath = path.join(dir, entry.name);
+            return entry.isDirectory() ? getAllFiles(fullPath) : fullPath;
+        }));
+        return files.flat();
+    } catch (err) {
+        logger.error(`Error reading directory ${dir}:`, err);
+        return [];
+    }
 }
 
 // Add fallback commands if they don't exist
@@ -408,7 +409,7 @@ async function messageHandler(sock, message) {
         
         // Debug message content
         console.log(`Message content: "${content}", Prefix detected: "${prefix}", Is command: ${isCommand}`);
-
+        
         if (isCommand) {
             // Extract command name and arguments
             // This improved version handles quotes and special characters better
@@ -426,17 +427,17 @@ async function messageHandler(sock, message) {
                 // Command with no args
                 commandName = content.slice(1).toLowerCase();
             }
-
+            
             // Log command processing
             console.log(`\nProcessing command: ${commandName} with args:`, args);
-
+            
             // Show typing indicator
             try {
                 await sock.sendPresenceUpdate('composing', message.key.remoteJid);
             } catch (err) {
                 logger.error('Error setting presence:', err);
             }
-
+            
             if (commands.has(commandName)) {
                 try {
                     const command = commands.get(commandName);
@@ -476,7 +477,7 @@ async function messageHandler(sock, message) {
                     `❌ Command *${prefix}${commandName}* not found. Try ${prefix}help or ${prefix}menu for available commands.${suggestText}`
                 );
             }
-
+            
             // Stop typing indicator
             try {
                 await sock.sendPresenceUpdate('paused', message.key.remoteJid);
@@ -501,11 +502,15 @@ async function init() {
         logger.log('\nInitializing ultra minimal handler...');
 
         // Load all commands first
-        await loadCommands();
+        const success = await loadCommands();
+        if (!success) {
+            logger.error('Failed to load commands');
+            return false;
+        }
 
         // Add fallback commands
         addFallbackCommands();
-        
+
         // Explicitly load the reactions module to ensure it's registered
         try {
             const reactionsPath = path.join(process.cwd(), 'src/commands/reactions.js');
@@ -557,8 +562,6 @@ async function init() {
 
         // Verify commands are loaded
         const totalCommands = commands.size;
-        const commandList = Array.from(commands.keys()).sort();
-
         logger.log('\n✅ Handler initialization complete:');
         logger.log(`Total commands available: ${totalCommands}`);
         logger.log('Try these basic commands:');
