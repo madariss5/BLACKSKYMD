@@ -3,15 +3,40 @@
  * Provides standardized error handling and reporting for all command modules
  */
 
-const logger = require('./logger');
-const { 
-  safeSendMessage, 
-  safeSendText, 
-  safeSendImage,
-  safeSendButtons,
-  normalizeJid,
-  ensureJidString
-} = require('./jidHelper');
+// Load logger
+let logger;
+try {
+    logger = require('./logger');
+} catch (err) {
+    // Fallback to console if logger isn't available
+    logger = {
+        info: console.log,
+        error: console.error,
+        warn: console.warn,
+        debug: console.log
+    };
+}
+
+// Load safe message helpers
+let jidHelper;
+try {
+    jidHelper = require('./jidHelper');
+} catch (err) {
+    // Fallback if jidHelper isn't available
+    jidHelper = {
+        safeSendMessage: async (sock, jid, content) => {
+            try {
+                return await sock.sendMessage(jid, content);
+            } catch (err) {
+                logger.error(`Error sending message: ${err.message}`);
+                return null;
+            }
+        }
+    };
+}
+
+// Counter for retry attempts per command
+const retryCounter = new Map();
 
 /**
  * Handle an error that occurred during command execution
@@ -29,84 +54,50 @@ const {
  * @returns {Promise<void>}
  */
 async function handleCommandError(sock, jid, error, commandName, moduleName, options = {}) {
-  const {
-    reply = true,
-    logError = true,
-    userFriendly = true,
-    detailed = false,
-    useRetry = true
-  } = options;
-  
-  // Log the error
-  if (logError) {
-    // Add category for better log classification
-    const category = categorizeError(error);
+    // Default options
+    const {
+        reply = true,
+        logError = true,
+        userFriendly = true,
+        detailed = false,
+        useRetry = true
+    } = options;
     
-    logger.error(`Error in ${moduleName}.${commandName} [${category}]: ${error.message}`, {
-      error: error.stack,
-      module: moduleName,
-      command: commandName,
-      category,
-      jid: ensureJidString(jid)
-    });
-  }
-  
-  // Send error response to user
-  if (reply) {
-    // Skip responding for certain errors or invalid recipients
-    if (!jid || jid === 'unknown' || !sock || typeof sock.sendMessage !== 'function') {
-      logger.warn(`Can't send error message: Invalid sock or JID (command: ${commandName}, module: ${moduleName})`);
-      return;
-    }
-    
-    // Handle user input errors directly without retry mechanism
-    if (isUserInputError(error) && userFriendly) {
-      try {
-        const errorMessage = `❌ *Error:* ${error.message}`;
-        await safeSendText(sock, jid, errorMessage);
-        return;
-      } catch (inputErrorReplyError) {
-        logger.error(`Failed to send input error message: ${inputErrorReplyError.message}`);
-      }
-    }
-    
-    // Use enhanced error messaging with retry for other errors
-    if (useRetry) {
-      try {
-        const messageSent = await sendEnhancedErrorMessage(
-          sock, 
-          jid, 
-          error, 
-          commandName,
-          userFriendly ? false : detailed
-        );
-        
-        if (messageSent) {
-          return;
+    // Always log errors unless specifically disabled
+    if (logError) {
+        logger.error(`Error in command "${commandName}" from module "${moduleName}": ${error.message}`);
+        if (error.stack) {
+            logger.error(`Stack trace: ${error.stack}`);
         }
-      } catch (enhancedMessageError) {
-        logger.error(`Enhanced error message failed: ${enhancedMessageError.message}`);
-      }
     }
     
-    // Fallback to simple message if enhanced messaging fails or isn't used
+    // Skip reply if disabled
+    if (!reply || !sock || !jid) return;
+    
     try {
-      let errorMessage;
-      
-      if (userFriendly) {
-        // Get user-friendly message based on error category
-        const category = categorizeError(error);
-        errorMessage = `❌ ${getUserFriendlyErrorMessage(category, commandName)}`;
-      } else {
-        // Technical error with details (for debugging/admin)
-        errorMessage = `❌ *Error in ${commandName}*:\n\n${error.message}\n\nModule: ${moduleName}`;
-      }
-      
-      await safeSendText(sock, jid, errorMessage);
-    } catch (replyError) {
-      logger.error(`All error messaging methods failed: ${replyError.message}`);
+        // Determine user-friendly message based on error type
+        const errorCategory = categorizeError(error);
+        let userMessage = userFriendly 
+            ? getUserFriendlyErrorMessage(errorCategory, commandName)
+            : `Error executing command ${commandName}: ${error.message}`;
+            
+        // Add technical details if requested
+        if (detailed) {
+            userMessage += `\n\nTechnical details: ${error.message}`;
+            if (error.code) {
+                userMessage += `\nError code: ${error.code}`;
+            }
+        }
+        
+        // Send error message with retry mechanism
+        if (useRetry) {
+            await retryMessageSend(sock, jid, { text: userMessage });
+        } else {
+            await jidHelper.safeSendMessage(sock, jid, { text: userMessage });
+        }
+    } catch (sendErr) {
+        logger.error(`Failed to send error message: ${sendErr.message}`);
     }
-  }
 }
 
 /**
@@ -120,25 +111,12 @@ async function handleCommandError(sock, jid, error, commandName, moduleName, opt
  * @returns {Promise<any>} - The result from the command function or null if it failed
  */
 async function safelyExecuteCommand(commandFunction, sock, message, args, commandName, moduleName) {
-  try {
-    return await commandFunction(sock, message, args);
-  } catch (error) {
-    // Safely extract JID, handle case where message might be invalid
-    let jid = 'unknown';
     try {
-      if (message && message.key && message.key.remoteJid) {
-        jid = message.key.remoteJid;
-      } else if (sock && sock.user && sock.user.id) {
-        // Fall back to bot's own JID if message JID is not available
-        jid = sock.user.id;
-      }
-    } catch (e) {
-      logger.error(`Failed to extract JID: ${e.message}`);
+        return await commandFunction(sock, message, args);
+    } catch (error) {
+        await handleCommandError(sock, message.key.remoteJid, error, commandName, moduleName);
+        return null;
     }
-    
-    await handleCommandError(sock, jid, error, commandName, moduleName);
-    return null;
-  }
 }
 
 /**
@@ -149,57 +127,9 @@ async function safelyExecuteCommand(commandFunction, sock, message, args, comman
  * @returns {Function} - The wrapped command function
  */
 function wrapWithErrorHandler(commandFunction, commandName, moduleName) {
-  return async function(sock, message, args) {
-    // Validate required parameters
-    if (!sock) {
-      logger.error(`Invalid socket passed to ${commandName} in ${moduleName}`);
-      return null;
-    }
-    
-    // If args is undefined, initialize as empty array
-    if (!args) {
-      args = [];
-    }
-    
-    // Apply timeout to prevent hanging commands (10 second default)
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(`Command ${commandName} timed out after 10 seconds`));
-      }, 10000);
-    });
-    
-    try {
-      // Race the command execution against the timeout
-      return await Promise.race([
-        safelyExecuteCommand(commandFunction, sock, message, args, commandName, moduleName),
-        timeoutPromise
-      ]);
-    } catch (error) {
-      // Handle timeout errors
-      logger.error(`Timeout or error in ${commandName}: ${error.message}`);
-      
-      // Get JID if possible for error reporting
-      let jid = 'unknown';
-      try {
-        if (message && message.key && message.key.remoteJid) {
-          jid = message.key.remoteJid;
-        }
-      } catch (e) {
-        // Ignore JID extraction errors
-      }
-      
-      await handleCommandError(
-        sock, 
-        jid, 
-        error, 
-        commandName, 
-        moduleName, 
-        { userFriendly: true }
-      );
-      
-      return null;
-    }
-  };
+    return async (sock, message, args) => {
+        return await safelyExecuteCommand(commandFunction, sock, message, args, commandName, moduleName);
+    };
 }
 
 /**
@@ -209,21 +139,21 @@ function wrapWithErrorHandler(commandFunction, commandName, moduleName) {
  * @returns {Object} - A new object with all commands wrapped with error handling
  */
 function addErrorHandlingToAll(commandsObject, moduleName) {
-  const wrappedCommands = {};
-  
-  for (const [commandName, commandFunction] of Object.entries(commandsObject)) {
-    if (typeof commandFunction === 'function') {
-      wrappedCommands[commandName] = wrapWithErrorHandler(
-        commandFunction,
-        commandName,
-        moduleName
-      );
-    } else {
-      wrappedCommands[commandName] = commandFunction;
-    }
-  }
-  
-  return wrappedCommands;
+    const wrappedCommands = {};
+    
+    Object.keys(commandsObject).forEach(commandName => {
+        if (typeof commandsObject[commandName] === 'function') {
+            wrappedCommands[commandName] = wrapWithErrorHandler(
+                commandsObject[commandName],
+                commandName,
+                moduleName
+            );
+        } else {
+            wrappedCommands[commandName] = commandsObject[commandName];
+        }
+    });
+    
+    return wrappedCommands;
 }
 
 /**
@@ -232,26 +162,21 @@ function addErrorHandlingToAll(commandsObject, moduleName) {
  * @returns {boolean} - Whether it's a user input error
  */
 function isUserInputError(error) {
-  // Check for custom property
-  if (error.isUserError) {
-    return true;
-  }
-  
-  // Check for specific error messages that indicate user input problems
-  const userErrorPatterns = [
-    /invalid (input|argument|parameter)/i,
-    /missing (input|argument|parameter)/i,
-    /please provide/i,
-    /not found/i,
-    /no results/i,
-    /invalid format/i,
-    /not supported/i,
-    /too (large|small|long|short)/i,
-    /exceeded limit/i,
-    /must be (a|an) [a-z]+/i
-  ];
-  
-  return userErrorPatterns.some(pattern => pattern.test(error.message));
+    if (!error) return false;
+    
+    // Check for common input error messages
+    const userInputErrorPatterns = [
+        /invalid (input|argument|parameter)/i,
+        /missing (required )?(input|argument|parameter)/i,
+        /incorrect format/i,
+        /too (few|many) arguments/i,
+        /argument out of range/i,
+        /invalid URL/i,
+        /user not found/i,
+        /group not found/i
+    ];
+    
+    return userInputErrorPatterns.some(pattern => pattern.test(error.message));
 }
 
 /**
@@ -260,60 +185,40 @@ function isUserInputError(error) {
  * @returns {string} - Error category
  */
 function categorizeError(error) {
-  const message = error.message.toLowerCase();
-  
-  // Connection-related errors
-  if (message.includes('connection') || 
-      message.includes('timeout') || 
-      message.includes('network') ||
-      message.includes('disconnected') ||
-      message.includes('offline')) {
-    return 'connection';
-  }
-  
-  // Authentication-related errors
-  if (message.includes('auth') || 
-      message.includes('login') || 
-      message.includes('credentials') ||
-      message.includes('permission')) {
-    return 'authentication';
-  }
-  
-  // Rate limiting or server-side errors
-  if (message.includes('too many') || 
-      message.includes('rate limit') || 
-      message.includes('429') ||
-      message.includes('server error') ||
-      message.includes('5xx')) {
-    return 'rate_limit';
-  }
-  
-  // Media-related errors
-  if (message.includes('media') || 
-      message.includes('image') || 
-      message.includes('video') ||
-      message.includes('audio') ||
-      message.includes('file')) {
-    return 'media';
-  }
-  
-  // Validation-related errors
-  if (message.includes('invalid') ||
-      message.includes('validation') ||
-      message.includes('format')) {
-    return 'validation';
-  }
-  
-  // JID-related errors
-  if (message.includes('jid') ||
-      message.includes('recipient') ||
-      message.includes('whatsapp.net') ||
-      message.includes('g.us')) {
-    return 'jid';
-  }
-  
-  // Default to 'unknown' for unrecognized errors
-  return 'unknown';
+    if (!error) return 'unknown';
+    
+    // Check for input errors first
+    if (isUserInputError(error)) {
+        return 'input';
+    }
+    
+    // Network/connection related errors
+    if (/network|connection|timeout|econnrefused|fetch|request|unavailable/i.test(error.message)) {
+        return 'network';
+    }
+    
+    // Permission related errors
+    if (/permission|unauthorized|forbidden|not allowed|admin only/i.test(error.message)) {
+        return 'permission';
+    }
+    
+    // Media/file related errors
+    if (/file|media|image|video|audio|download|upload|buffer|stream/i.test(error.message)) {
+        return 'media';
+    }
+    
+    // WhatsApp specific errors
+    if (/whatsapp|wa|baileys|socket|jid|message|chat|group/i.test(error.message)) {
+        return 'whatsapp';
+    }
+    
+    // Rate limiting
+    if (/rate|limit|too many|throttle/i.test(error.message)) {
+        return 'ratelimit';
+    }
+    
+    // Default to general error
+    return 'general';
 }
 
 /**
@@ -323,28 +228,29 @@ function categorizeError(error) {
  * @returns {string} - User-friendly error message
  */
 function getUserFriendlyErrorMessage(category, commandName) {
-  switch (category) {
-    case 'connection':
-      return `I'm having trouble connecting right now. Please try the ${commandName} command again in a moment.`;
-    
-    case 'authentication':
-      return `I don't have permission to perform this action. The ${commandName} command might need special access.`;
-    
-    case 'rate_limit':
-      return `I'm receiving too many requests right now. Please try the ${commandName} command again later.`;
-    
-    case 'media':
-      return `I had trouble processing the media for the ${commandName} command. The file might be too large or in an unsupported format.`;
-    
-    case 'validation':
-      return `There was a problem with the information provided for the ${commandName} command. Please check your input and try again.`;
-    
-    case 'jid':
-      return `I couldn't send the message to this chat. Please try the ${commandName} command in a different chat.`;
-    
-    default:
-      return `I encountered a problem with the ${commandName} command. Please try again or use a different command.`;
-  }
+    switch (category) {
+        case 'input':
+            return `⚠️ There seems to be an issue with the way you used the ${commandName} command. Please check the command format with !help ${commandName}.`;
+        
+        case 'network':
+            return `⚠️ Sorry, I couldn't complete the ${commandName} command because of a network issue. Please try again later.`;
+        
+        case 'permission':
+            return `⚠️ You don't have permission to use the ${commandName} command, or I need admin rights to perform this action.`;
+        
+        case 'media':
+            return `⚠️ There was a problem processing the media for the ${commandName} command. Make sure you're sending a supported file type and it's not too large.`;
+        
+        case 'whatsapp':
+            return `⚠️ I encountered a WhatsApp-related issue while running the ${commandName} command. Please try again later.`;
+        
+        case 'ratelimit':
+            return `⚠️ You're using the ${commandName} command too frequently. Please wait a moment before trying again.`;
+        
+        case 'general':
+        default:
+            return `⚠️ An error occurred while running the ${commandName} command. Please try again later.`;
+    }
 }
 
 /**
@@ -359,153 +265,46 @@ function getUserFriendlyErrorMessage(category, commandName) {
  * @returns {Promise<Object|null>} - Message sending result or null if all retries failed
  */
 async function retryMessageSend(sock, jid, content, options = {}) {
-  const {
-    maxRetries = 3,
-    initialDelay = 500,
-    sendFunction = safeSendMessage
-  } = options;
-  
-  let lastError = null;
-  const normalizedJid = normalizeJid(jid);
-  
-  if (!normalizedJid) {
-    logger.error('Invalid JID provided for retry message send');
-    return null;
-  }
-  
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      // Wait with exponential backoff, except on first attempt
-      if (attempt > 0) {
-        const delay = initialDelay * Math.pow(2, attempt - 1);
-        logger.info(`Retry attempt ${attempt}/${maxRetries} after ${delay}ms delay`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-      
-      // Attempt to send the message
-      const result = await sendFunction(sock, normalizedJid, content);
-      
-      if (result) {
-        if (attempt > 0) {
-          logger.info(`Message send succeeded after ${attempt} retries`);
+    const {
+        maxRetries = 3,
+        initialDelay = 500,
+        sendFunction = jidHelper.safeSendMessage
+    } = options;
+    
+    let attempt = 0;
+    let delay = initialDelay;
+    
+    while (attempt < maxRetries) {
+        try {
+            return await sendFunction(sock, jid, content);
+        } catch (err) {
+            attempt++;
+            
+            if (attempt >= maxRetries) {
+                logger.error(`Failed to send message after ${maxRetries} attempts: ${err.message}`);
+                return null;
+            }
+            
+            logger.warn(`Message send attempt ${attempt} failed: ${err.message}. Retrying in ${delay}ms`);
+            
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, delay));
+            
+            // Exponential backoff
+            delay *= 2;
         }
-        return result;
-      }
-    } catch (error) {
-      lastError = error;
-      const category = categorizeError(error);
-      
-      // Don't retry certain error categories
-      if (category === 'authentication' || category === 'validation' || category === 'jid') {
-        logger.warn(`Not retrying message send due to ${category} error: ${error.message}`);
-        break;
-      }
-      
-      logger.warn(`Message send attempt ${attempt + 1}/${maxRetries + 1} failed: ${error.message}`);
-    }
-  }
-  
-  // If we reached here, all retries failed
-  if (lastError) {
-    logger.error(`All ${maxRetries + 1} message send attempts failed. Last error: ${lastError.message}`);
-  } else {
-    logger.error(`All ${maxRetries + 1} message send attempts failed with unknown errors`);
-  }
-  
-  return null;
-}
-
-/**
- * Send an error message to user with enhanced reliability
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {Error} error - The error that occurred
- * @param {string} commandName - Name of the command that failed
- * @param {boolean} detailed - Whether to include technical details
- * @returns {Promise<boolean>} - Whether the error message was sent successfully
- */
-async function sendEnhancedErrorMessage(sock, jid, error, commandName, detailed = false) {
-  const normalizedJid = normalizeJid(jid);
-  
-  if (!normalizedJid || !sock || typeof sock.sendMessage !== 'function') {
-    return false;
-  }
-  
-  try {
-    const category = categorizeError(error);
-    const userFriendlyMessage = getUserFriendlyErrorMessage(category, commandName);
-    
-    let errorMessage;
-    if (detailed) {
-      errorMessage = `❌ *Error in ${commandName}*\n\n${userFriendlyMessage}\n\n*Technical details:* ${error.message}`;
-    } else {
-      errorMessage = `❌ ${userFriendlyMessage}`;
     }
     
-    // Try to send with buttons for better user experience (with fallback)
-    try {
-      const buttons = [
-        {buttonId: 'help', buttonText: {displayText: '💡 Get Help'}, type: 1},
-        {buttonId: `${commandName}_retry`, buttonText: {displayText: '🔄 Try Again'}, type: 1}
-      ];
-      
-      // First try buttons message with retry options
-      // Create a wrapper function that adapts safeSendButtons to the signature expected by retryMessageSend
-      const buttonSendWrapper = async (sock, jid, content) => {
-        if (!content || typeof content !== 'object') return null;
-        return await safeSendButtons(
-          sock, 
-          jid, 
-          content.text || '', 
-          content.footer || '', 
-          content.buttons || []
-        );
-      };
-      
-      const result = await retryMessageSend(
-        sock,
-        normalizedJid,
-        {
-          text: errorMessage,
-          footer: `Error Category: ${category.toUpperCase()}`,
-          buttons
-        },
-        { maxRetries: 2, sendFunction: buttonSendWrapper }
-      );
-      
-      if (result) {
-        return true;
-      }
-      
-      // Fall back to simple text message if buttons fail
-      logger.info('Falling back to simple text error message');
-    } catch (buttonError) {
-      logger.warn(`Button error message failed, falling back to text: ${buttonError.message}`);
-    }
-    
-    // Simple text fallback
-    const result = await retryMessageSend(
-      sock,
-      normalizedJid,
-      { text: errorMessage },
-      { maxRetries: 3 }
-    );
-    
-    return !!result;
-  } catch (finalError) {
-    logger.error(`Failed to send enhanced error message: ${finalError.message}`);
-    return false;
-  }
+    return null;
 }
 
 module.exports = {
-  handleCommandError,
-  safelyExecuteCommand,
-  wrapWithErrorHandler,
-  addErrorHandlingToAll,
-  isUserInputError,
-  categorizeError,
-  getUserFriendlyErrorMessage,
-  retryMessageSend,
-  sendEnhancedErrorMessage
+    handleCommandError,
+    safelyExecuteCommand,
+    wrapWithErrorHandler,
+    addErrorHandlingToAll,
+    isUserInputError,
+    categorizeError,
+    getUserFriendlyErrorMessage,
+    retryMessageSend
 };

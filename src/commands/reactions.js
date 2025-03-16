@@ -172,7 +172,9 @@ async function handleReaction(sock, message, type, args) {
                 const gifBuffer = fs.readFileSync(gifPath);
                 try {
                     const videoBuffer = await convertGifToMp4(gifBuffer);
-                    await sock.sendMessage(jid, {
+                    
+                    // Use safe send for video messages
+                    await safeSendMessage(sock, jid, {
                         video: videoBuffer,
                         gifPlayback: true,
                         caption: '',
@@ -181,7 +183,9 @@ async function handleReaction(sock, message, type, args) {
                     logger.info(`Sent reaction GIF for: ${type}`);
                 } catch (conversionError) {
                     logger.error(`GIF conversion failed: ${conversionError.message}`);
-                    await sock.sendMessage(jid, {
+                    
+                    // Use safe send for fallback image
+                    await safeSendMessage(sock, jid, {
                         image: gifBuffer,
                         caption: '',
                         mimetype: 'image/gif'

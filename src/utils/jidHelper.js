@@ -2,13 +2,6 @@
  * JID Helper Utility - Safe WhatsApp JID functions
  * Prevents "jid.endsWith is not a function" error
  */
-const logger = require('./logger');
-const mediaEffects = require('./mediaEffects');
-const path = require('path');
-const ffmpeg = require('fluent-ffmpeg');
-
-// JID string type cache to avoid repeated checks
-const jidTypeCache = new Map();
 
 /**
  * Safely check if a JID is a group JID - High-performance optimized
@@ -17,20 +10,8 @@ const jidTypeCache = new Map();
  */
 function isJidGroup(jid) {
     if (!jid) return false;
-    
-    // Fast path for string JIDs
-    if (typeof jid === 'string') {
-        // Fast check using endsWith only
-        return jid.endsWith('@g.us');
-    }
-    
-    // Handle non-string JIDs
-    try {
-        const jidStr = String(jid || '');
-        return jidStr.endsWith('@g.us');
-    } catch {
-        return false;
-    }
+    const stringJid = String(jid);
+    return stringJid.endsWith('@g.us');
 }
 
 /**
@@ -40,20 +21,8 @@ function isJidGroup(jid) {
  */
 function isJidUser(jid) {
     if (!jid) return false;
-    
-    // Fast path for string JIDs
-    if (typeof jid === 'string') {
-        // Fast check using endsWith only
-        return jid.endsWith('@s.whatsapp.net');
-    }
-    
-    // Handle non-string JIDs
-    try {
-        const jidStr = String(jid || '');
-        return jidStr.endsWith('@s.whatsapp.net');
-    } catch {
-        return false;
-    }
+    const stringJid = String(jid);
+    return stringJid.endsWith('@s.whatsapp.net');
 }
 
 /**
@@ -64,27 +33,12 @@ function isJidUser(jid) {
 function normalizeJid(jid) {
     if (!jid) return '';
     
-    // Fast path for cached and string values
-    const cacheKey = typeof jid === 'object' ? JSON.stringify(jid) : jid;
-    if (jidTypeCache.has(cacheKey)) {
-        return jidTypeCache.get(cacheKey);
+    const stringJid = String(jid);
+    if (stringJid.endsWith('@c.us')) {
+        return stringJid.replace('@c.us', '@s.whatsapp.net');
     }
     
-    try {
-        let jidStr = typeof jid === 'string' ? jid : String(jid || '');
-        
-        // Fast check for @c.us suffix
-        if (jidStr.endsWith('@c.us')) {
-            jidStr = jidStr.slice(0, -5) + '@s.whatsapp.net';
-        }
-        
-        // Cache result for future lookups
-        jidTypeCache.set(cacheKey, jidStr);
-        
-        return jidStr;
-    } catch {
-        return '';
-    }
+    return stringJid;
 }
 
 /**
@@ -93,15 +47,8 @@ function normalizeJid(jid) {
  * @returns {string} - The JID as a string or empty string if invalid
  */
 function ensureJidString(jid) {
-    // Fast path for string JIDs
-    if (typeof jid === 'string') return jid;
     if (!jid) return '';
-    
-    try {
-        return String(jid || '');
-    } catch {
-        return '';
-    }
+    return String(jid);
 }
 
 /**
@@ -112,15 +59,14 @@ function ensureJidString(jid) {
 function extractUserIdFromJid(jid) {
     if (!jid) return '';
     
-    const jidStr = typeof jid === 'string' ? jid : String(jid || '');
+    const stringJid = String(jid);
+    const atIndex = stringJid.indexOf('@');
     
-    // Fast path using indexOf/substring instead of regex
-    const atIndex = jidStr.indexOf('@');
-    if (atIndex > 0) {
-        return jidStr.substring(0, atIndex);
+    if (atIndex !== -1) {
+        return stringJid.substring(0, atIndex);
     }
     
-    return '';
+    return stringJid;
 }
 
 /**
@@ -129,27 +75,13 @@ function extractUserIdFromJid(jid) {
  * @returns {string} - Formatted JID safe for logging
  */
 function formatJidForLogging(jid) {
-    if (!jid) return 'unknown';
+    if (!jid) return '<null>';
     
-    // Fast path for strings
-    if (typeof jid === 'string') return jid;
-    
-    // Object handling optimized
-    if (typeof jid === 'object') {
-        // Direct property access without try/catch for speed
-        if (jid.key && jid.key.remoteJid) {
-            return typeof jid.key.remoteJid === 'string' ? 
-                jid.key.remoteJid : String(jid.key.remoteJid || '');
-        } 
-        if (jid.remoteJid) {
-            return typeof jid.remoteJid === 'string' ? 
-                jid.remoteJid : String(jid.remoteJid || '');
-        }
-        return 'object_jid';
+    try {
+        return String(jid);
+    } catch (err) {
+        return `<invalid:${typeof jid}>`;
     }
-    
-    // Fallback - direct conversion
-    return String(jid || '');
 }
 
 /**
@@ -160,74 +92,21 @@ function formatJidForLogging(jid) {
  * @returns {Promise<Object|null>} - Message sending result or null if failed
  */
 async function safeSendMessage(sock, jid, content) {
+    if (!sock || !jid) {
+        console.error(`Cannot send message: ${!sock ? 'Socket is null' : 'JID is null'}`);
+        return null;
+    }
+    
+    const validJid = ensureJidString(jid);
+    if (!validJid) {
+        console.error(`Invalid JID: ${formatJidForLogging(jid)}`);
+        return null;
+    }
+    
     try {
-        // First check if sock is valid
-        if (!sock || typeof sock.sendMessage !== 'function') {
-            logger.error('Invalid socket object provided to safeSendMessage');
-            return null;
-        }
-        
-        // Handle case where jid comes from message.key.remoteJid
-        let targetJid = jid;
-        if (typeof jid === 'object' && jid !== null) {
-            if (jid.remoteJid) {
-                targetJid = jid.remoteJid;
-            } else if (jid.key && jid.key.remoteJid) {
-                targetJid = jid.key.remoteJid;
-            }
-        }
-        
-        const normalizedJid = normalizeJid(targetJid);
-        
-        if (!normalizedJid) {
-            logger.error('Invalid JID provided for message sending:', targetJid);
-            return null;
-        }
-        
-        // Content validation
-        if (!content || typeof content !== 'object') {
-            logger.error('Invalid content provided to safeSendMessage');
-            return null;
-        }
-        
-        // Enhanced mention handling for notification delivery
-        if (content.mentions && Array.isArray(content.mentions)) {
-            // Log mention information for debugging
-            logger.info(`Sending message with ${content.mentions.length} mentions to ${formatJidForLogging(normalizedJid)}`);
-            
-            // Ensure all mentions are properly formatted as strings
-            content.mentions = content.mentions.map(mentionJid => {
-                // Convert any non-string JIDs to strings
-                return ensureJidString(mentionJid);
-            }).filter(Boolean); // Remove any empty/invalid JIDs
-        }
-        
-        // Enhanced handling for audio files to fix JID errors
-        if (content.audio) {
-            // Ensure we have proper fileName for audio messages
-            if (!content.fileName && content.audio.url) {
-                content.fileName = `audio_${Date.now()}.${content.mimetype === 'audio/mp3' ? 'mp3' : 'mp4'}`;
-            }
-            
-            // Ensure proper mimetype for audio messages
-            if (!content.mimetype) {
-                content.mimetype = 'audio/mp3';
-            }
-            
-            logger.info(`Sending audio message to ${formatJidForLogging(normalizedJid)}`);
-        }
-        
-        return await sock.sendMessage(normalizedJid, content);
+        return await sock.sendMessage(validJid, content);
     } catch (err) {
-        logger.error('Error in safeSendMessage:', err);
-        // Improved error logging for debugging
-        logger.error('JID type:', typeof jid);
-        if (jid && typeof jid === 'object') {
-            logger.error('JID is object with keys:', Object.keys(jid));
-        }
-        if (content && content.audio) {
-            logger.error('Attempted to send audio message');
-        }
+        console.error(`Error sending message to ${formatJidForLogging(jid)}: ${err.message}`);
         return null;
     }
 }
@@ -247,367 +126,17 @@ async function safeSendText(sock, jid, text) {
  * Safe image message sending with JID validation
  * @param {Object} sock - WhatsApp socket connection
  * @param {any} jid - JID to send to
- * @param {string|Buffer} image - Image URL or buffer
+ * @param {Buffer|string} image - Image buffer or URL
  * @param {string} caption - Optional caption
  * @returns {Promise<Object|null>} - Message sending result or null if failed
  */
 async function safeSendImage(sock, jid, image, caption = '') {
-    const content = {
-        image: typeof image === 'string' ? { url: image } : image,
-        caption
+    const content = { 
+        image: image,
+        caption: caption
     };
     
     return await safeSendMessage(sock, jid, content);
-}
-
-/**
- * Safe sticker message sending with JID validation
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {Buffer} sticker - Sticker buffer
- * @param {Object} options - Additional options (mimetype, etc.)
- * @returns {Promise<Object|null>} - Message sending result or null if failed
- */
-async function safeSendSticker(sock, jid, sticker, options = {}) {
-    const content = {
-        sticker,
-        ...options
-    };
-    
-    return await safeSendMessage(sock, jid, content);
-}
-
-/**
- * Safe animated GIF sending with multiple fallback methods
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {Buffer|string} gif - GIF buffer or path to GIF file
- * @param {string} caption - Caption text for the GIF
- * @param {Object} options - Additional options
- * @returns {Promise<Object|null>} - Message sending result or null if failed
- */
-// Cache for GIF conversion to avoid repeating expensive operations
-const GIF_CACHE = new Map();
-const GIF_CACHE_SIZE_LIMIT = 50;  // Maximum number of cached GIFs
-const GIF_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-const crypto = require('crypto');
-
-/**
- * Safe animated GIF sending with caching for performance
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {Buffer|string} gif - GIF buffer or path to GIF file
- * @param {string} caption - Caption text for the GIF
- * @param {Object} options - Additional options
- * @returns {Promise<Object|null>} - Message sending result or null if failed
- */
-async function safeSendAnimatedGif(sock, jid, gif, caption = '', options = {}) {
-    try {
-        // Fast validation of socket
-        if (!sock?.sendMessage) return null;
-        
-        // Fast JID normalization
-        const normalizedJid = normalizeJid(typeof jid === 'object' ? (jid.remoteJid || (jid.key?.remoteJid)) : jid);
-        if (!normalizedJid) return null;
-
-        // Get file path or create hash for buffer
-        const fs = require('fs');
-        let gifPath = typeof gif === 'string' ? gif : null;
-        let buffer = typeof gif === 'string' ? null : gif;
-        let cacheKey = gifPath;
-        
-        // If it's a buffer, create a hash for cache key
-        if (!gifPath && Buffer.isBuffer(buffer)) {
-            // Simple hash function for buffer
-            const hash = crypto.createHash('md5').update(buffer).digest('hex');
-            cacheKey = `buffer:${hash}:${buffer.length}`;
-        }
-        
-        // Check cache for pre-converted MP4
-        if (cacheKey) {
-            const cachedItem = GIF_CACHE.get(cacheKey);
-            if (cachedItem && (Date.now() - cachedItem.timestamp < GIF_CACHE_DURATION)) {
-                // Use cached MP4 buffer
-                return await sock.sendMessage(normalizedJid, {
-                    video: cachedItem.buffer,
-                    caption,
-                    gifPlayback: true,
-                    mimetype: 'video/mp4',
-                    ...options
-                });
-            }
-        }
-
-        // Load buffer from file if needed (only once)
-        if (gifPath && !buffer) {
-            try {
-                if (!fs.existsSync(gifPath)) return null;
-                buffer = fs.readFileSync(gifPath);
-            } catch (err) {
-                return null;
-            }
-        }
-
-        // Convert GIF to MP4 efficiently
-        try {
-            const tempDir = await mediaEffects.ensureTempDir();
-            const tempGifPath = path.join(tempDir, `temp-${Date.now()}.gif`);
-            const mp4Path = path.join(tempDir, `temp-${Date.now()}.mp4`);
-            
-            // Write buffer to file for processing (minimal logging)
-            fs.writeFileSync(tempGifPath, buffer);
-            
-            // Convert GIF to MP4 with optimized settings
-            await new Promise((resolve, reject) => {
-                ffmpeg(tempGifPath)
-                    .outputOptions([
-                        '-movflags faststart',
-                        '-pix_fmt yuv420p',
-                        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
-                        '-b:v', '1M',     // Reduced bitrate for faster processing
-                        '-r', '24',        // Slightly lower framerate
-                        '-shortest',
-                        '-an',
-                        '-f', 'mp4'
-                    ])
-                    .output(mp4Path)
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .run();
-            });
-            
-            // Read the MP4 file
-            const mp4Buffer = fs.readFileSync(mp4Path);
-            
-            // Cache the converted MP4 for future use
-            if (cacheKey) {
-                // Clean up cache if it gets too large
-                if (GIF_CACHE.size >= GIF_CACHE_SIZE_LIMIT) {
-                    // Remove oldest entry
-                    const oldestKey = [...GIF_CACHE.entries()]
-                        .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
-                    GIF_CACHE.delete(oldestKey);
-                }
-                
-                GIF_CACHE.set(cacheKey, {
-                    buffer: mp4Buffer,
-                    timestamp: Date.now()
-                });
-            }
-            
-            // Send the message
-            const result = await sock.sendMessage(normalizedJid, {
-                video: mp4Buffer,
-                caption,
-                gifPlayback: true,
-                mimetype: 'video/mp4',
-                ...options
-            });
-            
-            // Clean up temp files in the background (non-blocking)
-            setImmediate(() => {
-                try {
-                    fs.unlinkSync(tempGifPath);
-                    fs.unlinkSync(mp4Path);
-                } catch (e) {
-                    // Ignore cleanup errors
-                }
-            });
-            
-            return result;
-        } catch (convErr) {
-            // Simplified fallback with less logging
-            try {
-                return await sock.sendMessage(normalizedJid, {
-                    video: buffer,
-                    gifPlayback: true,
-                    caption
-                });
-            } catch (fallbackErr) {
-                try {
-                    return await sock.sendMessage(normalizedJid, {
-                        image: buffer,
-                        caption
-                    });
-                } catch (finalErr) {
-                    return null;
-                }
-            }
-        }
-    } catch (outerErr) {
-        return null;
-    }
-}
-
-/**
- * Safe audio message sending with JID validation
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {string|Buffer} audio - Audio URL or buffer
- * @param {Object} options - Additional options like ptt (push to talk)
- * @returns {Promise<Object|null>} - Message sending result or null if failed
- */
-async function safeSendAudio(sock, jid, audio, options = {}) {
-    const content = {
-        audio: typeof audio === 'string' ? { url: audio } : audio,
-        mimetype: 'audio/mp4',
-        ...options
-    };
-    
-    return await safeSendMessage(sock, jid, content);
-}
-
-/**
- * Safe video message sending with JID validation
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {string|Buffer} video - Video URL or buffer
- * @param {string} caption - Optional caption
- * @param {Object} options - Additional options
- * @returns {Promise<Object|null>} - Message sending result or null if failed
- */
-async function safeSendVideo(sock, jid, video, caption = '', options = {}) {
-    const content = {
-        video: typeof video === 'string' ? { url: video } : video,
-        caption,
-        ...options
-    };
-    
-    return await safeSendMessage(sock, jid, content);
-}
-
-/**
- * Safe document message sending with JID validation
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {string|Buffer} document - Document URL or buffer
- * @param {string} fileName - Name of the file
- * @param {string} mimetype - MIME type of the document
- * @param {string} caption - Optional caption
- * @returns {Promise<Object|null>} - Message sending result or null if failed
- */
-async function safeSendDocument(sock, jid, document, fileName, mimetype, caption = '') {
-    const content = {
-        document: typeof document === 'string' ? { url: document } : document,
-        fileName,
-        mimetype,
-        caption
-    };
-    
-    return await safeSendMessage(sock, jid, content);
-}
-
-/**
- * Safe button message sending with JID validation
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {string} text - Message text
- * @param {string} footer - Footer text
- * @param {Array} buttons - Button array
- * @returns {Promise<Object|null>} - Message sending result or null if failed
- */
-async function safeSendButtons(sock, jid, text, footer, buttons) {
-    // Validate buttons format
-    if (!Array.isArray(buttons) || buttons.length === 0) {
-        logger.error('Invalid buttons array provided to safeSendButtons');
-        return null;
-    }
-    
-    const content = {
-        text,
-        footer,
-        buttons,
-        headerType: 1
-    };
-    
-    return await safeSendMessage(sock, jid, content);
-}
-
-/**
- * Safe location message sending with JID validation
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {number} latitude - Latitude
- * @param {number} longitude - Longitude
- * @param {string} name - Optional location name
- * @param {string} address - Optional location address
- * @returns {Promise<Object|null>} - Message sending result or null if failed
- */
-async function safeSendLocation(sock, jid, latitude, longitude, name = '', address = '') {
-    const content = {
-        location: {
-            degreesLatitude: latitude,
-            degreesLongitude: longitude,
-            name,
-            address
-        }
-    };
-    
-    return await safeSendMessage(sock, jid, content);
-}
-
-/**
- * Safe contact card message sending with JID validation
- * @param {Object} sock - WhatsApp socket connection
- * @param {any} jid - JID to send to
- * @param {string} displayName - Display name for the contact
- * @param {string} vcard - vCard data for the contact
- * @returns {Promise<Object|null>} - Message sending result or null if failed
- */
-async function safeSendContact(sock, jid, displayName, vcard) {
-    const content = {
-        contacts: {
-            displayName,
-            contacts: [{ vcard }]
-        }
-    };
-    
-    return await safeSendMessage(sock, jid, content);
-}
-
-/**
- * Format a phone number for WhatsApp @mentions
- * This function returns both the international format and a formatted display version
- * @param {string} phoneNumber - Phone number to format
- * @returns {Object} - Object with international and formatted properties
- */
-function formatPhoneForMention(phoneNumber) {
-    try {
-        // Handle null/undefined input
-        if (!phoneNumber) {
-            return {
-                international: '',
-                formatted: ''
-            };
-        }
-
-        // If it's a JID, extract just the number part
-        let number = phoneNumber;
-        if (typeof phoneNumber === 'string' && phoneNumber.includes('@')) {
-            number = phoneNumber.split('@')[0];
-        }
-        
-        // Ensure it's a string
-        number = String(number);
-        
-        // Strip any non-digit characters
-        const digits = number.replace(/\D/g, '');
-        
-        // Format with country code based on prefix - for display purposes
-        let formattedNumber = digits;
-        
-        // Return both versions for flexible usage
-        return {
-            international: digits,  // Raw digits for JID construction
-            formatted: formattedNumber  // Formatted for display
-        };
-    } catch (err) {
-        logger.error(`Error formatting phone for mention: ${err.message}`);
-        return {
-            international: String(phoneNumber || ''),
-            formatted: String(phoneNumber || '')
-        };
-    }
 }
 
 module.exports = {
@@ -617,16 +146,7 @@ module.exports = {
     ensureJidString,
     extractUserIdFromJid,
     formatJidForLogging,
-    formatPhoneForMention,
     safeSendMessage,
     safeSendText,
-    safeSendImage,
-    safeSendSticker,
-    safeSendAnimatedGif,
-    safeSendAudio,
-    safeSendVideo,
-    safeSendDocument,
-    safeSendButtons,
-    safeSendLocation,
-    safeSendContact
+    safeSendImage
 };

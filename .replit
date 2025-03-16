@@ -17,7 +17,11 @@ args = "GitHub Editor"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "WhatsApp Bot"
+args = "Terminal QR Connect"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Advanced Connection Manager"
 
 [[workflows.workflow]]
 name = "Run Bot"
@@ -43,7 +47,7 @@ task = "shell.exec"
 args = "cd /home/runner/workspace/github-tools && node minimal-github-editor.js"
 
 [[workflows.workflow]]
-name = "WhatsApp Bot"
+name = "Terminal QR Connect"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -54,8 +58,21 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner/workspace && node src/cloud-qr-server.js"
-waitForPort = 5000
+args = "cd /home/runner/workspace && node terminal-qr-connect.js"
+
+[[workflows.workflow]]
+name = "Advanced Connection Manager"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace && node connection-manager.js"
 
 [deployment]
 run = ["sh", "-c", "cd /home/runner/workspace && node src/qr-web-server-fixed.js"]

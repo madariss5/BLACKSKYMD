@@ -5,7 +5,19 @@
  * to ensure consistent usage throughout the application.
  */
 
-const logger = require('./logger');
+// Load logger if available
+let logger;
+try {
+    logger = require('./logger');
+} catch (err) {
+    // Fallback to console if logger isn't available
+    logger = {
+        info: console.log,
+        error: console.error,
+        warn: console.warn,
+        debug: console.log
+    };
+}
 
 /**
  * Standardize command module to the modern format
@@ -15,52 +27,35 @@ const logger = require('./logger');
  */
 function standardizeCommandModule(module, moduleName) {
     if (!module) {
-        logger.warn(`Null or undefined module provided for ${moduleName}`);
-        return {
-            commands: {},
-            category: moduleName,
-            init: async () => false
-        };
+        logger.warn(`Module ${moduleName} is undefined or null`);
+        return { commands: {}, category: moduleName };
     }
-
-    // If already in modern format, return as is
+    
+    // If already in standard format, return as is
     if (module.commands && typeof module.commands === 'object') {
-        return {
-            commands: module.commands,
-            category: module.category || moduleName,
-            init: typeof module.init === 'function' ? module.init : async () => true
-        };
+        return module;
     }
-
-    // Convert legacy format (direct function exports) to modern format
-    if (typeof module === 'object') {
-        const commands = {};
-        let functionCount = 0;
-
-        // Copy all function properties to commands object
-        for (const [key, value] of Object.entries(module)) {
-            if (typeof value === 'function' && key !== 'init') {
-                commands[key] = value;
-                functionCount++;
-            }
-        }
-
-        logger.info(`Adapted legacy module ${moduleName} - found ${functionCount} commands`);
-
-        return {
-            commands,
-            category: moduleName,
-            init: typeof module.init === 'function' ? module.init : async () => true
-        };
-    }
-
-    // Return empty module as fallback
-    logger.warn(`Invalid module format for ${moduleName}`);
-    return {
+    
+    // Create a standardized version of the module
+    const standardized = {
         commands: {},
-        category: moduleName,
-        init: async () => false
+        category: module.category || moduleName
     };
+    
+    // Handle older module formats where commands are directly on the module
+    Object.keys(module).forEach(key => {
+        if (typeof module[key] === 'function' && key !== 'init') {
+            standardized.commands[key] = module[key];
+        }
+    });
+    
+    // Copy init function if it exists
+    if (typeof module.init === 'function') {
+        standardized.init = module.init;
+    }
+    
+    logger.info(`Standardized module ${moduleName} (${Object.keys(standardized.commands).length} commands)`);
+    return standardized;
 }
 
 /**
@@ -82,9 +77,7 @@ function extractCommands(module, moduleName) {
  */
 function countCommands(module, moduleName) {
     const commands = extractCommands(module, moduleName);
-    return Object.keys(commands).filter(cmd => 
-        typeof commands[cmd] === 'function' && cmd !== 'init'
-    ).length;
+    return Object.keys(commands).filter(key => typeof commands[key] === 'function').length;
 }
 
 module.exports = {
