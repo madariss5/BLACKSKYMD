@@ -22,22 +22,38 @@ heroku create your-whatsapp-bot-name
 
 Replace `your-whatsapp-bot-name` with a unique name for your app.
 
-### 2. Set Environment Variables (Optional)
+### 2. Set Environment Variables
 
-You can set environment variables for your bot, such as:
+You need to set environment variables for your bot:
 
 ```bash
-# Set admin number (replace with your WhatsApp number without +)
+# Required: Set admin number (replace with your WhatsApp number without +)
 heroku config:set ADMIN_NUMBER=1234567890
 
-# Set log level (info, warn, error, debug)
+# Optional: Set log level (info, warn, error, debug)
 heroku config:set LOG_LEVEL=info
 
-# Enable or disable commands
+# Optional: Enable or disable commands
 heroku config:set ENABLE_COMMANDS=true
+
+# Optional but Recommended: Set CREDS_JSON for direct authentication 
+# (copy the content of your creds.json file)
+heroku config:set CREDS_JSON='{"clientID":"your-content-here",...}'
 ```
 
-### 3. Deploy Your Bot
+### 3. Set Up for Docker Deployment
+
+To handle the dependencies for the canvas library and other tools, we'll use Docker:
+
+```bash
+# Set the stack to container
+heroku stack:set container -a your-whatsapp-bot-name
+
+# Check the stack was updated
+heroku stack -a your-whatsapp-bot-name
+```
+
+### 4. Deploy Your Bot
 
 ```bash
 # Add Heroku remote to your git repo
