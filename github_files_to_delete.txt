@@ -1,0 +1,8 @@
+github-browser-debug.js
+github-file-editor.js
+github-permissions-fix.js
+simple-github-editor.js
+test-github-editing.js
+github-editor.sh
+GITHUB_EDITING_GUIDE.md
+GITHUB_TOOLS_GUIDE.md
