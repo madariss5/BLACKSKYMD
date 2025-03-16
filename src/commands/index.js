@@ -95,46 +95,30 @@ async function initializeModules(sock) {
     }
 }
 
+// Import the command adapter for standardization
+const { extractCommands, countCommands, standardizeCommandModule } = require('../utils/commandAdapter');
+
 // Helper function to safely load commands
 function loadCommandsFromModule(module, name) {
     try {
-        let commandsObject = {};
-        
-        if (module && module.commands) {
-            // Get commands from the modern format
-            commandsObject = module.commands;
-            
-            // Check if the module has a category property
-            const category = module.category || name.split('_')[0];
-            const commandCount = Object.keys(commandsObject).filter(
-                cmd => typeof commandsObject[cmd] === 'function' && cmd !== 'init'
-            ).length;
-            
-            logger.info(`✓ Successfully loaded ${commandCount} commands from "${name}" (category: "${category}")`);
-            
-            if (commandCount === 0) {
-                logger.warn(`⚠️ No commands found in "${name}" module`);
-            }
-            
-            return commandsObject;
-        } else if (typeof module === 'object') {
-            // Legacy format handling
-            commandsObject = module;
-            const commandCount = Object.keys(commandsObject).filter(
-                cmd => typeof commandsObject[cmd] === 'function' && cmd !== 'init'
-            ).length;
-            
-            logger.info(`✓ Successfully loaded ${commandCount} commands from "${name}" (legacy format)`);
-            
-            if (commandCount === 0) {
-                logger.warn(`⚠️ No commands found in "${name}" module (legacy format)`);
-            }
-            
-            return commandsObject;
+        if (!module) {
+            logger.warn(`⚠️ Module "${name}" is null or undefined`);
+            return {};
         }
         
-        logger.warn(`⚠️ Invalid module format for "${name}"`);
-        return {};
+        // Standardize the module format
+        const standardized = standardizeCommandModule(module, name);
+        const commandsObject = standardized.commands;
+        const category = standardized.category || name.split('_')[0];
+        const commandCount = countCommands(module, name);
+        
+        logger.info(`✓ Successfully loaded ${commandCount} commands from "${name}" (category: "${category}")`);
+        
+        if (commandCount === 0) {
+            logger.warn(`⚠️ No commands found in "${name}" module`);
+        }
+        
+        return commandsObject;
     } catch (err) {
         logger.error(`❌ Error loading "${name}" commands:`, err);
         console.error(err); // Print to console for debugging

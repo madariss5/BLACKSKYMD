@@ -12,9 +12,32 @@ const { convertGifToMp4 } = require('../utils/gifConverter');
 // Path to reaction GIFs directory
 const REACTIONS_DIR = path.join(process.cwd(), 'data', 'reaction_gifs');
 
-// Import the REACTION_GIF_MAPPING from the enhanced-reaction-fix
-const enhancedReactionFix = require('../enhanced-reaction-fix');
-const REACTION_GIF_MAPPING = enhancedReactionFix.REACTION_GIF_MAPPING;
+// Define reaction GIF mapping
+const REACTION_GIF_MAPPING = {
+    // Self-reactions
+    'smile': 'smile.gif',
+    'happy': 'happy.gif',
+    'dance': 'dance.gif',
+    'cry': 'cry.gif',
+    'blush': 'blush.gif',
+    'laugh': 'laugh.gif',
+    
+    // Target-reactions
+    'hug': 'hug.gif',
+    'pat': 'pat.gif',
+    'kiss': 'kiss.gif',
+    'cuddle': 'cuddle.gif',
+    'wave': 'wave.gif',
+    'wink': 'wink.gif',
+    'poke': 'poke.gif',
+    'slap': 'slap.gif',
+    'bonk': 'bonk.gif',
+    'bite': 'bite.gif',
+    'punch': 'punch.gif',
+    'highfive': 'highfive.gif',
+    'yeet': 'yeet.gif',
+    'kill': 'kill.gif'
+};
 
 // Create reaction GIFs directory if it doesn't exist
 function ensureDirectoriesExist() {

@@ -86,6 +86,9 @@ async function loadCommands() {
         
         // Also load individual command files directly for more reliability
         try {
+            // Import the command adapter
+            const { extractCommands, standardizeCommandModule } = require('../utils/commandAdapter');
+            
             // Define command modules to load
             const commandModules = [
                 { name: 'basic', module: require('../commands/basic') },
@@ -130,39 +133,37 @@ async function loadCommands() {
             logger.info(`Loaded ${commandConfigs.size} command configurations from JSON files`);
             
             for (const { name, module } of commandModules) {
-                if (module && typeof module === 'object') {
-                    // Try to get commands from module
-                    const moduleCommands = module.commands || module;
-                    
-                    if (moduleCommands && typeof moduleCommands === 'object') {
-                        // Register each command
-                        for (const [cmdName, cmdFunc] of Object.entries(moduleCommands)) {
-                            if (typeof cmdFunc === 'function' && cmdName !== 'init') {
-                                try {
-                                    // Get configuration from our preloaded configs
-                                    const config = commandConfigs.get(cmdName);
-                                    
-                                    commands.set(cmdName, {
-                                        execute: async (sock, message, args, options = {}) => {
-                                            try {
-                                                return await cmdFunc(sock, message, args, options);
-                                            } catch (err) {
-                                                logger.error(`Error executing command ${cmdName} from ${name}:`, err);
-                                                throw err;
-                                            }
-                                        },
-                                        cooldown: config?.cooldown || 5,
-                                        groupOnly: config?.groupOnly || name === 'group',
-                                        category: config?.configCategory || name,
-                                        description: config?.description || `Command: ${cmdName}`,
-                                        usage: config?.usage || `!${cmdName}`,
-                                        enabled: config?.enabled !== false,
-                                        permissions: config?.permissions || ['user']
-                                    });
-                                } catch (err) {
-                                    logger.error(`Error registering command ${cmdName} from ${name}:`, err);
-                                }
-                            }
+                // Standardize the module format
+                const standardizedModule = standardizeCommandModule(module, name);
+                const moduleCommands = standardizedModule.commands;
+                const category = standardizedModule.category || name;
+                
+                // Register each command with proper error handling
+                for (const [cmdName, cmdFunc] of Object.entries(moduleCommands)) {
+                    if (typeof cmdFunc === 'function' && cmdName !== 'init') {
+                        try {
+                            // Get configuration from our preloaded configs
+                            const config = commandConfigs.get(cmdName);
+                            
+                            commands.set(cmdName, {
+                                execute: async (sock, message, args, options = {}) => {
+                                    try {
+                                        return await cmdFunc(sock, message, args, options);
+                                    } catch (err) {
+                                        logger.error(`Error executing command ${cmdName} from ${name}:`, err);
+                                        throw err;
+                                    }
+                                },
+                                cooldown: config?.cooldown || 5,
+                                groupOnly: config?.groupOnly || name === 'group',
+                                category: config?.configCategory || category,
+                                description: config?.description || `Command: ${cmdName}`,
+                                usage: config?.usage || `!${cmdName}`,
+                                enabled: config?.enabled !== false,
+                                permissions: config?.permissions || ['user']
+                            });
+                        } catch (err) {
+                            logger.error(`Error registering command ${cmdName} from ${name}:`, err);
                         }
                     }
                 }
@@ -380,11 +381,15 @@ async function processCommand(sock, message, commandText, options = {}) {
         // Slower path - Check module cache first before requiring module again
         if (!commandModuleCache.has('indexCommands')) {
             try {
-                const commandModules = require('../commands/index');
-                if (commandModules && commandModules.commands) {
-                    commandModuleCache.set('indexCommands', commandModules.commands);
-                }
+                // Use the command adapter for standardized imports
+                const { extractCommands } = require('../utils/commandAdapter');
+                const commandsIndex = require('../commands/index');
+                
+                // Extract commands in a standardized format
+                const standardizedCommands = extractCommands(commandsIndex, 'index');
+                commandModuleCache.set('indexCommands', standardizedCommands);
             } catch (err) {
+                logger.error(`Error loading index commands: ${err.message}`);
                 commandModuleCache.set('indexCommands', {});
             }
         }
@@ -394,9 +399,14 @@ async function processCommand(sock, message, commandText, options = {}) {
         
         // If command exists in cached module
         if (cachedCommands && typeof cachedCommands[cmdName] === 'function') {
-            await cachedCommands[cmdName](sock, message, args, options);
-            console.log(`Command executed successfully from modules: ${cmdName}`);
-            return;
+            try {
+                await cachedCommands[cmdName](sock, message, args, options);
+                console.log(`Command executed successfully from modules: ${cmdName}`);
+                return;
+            } catch (cmdErr) {
+                logger.error(`Error executing command ${cmdName} from cached modules: ${cmdErr.message}`);
+                throw cmdErr;
+            }
         }
         
         // Command not found - only send message for actual command attempts (starting with !)
