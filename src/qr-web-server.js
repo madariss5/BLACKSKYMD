@@ -821,6 +821,146 @@ app.get('/test-reaction', (req, res) => {
     }
 });
 
+// API endpoint to get list of all available reaction commands
+app.get('/reaction-commands', async (req, res) => {
+    const reactionGifsDir = path.join(process.cwd(), 'data', 'reaction_gifs');
+    const validReactions = [
+        'smile', 'happy', 'dance', 'cry', 'blush', 'laugh',
+        'hug', 'pat', 'kiss', 'cuddle', 'wave', 'wink', 'poke',
+        'slap', 'bonk', 'bite', 'punch', 'highfive', 'yeet', 'kill'
+    ];
+    
+    // Check each reaction GIF to make sure it exists
+    const availableReactions = validReactions.filter(reaction => {
+        const gifPath = path.join(reactionGifsDir, `${reaction}.gif`);
+        return fs.existsSync(gifPath);
+    });
+    
+    // Create basic HTML page to display the reaction commands with GIF previews
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>WhatsApp Bot Reaction Commands</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f0f4f7;
+                margin: 0;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                text-align: center;
+            }
+            .container {
+                background-color: white;
+                border-radius: 15px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                padding: 30px;
+                max-width: 800px;
+                width: 100%;
+            }
+            h1 {
+                color: #128C7E;
+                margin-bottom: 5px;
+            }
+            h2 {
+                color: #075E54;
+                font-size: 1.2em;
+                margin-top: 0;
+            }
+            .reaction-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 20px;
+                margin-top: 20px;
+            }
+            .reaction-item {
+                border: 1px solid #e0e0e0;
+                border-radius: 10px;
+                padding: 10px;
+                background-color: #f9f9f9;
+                transition: transform 0.2s;
+            }
+            .reaction-item:hover {
+                transform: scale(1.05);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            }
+            .reaction-gif {
+                width: 100%;
+                height: 150px;
+                object-fit: cover;
+                border-radius: 5px;
+                margin-bottom: 10px;
+            }
+            .reaction-name {
+                font-weight: bold;
+                color: #128C7E;
+            }
+            .reaction-command {
+                font-family: monospace;
+                background-color: #f0f0f0;
+                padding: 3px 6px;
+                border-radius: 3px;
+                margin-top: 5px;
+                display: inline-block;
+            }
+            .back-button {
+                background-color: #128C7E;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 1em;
+                margin-top: 20px;
+                text-decoration: none;
+                display: inline-block;
+            }
+            .usage-instructions {
+                margin-top: 20px;
+                padding: 15px;
+                background-color: #e8f5e9;
+                border-radius: 5px;
+                text-align: left;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>BLACKSKY-MD</h1>
+            <h2>WhatsApp Bot Reaction Commands</h2>
+            
+            <div class="usage-instructions">
+                <strong>How to use:</strong>
+                <p>Send <code>!{command} @user</code> to send a reaction to someone.</p>
+                <p>For example, to send a hug to someone, type: <code>!hug @user</code></p>
+                <p>The bot will automatically send the reaction GIF in your chat.</p>
+            </div>
+            
+            <div class="reaction-grid">
+                ${availableReactions.map(reaction => `
+                    <div class="reaction-item">
+                        <img src="/test-reaction?type=${reaction}" class="reaction-gif" alt="${reaction} reaction">
+                        <div class="reaction-name">${reaction.charAt(0).toUpperCase() + reaction.slice(1)}</div>
+                        <div class="reaction-command">!${reaction}</div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <a href="/" class="back-button">Back to QR Code</a>
+        </div>
+    </body>
+    </html>
+    `;
+    
+    res.send(html);
+});
+
 // Test command endpoint for debugging
 app.post('/test-command', async (req, res) => {
     try {
