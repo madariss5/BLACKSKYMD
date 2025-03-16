@@ -13,11 +13,11 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "WhatsApp Bot"
+args = "GitHub Editor"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "GitHub Editor"
+args = "WhatsApp Bot"
 
 [[workflows.workflow]]
 name = "Run Bot"
@@ -27,20 +27,6 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node src/index.js"
-
-[[workflows.workflow]]
-name = "WhatsApp Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node src/qr-web-server.js"
 
 [[workflows.workflow]]
 name = "GitHub Editor"
@@ -55,6 +41,21 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd /home/runner/workspace/github-tools && node minimal-github-editor.js"
+
+[[workflows.workflow]]
+name = "WhatsApp Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node src/qr-web-server.js"
+waitForPort = 5007
 
 [deployment]
 run = ["sh", "-c", "node src/qr-web-server.js"]

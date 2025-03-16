@@ -475,7 +475,14 @@ class SessionManager {
     async restoreFromBackup() {
         try {
             let backup = null;
-
+            const additionalBackupDirs = [
+                './auth_info_baileys_backup',
+                './data/session_backups',
+                './auth_info_baileys',
+                './auth_info_baileys_qr',
+                './auth_info_simple_pairing'
+            ];
+            
             // Try standard backup first
             try {
                 const standardBackupPath = this._getBackupPath('standard');
@@ -545,6 +552,55 @@ class SessionManager {
                     logger.error('Error searching for backup files:', anyErr);
                 }
             }
+            
+            // Try additional backup directories
+            if (!backup) {
+                for (const backupDir of additionalBackupDirs) {
+                    try {
+                        // Ensure directory exists
+                        await fs.mkdir(backupDir, { recursive: true });
+                        
+                        // Check for creds.json or latest backup
+                        const possiblePaths = [
+                            path.join(backupDir, 'creds.json'),
+                            path.join(backupDir, 'latest_creds.json'),
+                            path.join(backupDir, `${this.sessionId}_creds.json`)
+                        ];
+                        
+                        for (const possiblePath of possiblePaths) {
+                            try {
+                                const data = await fs.readFile(possiblePath, 'utf8');
+                                backup = JSON.parse(data);
+                                logger.info(`Found backup in alternative location: ${possiblePath}`);
+                                break;
+                            } catch (err) {
+                                // Continue to next path
+                            }
+                        }
+                        
+                        if (backup) break; // Exit the directory loop if we found a backup
+                        
+                        // Try to find any JSON file in the directory
+                        const files = await fs.readdir(backupDir);
+                        const jsonFiles = files.filter(file => 
+                            file.endsWith('.json') && 
+                            (file.includes('creds') || file.includes('backup') || file.includes('session'))
+                        );
+                        
+                        if (jsonFiles.length > 0) {
+                            // Try the newest file
+                            jsonFiles.sort().reverse();
+                            const latestFile = path.join(backupDir, jsonFiles[0]);
+                            const jsonData = await fs.readFile(latestFile, 'utf8');
+                            backup = JSON.parse(jsonData);
+                            logger.info(`Restored from alternative backup location: ${latestFile}`);
+                            break;
+                        }
+                    } catch (dirErr) {
+                        // Continue to next directory
+                    }
+                }
+            }
 
             if (!backup) {
                 logger.warn('No backup found, will need to generate new QR code');
@@ -557,6 +613,20 @@ class SessionManager {
                 JSON.stringify(backup).replace(/\s+/g, ''),
                 'utf8'
             );
+            
+            // Also save to multiple locations for redundancy
+            for (const backupDir of additionalBackupDirs) {
+                try {
+                    await fs.mkdir(backupDir, { recursive: true });
+                    await fs.writeFile(
+                        path.join(backupDir, 'latest_creds.json'),
+                        JSON.stringify(backup),
+                        'utf8'
+                    );
+                } catch (writeErr) {
+                    // Continue if we can't write to this location
+                }
+            }
 
             logger.info('Credentials restored from backup successfully');
             return true;

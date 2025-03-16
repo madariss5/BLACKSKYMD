@@ -29,6 +29,12 @@ This bot includes an enhanced connection system specifically designed to work ar
    - Most reliable connection method
    - No web interface required, works directly in the terminal
 
+4. **Termux Optimized Connection**
+   - Specifically designed for Android Termux environment
+   - Reduced memory footprint for better performance on mobile devices
+   - Simplified setup process with automatic dependency installation
+   - See [TERMUX_GUIDE.md](TERMUX_GUIDE.md) for complete installation instructions
+
 For detailed information about connection options, see [CONNECTION_README.md](CONNECTION_README.md).
 
 ## Quick Start
@@ -108,6 +114,22 @@ This bot supports multiple deployment methods:
 1. Clone this repository
 2. Install dependencies: `npm install`
 3. Run the bot: `node quick-connect.js`
+
+### 3. Termux (Android) Deployment
+
+1. Install Termux from F-Droid or Google Play Store
+2. Run the installation commands:
+```bash
+pkg update && pkg upgrade -y
+pkg install nodejs git ffmpeg imagemagick -y
+git clone https://github.com/madariss5/BLACKSKY.git
+cd BLACKSKY
+npm install
+chmod +x termux-start.sh
+./termux-start.sh
+```
+
+For detailed Termux setup instructions, see [TERMUX_GUIDE.md](TERMUX_GUIDE.md).
 
 ### 3. Heroku Manual Deployment
 

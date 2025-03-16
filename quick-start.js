@@ -20,6 +20,8 @@ const connectionMethods = [
   { name: 'Safari Connection', command: 'node safari-connect.js', description: 'Uses Safari browser fingerprinting' },
   { name: 'Fresh Connection', command: 'node fresh-connection.js', description: 'Starts with a completely fresh session' },
   { name: 'Terminal QR', command: 'node src/terminal-qr.js', description: 'Shows QR code in terminal (for SSH)' },
+  { name: 'Termux Optimized', command: 'node src/termux-connection.js', description: 'Lightweight connection for Android Termux' },
+  { name: 'Termux 24/7 Setup', command: 'bash termux-background.sh', description: 'Set up 24/7 background service for Termux' },
   { name: 'Update GitHub', command: 'node github-update.js', description: 'Updates GitHub repository with your changes' }
 ];
 

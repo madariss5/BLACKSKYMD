@@ -12,6 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
 const logger = require('./utils/logger');
+// Load the handler with full debug info
+process.env.DEBUG_BOT = 'true';
 const handler = require('./handlers/ultra-minimal-handler');
 const { 
     isConnectionError, 
@@ -31,23 +33,40 @@ let connectionStatus = 'disconnected';
 let sock = null;
 let qrGenerationAttempt = 0;
 
-// Use a unique auth directory to avoid conflicts with other sessions
-const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info_' + Date.now());
+// Use auth directory that persists across restarts for 24/7 operation
+const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info_baileys');
 
-// Always create a fresh auth directory
-if (fs.existsSync(AUTH_DIRECTORY)) {
-    // Remove existing auth directory to start fresh
+// Create auth directory if it doesn't exist
+if (!fs.existsSync(AUTH_DIRECTORY)) {
     try {
-        fs.rmSync(AUTH_DIRECTORY, { recursive: true, force: true });
-        logger.info(`Removed existing auth directory: ${AUTH_DIRECTORY}`);
+        fs.mkdirSync(AUTH_DIRECTORY, { recursive: true });
+        logger.info(`Created auth directory: ${AUTH_DIRECTORY}`);
     } catch (err) {
-        logger.error(`Failed to remove existing auth directory: ${err.message}`);
+        logger.error(`Failed to create auth directory: ${err.message}`);
     }
 }
 
-// Create fresh auth directory
-fs.mkdirSync(AUTH_DIRECTORY, { recursive: true });
-logger.info(`Created fresh auth directory: ${AUTH_DIRECTORY}`);
+// Also ensure we have backup directories
+const BACKUP_DIRS = [
+    './backups',
+    './auth_info_baileys_backup',
+    './data/session_backups'
+];
+
+// Create backup directories for redundancy
+for (const dir of BACKUP_DIRS) {
+    if (!fs.existsSync(dir)) {
+        try {
+            fs.mkdirSync(dir, { recursive: true });
+            logger.info(`Created backup directory: ${dir}`);
+        } catch (err) {
+            logger.error(`Failed to create backup directory: ${err.message}`);
+        }
+    }
+}
+
+// Make sure auth directory exists (already created above)
+logger.info(`Using persisted auth directory: ${AUTH_DIRECTORY} for 24/7 operation`);
 
 // Serve static HTML page with QR code
 app.get('/', (req, res) => {
@@ -523,6 +542,20 @@ app.post('/test-command', async (req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
     logger.info(`\n✅ QR Web Server running at http://localhost:${PORT}\n`);
     logger.info('✅ Use this URL to access the WhatsApp QR code scanning interface\n');
+    
+    // Create a keep-alive HTTP server on another port to help with 24/7 running
+    const keepAlivePort = 3000;
+    const keepAliveServer = http.createServer((req, res) => {
+        res.writeHead(200);
+        res.end('WhatsApp Bot Keep-Alive Server - Status: Running');
+    });
+    
+    keepAliveServer.listen(keepAlivePort, '0.0.0.0', () => {
+        logger.info(`Keep-Alive server running at http://localhost:${keepAlivePort}\n`);
+        logger.info('✅ Use UptimeRobot to ping this URL every 5 minutes to keep the bot running 24/7\n');
+    });
+    
+    // Start the WhatsApp connection
     startConnection();
 });
 

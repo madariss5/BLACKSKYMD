@@ -382,9 +382,31 @@ async function messageHandler(sock, message) {
         }
 
         // Determine if message is a command by checking prefixes
-        const validPrefixes = ['!', '/', '.'];
+        const configPrefix = process.env.PREFIX || '.'; // Default to '.' if not set in .env
+        const validPrefixes = ['!', '/', '.', configPrefix]; // Include configured prefix
+        // Remove duplicates from validPrefixes array
+        const uniquePrefixes = [...new Set(validPrefixes)];
+        
+        // Log the config prefix being used (for debugging)
+        console.log(`Config prefix: ${configPrefix}, Valid prefixes: ${uniquePrefixes.join(', ')}`)
+        
         const prefix = content.charAt(0);
-        const isCommand = validPrefixes.includes(prefix);
+        const isCommand = uniquePrefixes.includes(prefix);
+        
+        // If not a command but starts with 'prefix' or 'pref' (common user typo when asking about commands)
+        if (!isCommand && (content.toLowerCase().startsWith('prefix') || content.toLowerCase().startsWith('pref'))) {
+            try {
+                await safeSendText(sock, message.key.remoteJid, 
+                    `ℹ️ *Command Prefix Information*\n\nYou can use any of these prefixes: ${uniquePrefixes.join(', ')}\n\nFor example:\n${configPrefix}help - Show all commands\n${configPrefix}ping - Test if bot is working`
+                );
+                return; // Early return after sending prefix info
+            } catch (err) {
+                logger.error('Error sending prefix info:', err);
+            }
+        }
+        
+        // Debug message content
+        console.log(`Message content: "${content}", Prefix detected: "${prefix}", Is command: ${isCommand}`);
 
         if (isCommand) {
             // Extract command name and arguments
@@ -446,11 +468,11 @@ async function messageHandler(sock, message) {
                 
                 let suggestText = '';
                 if (similarCommands.length > 0) {
-                    suggestText = `\n\nDid you mean: ${similarCommands.map(cmd => `*!${cmd}*`).join(', ')}?`;
+                    suggestText = `\n\nDid you mean: ${similarCommands.map(cmd => `*${prefix}${cmd}*`).join(', ')}?`;
                 }
                 
                 await safeSendText(sock, message.key.remoteJid,
-                    `❌ Command *!${commandName}* not found. Try !help or !menu for available commands.${suggestText}`
+                    `❌ Command *${prefix}${commandName}* not found. Try ${prefix}help or ${prefix}menu for available commands.${suggestText}`
                 );
             }
 
@@ -490,8 +512,9 @@ async function init() {
         logger.log('\n✅ Handler initialization complete:');
         logger.log(`Total commands available: ${totalCommands}`);
         logger.log('Try these basic commands:');
-        logger.log('- !ping (Test bot response)');
-        logger.log('- !menu (Show all commands)');
+        const configPrefix = process.env.PREFIX || '.';
+        logger.log(`- ${configPrefix}ping (Test bot response)`);
+        logger.log(`- ${configPrefix}menu (Show all commands)`);
 
         return true;
     } catch (err) {
