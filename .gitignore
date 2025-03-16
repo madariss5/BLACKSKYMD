@@ -4,39 +4,90 @@ node_modules/
 # Environment variables
 .env
 
-# Auth data & sessions
-auth_info/
-auth_info_qr/
+# Authentication files (These contain sensitive credentials)
+auth_info*/
+auth_backup*/
 sessions/
+*.auth.json
 creds.json
 
-# Logs
-logs/
+# Log files
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Temporary files
-temp/
-tmp/
-
-# OS specific files
+# Temporary files and caches
 .DS_Store
-Thumbs.db
+tmp/
+temp/
+.cache/
 
-# Editor directories and files
+# QR code images
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage data
+coverage/
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# IDE folders
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Dependencies
-package-lock.json
-yarn.lock
+# Replit files
+.replit
+replit.nix
+.config/
+.breakpoints
 
-# Build files
-dist/
-build/
-.build/
+# Heroku files
+npm-debug.log
+/.env
+/.next
 
-# Cache
-.cache/
+# Test files and directories
+test/
+*test*
+**/test/
+**/*test*
+
+# Backup files
+*backup*
+*.bak
+*-bak
+**/backup/
+
+# Exclude all folders starting with "auth_"
+auth_*/
+
+# Except keep these files for GitHub
+!local-connect.js
+!heroku-bot.js
+!persistent-connection.js
+!MODULE_COMPATIBILITY.md
+!DEPLOYMENT_SUMMARY.md
+!LOCAL_CONNECTION_GUIDE.md
+!GITHUB_README.md
+!.github/

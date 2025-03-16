@@ -289,6 +289,97 @@ async function connectToWhatsApp() {
 }
 
 /**
+ * Load all command modules from the src directory
+ * @returns {Object} Loaded command modules
+ */
+async function loadCommandModules() {
+  const commandModules = {};
+  const modulesPath = path.join(process.cwd(), 'src', 'commands');
+  
+  // Only load default command modules if src/commands doesn't exist
+  if (!fs.existsSync(modulesPath)) {
+    logger.info('Command modules directory not found, using built-in commands only');
+    return commandModules;
+  }
+  
+  try {
+    const categories = fs.readdirSync(modulesPath).filter(
+      file => fs.statSync(path.join(modulesPath, file)).isDirectory()
+    );
+    
+    for (const category of categories) {
+      const categoryPath = path.join(modulesPath, category);
+      const commandFiles = fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'));
+      
+      for (const file of commandFiles) {
+        try {
+          const filePath = path.join(categoryPath, file);
+          const commandModule = require(filePath);
+          
+          if (commandModule && typeof commandModule === 'object') {
+            // Use the filename without extension as the module name
+            const moduleName = file.replace('.js', '');
+            commandModules[moduleName] = commandModule;
+            logger.info(`Loaded command module: ${category}/${moduleName}`);
+          }
+        } catch (err) {
+          logger.error(`Error loading command module ${category}/${file}:`, err);
+        }
+      }
+    }
+    
+    logger.info(`Loaded ${Object.keys(commandModules).length} command modules`);
+  } catch (err) {
+    logger.error('Error loading command modules:', err);
+  }
+  
+  return commandModules;
+}
+
+// Global commands object
+let commands = {};
+
+/**
+ * Initialize commands when the bot starts
+ */
+async function initializeCommands() {
+  commands = await loadCommandModules();
+}
+
+/**
+ * Safe message sending with JID verification
+ * @param {Object} sock - WhatsApp socket
+ * @param {string} jid - Recipient JID
+ * @param {Object} content - Message content
+ * @returns {Promise<Object>} - Send result
+ */
+async function safeSendMessage(sock, jid, content) {
+  try {
+    // Validate JID format and fix if needed
+    if (typeof jid !== 'string') {
+      logger.warn(`Invalid JID type: ${typeof jid}`);
+      return null;
+    }
+    
+    // Ensure JID has proper format
+    const formattedJid = jid.includes('@') ? jid : `${jid}@s.whatsapp.net`;
+    
+    // Send message
+    const result = await sock.sendMessage(formattedJid, content);
+    stats.messagesSent++;
+    return result;
+  } catch (err) {
+    logger.error(`Error sending message to ${jid}:`, err);
+    stats.errors.push({
+      timestamp: new Date().toISOString(),
+      error: err.message,
+      type: 'MESSAGE_SENDING'
+    });
+    return null;
+  }
+}
+
+/**
  * Handle incoming messages
  */
 async function handleIncomingMessage(sock, msg) {
@@ -309,6 +400,7 @@ async function handleIncomingMessage(sock, msg) {
     // Get sender information
     const sender = msg.key.remoteJid;
     const isGroup = sender.endsWith('@g.us');
+    const senderNumber = sender.split('@')[0];
     
     // Process commands (starting with !)
     if (body.startsWith('!')) {
@@ -318,26 +410,24 @@ async function handleIncomingMessage(sock, msg) {
       logger.info(`Command received: ${command} from ${sender}`);
       stats.commandsProcessed++;
       
-      // Process commands
+      // First, check built-in commands
       switch (command) {
         case 'help':
-          await sock.sendMessage(sender, {
+          await safeSendMessage(sock, sender, {
             text: `*Available Commands*\n\n` +
                   `!help - Show this help message\n` +
                   `!ping - Check bot responsiveness\n` +
                   `!status - Show bot status\n` +
                   `!uptime - Show bot uptime\n`
           });
-          stats.messagesSent++;
-          break;
+          return;
           
         case 'ping':
-          await sock.sendMessage(sender, { text: 'Pong! 🏓' });
-          stats.messagesSent++;
-          break;
+          await safeSendMessage(sock, sender, { text: 'Pong! 🏓' });
+          return;
           
         case 'status':
-          await sock.sendMessage(sender, {
+          await safeSendMessage(sock, sender, {
             text: `*Bot Status*\n\n` +
                   `*Connection:* ${connectionState}\n` +
                   `*Uptime:* ${formatUptime()}\n` +
@@ -345,27 +435,58 @@ async function handleIncomingMessage(sock, msg) {
                   `*Messages Sent:* ${stats.messagesSent}\n` +
                   `*Commands Processed:* ${stats.commandsProcessed}\n` +
                   `*Reconnects:* ${stats.reconnects}\n` +
-                  `*Last Connected:* ${lastConnected ? lastConnected.toISOString() : 'Never'}\n`
+                  `*Last Connected:* ${lastConnected ? lastConnected.toISOString() : 'Never'}\n` +
+                  `*Command Modules:* ${Object.keys(commands).length}\n`
           });
-          stats.messagesSent++;
-          break;
+          return;
           
         case 'uptime':
-          await sock.sendMessage(sender, { 
+          await safeSendMessage(sock, sender, { 
             text: `🤖 Bot has been running for ${formatUptime()}` 
           });
-          stats.messagesSent++;
-          break;
+          return;
           
-        default:
-          // If the sender is the admin, provide feedback on unknown commands
-          if (sender === `${ADMIN_NUMBER}@s.whatsapp.net`) {
-            await sock.sendMessage(sender, { 
-              text: `Unknown command: ${command}. Type !help for available commands.` 
+        case 'modules':
+          await safeSendMessage(sock, sender, {
+            text: `*Available Command Modules*\n\n` +
+                  Object.keys(commands).map(cmd => `- ${cmd}`).join('\n')
+          });
+          return;
+      }
+      
+      // Then, check for commands in loaded modules
+      for (const [moduleName, moduleObj] of Object.entries(commands)) {
+        if (moduleObj.commands && moduleObj.commands[command]) {
+          try {
+            // Create message context
+            const context = {
+              sender,
+              senderNumber,
+              isGroup,
+              command,
+              args,
+              sock,
+              safeSendMessage: (jid, content) => safeSendMessage(sock, jid || sender, content)
+            };
+            
+            // Execute command
+            await moduleObj.commands[command](context);
+            return;
+          } catch (err) {
+            logger.error(`Error executing command ${command} from module ${moduleName}:`, err);
+            await safeSendMessage(sock, sender, {
+              text: `Error executing command: ${command}\n${err.message}`
             });
-            stats.messagesSent++;
+            return;
           }
-          break;
+        }
+      }
+      
+      // If no command was found, send unknown command message to admin
+      if (sender === `${ADMIN_NUMBER}@s.whatsapp.net`) {
+        await safeSendMessage(sock, sender, { 
+          text: `Unknown command: ${command}. Type !help for available commands.` 
+        });
       }
     }
   } catch (err) {
@@ -407,9 +528,12 @@ app.get('/status', (req, res) => {
   });
 });
 
-// Start server
-server.listen(PORT, () => {
+// Start server and initialize commands
+server.listen(PORT, async () => {
   logger.info(`Server is running on port ${PORT}`);
+  
+  // Initialize command modules first
+  await initializeCommands();
   
   // Start WhatsApp connection
   connectToWhatsApp().catch(err => {

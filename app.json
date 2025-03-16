@@ -1,14 +1,13 @@
 {
-  "name": "WhatsApp Bot",
-  "description": "A reliable WhatsApp bot optimized for Heroku deployment",
-  "repository": "https://github.com/yourusername/whatsapp-bot",
-  "logo": "https://node-js-sample.herokuapp.com/node.png",
-  "keywords": ["node", "whatsapp", "bot", "baileys"],
+  "name": "BLACKSKY-MD WhatsApp Bot",
+  "description": "A sophisticated WhatsApp multi-device bot with enhanced connection reliability and 490+ commands",
+  "repository": "https://github.com/yourusername/blacksky-whatsapp-bot",
+  "logo": "https://raw.githubusercontent.com/yourusername/blacksky-whatsapp-bot/main/public/logo.png",
+  "keywords": ["node", "whatsapp", "bot", "baileys", "multi-device", "heroku", "commands"],
   "env": {
     "ADMIN_NUMBER": {
       "description": "Your WhatsApp number without the + sign (e.g., 1234567890)",
-      "required": false,
-      "value": "4915561048015"
+      "required": true
     },
     "LOG_LEVEL": {
       "description": "Logging level (info, warn, error, debug)",
@@ -19,11 +18,42 @@
       "description": "Enable or disable command processing (true/false)",
       "required": false,
       "value": "true"
+    },
+    "MAX_RETRIES": {
+      "description": "Maximum reconnection attempts for WhatsApp",
+      "required": false,
+      "value": "10"
+    },
+    "RECONNECT_INTERVAL": {
+      "description": "Base reconnection interval in seconds (will use exponential backoff)",
+      "required": false,
+      "value": "5"
+    },
+    "PORT": {
+      "description": "Port for the web dashboard",
+      "required": false,
+      "value": "5000"
+    },
+    "NODE_ENV": {
+      "description": "Node environment",
+      "required": false,
+      "value": "production"
     }
   },
   "buildpacks": [
     {
       "url": "heroku/nodejs"
     }
-  ]
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  },
+  "scripts": {
+    "postdeploy": "echo 'IMPORTANT: You must manually copy auth_info_baileys contents to auth_info_heroku folder!'"
+  },
+  "success_url": "/",
+  "addons": []
 }
