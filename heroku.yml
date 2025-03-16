@@ -1,5 +1,5 @@
 build:
   docker:
     web: Dockerfile
-  config:
-    BUILDPACK_OPTIONS: "--enable-runtime-buildtime-dependencies"
+run:
+  web: node heroku-bot.js

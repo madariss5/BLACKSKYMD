@@ -35,14 +35,38 @@ For a reliable 24/7 WhatsApp bot, we recommend the following two-step process:
    heroku create your-whatsapp-bot-name
    ```
 
-2. Clone this repository and deploy to Heroku:
+2. Choose one of these three deployment methods:
+
+   **Option A: Using CREDS_JSON (Recommended)**
+   
+   Find your `creds.json` file in the `auth_info_baileys` folder and set it as an environment variable:
+   ```bash
+   heroku config:set CREDS_JSON='{"clientID":"your-content-here",...}' -a your-whatsapp-bot-name
+   ```
+
+   **Option B: Docker-based Deployment (For dependency issues)**
+   
+   Use Docker to resolve canvas and other dependency issues:
+   ```bash
+   heroku stack:set container -a your-whatsapp-bot-name
+   ```
+   
+   **Option C: Aptfile-based Deployment (Alternative for dependency issues)**
+   
+   Add the apt buildpack to install system dependencies:
+   ```bash
+   heroku buildpacks:add --index 1 heroku-community/apt -a your-whatsapp-bot-name
+   heroku buildpacks:add --index 2 heroku/nodejs -a your-whatsapp-bot-name
+   ```
+
+3. Deploy to Heroku:
    ```bash
    git clone <repository-url>
    cd <repository-directory>
    git push heroku main
    ```
 
-3. Upload your local authentication to Heroku:
+4. If you didn't use CREDS_JSON, upload your local authentication to Heroku:
    ```bash
    # Compress your auth files
    zip -r auth_files.zip auth_info_baileys
@@ -54,7 +78,7 @@ For a reliable 24/7 WhatsApp bot, we recommend the following two-step process:
    heroku ps:copy auth_files.zip
    ```
 
-4. Extract and set up the authentication on Heroku:
+5. Extract and set up the authentication on Heroku:
    ```bash
    # On the Heroku shell
    mkdir -p auth_info_heroku
@@ -63,12 +87,12 @@ For a reliable 24/7 WhatsApp bot, we recommend the following two-step process:
    exit
    ```
 
-5. Restart your Heroku dyno:
+6. Restart your Heroku dyno:
    ```bash
    heroku dyno:restart
    ```
 
-6. Open your application:
+7. Open your application:
    ```bash
    heroku open
    ```
@@ -118,4 +142,6 @@ If you lose your authentication files, you can:
 
 For more detailed instructions, see:
 - `HEROKU-DEPLOYMENT.md` - General Heroku deployment guide
+- `HEROKU-DOCKER-GUIDE.md` - Docker-based Heroku deployment (resolves dependency issues)
+- `HEROKU-APTFILE-GUIDE.md` - Aptfile-based Heroku deployment (alternative approach)
 - `HEROKU-SAFARI.md` - Advanced deployment with Safari connection method

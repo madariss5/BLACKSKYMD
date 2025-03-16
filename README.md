@@ -2,12 +2,16 @@
 
 A robust WhatsApp multi-device bot engineered to tackle complex network connectivity challenges with intelligent communication resilience.
 
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/yourusername/your-repo-name)
+
 ## Key Features
 
 - Multi-device WhatsApp bot using @whiskeysockets/baileys
 - Advanced connection handling for cloud environments like Replit
 - Intelligent error recovery and credential management
 - Multiple connection methods for different usage scenarios
+- Multiple deployment options (Docker, Aptfile, Standard)
+- 490+ commands across 15 categories
 
 ## Connection System
 
@@ -91,6 +95,29 @@ node check-connection.js
    - You should only need to scan the QR code once
    - Subsequent restarts will use the saved credentials
 
+## Deployment Options
+
+This bot supports multiple deployment methods:
+
+### 1. Heroku One-Click Deploy 
+
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/yourusername/your-repo-name)
+
+### 2. Local Deployment
+
+1. Clone this repository
+2. Install dependencies: `npm install`
+3. Run the bot: `node quick-connect.js`
+
+### 3. Heroku Manual Deployment
+
+See our detailed guides for different deployment strategies:
+- [Standard Deployment](HEROKU-DEPLOYMENT.md)
+- [Docker-based Deployment](HEROKU-DOCKER-GUIDE.md) (for dependency issues)
+- [Aptfile-based Deployment](HEROKU-APTFILE-GUIDE.md) (alternative approach)
+
+For a complete overview of all deployment options, see [DEPLOYMENT_OPTIONS.md](DEPLOYMENT_OPTIONS.md).
+
 ## Troubleshooting
 
 If you're experiencing connection issues:
@@ -104,6 +131,7 @@ If you're experiencing connection issues:
 - WhatsApp may occasionally reject connections from cloud providers
 - The connection system will automatically try different approaches
 - If all methods fail, WhatsApp servers may be temporarily blocking the IP address
+- For Heroku deployments, see [HEROKU-DEPLOYMENT.md](HEROKU-DEPLOYMENT.md)
 
 ## Command Usage
 

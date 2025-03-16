@@ -1,6 +1,6 @@
 FROM node:18
 
-# Install dependencies for canvas
+# Install dependencies for canvas and other modules
 RUN apt-get update && apt-get install -y \
     build-essential \
     libcairo2-dev \
@@ -8,29 +8,26 @@ RUN apt-get update && apt-get install -y \
     libjpeg-dev \
     libgif-dev \
     librsvg2-dev \
-    python3 \
-    python3-pip \
     ffmpeg \
+    python3 \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copy package files
-COPY heroku-package.json ./package.json
-COPY heroku-bot.js .
-COPY src ./src
-COPY public ./public
-COPY views ./views
-
-# Install app dependencies
+# Copy package files and install dependencies
+COPY package*.json ./
 RUN npm install
 
-# Create authentication directory
-RUN mkdir -p auth_info_heroku
+# Copy the rest of the application
+COPY . .
 
-# Expose port
-EXPOSE 8000
+# Create directories for auth files if they don't exist
+RUN mkdir -p auth_info_baileys auth_info_heroku
 
-# Start app
-CMD [ "npm", "start" ]
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=5000
+
+# This will be used by heroku-bot.js
+CMD ["node", "heroku-bot.js"]

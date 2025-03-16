@@ -1,0 +1,86 @@
+name: WhatsApp Bot CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev ffmpeg
+    
+    - name: Run linting
+      run: npm run lint
+      continue-on-error: true
+    
+    - name: Check if connection scripts exist
+      run: |
+        ls -la
+        test -f quick-connect.js
+        test -f connect-interactive.js
+        test -f heroku-bot.js
+  
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js 18.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18.x
+        cache: 'npm'
+    
+    - name: Create deployment summary
+      run: |
+        echo "## Deployment Summary" > deployment.md
+        echo "Deployed at: $(date)" >> deployment.md
+        echo "Commit: ${{ github.sha }}" >> deployment.md
+        echo "Changes:" >> deployment.md
+        git log -1 --pretty=format:"%s%n%b" >> deployment.md
+    
+    - name: Upload deployment summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-summary
+        path: deployment.md
+    
+    - name: Send Discord notification
+      if: false  # Disabled for now, enable when Discord webhook is configured
+      run: |
+        curl -H "Content-Type: application/json" \
+        -d '{
+          "content": "New bot deployment",
+          "embeds": [{
+            "title": "WhatsApp Bot Deployed",
+            "description": "Commit: ${{ github.sha }}",
+            "color": 3066993
+          }]
+        }' \
+        ${{ secrets.DISCORD_WEBHOOK }}
