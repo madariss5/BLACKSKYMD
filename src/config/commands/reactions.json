@@ -1,599 +1,177 @@
 {
-  "category": "reactions",
+  "name": "reactions",
+  "description": "Animated reaction commands",
   "commands": [
     {
       "name": "hug",
-      "description": "Send a warm anime hug",
-      "usage": "!hug @user",
-      "example": "!hug @user",
+      "description": "Hug someone!",
+      "usage": ".hug @user",
+      "aliases": ["embracement"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.hug"
+      "category": "reactions",
+      "enabled": true
     },
     {
       "name": "pat",
-      "description": "Pat someone gently",
-      "usage": "!pat @user",
-      "example": "!pat @user", 
+      "description": "Pat someone!",
+      "usage": ".pat @user",
+      "aliases": ["headpat", "patpat"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.pat"
+      "category": "reactions",
+      "enabled": true
     },
     {
       "name": "kiss",
-      "description": "Give someone a kiss",
-      "usage": "!kiss @user",
-      "example": "!kiss @user",
+      "description": "Kiss someone!",
+      "usage": ".kiss @user",
+      "aliases": ["smooch"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.kiss"
+      "category": "reactions",
+      "enabled": true
     },
     {
       "name": "cuddle",
-      "description": "Cuddle with someone",
-      "usage": "!cuddle @user",
-      "example": "!cuddle @user",
+      "description": "Cuddle someone!",
+      "usage": ".cuddle @user",
+      "aliases": ["snuggle"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.cuddle"
-    },
-    {
-      "name": "poke",
-      "description": "Poke someone playfully",
-      "usage": "!poke @user",
-      "example": "!poke @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.poke"
-    },
-    {
-      "name": "tickle",
-      "description": "Tickle someone",
-      "usage": "!tickle @user",
-      "example": "!tickle @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.tickle"
-    },
-    {
-      "name": "boop",
-      "description": "Boop someone's nose",
-      "usage": "!boop @user",
-      "example": "!boop @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.boop"
-    },
-    {
-      "name": "blush",
-      "description": "Show that you're blushing",
-      "usage": "!blush",
-      "example": "!blush",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.blush"
-    },
-    {
-      "name": "cry",
-      "description": "Show that you're crying",
-      "usage": "!cry",
-      "example": "!cry",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.cry"
-    },
-    {
-      "name": "dance",
-      "description": "Show your dance moves",
-      "usage": "!dance",
-      "example": "!dance",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.dance"
-    },
-    {
-      "name": "laugh",
-      "description": "Show that you're laughing",
-      "usage": "!laugh",
-      "example": "!laugh",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.laugh"
+      "category": "reactions",
+      "enabled": true
     },
     {
       "name": "slap",
-      "description": "Slap someone (playfully)",
-      "usage": "!slap @user",
-      "example": "!slap @user",
+      "description": "Slap someone!",
+      "usage": ".slap @user",
+      "aliases": ["smack"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.slap"
-    },
-    {
-      "name": "punch",
-      "description": "Punch someone (playfully)",
-      "usage": "!punch @user",
-      "example": "!punch @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.punch"
+      "category": "reactions",
+      "enabled": true
     },
     {
       "name": "bonk",
-      "description": "Bonk someone",
-      "usage": "!bonk @user",
-      "example": "!bonk @user",
+      "description": "Bonk someone!",
+      "usage": ".bonk @user",
+      "aliases": ["boop"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.bonk"
+      "category": "reactions",
+      "enabled": true
     },
     {
-      "name": "pout",
-      "description": "Show that you're pouting",
-      "usage": "!pout",
-      "example": "!pout",
+      "name": "punch",
+      "description": "Punch someone!",
+      "usage": ".punch @user",
+      "aliases": ["hit"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.pout"
+      "category": "reactions",
+      "enabled": true
     },
     {
-      "name": "smug",
-      "description": "Show a smug expression",
-      "usage": "!smug",
-      "example": "!smug",
+      "name": "poke",
+      "description": "Poke someone!",
+      "usage": ".poke @user",
+      "aliases": ["nudge"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.smug"
-    },
-    {
-      "name": "wink",
-      "description": "Wink at someone",
-      "usage": "!wink @user",
-      "example": "!wink @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.wink"
-    },
-    {
-      "name": "grouphug",
-      "description": "Hug everyone in the group",
-      "usage": "!grouphug",
-      "example": "!grouphug",
-      "cooldown": 10,
-      "permissions": ["user"],
-      "handler": "reactions.grouphug"
-    },
-    {
-      "name": "wave",
-      "description": "Wave at everyone",
-      "usage": "!wave",
-      "example": "!wave",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.wave"
-    },
-    {
-      "name": "run",
-      "description": "Show that you're running",
-      "usage": "!run",
-      "example": "!run",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.run"
-    },
-    {
-      "name": "sleep",
-      "description": "Show that you're sleeping",
-      "usage": "!sleep",
-      "example": "!sleep",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.sleep"
-    },
-    {
-      "name": "panic",
-      "description": "Show that you're panicking",
-      "usage": "!panic",
-      "example": "!panic",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.panic"
-    },
-    {
-      "name": "facepalm",
-      "description": "Show a facepalm reaction",
-      "usage": "!facepalm",
-      "example": "!facepalm",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.facepalm"
-    },
-    {
-      "name": "highfive",
-      "description": "Give a high five to someone",
-      "usage": "!highfive @user",
-      "example": "!highfive @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.highfive"
-    },
-    {
-      "name": "hold",
-      "description": "Hold someone's hand",
-      "usage": "!hold @user",
-      "example": "!hold @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.hold"
-    },
-    {
-      "name": "handhold",
-      "description": "Hold hands with someone",
-      "usage": "!handhold @user",
-      "example": "!handhold @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.handhold"
-    },
-    {
-      "name": "nom",
-      "description": "Pretend to nibble on someone",
-      "usage": "!nom @user",
-      "example": "!nom @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.nom"
+      "category": "reactions",
+      "enabled": true
     },
     {
       "name": "bite",
-      "description": "Bite someone playfully",
-      "usage": "!bite @user",
-      "example": "!bite @user",
+      "description": "Bite someone!",
+      "usage": ".bite @user",
+      "aliases": ["nom"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.bite"
+      "category": "reactions",
+      "enabled": true
     },
     {
-      "name": "glomp",
-      "description": "Jump hug someone enthusiastically",
-      "usage": "!glomp @user",
-      "example": "!glomp @user",
+      "name": "highfive",
+      "description": "High five someone!",
+      "usage": ".highfive @user",
+      "aliases": ["hi5"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.glomp"
-    },
-    {
-      "name": "kill",
-      "description": "Pretend to kill someone (joke)",
-      "usage": "!kill @user",
-      "example": "!kill @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.kill"
-    },
-    {
-      "name": "yeet",
-      "description": "Throw someone away",
-      "usage": "!yeet @user",
-      "example": "!yeet @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.yeet"
-    },
-    {
-      "name": "stare",
-      "description": "Stare at someone",
-      "usage": "!stare @user",
-      "example": "!stare @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.stare"
-    },
-    {
-      "name": "lick",
-      "description": "Lick someone playfully",
-      "usage": "!lick @user",
-      "example": "!lick @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.lick"
-    },
-    {
-      "name": "feed",
-      "description": "Feed someone",
-      "usage": "!feed @user",
-      "example": "!feed @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.feed"
-    },
-    {
-      "name": "bully",
-      "description": "Playfully bully someone",
-      "usage": "!bully @user",
-      "example": "!bully @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.bully"
-    },
-    {
-      "name": "happy",
-      "description": "Show that you're happy",
-      "usage": "!happy",
-      "example": "!happy",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.happy"
-    },
-    {
-      "name": "sad",
-      "description": "Show that you're sad",
-      "usage": "!sad",
-      "example": "!sad",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.sad"
-    },
-    {
-      "name": "angry",
-      "description": "Show that you're angry",
-      "usage": "!angry",
-      "example": "!angry",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.angry"
-    },
-    {
-      "name": "confused",
-      "description": "Show that you're confused",
-      "usage": "!confused",
-      "example": "!confused",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.confused"
-    },
-    {
-      "name": "think",
-      "description": "Show that you're thinking",
-      "usage": "!think",
-      "example": "!think",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.think"
-    },
-    {
-      "name": "peck",
-      "description": "Give a quick kiss on the cheek",
-      "usage": "!peck @user",
-      "example": "!peck @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.peck"
-    },
-    {
-      "name": "greet",
-      "description": "Greet someone formally",
-      "usage": "!greet @user",
-      "example": "!greet @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.greet"
-    },
-    {
-      "name": "salute",
-      "description": "Give a military salute",
-      "usage": "!salute @user",
-      "example": "!salute @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.salute"
-    },
-    {
-      "name": "shocked",
-      "description": "Show that you're shocked",
-      "usage": "!shocked",
-      "example": "!shocked",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.shocked"
-    },
-    {
-      "name": "shrug",
-      "description": "Show a shrug gesture",
-      "usage": "!shrug",
-      "example": "!shrug",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.shrug"
-    },
-    {
-      "name": "nod",
-      "description": "Nod in agreement",
-      "usage": "!nod",
-      "example": "!nod",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.nod"
-    },
-    {
-      "name": "shake",
-      "description": "Shake head in disagreement",
-      "usage": "!shake",
-      "example": "!shake",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.shake"
-    },
-    {
-      "name": "kick",
-      "description": "Kick someone (playfully)",
-      "usage": "!kick @user",
-      "example": "!kick @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.kick"
-    },
-    {
-      "name": "throw",
-      "description": "Throw something at someone",
-      "usage": "!throw @user",
-      "example": "!throw @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.throw"
-    },
-    {
-      "name": "shoot",
-      "description": "Pretend to shoot someone (joke)",
-      "usage": "!shoot @user",
-      "example": "!shoot @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.shoot"
-    },
-    {
-      "name": "thumbsup",
-      "description": "Give a thumbs up",
-      "usage": "!thumbsup",
-      "example": "!thumbsup",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.thumbsup"
-    },
-    {
-      "name": "thumbsdown",
-      "description": "Give a thumbs down",
-      "usage": "!thumbsdown",
-      "example": "!thumbsdown",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.thumbsdown"
-    },
-    {
-      "name": "excited",
-      "description": "Show that you're excited",
-      "usage": "!excited",
-      "example": "!excited",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.excited"
-    },
-    {
-      "name": "lewd",
-      "description": "React to something lewd (SFW)",
-      "usage": "!lewd",
-      "example": "!lewd",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.lewd"
-    },
-    {
-      "name": "bored",
-      "description": "Show that you're bored",
-      "usage": "!bored",
-      "example": "!bored",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.bored"
-    },
-    {
-      "name": "nervous",
-      "description": "Show that you're nervous",
-      "usage": "!nervous",
-      "example": "!nervous",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.nervous"
-    },
-    {
-      "name": "celebrate",
-      "description": "Celebrate something",
-      "usage": "!celebrate",
-      "example": "!celebrate",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.celebrate"
-    },
-    {
-      "name": "dizzy",
-      "description": "Show that you're dizzy",
-      "usage": "!dizzy",
-      "example": "!dizzy",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.dizzy"
-    },
-    {
-      "name": "bye",
-      "description": "Say goodbye to the group",
-      "usage": "!bye",
-      "example": "!bye",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.bye"
-    },
-    {
-      "name": "smack",
-      "description": "Smack someone",
-      "usage": "!smack @user",
-      "example": "!smack @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.smack"
-    },
-    {
-      "name": "nuzzle",
-      "description": "Nuzzle against someone",
-      "usage": "!nuzzle @user",
-      "example": "!nuzzle @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.nuzzle"
-    },
-    {
-      "name": "growl",
-      "description": "Growl at someone",
-      "usage": "!growl @user",
-      "example": "!growl @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.growl"
-    },
-    {
-      "name": "hifive",
-      "description": "Alternative command for highfive",
-      "usage": "!hifive @user",
-      "example": "!hifive @user",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.highfive"
-    },
-    {
-      "name": "disgusted",
-      "description": "Show disgust reaction",
-      "usage": "!disgusted",
-      "example": "!disgusted",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.disgusted"
-    },
-    {
-      "name": "scared",
-      "description": "Show that you're scared",
-      "usage": "!scared",
-      "example": "!scared",
-      "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.scared"
+      "category": "reactions",
+      "enabled": true
     },
     {
       "name": "smile",
-      "description": "Show a bright smile",
-      "usage": "!smile",
-      "example": "!smile",
+      "description": "Show a smile!",
+      "usage": ".smile",
+      "aliases": ["grin"],
       "cooldown": 5,
-      "permissions": ["user"],
-      "handler": "reactions.smile"
+      "category": "reactions",
+      "enabled": true
+    },
+    {
+      "name": "happy",
+      "description": "Show that you're happy!",
+      "usage": ".happy",
+      "aliases": ["joy"],
+      "cooldown": 5,
+      "category": "reactions",
+      "enabled": true
+    },
+    {
+      "name": "wave",
+      "description": "Wave at someone!",
+      "usage": ".wave @user",
+      "aliases": ["hello"],
+      "cooldown": 5,
+      "category": "reactions",
+      "enabled": true
+    },
+    {
+      "name": "dance",
+      "description": "Dance!",
+      "usage": ".dance",
+      "aliases": ["groove"],
+      "cooldown": 5,
+      "category": "reactions",
+      "enabled": true
+    },
+    {
+      "name": "cry",
+      "description": "Show that you're sad!",
+      "usage": ".cry",
+      "aliases": ["sob", "tears"],
+      "cooldown": 5,
+      "category": "reactions",
+      "enabled": true
+    },
+    {
+      "name": "blush",
+      "description": "Show that you're blushing!",
+      "usage": ".blush",
+      "aliases": ["embarrassed"],
+      "cooldown": 5,
+      "category": "reactions",
+      "enabled": true
+    },
+    {
+      "name": "laugh",
+      "description": "Laugh!",
+      "usage": ".laugh",
+      "aliases": ["lol", "haha"],
+      "cooldown": 5,
+      "category": "reactions",
+      "enabled": true
+    },
+    {
+      "name": "wink",
+      "description": "Wink at someone!",
+      "usage": ".wink @user",
+      "aliases": [],
+      "cooldown": 5,
+      "category": "reactions",
+      "enabled": true
+    },
+    {
+      "name": "yeet",
+      "description": "Yeet someone!",
+      "usage": ".yeet @user",
+      "aliases": ["throw"],
+      "cooldown": 5,
+      "category": "reactions",
+      "enabled": true
     }
   ]
 }
