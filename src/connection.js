@@ -12,6 +12,7 @@ const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const pino = require('pino');
 
 // QR generation state
 let qrGenerated = false;
@@ -88,12 +89,14 @@ async function startConnection() {
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
         
         // Get connection config from session manager
-        const connectionConfig = sessionManager.getConnectionConfig();
+        // Get custom config but skip the logger part
+        const baseConfig = sessionManager.getConnectionConfig();
         
-        // Connect to WhatsApp
+        // Connect to WhatsApp with direct logger configuration
         sock = makeWASocket({
-            ...connectionConfig,
-            auth: state
+            ...baseConfig,
+            auth: state,
+            logger: pino({ level: 'silent' }) // Use a direct pino instance for Baileys
         });
         
         // Setup save credentials listener

@@ -1,10 +1,8 @@
 const pino = require('pino');
 
-let originalLevel = 'info'; // Changed from debug to reduce noise
-
-// Create a consistent logger instance with enhanced configuration
+// Create the logger instance
 const logger = pino({
-    level: originalLevel,
+    level: 'info',
     transport: {
         target: 'pino-pretty',
         options: {
@@ -16,35 +14,7 @@ const logger = pino({
             customLevels: 'error:99,warn:98,info:97,debug:96'
         }
     },
-    formatters: {
-        level: (label) => {
-            return { level: label };
-        }
-    },
-    serializers: {
-        err: (err) => ({
-            type: err.type || 'Error',
-            message: err.message,
-            stack: err.stack,
-            code: err.code,
-            details: err.details || {}
-        }),
-        // Add WhatsApp specific serializers
-        connection: (conn) => ({
-            state: conn.state,
-            isOnline: conn.isOnline,
-            lastSeen: conn.lastSeen,
-            platform: conn.platform
-        }),
-        message: (msg) => ({
-            id: msg.key?.id,
-            type: msg.type,
-            from: msg.key?.remoteJid,
-            timestamp: msg.messageTimestamp
-        })
-    },
     timestamp: () => `,"time":"${new Date(Date.now()).toISOString()}"`,
-    // Reduce noise from WebSocket
     mixin: () => ({
         appName: 'BLACKSKY-MD'
     })
@@ -53,14 +23,21 @@ const logger = pino({
 // Prevent unnecessary warnings
 process.removeAllListeners('warning');
 
-// Add methods to control logging
-logger.silenceLogging = () => {
-    originalLevel = logger.level;
-    logger.level = 'silent';
-};
-
-logger.restoreLogging = () => {
-    logger.level = originalLevel;
+// Add child method for Baileys compatibility
+logger.child = (bindings) => {
+    return pino({
+        level: logger.level,
+        transport: {
+            target: 'pino-pretty',
+            options: {
+                colorize: true,
+                translateTime: 'SYS:standard',
+                ignore: 'pid,hostname',
+                messageFormat: '{msg}',
+                levelFirst: true
+            }
+        }
+    }).child(bindings);
 };
 
 // Add custom methods for module loading
