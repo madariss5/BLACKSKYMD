@@ -259,18 +259,18 @@ function formatPhoneForMention(jid) {
     const phoneNumber = jid.split('@')[0];
     
     // Special case for the German number to ensure correct format
-    if (phoneNumber === '4915561048015') {
+    if (phoneNumber === '4915563151347') {
         return {
-            international: '+4915561048015', 
-            formatted: '🇩🇪 +49 15561-048015',
+            international: '+4915563151347', 
+            formatted: '🇩🇪 +49 15563-151347',
             stylish: '𝙈𝙖𝙧𝙩𝙞𝙣',
-            md: '```+4915561048015```',
+            md: '```+4915563151347```',
             // Enhanced MD formatting fields
             mentionName: 'Martin',
-            mentionNumber: '+4915561048015',
-            mentionFormat: 'user Martin +4915561048015',
+            mentionNumber: '+4915563151347',
+            mentionFormat: 'user Martin +4915563151347',
             // WhatsApp notification-friendly format
-            whatsappMention: `@4915561048015`,
+            whatsappMention: `@4915563151347`,
             mentionJid: jid,
             notificationTag: '@martin'
         };

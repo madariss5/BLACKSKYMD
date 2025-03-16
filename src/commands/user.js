@@ -271,6 +271,44 @@ async function createProfileCard(profile, theme = null, jid = null) {
             ctx.fillText(profile.customTitle, 50, 90);
         }
         
+        // Try to add profile picture if available
+        if (profile.profilePic) {
+            try {
+                // Check if the profile picture file exists
+                if (await fs.access(profile.profilePic).then(() => true).catch(() => false)) {
+                    // Load the profile picture
+                    const { loadImage } = require('canvas');
+                    const profileImage = await loadImage(profile.profilePic);
+                    
+                    // Create circular clip for profile picture
+                    ctx.save();
+                    ctx.beginPath();
+                    const pictureX = 120;
+                    const pictureY = 160;
+                    const pictureRadius = 70;
+                    ctx.arc(pictureX, pictureY, pictureRadius, 0, Math.PI * 2, true);
+                    ctx.closePath();
+                    ctx.clip();
+                    
+                    // Draw the profile picture in the circular clip
+                    ctx.drawImage(profileImage, pictureX - pictureRadius, pictureY - pictureRadius, 
+                                 pictureRadius * 2, pictureRadius * 2);
+                    
+                    // Reset clip and add border
+                    ctx.restore();
+                    ctx.strokeStyle = colors.primary;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(pictureX, pictureY, pictureRadius, 0, Math.PI * 2, true);
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+            } catch (picErr) {
+                // If there's an error loading the profile picture, continue without it
+                logger.error(`Error loading profile picture for card: ${picErr.message}`);
+            }
+        }
+        
         // Draw user info section - right side panel
         ctx.fillStyle = colors.secondary;
         ctx.globalAlpha = 0.7;
@@ -286,9 +324,9 @@ async function createProfileCard(profile, theme = null, jid = null) {
         // Stats section
         ctx.fillText(`📈 Level: ${profile.level}`, 240, y); y += 40;
         
-        // Calculate level progress
-        const currentLevelXP = profile.level > 1 ? levelThresholds[profile.level - 1] : 0;
-        const nextLevelXP = levelThresholds[profile.level];
+        // Calculate level progress using the same formula from levelingSystem
+        const currentLevelXP = profile.level > 1 ? levelingSystem.calculateRequiredXP(profile.level) : 0;
+        const nextLevelXP = levelingSystem.calculateRequiredXP(profile.level + 1);
         const progressXP = profile.xp - currentLevelXP;
         const totalNeededXP = nextLevelXP - currentLevelXP;
         const progressPercent = Math.min(100, Math.floor((progressXP / totalNeededXP) * 100));
@@ -565,29 +603,27 @@ ${rankText}
 *Progress:* ${progress.progressBar}
 *🕒 Registered:* ${new Date(profile.registeredAt).toLocaleDateString()}`;
 
-            // Send profile picture first if available
+            // Send profile information with picture if available
             if (profile.profilePic && await fs.access(profile.profilePic).then(() => true).catch(() => false)) {
                 try {
                     // Read profile picture as buffer
                     const profilePicBuffer = await fs.readFile(profile.profilePic);
                     
-                    // Send profile picture with caption
+                    // Send profile picture with full profile info as caption
                     await safeSendMessage(sock, sender, {
                         image: profilePicBuffer,
-                        caption: `*👤 ${profile.name}'s Profile Picture*`
+                        caption: profileText.trim()
                     });
-                    logger.info(`Successfully sent profile picture for ${formatJidForLogging(targetJid)}`);
-                    
-                    // Short delay to ensure messages are sent in order
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    logger.info(`Successfully sent profile with picture for ${formatJidForLogging(targetJid)}`);
                 } catch (picErr) {
-                    logger.error(`Error sending profile picture for ${formatJidForLogging(targetJid)}:`, picErr);
-                    // Continue even if sending profile picture fails
+                    logger.error(`Error sending profile with picture for ${formatJidForLogging(targetJid)}:`, picErr);
+                    // Fall back to text-only profile if image sending fails
+                    await safeSendText(sock, sender, profileText.trim());
                 }
+            } else {
+                // Send text-only profile if no picture is available
+                await safeSendText(sock, sender, profileText.trim());
             }
-            
-            // Send profile text
-            await safeSendText(sock, sender, profileText.trim());
             
             // Generate and send profile card with robust error handling
             try {
@@ -934,55 +970,67 @@ ${rankText}
                 return;
             }
 
-            // Calculate streak (consecutive days)
-            let streak = profile.dailyStreak || 0;
+            // Use the enhanced streak system
+            const streakResult = levelingSystem.updateDailyStreak(sender);
+            const streak = streakResult.streak;
+            const streakBroken = streakResult.streakBroken;
             
-            if (lastDaily) {
-                const yesterday = new Date(now);
-                yesterday.setDate(yesterday.getDate() - 1);
-                
-                // Check if last claim was yesterday
-                if (lastDaily.getDate() === yesterday.getDate() && 
-                    lastDaily.getMonth() === yesterday.getMonth() && 
-                    lastDaily.getFullYear() === yesterday.getFullYear()) {
-                    streak++;
-                } else {
-                    streak = 1; // Reset streak if not consecutive
-                }
-            } else {
-                streak = 1; // First time claiming
-            }
+            // Get streak bonus information
+            const streakBonus = levelingSystem.calculateStreakBonus(sender);
             
-            // Store the updated streak
-            profile.dailyStreak = streak;
+            // Get next streak reward info
+            const nextReward = levelingSystem.getNextStreakReward(streak);
             
-            // Calculate rewards - more rewards for longer streaks
-            const baseXP = 100;
+            // Calculate rewards with enhanced formula
+            const baseXP = levelingSystem.XP_SETTINGS.daily.min;
             const baseCoins = 100;
-            const streakMultiplier = Math.min(2, 1 + (streak * 0.1)); // Max 2x multiplier for 10+ day streak
             
-            const xpReward = Math.floor((Math.random() * 50 + baseXP) * streakMultiplier);
-            const coinsReward = Math.floor((Math.random() * 100 + baseCoins) * streakMultiplier);
+            // Apply streak multiplier to XP and coins
+            const xpReward = Math.floor(baseXP * streakBonus.multiplier);
+            const coinsReward = Math.floor(baseCoins * streakBonus.multiplier) + streakBonus.coins;
 
             // Update user profile
             profile.coins += coinsReward;
-            profile.lastDaily = now.toISOString();
             userDatabase.updateUserProfile(sender, { 
-                coins: profile.coins, 
-                lastDaily: profile.lastDaily,
-                dailyStreak: profile.dailyStreak
+                coins: profile.coins
             });
 
             // Add XP and check for level up
-            const levelUpData = levelingSystem.addXP(sender, 'daily');
+            const levelUpData = await levelingSystem.addXP(sender, 'daily');
             
-            // Create reward message
-            let rewardText = `*🎁 Daily Reward Claimed!*\n\n*⭐ XP:* +${xpReward}\n*💰 Coins:* +${coinsReward}\n*📅 Streak:* ${streak} day${streak !== 1 ? 's' : ''}`;
-
-            // Add streak bonus info if applicable
-            if (streak > 1) {
-                const bonusPercent = Math.floor((streakMultiplier - 1) * 100);
-                rewardText += `\n*🔥 Streak Bonus:* +${bonusPercent}%`;
+            // Create enhanced reward message
+            let rewardText = `*🎁 Daily Reward Claimed!*\n\n`;
+            rewardText += `*💰 Coins:* +${coinsReward}\n`;
+            rewardText += `*⭐ XP:* +${xpReward}\n\n`;
+            
+            // Add streak information with emoji indicators based on streak length
+            let streakEmoji = '🔥';
+            if (streak >= 30) streakEmoji = '🌟';
+            else if (streak >= 15) streakEmoji = '⚡';
+            else if (streak >= 7) streakEmoji = '🔥🔥';
+            
+            rewardText += `*${streakEmoji} Daily Streak:* ${streak} day${streak !== 1 ? 's' : ''}\n`;
+            
+            // Show streak multiplier
+            if (streakBonus.multiplier > 1.0) {
+                rewardText += `*✨ Streak Multiplier:* ${streakBonus.multiplier.toFixed(1)}x\n`;
+            }
+            
+            // Show streak milestone bonus if applicable
+            if (streakBonus.coins > 0) {
+                rewardText += `*🎉 Streak Milestone Bonus:* +${streakBonus.coins} coins\n`;
+            }
+            
+            // Show next streak milestone if not already maxed
+            if (nextReward && !nextReward.alreadyMaxed) {
+                rewardText += `\n*🔜 Next Milestone:* ${nextReward.daysNeeded} days (${nextReward.daysLeft} more days)\n`;
+                rewardText += `*🎁 Reward:* ${nextReward.multiplier.toFixed(1)}x XP & ${nextReward.coins} coins\n`;
+            }
+            
+            // Special message if streak was broken
+            if (streakBroken) {
+                rewardText += `\n*⚠️ Your previous streak was reset!*\n`;
+                rewardText += `*💡 Tip:* Claim daily rewards every day to build your streak!`;
             }
             
             // Add level up info if leveled up
@@ -990,7 +1038,7 @@ ${rankText}
                 rewardText += `\n\n*🎉 Level Up!*\nYou are now level ${levelUpData.newLevel}!`;
             }
 
-            await safeSendText(sock, sender, rewardText );
+            await safeSendText(sock, sender, rewardText);
             
             // Award achievements for streaks
             if (streak >= 7) {
@@ -999,8 +1047,7 @@ ${rankText}
                     profile.achievements.push('Weekly Streak');
                     userDatabase.updateUserProfile(sender, { achievements: profile.achievements });
                     
-                    await safeSendText(sock, sender, `*🏆 Achievement Unlocked:* Weekly Streak\n\nYou've claimed daily rewards for 7 days in a row!` 
-                    );
+                    await safeSendText(sock, sender, `*🏆 Achievement Unlocked:* Weekly Streak\n\nYou've claimed daily rewards for 7 days in a row!`);
                 }
             }
             
@@ -1010,8 +1057,18 @@ ${rankText}
                     profile.achievements.push('Monthly Dedication');
                     userDatabase.updateUserProfile(sender, { achievements: profile.achievements });
                     
-                    await safeSendText(sock, sender, `*🏆 Achievement Unlocked:* Monthly Dedication\n\nYou've claimed daily rewards for 30 days in a row!` 
-                    );
+                    await safeSendText(sock, sender, `*🏆 Achievement Unlocked:* Monthly Dedication\n\nYou've claimed daily rewards for 30 days in a row!`);
+                }
+            }
+            
+            // Add achievement for hitting a 90-day streak
+            if (streak >= 90) {
+                profile.achievements = profile.achievements || [];
+                if (!profile.achievements.includes('Streak Master')) {
+                    profile.achievements.push('Streak Master');
+                    userDatabase.updateUserProfile(sender, { achievements: profile.achievements });
+                    
+                    await safeSendText(sock, sender, `*🏆 Achievement Unlocked:* Streak Master\n\nIncredible! You've maintained a daily streak for 90 days!`);
                 }
             }
         } catch (err) {
@@ -1106,12 +1163,162 @@ ${users.map((user, i) => `${i + 1}. *${user.name}*: ${formatNumber(user.value)} 
 
         const achievementsText = `
 🏆 Achievements
-Total: ${profile.achievements.length}
+Total: ${profile.achievements ? profile.achievements.length : 0}
 
-${profile.achievements.map(a => `• ${a}`).join('\n') || 'No achievements yet'}
+${profile.achievements && profile.achievements.length > 0 ? profile.achievements.map(a => `• ${a}`).join('\n') : 'No achievements yet'}
         `.trim();
 
         await safeSendText(sock, sender, achievementsText );
+    },
+    
+    async stats(sock, message) {
+        try {
+            const sender = message.key.remoteJid;
+            
+            // Get detailed user stats from the leveling system
+            const stats = levelingSystem.getUserStats(sender);
+            
+            if (!stats) {
+                await safeSendText(sock, sender, '*❌ Error:* Could not retrieve user statistics. Please try again later.');
+                return;
+            }
+            
+            // Create a nicely formatted stats message
+            let statsText = `*📊 User Statistics*\n\n`;
+            
+            // Basic user info
+            statsText += `*👤 Name:* ${stats.name}\n`;
+            statsText += `*📈 Level:* ${stats.level}\n`;
+            statsText += `*⭐ XP:* ${stats.xp}\n`;
+            statsText += `*💰 Coins:* ${stats.coins}\n`;
+            statsText += `*👑 Rank:* ${stats.rank} of ${stats.totalUsers}\n`;
+            statsText += `*🎖️ Title:* ${stats.rankTitle}\n\n`;
+            
+            // Streak info with special formatting based on streak length
+            let streakEmoji = '🔥';
+            if (stats.dailyStreak >= 30) streakEmoji = '🌟';
+            else if (stats.dailyStreak >= 15) streakEmoji = '⚡';
+            else if (stats.dailyStreak >= 7) streakEmoji = '🔥🔥';
+            
+            statsText += `*${streakEmoji} Daily Streak:* ${stats.dailyStreak} day${stats.dailyStreak !== 1 ? 's' : ''}\n`;
+            
+            // Show streak multiplier if applicable
+            if (stats.streakMultiplier > 1.0) {
+                statsText += `*✨ Streak Bonus:* ${stats.streakMultiplier.toFixed(1)}x XP multiplier\n`;
+            }
+            
+            // Show next streak milestone if available
+            if (stats.nextStreakReward && !stats.nextStreakReward.alreadyMaxed) {
+                statsText += `*🔜 Next Milestone:* ${stats.nextStreakReward.daysNeeded} days (${stats.nextStreakReward.daysLeft} more days)\n`;
+            }
+            
+            // Activity stats
+            statsText += `\n*📊 Activity Stats*\n`;
+            statsText += `*💬 Messages:* ${stats.totalMessages}\n`;
+            statsText += `*🤖 Commands:* ${stats.totalCommands}\n`;
+            statsText += `*⭐ Total XP Earned:* ${stats.totalXpGained || 0}\n`;
+            statsText += `*💰 Total Coins Earned:* ${stats.totalCoinsEarned || 0}\n`;
+            
+            // Account age
+            statsText += `\n*🕒 Account Age:* ${stats.daysSinceRegistration} days\n`;
+            
+            // Achievements count
+            const achievementsCount = stats.achievements ? stats.achievements.length : 0;
+            statsText += `*🏆 Achievements:* ${achievementsCount}\n`;
+            
+            // Progress bar
+            statsText += `\n*Progress:* ${stats.progressBar}`;
+            
+            await safeSendText(sock, sender, statsText);
+            
+        } catch (err) {
+            logger.error(`Error in stats command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to retrieve user statistics.');
+        }
+    },
+    
+    async checkin(sock, message) {
+        try {
+            const sender = message.key.remoteJid;
+            const profile = userDatabase.getUserProfile(sender);
+            
+            if (!profile) {
+                await safeSendText(sock, sender, '*❌ Error:* You need to register first! Use .register to create a profile.');
+                return;
+            }
+            
+            const now = new Date();
+            const lastDaily = profile.lastDaily ? new Date(profile.lastDaily) : null;
+            
+            // Check if already claimed today
+            if (lastDaily && now.getDate() === lastDaily.getDate() && 
+                now.getMonth() === lastDaily.getMonth() && 
+                now.getFullYear() === lastDaily.getFullYear()) {
+                
+                const nextReset = new Date(now);
+                nextReset.setDate(nextReset.getDate() + 1);
+                nextReset.setHours(0, 0, 0, 0);
+                
+                const timeLeft = nextReset - now;
+                const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
+                const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                
+                await safeSendMessage(sock, sender, { 
+                    text: `*✅ Daily Check-in:* Already completed!\n\n*⏱️ Next check-in:* ${hoursLeft}h ${minutesLeft}m` 
+                });
+                return;
+            }
+            
+            // Use the enhanced streak system
+            const streakResult = levelingSystem.updateDailyStreak(sender);
+            const streak = streakResult.streak;
+            const streakBroken = streakResult.streakBroken;
+            
+            // Get streak bonus information
+            const streakBonus = levelingSystem.calculateStreakBonus(sender);
+            
+            // Create check-in message
+            let checkinText = `*✅ Daily Check-in Complete!*\n\n`;
+            
+            // Streak information
+            let streakEmoji = '🔥';
+            if (streak >= 30) streakEmoji = '🌟';
+            else if (streak >= 15) streakEmoji = '⚡';
+            else if (streak >= 7) streakEmoji = '🔥🔥';
+            
+            checkinText += `*${streakEmoji} Daily Streak:* ${streak} day${streak !== 1 ? 's' : ''}\n`;
+            
+            // Show streak multiplier
+            if (streakBonus.multiplier > 1.0) {
+                checkinText += `*✨ Streak Multiplier:* ${streakBonus.multiplier.toFixed(1)}x\n`;
+            }
+            
+            // Add XP with enhanced daily activity type
+            const levelUpData = await levelingSystem.addXP(sender, 'daily');
+            
+            // Calculate XP reward with streak multiplier
+            const baseXpReward = Math.floor((levelingSystem.XP_SETTINGS.daily.min + levelingSystem.XP_SETTINGS.daily.max) / 2);
+            const totalXpReward = Math.floor(baseXpReward * streakBonus.multiplier);
+            
+            checkinText += `*⭐ XP:* +${totalXpReward}\n`;
+            
+            // Special message if streak was broken
+            if (streakBroken) {
+                checkinText += `\n*⚠️ Your previous streak was reset!*\n`;
+                checkinText += `*💡 Tip:* Check in every day to build your streak!\n`;
+            }
+            
+            // Level up message if applicable
+            if (levelUpData) {
+                checkinText += `\n*🎉 Level Up!*\nYou are now level ${levelUpData.newLevel}!`;
+            }
+            
+            await safeSendText(sock, sender, checkinText);
+            
+        } catch (err) {
+            logger.error(`Error in checkin command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to complete daily check-in. Please try again.');
+        }
     },
 
     async inventory(sock, sender) {
@@ -1164,6 +1371,70 @@ ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty
         await safeSendMessage(sock, sender, {
             text: `✅ Successfully transferred ${transferAmount} coins to ${targetProfile.name}`
         });
+    },
+    
+    async streaks(sock, message) {
+        try {
+            const sender = message.key.remoteJid;
+            const profile = userDatabase.getUserProfile(sender);
+            
+            if (!profile) {
+                await safeSendText(sock, sender, '*❌ Error:* You need to register first! Use .register to create a profile.');
+                return;
+            }
+            
+            // Get streak information
+            const streakBonus = levelingSystem.calculateStreakBonus(sender);
+            const nextReward = levelingSystem.getNextStreakReward(profile.dailyStreak || 0);
+            
+            // Create visually appealing streak message
+            let streakText = `*🔥 Daily Streak Information*\n\n`;
+            
+            // Streak count with emoji based on length
+            let streakEmoji = '🔥';
+            if (profile.dailyStreak >= 30) streakEmoji = '🌟';
+            else if (profile.dailyStreak >= 15) streakEmoji = '⚡';
+            else if (profile.dailyStreak >= 7) streakEmoji = '🔥🔥';
+            
+            streakText += `*${streakEmoji} Current Streak:* ${profile.dailyStreak || 0} day${(profile.dailyStreak || 0) !== 1 ? 's' : ''}\n\n`;
+            
+            // Create a visual streak bar
+            const maxBarLength = 10;
+            const filledBars = Math.min(Math.floor((profile.dailyStreak || 0) / 3), maxBarLength);
+            const emptyBars = maxBarLength - filledBars;
+            const streakBar = '█'.repeat(filledBars) + '░'.repeat(emptyBars);
+            
+            streakText += `*Streak Progress:*\n${streakBar} ${profile.dailyStreak || 0}/30\n\n`;
+            
+            // Show current streak bonuses
+            streakText += `*✨ Current Bonuses:*\n`;
+            streakText += `• *XP Multiplier:* ${streakBonus.multiplier.toFixed(1)}x\n`;
+            if (streakBonus.coins > 0) {
+                streakText += `• *Bonus Coins:* +${streakBonus.coins} per daily claim\n`;
+            }
+            
+            // Show next milestone if not maxed
+            if (nextReward && !nextReward.alreadyMaxed) {
+                streakText += `\n*🔜 Next Milestone:* ${nextReward.daysNeeded} days (${nextReward.daysLeft} more days)\n`;
+                streakText += `• *Future XP Multiplier:* ${nextReward.multiplier.toFixed(1)}x\n`;
+                streakText += `• *Future Bonus Coins:* +${nextReward.coins} per daily claim\n`;
+            } else if (nextReward && nextReward.alreadyMaxed) {
+                streakText += `\n*🏆 Maximum Streak Rewards Achieved!*\n`;
+                streakText += `You've reached the highest streak milestone of ${nextReward.daysNeeded} days.\n`;
+            }
+            
+            // Add tips for maintaining streak
+            streakText += `\n*💡 Tips:*\n`;
+            streakText += `• Use .daily command once every 24 hours\n`;
+            streakText += `• If you miss a day, your streak will reset\n`;
+            streakText += `• Higher streaks = better rewards!`;
+            
+            await safeSendText(sock, sender, streakText);
+            
+        } catch (err) {
+            logger.error(`Error in streaks command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
+            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to retrieve streak information.');
+        }
     }
 };
 

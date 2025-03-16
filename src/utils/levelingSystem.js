@@ -11,22 +11,64 @@ const { isFeatureEnabled } = require('./groupSettings');
 const { languageManager } = require('./language');
 const config = require('../config/config');
 
-// XP gain settings
+// XP gain settings - Enhanced with more interaction types and better rewards
 const XP_SETTINGS = {
     message: { min: 10, max: 25 },
     command: { min: 15, max: 30 },
     media: { min: 20, max: 40 },
     voice: { min: 25, max: 50 },
-    daily: { min: 100, max: 100 }
+    daily: { min: 100, max: 150 },
+    reaction: { min: 5, max: 15 },
+    groupChat: { min: 12, max: 30 },
+    privateChat: { min: 8, max: 20 },
+    sticker: { min: 8, max: 20 },
+    game: { min: 30, max: 60 },
+    quiz: { min: 50, max: 100 }
+};
+
+// Rank titles for each level range - adds immersion
+const RANK_TITLES = {
+    '1-5': 'Novice',
+    '6-10': 'Apprentice',
+    '11-15': 'Adept',
+    '16-20': 'Expert',
+    '21-30': 'Master',
+    '31-40': 'Grandmaster',
+    '41-50': 'Legendary',
+    '51-75': 'Mythical',
+    '76-100': 'Divine',
+    '101+': 'Transcendent'
+};
+
+// Level milestone rewards
+const LEVEL_MILESTONES = {
+    5: { coins: 500, title: 'Consistent', description: 'Reached level 5' },
+    10: { coins: 1000, title: 'Dedicated', description: 'Reached level 10' },
+    20: { coins: 2500, title: 'Expert', description: 'Reached level 20' },
+    30: { coins: 5000, title: 'Master', description: 'Reached level 30' },
+    50: { coins: 10000, title: 'Legend', description: 'Reached level 50' },
+    100: { coins: 50000, title: 'Mythic', description: 'Reached level 100' }
 };
 
 // Cooldown map to prevent XP farming (userId => timestamp)
 const xpCooldowns = new Map();
+const groupXpCooldowns = new Map(); // Separate cooldown for group messages
 const COOLDOWN_MS = 60 * 1000; // 1 minute cooldown between XP gains
+const GROUP_COOLDOWN_MS = 30 * 1000; // 30 seconds cooldown for group XP
 
 // Formula settings for level calculation
 const BASE_XP = 100;
 const XP_MULTIPLIER = 1.5;
+
+// Daily streak bonuses
+const STREAK_BONUSES = {
+    3: { xpMultiplier: 1.2, coins: 50 },
+    7: { xpMultiplier: 1.5, coins: 150 },
+    14: { xpMultiplier: 1.8, coins: 300 },
+    30: { xpMultiplier: 2.0, coins: 500 },
+    60: { xpMultiplier: 2.5, coins: 1000 },
+    90: { xpMultiplier: 3.0, coins: 2000 }
+};
 
 // Cache settings
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
@@ -163,10 +205,24 @@ async function addXP(userId, activityType = 'message', groupJid = null) {
             logger.debug(`Leveling is disabled for group ${groupJid}, not adding XP`);
             return null;
         }
+        
+        // Use group-specific cooldown for group chats
+        if (activityType === 'groupChat' || activityType === 'message') {
+            const lastGroupUpdate = groupXpCooldowns.get(userId + groupJid);
+            const now = Date.now();
+            
+            if (lastGroupUpdate && (now - lastGroupUpdate) < GROUP_COOLDOWN_MS) {
+                return null;
+            }
+            
+            // Set group cooldown
+            groupXpCooldowns.set(userId + groupJid, now);
+        }
     }
     
-    // Check if on cooldown (except for daily and command types)
-    if (activityType !== 'daily' && activityType !== 'command') {
+    // Check if on cooldown (except for special activity types)
+    const noCooldownTypes = ['daily', 'command', 'game', 'quiz'];
+    if (!noCooldownTypes.includes(activityType)) {
         const lastUpdate = xpCooldowns.get(userId);
         const now = Date.now();
         
@@ -180,10 +236,49 @@ async function addXP(userId, activityType = 'message', groupJid = null) {
     
     // Get XP amount based on activity type
     const settings = XP_SETTINGS[activityType] || XP_SETTINGS.message;
-    const xpAmount = Math.floor(Math.random() * (settings.max - settings.min + 1)) + settings.min;
+    let xpAmount = Math.floor(Math.random() * (settings.max - settings.min + 1)) + settings.min;
     
-    // Update user profile
+    // Get user profile
     const profile = getUserLevelData(userId);
+    
+    // Apply streak multiplier for daily activity
+    if (activityType === 'daily' && profile.dailyStreak) {
+        // Find the highest applicable streak bonus
+        let appliedMultiplier = 1.0;
+        let streakBonus = 0;
+        
+        for (const days in STREAK_BONUSES) {
+            if (profile.dailyStreak >= parseInt(days)) {
+                appliedMultiplier = Math.max(appliedMultiplier, STREAK_BONUSES[days].xpMultiplier);
+                streakBonus = Math.max(streakBonus, STREAK_BONUSES[days].coins);
+            }
+        }
+        
+        // Apply streak bonuses
+        xpAmount = Math.floor(xpAmount * appliedMultiplier);
+        
+        // Add streak bonus coins if applicable
+        if (streakBonus > 0) {
+            profile.coins = (profile.coins || 0) + streakBonus;
+            userDatabase.updateUserProfile(userId, { coins: profile.coins });
+            logger.info(`User ${userId} received ${streakBonus} coins for ${profile.dailyStreak} day streak!`);
+        }
+    }
+    
+    // Apply level-specific multipliers
+    if (profile.level >= 10) {
+        // Small XP bonus for higher-level users (1% per level above 10)
+        const levelBonus = 1 + ((profile.level - 10) * 0.01);
+        xpAmount = Math.floor(xpAmount * levelBonus);
+    }
+    
+    // Track activity for stats
+    profile.activityStats = profile.activityStats || {};
+    profile.activityStats[activityType] = (profile.activityStats[activityType] || 0) + 1;
+    profile.activityStats.totalXpGained = (profile.activityStats.totalXpGained || 0) + xpAmount;
+    userDatabase.updateUserProfile(userId, { activityStats: profile.activityStats });
+    
+    // Update user profile XP
     const oldLevel = profile.level;
     profile.xp += xpAmount;
     
@@ -196,12 +291,48 @@ async function addXP(userId, activityType = 'message', groupJid = null) {
     
     // Check for level up
     if (newLevel > oldLevel) {
-        // Calculate rewards for leveling up
-        const coinReward = Math.floor(50 * Math.pow(1.2, newLevel - 1));
+        // Calculate rewards for leveling up - enhanced coin formula
+        let coinReward = Math.floor(50 * Math.pow(1.2, newLevel - 1));
+        
+        // Check for milestone rewards
+        let milestoneReward = null;
+        let achievementUnlocked = null;
+        
+        if (LEVEL_MILESTONES[newLevel]) {
+            milestoneReward = LEVEL_MILESTONES[newLevel];
+            coinReward += milestoneReward.coins;
+            
+            // Add milestone achievement if not already present
+            if (Array.isArray(profile.achievements)) {
+                if (!profile.achievements.includes(milestoneReward.title)) {
+                    profile.achievements.push(milestoneReward.title);
+                    userDatabase.updateUserProfile(userId, { achievements: profile.achievements });
+                    achievementUnlocked = milestoneReward.title;
+                }
+            }
+        }
+        
+        // Update rank title based on level
+        let rankTitle = 'Novice';
+        for (const range in RANK_TITLES) {
+            const [min, max] = range.split('-');
+            if ((max === '+' && newLevel >= parseInt(min)) || 
+                (newLevel >= parseInt(min) && newLevel <= parseInt(max))) {
+                rankTitle = RANK_TITLES[range];
+                break;
+            }
+        }
+        
+        // Save rank title
+        profile.rankTitle = rankTitle;
         
         // Add coins to user profile
         profile.coins = (profile.coins || 0) + coinReward;
-        userDatabase.updateUserProfile(userId, { coins: profile.coins });
+        userDatabase.updateUserProfile(userId, { 
+            coins: profile.coins, 
+            rankTitle: rankTitle,
+            totalLevelUps: (profile.totalLevelUps || 0) + 1
+        });
         
         // Clear level card cache when user levels up to force regeneration
         if (cardBufferCache && cardBufferCache.has(userId)) {
@@ -216,7 +347,10 @@ async function addXP(userId, activityType = 'message', groupJid = null) {
             newLevel,
             coinReward,
             totalXp: profile.xp,
-            requiredXp: calculateRequiredXP(newLevel + 1)
+            requiredXp: calculateRequiredXP(newLevel + 1),
+            milestone: milestoneReward,
+            achievement: achievementUnlocked,
+            rankTitle: rankTitle
         };
     }
     
@@ -412,10 +546,12 @@ async function generateLevelCard(userId, userData) {
             progress = getLevelProgress(userId);
         } catch (progressError) {
             logger.error(`Error getting level progress for level card generation (${userId}):`, progressError);
-            // Create fallback progress data
+            // Create fallback progress data with consistent requiredXP
+            const nextLevel = (profile.level || 1) + 1;
+            const requiredXP = calculateRequiredXP(nextLevel);
             progress = {
                 currentLevel: profile.level || 1,
-                requiredXP: 100,
+                requiredXP: requiredXP,
                 progressPercent: 0
             };
         }
@@ -473,14 +609,18 @@ async function generateLevelCard(userId, userData) {
                 ctx.fillStyle = '#bbbbbb';
                 // Get XP text with translation
                 const xpLabel = languageManager.getText('user.xp', currentLang);
-                // Use the next level XP requirement for consistency with profile command
-                const nextLevelXP = calculateRequiredXP(profile.level + 1);
-                ctx.fillText(`${xpLabel}: ${profile.xp || 0} / ${nextLevelXP}`, 30, 160);
+                // Use the next level XP requirement from progress for consistency with profile command
+                ctx.fillText(`${xpLabel}: ${profile.xp || 0} / ${progress.requiredXP}`, 30, 160);
             } catch (xpError) {
                 logger.error(`Error rendering XP for level card (${userId}):`, xpError);
-                // Fallback to English
-                const nextLevelXP = calculateRequiredXP(profile.level + 1);
-                ctx.fillText(`XP: ${profile.xp || 0} / ${nextLevelXP}`, 30, 160);
+                // Fallback to English - use progress for consistent values
+                // If progress isn't available, calculate it directly
+                if (!progress || !progress.requiredXP) {
+                    const nextLevelXP = calculateRequiredXP(profile.level + 1);
+                    ctx.fillText(`XP: ${profile.xp || 0} / ${nextLevelXP}`, 30, 160);
+                } else {
+                    ctx.fillText(`XP: ${profile.xp || 0} / ${progress.requiredXP}`, 30, 160);
+                }
             }
             
             // Progress bar background
@@ -669,6 +809,224 @@ async function getLevelCardBuffer(userId, userData) {
     }
 }
 
+/**
+ * Get user rank title based on level
+ * @param {number} level User level
+ * @returns {string} Rank title
+ */
+function getRankTitle(level) {
+    try {
+        for (const range in RANK_TITLES) {
+            const [min, max] = range.split('-');
+            if ((max === '+' && level >= parseInt(min)) || 
+                (level >= parseInt(min) && level <= parseInt(max))) {
+                return RANK_TITLES[range];
+            }
+        }
+        return 'Novice'; // Default rank
+    } catch (error) {
+        logger.error('Error getting rank title:', error);
+        return 'Novice'; // Default on error
+    }
+}
+
+/**
+ * Calculate daily streak bonuses for a user
+ * @param {string} userId User ID
+ * @returns {Object} Streak bonus info
+ */
+function calculateStreakBonus(userId) {
+    try {
+        const profile = getUserLevelData(userId);
+        if (!profile || !profile.dailyStreak) return { multiplier: 1.0, coins: 0 };
+        
+        let multiplier = 1.0;
+        let coins = 0;
+        
+        // Find the highest applicable streak bonus
+        for (const days in STREAK_BONUSES) {
+            if (profile.dailyStreak >= parseInt(days)) {
+                multiplier = Math.max(multiplier, STREAK_BONUSES[days].xpMultiplier);
+                coins = Math.max(coins, STREAK_BONUSES[days].coins);
+            }
+        }
+        
+        return { multiplier, coins, streak: profile.dailyStreak };
+    } catch (error) {
+        logger.error(`Error calculating streak bonus for ${userId}:`, error);
+        return { multiplier: 1.0, coins: 0, streak: 0 };
+    }
+}
+
+/**
+ * Get detailed stats for a user
+ * @param {string} userId User ID
+ * @returns {Object} Detailed user stats
+ */
+function getUserStats(userId) {
+    try {
+        const profile = getUserLevelData(userId);
+        const progress = getLevelProgress(userId);
+        const leaderboard = getLeaderboard(100);
+        
+        // Calculate rank
+        const rank = leaderboard.findIndex(u => u.id === userId) + 1;
+        
+        // Get time statistics
+        const registeredAt = profile.registeredAt ? new Date(profile.registeredAt) : new Date();
+        const daysSinceRegistration = Math.floor((new Date() - registeredAt) / (1000 * 60 * 60 * 24));
+        
+        // Get activity stats
+        const activityStats = profile.activityStats || {};
+        
+        // Calculate rewards earned
+        const totalCoinsEarned = (activityStats.totalCoinsEarned || 0) + (profile.totalLevelUps || 0) * 50;
+        
+        // Get streak info
+        const streakInfo = calculateStreakBonus(userId);
+        
+        return {
+            userId,
+            name: profile.name || 'User',
+            level: profile.level || 1,
+            xp: profile.xp || 0,
+            rank: rank > 0 ? rank : 'Unranked',
+            totalUsers: leaderboard.length,
+            progress: progress.progressPercent,
+            progressBar: progress.progressBar,
+            coins: profile.coins || 0,
+            rankTitle: profile.rankTitle || getRankTitle(profile.level || 1),
+            achievements: profile.achievements || [],
+            daysSinceRegistration,
+            registeredAt: registeredAt.toISOString(),
+            dailyStreak: profile.dailyStreak || 0,
+            streakMultiplier: streakInfo.multiplier,
+            nextStreakReward: getNextStreakReward(profile.dailyStreak || 0),
+            activityStats: activityStats,
+            totalMessages: activityStats.message || 0,
+            totalCommands: activityStats.command || 0,
+            totalXpGained: activityStats.totalXpGained || 0,
+            totalCoinsEarned: totalCoinsEarned
+        };
+    } catch (error) {
+        logger.error(`Error getting user stats for ${userId}:`, error);
+        return {
+            userId,
+            name: 'User',
+            level: 1,
+            xp: 0,
+            rank: 'Unranked',
+            totalUsers: 0,
+            progress: 0,
+            progressBar: '░░░░░░░░░░░░░░░░░░░░ 0%',
+            coins: 0,
+            rankTitle: 'Novice',
+            achievements: [],
+            daysSinceRegistration: 0,
+            registeredAt: new Date().toISOString(),
+            dailyStreak: 0,
+            streakMultiplier: 1.0,
+            nextStreakReward: null,
+            activityStats: {},
+            totalMessages: 0,
+            totalCommands: 0,
+            totalXpGained: 0,
+            totalCoinsEarned: 0
+        };
+    }
+}
+
+/**
+ * Get the next available streak reward
+ * @param {number} currentStreak Current daily streak
+ * @returns {Object|null} Next streak reward info
+ */
+function getNextStreakReward(currentStreak) {
+    // Sort streak days in ascending order
+    const streakDays = Object.keys(STREAK_BONUSES)
+        .map(days => parseInt(days))
+        .sort((a, b) => a - b);
+    
+    // Find the next streak milestone
+    for (const days of streakDays) {
+        if (days > currentStreak) {
+            return {
+                daysNeeded: days,
+                daysLeft: days - currentStreak,
+                multiplier: STREAK_BONUSES[days].xpMultiplier,
+                coins: STREAK_BONUSES[days].coins
+            };
+        }
+    }
+    
+    // If we're past all milestones, return the highest one
+    const highestStreak = streakDays[streakDays.length - 1];
+    return {
+        daysNeeded: highestStreak,
+        alreadyMaxed: true,
+        multiplier: STREAK_BONUSES[highestStreak].xpMultiplier,
+        coins: STREAK_BONUSES[highestStreak].coins
+    };
+}
+
+/**
+ * Apply daily streak update
+ * @param {string} userId User ID 
+ * @returns {Object} Updated streak info
+ */
+function updateDailyStreak(userId) {
+    try {
+        const profile = getUserLevelData(userId);
+        const now = new Date();
+        const lastDaily = profile.lastDaily ? new Date(profile.lastDaily) : null;
+        
+        let streak = profile.dailyStreak || 0;
+        let streakBroken = false;
+        
+        // If there's a previous daily claim, check if streak continues
+        if (lastDaily) {
+            // Get yesterday's date for comparison
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            // Check if last daily was claimed yesterday or today (same day multiple claims)
+            if (lastDaily.toDateString() === yesterday.toDateString() || 
+                lastDaily.toDateString() === now.toDateString()) {
+                // Streak continues/maintained
+                streak += 1;
+            } else {
+                // Streak broken - more than one day gap
+                streak = 1;
+                streakBroken = true;
+            }
+        } else {
+            // First time claiming daily
+            streak = 1;
+        }
+        
+        // Update profile
+        profile.dailyStreak = streak;
+        profile.lastDaily = now.toISOString();
+        userDatabase.updateUserProfile(userId, { 
+            dailyStreak: streak, 
+            lastDaily: profile.lastDaily 
+        });
+        
+        return {
+            streak,
+            streakBroken,
+            lastDaily: profile.lastDaily
+        };
+    } catch (error) {
+        logger.error(`Error updating daily streak for ${userId}:`, error);
+        return {
+            streak: 1,
+            streakBroken: false,
+            lastDaily: new Date().toISOString()
+        };
+    }
+}
+
 module.exports = {
     initializeUser,
     getUserLevelData,
@@ -680,5 +1038,15 @@ module.exports = {
     getLeaderboard,
     createProgressBar,
     generateLevelCard,
-    getLevelCardBuffer
+    getLevelCardBuffer,
+    getRankTitle,
+    calculateStreakBonus,
+    getUserStats,
+    updateDailyStreak,
+    getNextStreakReward,
+    // Constants for external use
+    RANK_TITLES,
+    XP_SETTINGS,
+    LEVEL_MILESTONES,
+    STREAK_BONUSES
 };

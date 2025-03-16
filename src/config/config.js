@@ -8,7 +8,7 @@ const config = {
         // ============================================
         number: process.env.OWNER_NUMBER ? 
             process.env.OWNER_NUMBER.replace(/[^0-9]/g, '') : 
-            '4915561048015',
+            '4915563151347',
         email: process.env.OWNER_EMAIL || '',
     },
 

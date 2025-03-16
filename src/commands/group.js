@@ -1207,7 +1207,7 @@ const groupCommands = {
                 let participantDisplayName = '';
                 
                 // Special cases for well-known numbers with friendly names
-                if (numberStr === '4915561048015') {
+                if (numberStr === '4915563151347') {
                     participantDisplayName = 'Martin 🇩🇪'; // German number
                 } else if (numberStr === '14155552671') {
                     participantDisplayName = 'John 🇺🇸'; // US number

@@ -233,92 +233,168 @@ async function saveNsfwSettingsForGroup(groupId, enabled) {
     }
 }
 
-async function downloadMedia(url) {
+/**
+ * Download media from URL and return as buffer
+ * @param {string} url - URL to download from
+ * @param {number} timeout - Timeout in milliseconds
+ * @returns {Promise<Buffer|null>} - Downloaded buffer or null on failure
+ */
+async function downloadMedia(url, timeout = 5000) {
     try {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const buffer = Buffer.from(response.data);
-        const fileType = await getFileTypeFromBuffer(buffer);
-
-        if (!fileType) {
-            logger.error('Could not determine file type');
-            return null;
-        }
-
-        const filename = `${Date.now()}.${fileType.ext}`;
-        const filePath = path.join(TEMP_DIR, filename);
-
-        await fs.writeFile(filePath, buffer);
-        return filePath;
+        logger.info(`Downloading media from ${url}`);
+        const response = await axios.get(url, { 
+            responseType: 'arraybuffer',
+            timeout: timeout
+        });
+        
+        return Buffer.from(response.data);
     } catch (err) {
-        logger.error('Error downloading media:', err);
+        logger.error(`Error downloading media from ${url}: ${err.message}`);
         return null;
     }
 }
 
-async function fetchApi(url, fallbacks = [], requireGif = false) {
-    const headers = {
-        'User-Agent': 'WhatsApp-MD-Bot/1.0',
-        'Accept': 'image/gif,image/webp,video/mp4,*/*'
+/**
+ * Enhanced helper function to safely fetch and send NSFW images
+ * Optimized for faster loading and performance
+ * @param {Object} sock - WhatsApp socket
+ * @param {string} jid - JID to send to
+ * @param {string} category - NSFW category
+ * @param {string} caption - Image caption
+ * @param {boolean} requireGif - Whether to require GIF format
+ * @returns {Promise<boolean>} - Whether sending was successful
+ */
+async function fetchAndSendNsfwImage(sock, jid, category, caption, requireGif = false) {
+    // Define direct fallback URLs - these are used when all APIs fail
+    const DIRECT_GIFS = {
+        'hentai': 'https://i.imgur.com/5uss6YD.gif',
+        'boobs': 'https://i.imgur.com/CniLJ7G.gif',
+        'ass': 'https://i.imgur.com/UIUszlj.gif',
+        'pussy': 'https://i.imgur.com/Eq6sSn1.gif',
+        'blowjob': 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif',
+        'feet': 'https://i.imgur.com/pWHHXF6.gif',
+        'gifboobs': 'https://i.imgur.com/CniLJ7G.gif',
+        'gifass': 'https://i.imgur.com/UIUszlj.gif',
+        'gifhentai': 'https://i.imgur.com/5uss6YD.gif',
+        'gifblowjob': 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif',
+        'waifu': 'https://i.imgur.com/x5Rz9DR.jpg',
+        'neko': 'https://i.imgur.com/YSZaEiX.jpg',
+        'uniform': 'https://i.imgur.com/NWQJ9NS.jpg',
+        'thighs': 'https://i.imgur.com/2r9XQB9.jpg',
+        'femdom': 'https://i.imgur.com/Y89UFxR.jpg',
+        'tentacle': 'https://i.imgur.com/IZ6AjDg.jpg',
+        'pantsu': 'https://i.imgur.com/yjGUrKG.jpg',
+        'kitsune': 'https://i.imgur.com/sxbpLc3.jpg'
     };
 
-    // Try the primary API endpoint with exponential backoff
     try {
-        const data = await fetchWithExponentialBackoff(url, { headers }, 2);
+        // Start timing for performance tracking
+        const startTime = Date.now();
         
-        // Validate response has an image URL
-        if (!data || (!data.url && !data.image)) {
-            throw new Error('Invalid API response: No image URL found');
-        }
+        // Send typing indicator and interim message concurrently for better UX
+        await Promise.all([
+            sock.sendPresenceUpdate('composing', jid),
+            safeSendText(sock, jid, 'Fetching image...')
+        ]);
+
+        // Try optimized fetchNsfwImage utility first with parallel operation
+        const imageUrl = await fetchNsfwImage(category, requireGif);
         
-        // Extract the image URL
-        const imageUrl = data.url || data.image;
-        
-        // Validate GIF format if required
-        if (requireGif) {
-            const isGif = imageUrl.endsWith('.gif') || imageUrl.includes('gif');
-            if (!isGif) {
-                throw new Error('Non-GIF image returned when GIF was required');
+        if (imageUrl) {
+            // Fast path for known optimized domains
+            const isOptimizedDomain = imageUrl.includes('tenor.com') || 
+                                     imageUrl.includes('imgur.com') || 
+                                     imageUrl.includes('giphy.com');
+            
+            // For GIFs from optimized domains, send directly without buffer conversion
+            if (isOptimizedDomain && (requireGif || category.includes('gif'))) {
+                try {
+                    logger.info(`Downloading media from ${imageUrl}`);
+                    
+                    // Send directly using the URL to avoid unnecessary buffering
+                    if (requireGif) {
+                        await safeSendAnimatedGif(sock, jid, imageUrl, caption || `${category.toUpperCase()} 🔞`);
+                    } else {
+                        await safeSendImage(sock, jid, imageUrl, caption || `${category.toUpperCase()} 🔞`);
+                    }
+                    
+                    logger.info(`NSFW ${category} media sent to ${formatJidForLogging(jid)} (fast path)`);
+                    return true;
+                } catch (fastPathErr) {
+                    // If direct send fails, fall back to buffer method
+                    logger.debug(`Fast path failed, trying buffer method: ${fastPathErr.message}`);
+                }
+            }
+            
+            // Standard path with buffer
+            const buffer = await downloadMedia(imageUrl);
+            
+            if (buffer) {
+                if (requireGif) {
+                    await safeSendAnimatedGif(sock, jid, buffer, caption || `${category.toUpperCase()} 🔞`);
+                } else {
+                    await safeSendImage(sock, jid, buffer, caption || `${category.toUpperCase()} 🔞`);
+                }
+                
+                // Log performance metrics
+                const processingTime = Date.now() - startTime;
+                logger.info(`NSFW ${category} ${requireGif ? 'GIF' : 'image'} sent to ${formatJidForLogging(jid)}`);
+                
+                if (processingTime > 2000) {
+                    // Log slow operations to help identify bottlenecks
+                    logger.debug(`Image processing took ${processingTime}ms for ${category}`);
+                }
+                
+                return true;
             }
         }
         
-        return data;
-    } catch (err) {
-        logger.warn(`Primary API fetch error (${url}):`, err.message);
-
-        // Try fallback APIs if available
-        if (fallbacks && fallbacks.length > 0) {
-            logger.info(`Attempting ${fallbacks.length} fallback APIs`);
-
-            for (const fallbackUrl of fallbacks) {
-                try {
-                    logger.info(`Trying fallback API: ${fallbackUrl}`);
-                    const data = await fetchWithExponentialBackoff(fallbackUrl, { headers }, 1);
-                    
-                    // Extract the image URL and validate
-                    const imageUrl = data.url || data.image;
-                    if (!imageUrl) {
-                        logger.warn(`Fallback API ${fallbackUrl} returned invalid response`);
-                        continue;
+        // Fallback to direct GIFs from our constant list - ultra-fast path
+        // This should be very quick since it's a direct, known URL
+        const fallbackUrl = DIRECT_GIFS[category] || DIRECT_GIFS[requireGif ? 'gif' + category : category];
+        if (fallbackUrl) {
+            logger.info(`Using direct fallback for ${category}: ${fallbackUrl}`);
+            
+            try {
+                // Try to send directly first for faster response
+                if (requireGif) {
+                    await safeSendAnimatedGif(sock, jid, fallbackUrl, caption || `${category.toUpperCase()} 🔞`);
+                } else {
+                    await safeSendImage(sock, jid, fallbackUrl, caption || `${category.toUpperCase()} 🔞`);
+                }
+                
+                logger.info(`NSFW ${category} sent using direct fallback to ${formatJidForLogging(jid)}`);
+                return true;
+            } catch (directErr) {
+                // If direct send fails, try buffer method
+                const buffer = await downloadMedia(fallbackUrl, 3000); // Shorter timeout for fallbacks
+                
+                if (buffer) {
+                    if (requireGif) {
+                        await safeSendAnimatedGif(sock, jid, buffer, caption || `${category.toUpperCase()} 🔞`);
+                    } else {
+                        await safeSendImage(sock, jid, buffer, caption || `${category.toUpperCase()} 🔞`);
                     }
                     
-                    // Validate GIF format if required
-                    if (requireGif && !imageUrl.endsWith('.gif') && !imageUrl.includes('gif')) {
-                        logger.warn(`Fallback API ${fallbackUrl} returned non-GIF image`);
-                        continue;
-                    }
-                    
-                    logger.info(`Fallback API success: ${fallbackUrl}`);
-                    return data;
-                } catch (fallbackErr) {
-                    logger.warn(`Fallback API fetch error (${fallbackUrl}):`, fallbackErr.message);
+                    logger.info(`NSFW ${category} sent using fallback buffer to ${formatJidForLogging(jid)}`);
+                    return true;
                 }
             }
         }
-
-        // All APIs failed
-        return null;
+        
+        // All methods failed
+        await safeSendText(sock, jid, 'Failed to fetch image. Please try again later.');
+        return false;
+    } catch (err) {
+        logger.error(`Error in fetchAndSendNsfwImage (${category}): ${err.message}`);
+        await safeSendText(sock, jid, 'Failed to fetch image due to server error.');
+        return false;
     }
 }
+
+// Note: This function is no longer needed as we're using the optimized
+// fetchNsfwImage utility from '../utils/fetchNsfwImage.js'
+// The utility handles API requests, caching, fallbacks, and error handling
 
 function applyCooldown(userId, seconds = 60) {
     const now = Date.now();
@@ -673,21 +749,53 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const hentaiUrl = `${API_ENDPOINTS.HMTAI}/nsfw/hentai`;
-            const fallbacks = [
-                'https://api.waifu.pics/nsfw/waifu',
-                'https://api.nekos.fun/api/hentai'
-            ];
-
-            const response = await fetchApi(hentaiUrl, fallbacks);
-            if (!response || !response.url) {
-                await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
-                return;
+            try {
+                // Try to use the optimized fetchNsfwImage utility first
+                const imageUrl = await fetchNsfwImage('hentai', false);
+                
+                if (imageUrl) {
+                    // Download the image to a buffer instead of sending URL directly
+                    logger.info(`Downloading image from ${imageUrl}`);
+                    const axios = require('axios');
+                    const response = await axios.get(imageUrl, { 
+                        responseType: 'arraybuffer',
+                        timeout: 5000
+                    });
+                    
+                    const buffer = Buffer.from(response.data);
+                    
+                    // Send the image as a buffer instead of URL to prevent "cannot use 'in' operator" error
+                    await safeSendImage(sock, sender, buffer, '🔞 Hentai');
+                    
+                    logger.info(`NSFW hentai image sent to ${formatJidForLogging(sender)}`);
+                    return;
+                }
+            } catch (fetchErr) {
+                logger.warn(`Error fetching from optimized utility: ${fetchErr.message}, falling back to direct method`);
             }
-
-            await safeSendImage(sock, sender, response.url, '🔞 Hentai');
-
-            logger.info(`NSFW hentai image sent to ${formatJidForLogging(sender)}`);
+            
+            // Fallback method - try direct fallback GIF
+            try {
+                const fallbackUrl = DIRECT_GIFS['hentai']; 
+                if (fallbackUrl) {
+                    const axios = require('axios');
+                    const response = await axios.get(fallbackUrl, { 
+                        responseType: 'arraybuffer',
+                        timeout: 5000
+                    });
+                    
+                    const buffer = Buffer.from(response.data);
+                    await safeSendImage(sock, sender, buffer, '🔞 Hentai');
+                    
+                    logger.info(`NSFW hentai image sent via fallback to ${formatJidForLogging(sender)}`);
+                    return;
+                }
+            } catch (fallbackErr) {
+                logger.error(`Error with fallback method: ${fallbackErr.message}`);
+            }
+            
+            // If we got here, all methods failed
+            await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
         } catch (err) {
             logger.error('Error in hentai:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -755,21 +863,53 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const assUrl = `${API_ENDPOINTS.HMTAI}/nsfw/ass`;
-            const fallbacks = [
-                'https://api.nekos.fun/api/ass',
-                'https://api.waifu.pics/nsfw/waifu'
-            ];
-
-            const response = await fetchApi(assUrl, fallbacks);
-            if (!response || !response.url) {
-                await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
-                return;
+            try {
+                // Try to use the optimized fetchNsfwImage utility first
+                const imageUrl = await fetchNsfwImage('ass', false);
+                
+                if (imageUrl) {
+                    // Download the image to a buffer instead of sending URL directly
+                    logger.info(`Downloading image from ${imageUrl}`);
+                    const axios = require('axios');
+                    const response = await axios.get(imageUrl, { 
+                        responseType: 'arraybuffer',
+                        timeout: 5000
+                    });
+                    
+                    const buffer = Buffer.from(response.data);
+                    
+                    // Send the image as a buffer instead of URL to prevent "cannot use 'in' operator" error
+                    await safeSendImage(sock, sender, buffer, '🔞 Ass');
+                    
+                    logger.info(`NSFW ass image sent to ${formatJidForLogging(sender)}`);
+                    return;
+                }
+            } catch (fetchErr) {
+                logger.warn(`Error fetching from optimized utility: ${fetchErr.message}, falling back to direct method`);
             }
-
-            await safeSendImage(sock, sender, response.url, '🔞 Ass');
-
-            logger.info(`NSFW ass image sent to ${formatJidForLogging(sender)}`);
+            
+            // Fallback method - try direct fallback GIF
+            try {
+                const fallbackUrl = DIRECT_GIFS['ass']; 
+                if (fallbackUrl) {
+                    const axios = require('axios');
+                    const response = await axios.get(fallbackUrl, { 
+                        responseType: 'arraybuffer',
+                        timeout: 5000
+                    });
+                    
+                    const buffer = Buffer.from(response.data);
+                    await safeSendImage(sock, sender, buffer, '🔞 Ass');
+                    
+                    logger.info(`NSFW ass image sent via fallback to ${formatJidForLogging(sender)}`);
+                    return;
+                }
+            } catch (fallbackErr) {
+                logger.error(`Error with fallback method: ${fallbackErr.message}`);
+            }
+            
+            // If we got here, all methods failed
+            await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
         } catch (err) {
             logger.error('Error in ass:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -795,22 +935,9 @@ NSFW Statistics:
             }
 
             await safeSendText(sock, sender, 'Fetching image...');
-
-            const pussyUrl = `${API_ENDPOINTS.HMTAI}/nsfw/pussy`;
-            const fallbacks = [
-                'https://api.nekos.fun/api/pussy',
-                'https://api.waifu.pics/nsfw/pussy'
-            ];
-
-            const response = await fetchApi(pussyUrl, fallbacks);
-            if (!response || !response.url) {
-                await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
-                return;
-            }
-
-            await safeSendImage(sock, sender, response.url, '🔞 Pussy');
-
-            logger.info(`NSFW pussy image sent to ${formatJidForLogging(sender)}`);
+            
+            // Use our new helper function to handle all the fetching, downloading and sending
+            await fetchAndSendNsfwImage(sock, sender, 'pussy', '🔞 Pussy', false);
         } catch (err) {
             logger.error('Error in pussy:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -836,22 +963,9 @@ NSFW Statistics:
             }
 
             await safeSendText(sock, sender, 'Fetching image...');
-
-            const blowjobUrl = `${API_ENDPOINTS.HMTAI}/nsfw/blowjob`;
-            const fallbacks = [
-                'https://api.nekos.fun/api/blowjob',
-                'https://api.waifu.pics/nsfw/blowjob'
-            ];
-
-            const response = await fetchApi(blowjobUrl, fallbacks);
-            if (!response || !response.url) {
-                await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
-                return;
-            }
-
-            await safeSendImage(sock, sender, response.url, '🔞 Blowjob');
-
-            logger.info(`NSFW blowjob image sent to ${formatJidForLogging(sender)}`);
+            
+            // Use our helper function to handle all the fetching, downloading and sending
+            await fetchAndSendNsfwImage(sock, sender, 'blowjob', '🔞 Blowjob', false);
         } catch (err) {
             logger.error('Error in blowjob:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -877,22 +991,9 @@ NSFW Statistics:
             }
 
             await safeSendText(sock, sender, 'Fetching image...');
-
-            const analUrl = `${API_ENDPOINTS.HMTAI}/nsfw/anal`;
-            const fallbacks = [
-                'https://api.nekos.fun/api/anal',
-                'https://api.waifu.pics/nsfw/waifu'
-            ];
-
-            const response = await fetchApi(analUrl, fallbacks);
-            if (!response || !response.url) {
-                await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
-                return;
-            }
-
-            await safeSendImage(sock, sender, response.url, '🔞 Anal');
-
-            logger.info(`NSFW anal image sent to ${formatJidForLogging(sender)}`);
+            
+            // Use our helper function to handle all the fetching, downloading and sending
+            await fetchAndSendNsfwImage(sock, sender, 'anal', '🔞 Anal', false);
         } catch (err) {
             logger.error('Error in anal:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -918,22 +1019,9 @@ NSFW Statistics:
             }
 
             await safeSendText(sock, sender, 'Fetching image...');
-
-            const feetUrl = `${API_ENDPOINTS.HMTAI}/nsfw/foot`;
-            const fallbacks = [
-                'https://api.nekos.fun/api/feet',
-                'https://api.waifu.pics/nsfw/waifu'
-            ];
-
-            const response = await fetchApi(feetUrl, fallbacks);
-            if (!response || !response.url) {
-                await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
-                return;
-            }
-
-            await safeSendImage(sock, sender, response.url, '🔞 Feet');
-
-            logger.info(`NSFW feet image sent to ${formatJidForLogging(sender)}`);
+            
+            // Use our helper function to handle all the fetching, downloading and sending
+            await fetchAndSendNsfwImage(sock, sender, 'feet', '🔞 Feet', false);
         } catch (err) {
             logger.error('Error in feet:', err);
             await safeSendText(sock, sender, 'Failed to fetch image due to server error.');
@@ -961,18 +1049,9 @@ NSFW Statistics:
 
             // Send immediate feedback with improved waiting message
             await safeSendText(sock, sender, '🔍 Searching for the perfect animated content...');
-
-            // Use the optimized fetchNsfwImage with requireGif=true for GIF content
-            const imageUrl = await fetchNsfwImage('gifboobs', true);
             
-            if (!imageUrl) {
-                await safeSendText(sock, sender, 'Failed to fetch GIF. Please try again later.');
-                return;
-            }
-
-            await safeSendAnimatedGif(sock, sender, imageUrl, '🔞 Boobs GIF');
-
-            logger.info(`NSFW boobs GIF sent to ${formatJidForLogging(sender)}`);
+            // Use our helper function with requireGif=true
+            await fetchAndSendNsfwImage(sock, sender, 'gifboobs', '🔞 Boobs GIF', true);
         } catch (err) {
             logger.error('Error in gifboobs:', err);
             await safeSendText(sock, sender, 'Failed to fetch GIF due to server error.');
@@ -998,22 +1077,9 @@ NSFW Statistics:
             }
 
             await safeSendText(sock, sender, 'Fetching GIF...');
-
-            const gifUrl = `${API_ENDPOINTS.HMTAI}/nsfw/ass`;
-            const fallbacks = [
-                'https://api.nekos.fun/api/ass',
-                'https://api.waifu.pics/nsfw/waifu'
-            ];
-
-            const response = await fetchApi(gifUrl, fallbacks);
-            if (!response || !response.url) {
-                await safeSendText(sock, sender, 'Failed to fetch GIF. Please try again later.');
-                return;
-            }
-
-            await safeSendAnimatedGif(sock, sender, response.url, '🔞 Ass GIF');
-
-            logger.info(`NSFW ass GIF sent to ${formatJidForLogging(sender)}`);
+            
+            // Use our helper function with requireGif=true
+            await fetchAndSendNsfwImage(sock, sender, 'gifass', '🔞 Ass GIF', true);
         } catch (err) {
             logger.error('Error in gifass:', err);
             await safeSendText(sock, sender, 'Failed to fetch GIF due to server error.');
@@ -1039,22 +1105,9 @@ NSFW Statistics:
             }
 
             await safeSendText(sock, sender, 'Fetching GIF...');
-
-            const gifUrl = `${API_ENDPOINTS.HMTAI}/nsfw/hentai`;
-            const fallbacks = [
-                'https://api.nekos.fun/api/hentai',
-                'https://api.waifu.pics/nsfw/waifu'
-            ];
-
-            const response = await fetchApi(gifUrl, fallbacks);
-            if (!response || !response.url) {
-                await safeSendText(sock, sender, 'Failed to fetch GIF. Please try again later.');
-                return;
-            }
-
-            await safeSendAnimatedGif(sock, sender, response.url, '🔞 Hentai GIF');
-
-            logger.info(`NSFW hentai GIF sent to ${formatJidForLogging(sender)}`);
+            
+            // Use our helper function with requireGif=true
+            await fetchAndSendNsfwImage(sock, sender, 'gifhentai', '🔞 Hentai GIF', true);
         } catch (err) {
             logger.error('Error in gifhentai:', err);
             await safeSendText(sock, sender, 'Failed to fetch GIF due to server error.');
@@ -1425,82 +1478,31 @@ NSFW Statistics:
     },
 };
 
-// Add specialized error handler for API failures with exponential backoff
+// Simplified API checker that leverages the fetchNsfwImage utility
 async function fetchWithExponentialBackoff(url, options = {}, retries = 3, initialDelay = 500) {
-    let delay = initialDelay;
-    const maxDelay = 10000; // Cap max delay at 10 seconds
-    
-    // Add jitter to avoid thundering herd problem
-    const getJitter = () => Math.random() * 200 - 100; // +/- 100ms jitter
-    
-    // Keep track of different error types for adaptive retry strategies
-    let timeoutErrors = 0;
-    let networkErrors = 0;
-    let serverErrors = 0;
-    
-    for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-            // Create abort controller for more reliable timeouts
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), options.timeout || 5000);
+    try {
+        // Use axios directly for API validation checks
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), options.timeout || 5000);
             
-            // Add improved options
-            const requestOptions = {
-                timeout: options.timeout || 5000,
-                validateStatus: status => status >= 200 && status < 500, // Accept all non-server error responses
-                signal: controller.signal,
-                ...options
-            };
+        const requestOptions = {
+            timeout: options.timeout || 5000,
+            validateStatus: status => status >= 200 && status < 500,
+            signal: controller.signal,
+            ...options
+        };
             
-            // Make the request
-            const response = await axios.get(url, requestOptions);
-            clearTimeout(timeoutId);
+        const response = await axios.get(url, requestOptions);
+        clearTimeout(timeoutId);
             
-            // Validate response
-            if (!response.data) {
-                throw new Error('Empty response received');
-            }
-            
-            // If we got here, we succeeded
-            if (attempt > 0) {
-                logger.info(`Successfully recovered after ${attempt} retries for ${url}`);
-            }
-            
-            return response.data;
-        } catch (error) {
-            // Clear any pending timeout
-            clearTimeout(error.timeoutId);
-            
-            // Track error types for analytics
-            if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-                timeoutErrors++;
-            } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-                networkErrors++;
-            } else if (error.response && error.response.status >= 500) {
-                serverErrors++;
-            }
-            
-            // On final retry, provide detailed error info
-            if (attempt === retries) {
-                logger.error(`All ${retries} retries failed for ${url}`, {
-                    timeoutErrors,
-                    networkErrors,
-                    serverErrors,
-                    lastError: error.message
-                });
-                throw error;
-            }
-            
-            // Log the error
-            logger.warn(`API fetch attempt ${attempt + 1}/${retries} failed for ${url}: ${error.message}`);
-            
-            // Calculate delay with jitter
-            const jitteredDelay = delay + getJitter();
-            await new Promise(resolve => setTimeout(resolve, jitteredDelay));
-            
-            // Exponential backoff with cap
-            delay = Math.min(delay * 2, maxDelay);
+        if (!response.data) {
+            throw new Error('Empty response received');
         }
+            
+        return response.data;
+    } catch (error) {
+        logger.warn(`API fetch error: ${error.message}`);
+        throw error;
     }
 }
 

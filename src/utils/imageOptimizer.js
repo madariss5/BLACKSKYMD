@@ -240,7 +240,36 @@ async function optimizeImage(input, options = {}) {
 }
 
 /**
- * Optimize a GIF for faster sending
+ * Fast path for GIF URLs that don't need processing
+ * This significantly speeds up GIF loading
+ * @param {string} url - URL to check
+ * @returns {boolean} - Whether the URL can be used directly
+ */
+function isOptimizedGifUrl(url) {
+  // Common CDNs that serve optimized content
+  const optimizedDomains = [
+    'media.tenor.com',
+    'media.giphy.com',
+    'i.imgur.com',
+    'c.tenor.com',
+    'cdn.discordapp.com',
+    'media1.tenor.com',
+    'media2.tenor.com',
+    'thumbs.gfycat.com',
+    'media.discordapp.net',
+    'i.tenor.com'
+  ];
+  
+  try {
+    const urlObj = new URL(url);
+    return optimizedDomains.some(domain => urlObj.hostname.includes(domain));
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Optimize a GIF for faster sending with fast path for optimized sources
  * @param {string|Buffer} input - GIF URL, path, or buffer
  * @param {Object} options - Optimization options
  * @returns {Promise<Buffer>} - Optimized GIF buffer
@@ -251,20 +280,43 @@ async function optimizeGif(input, options = {}) {
     useCache = true,
     maxWidth = 400,
     maxHeight = 400,
-    fps = 15
+    fps = 15,
+    skipOptimization = false  // Skip optimization for fast loading
   } = options;
   
   ensureCacheDir();
   
-  // For URL inputs, try the cache first
-  if (typeof input === 'string' && input.startsWith('http') && useCache) {
-    const cachedBuffer = getCachedImage(input);
-    if (cachedBuffer) {
-      return cachedBuffer;
+  // FAST PATH: Skip optimization for already optimized sources
+  if (typeof input === 'string' && input.startsWith('http')) {
+    // Check if from optimized CDN - these GIFs are already optimized
+    if (isOptimizedGifUrl(input) || skipOptimization) {
+      try {
+        logger.debug(`Using fast path for ${input.substring(0, 30)}...`);
+        // Just download without processing
+        const response = await axios.get(input, { 
+          responseType: 'arraybuffer',
+          timeout: 3000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        return Buffer.from(response.data);
+      } catch (err) {
+        // Fall back to regular optimization path on error
+        logger.warn(`Fast path failed for ${input.substring(0, 30)}..., using regular optimization`);
+      }
+    }
+    
+    // Check cache for other URLs
+    if (useCache) {
+      const cachedBuffer = getCachedImage(input);
+      if (cachedBuffer) {
+        return cachedBuffer;
+      }
     }
   }
   
-  // Process similarly to optimizeImage but with GIF-specific settings
+  // Regular optimization path
   try {
     let gifBuffer;
     
@@ -287,15 +339,15 @@ async function optimizeGif(input, options = {}) {
       throw new Error('Invalid input type');
     }
     
-    // Use WebP for animated GIFs - more efficient
+    // Use WebP for animated GIFs - more efficient but requires processing
     const optimizedBuffer = await sharp(gifBuffer, { animated: true })
       .resize(maxWidth, maxHeight, {
         fit: 'inside',
         withoutEnlargement: true
       })
       .webp({ 
-        quality: 75,
-        effort: 4, // Lower value is faster
+        quality: 70,    // Slightly lower quality for faster processing
+        effort: 3,      // Lower value is faster (1-6 scale)
         animation: { 
           fps
         } 

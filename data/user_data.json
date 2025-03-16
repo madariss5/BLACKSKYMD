@@ -20,13 +20,13 @@
     "120363407638585565@g.us": {
       "name": "Martin",
       "age": 21,
-      "xp": 0,
+      "xp": 100,
       "level": 1,
-      "coins": 100,
+      "coins": 220,
       "bio": "",
       "language": "en",
       "registeredAt": "2025-03-15T10:57:08.783Z",
-      "lastDaily": null,
+      "lastDaily": "2025-03-16T23:15:03.169Z",
       "inventory": [],
       "achievements": [
         "New Arrival"
@@ -46,7 +46,7 @@
   "lottery": [],
   "_meta": {
     "version": 1,
-    "savedAt": "2025-03-16T23:07:23.922Z",
+    "savedAt": "2025-03-16T23:51:43.039Z",
     "profileCount": 2,
     "invalidProfileCount": 0
   }
