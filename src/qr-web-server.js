@@ -1,10 +1,5 @@
 /**
  * WhatsApp QR Web Server and Connection Manager
- * This file manages both the QR code display and the WhatsApp connection
- * The bot functionality is handled by the main index.js file
- * 
- * Enhanced with automatic reaction GIF verification and mapping
- * Includes integration with enhanced-reaction-fix.js for reliable GIF mapping
  */
 
 const express = require('express');
@@ -15,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
 const logger = require('./utils/logger');
+
 // Load the handler with full debug info
 process.env.DEBUG_BOT = 'true';
 const handler = require('./handlers/ultra-minimal-handler');
@@ -23,7 +19,8 @@ const {
     handleConnectionError, 
     resetConnectionStats 
 } = require('./utils/connectionErrorHandler');
-const { backupCredentials, sendCredsBackup } = require('./utils/credentialsBackup');
+const { backupCredentials } = require('./utils/credentialsBackup'); //Removed sendCredsBackup
+
 
 // Import the direct copy script for reaction GIFs
 const directCopyReactionGifs = require('./direct-copy-reaction-gifs');
@@ -97,7 +94,7 @@ let connectionStatus = 'disconnected';
 let sock = null;
 let qrGenerationAttempt = 0;
 
-// Use auth directory that persists across restarts for 24/7 operation
+// Use a single auth directory for persistence
 const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info_baileys');
 
 // Create auth directory if it doesn't exist
@@ -110,27 +107,6 @@ if (!fs.existsSync(AUTH_DIRECTORY)) {
     }
 }
 
-// Also ensure we have backup directories
-const BACKUP_DIRS = [
-    './backups',
-    './auth_info_baileys_backup',
-    './data/session_backups'
-];
-
-// Create backup directories for redundancy
-for (const dir of BACKUP_DIRS) {
-    if (!fs.existsSync(dir)) {
-        try {
-            fs.mkdirSync(dir, { recursive: true });
-            logger.info(`Created backup directory: ${dir}`);
-        } catch (err) {
-            logger.error(`Failed to create backup directory: ${err.message}`);
-        }
-    }
-}
-
-// Make sure auth directory exists (already created above)
-logger.info(`Using persisted auth directory: ${AUTH_DIRECTORY} for 24/7 operation`);
 
 // Serve static HTML page with QR code
 app.get('/', (req, res) => {
@@ -243,7 +219,6 @@ app.get('/', (req, res) => {
         <div class="container">
             <h1>BLACKSKY-MD</h1>
             <h2>WhatsApp Bot Connection</h2>
-
             <div class="status ${connectionStatus}">
                 Status: ${connectionStatus === 'connected' 
                         ? 'Connected ✓' 
@@ -251,7 +226,6 @@ app.get('/', (req, res) => {
                             ? 'Connecting...' 
                             : 'Waiting for QR Code...'}
             </div>
-
             <div class="qr-container">
                 ${latestQR 
                     ? `<img src="${latestQR}" alt="WhatsApp QR Code" width="300" height="300">`
@@ -262,7 +236,6 @@ app.get('/', (req, res) => {
                            <p>If no QR appears after 15 seconds, click refresh.</p>`
                 }
             </div>
-
             ${connectionStatus === 'connected' ? `
                 <div class="bot-status">
                     <strong>Bot Status:</strong> Active and ready to use<br>
@@ -317,7 +290,6 @@ app.get('/', (req, res) => {
             ` : `
                 <button class="refresh-button" onclick="location.reload()">Refresh</button>
             `}
-
             <div class="instructions">
                 <strong>Instructions:</strong>
                 <ol>
@@ -355,7 +327,7 @@ async function startConnection() {
         // Initialize handler
         await handler.init();
         logger.info('Command handler initialized');
-        
+
         // Verify and fix reaction GIFs on startup
         try {
             // Run our enhanced verification function
@@ -403,44 +375,10 @@ async function startConnection() {
                 latestQR = null; // Clear QR code once connected
                 await saveCreds();
                 logger.info('Connection established successfully!');
-                
+
                 // Reset connection error stats after successful connection
                 resetConnectionStats();
                 
-                try {
-                    const user = sock.user;
-                    const userString = user.name || user.verifiedName || user.id.split(':')[0];
-                    logger.info('Connected as:', userString);
-                    
-                    // Backup credentials to file
-                    const credsBackupPath = path.join(AUTH_DIRECTORY, 'creds.json');
-                    if (fs.existsSync(credsBackupPath)) {
-                        const credsData = JSON.parse(fs.readFileSync(credsBackupPath, 'utf8'));
-                        await backupCredentials(credsData);
-                        logger.info('Credentials backup saved');
-                        
-                        // Send credentials backup to self for extra security
-                        try {
-                            // Extract bot's JID from user object
-                            const botNumber = user.id.split(':')[0];
-                            const botJid = `${botNumber}@s.whatsapp.net`;
-                            
-                            // Send backup to bot's own number
-                            const success = await sendCredsBackup(sock, botJid);
-                            if (success) {
-                                logger.info('Credentials backup sent to bot\'s own number');
-                            } else {
-                                logger.warn('Failed to send credentials backup to bot\'s own number');
-                            }
-                        } catch (backupError) {
-                            logger.error('Error sending credentials backup to self:', backupError.message);
-                        }
-                    } else {
-                        logger.warn('Could not find credentials file for backup');
-                    }
-                } catch (e) {
-                    logger.error('Could not get user details or backup credentials:', e.message);
-                }
             }
 
             if (connection === 'close') {
@@ -471,20 +409,9 @@ async function startConnection() {
             }
         });
 
-        // Handle credentials update
-        sock.ev.on('creds.update', async (creds) => {
-            // Save using Baileys built-in method
-            await saveCreds();
-            
-            // Also backup using our utility
-            try {
-                await backupCredentials(creds);
-                logger.info('Credentials backed up after update');
-            } catch (err) {
-                logger.error('Failed to backup credentials after update:', err.message);
-            }
-        });
-        
+        // Handle credentials update - simple save only
+        sock.ev.on('creds.update', saveCreds);
+
         // Wire up message handler
         sock.ev.on('messages.upsert', async (m) => {
             if (m.type === 'notify') {
@@ -500,9 +427,8 @@ async function startConnection() {
     } catch (err) {
         logger.error('Error starting connection:', err);
         connectionStatus = 'disconnected';
-        
+
         if (isConnectionError(err)) {
-            // Use specialized connection error handler
             await handleConnectionError(
                 sock, 
                 err, 
@@ -510,7 +436,6 @@ async function startConnection() {
                 () => startConnection()
             );
         } else {
-            // Standard error handling
             setTimeout(startConnection, 5000);
         }
     }
@@ -952,9 +877,8 @@ app.get('/reaction-commands', async (req, res) => {
                 `).join('')}
             </div>
             
-            <a href="/" class="back-button">Back to QR Code</a>
-        </div>
-    </body>
+            <a href="/" class="back-button">Back to QR Code</a>            </div>
+        </body>
     </html>
     `;
     
@@ -1027,18 +951,6 @@ app.post('/test-command', async (req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
     logger.info(`\n✅ QR Web Server running at http://localhost:${PORT}\n`);
     logger.info('✅ Use this URL to access the WhatsApp QR code scanning interface\n');
-    
-    // Create a keep-alive HTTP server on another port to help with 24/7 running
-    const keepAlivePort = 3000;
-    const keepAliveServer = http.createServer((req, res) => {
-        res.writeHead(200);
-        res.end('WhatsApp Bot Keep-Alive Server - Status: Running');
-    });
-    
-    keepAliveServer.listen(keepAlivePort, '0.0.0.0', () => {
-        logger.info(`Keep-Alive server running at http://localhost:${keepAlivePort}\n`);
-        logger.info('✅ Use UptimeRobot to ping this URL every 5 minutes to keep the bot running 24/7\n');
-    });
     
     // Start the WhatsApp connection
     startConnection();
