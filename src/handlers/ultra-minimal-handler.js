@@ -3,79 +3,14 @@
  * Enhanced with full command functionality
  */
 
-const fs = require('fs').promises;
+const fs = require('fs'); // Use regular fs for sync operations
+const fsPromises = require('fs').promises; // Use promises for async operations
 const path = require('path');
 const logger = console;
 
 // Commands storage
 const commands = new Map();
 const { safeSendText, safeSendMessage } = require('../utils/jidHelper');
-
-// Helper function to calculate Levenshtein distance
-function levenshteinDistance(a, b) {
-    const matrix = Array(b.length + 1).fill().map(() => Array(a.length + 1).fill(0));
-
-    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
-    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
-
-    for (let j = 1; j <= b.length; j++) {
-        for (let i = 1; i <= a.length; i++) {
-            const substitutionCost = a[i - 1] === b[j - 1] ? 0 : 1;
-            matrix[j][i] = Math.min(
-                matrix[j][i - 1] + 1,
-                matrix[j - 1][i] + 1,
-                matrix[j - 1][i - 1] + substitutionCost
-            );
-        }
-    }
-
-    return matrix[b.length][a.length];
-}
-
-// Load all command configurations
-async function loadCommandConfigs() {
-    try {
-        const configsMap = new Map();
-        const configDir = path.join(process.cwd(), 'src/config/commands');
-
-        try {
-            await fs.access(configDir);
-        } catch (err) {
-            logger.warn('Config directory does not exist:', configDir);
-            return configsMap;
-        }
-
-        const configFiles = await fs.readdir(configDir);
-        for (const file of configFiles) {
-            if (!file.endsWith('.json')) continue;
-
-            try {
-                const filePath = path.join(configDir, file);
-                const content = await fs.readFile(filePath, 'utf8');
-                const config = JSON.parse(content);
-                const category = file.replace('.json', '');
-
-                if (Array.isArray(config.commands)) {
-                    for (const cmd of config.commands) {
-                        if (cmd && cmd.name) {
-                            configsMap.set(cmd.name, {
-                                ...cmd,
-                                category
-                            });
-                        }
-                    }
-                }
-            } catch (err) {
-                logger.error(`Error loading config file ${file}:`, err);
-            }
-        }
-
-        return configsMap;
-    } catch (err) {
-        logger.error('Error loading command configs:', err);
-        return new Map();
-    }
-}
 
 // Add core commands
 function addCoreCommands() {
@@ -91,9 +26,6 @@ function addCoreCommands() {
         description: 'Check if bot is responding',
         usage: '!ping',
         category: 'core',
-        cooldown: 3,
-        groupOnly: false,
-        permissions: ['user'],
         enabled: true
     });
 
@@ -112,11 +44,11 @@ function addCoreCommands() {
                     }
                     categories.get(category).push({
                         name,
-                        description: cmd.description || 'No description available'
+                        description: cmd.description || 'No description'
                     });
                 }
 
-                // Build menu text with descriptions
+                // Build menu text
                 for (const [category, cmdList] of categories.entries()) {
                     menuText += `*${category.toUpperCase()}*\n`;
                     cmdList.sort((a, b) => a.name.localeCompare(b.name))
@@ -131,12 +63,9 @@ function addCoreCommands() {
                 logger.error('Error in menu command:', err);
             }
         },
-        description: 'Show available commands with descriptions',
+        description: 'Show available commands',
         usage: '!menu',
         category: 'core',
-        cooldown: 5,
-        groupOnly: false,
-        permissions: ['user'],
         enabled: true
     });
 
@@ -144,20 +73,14 @@ function addCoreCommands() {
         execute: async (sock, message, args) => {
             try {
                 const sender = message.key.remoteJid;
-
                 if (args.length > 0) {
                     const commandName = args[0].toLowerCase();
                     const command = commands.get(commandName);
-
                     if (command) {
-                        const helpText = `*Command: ${commandName}*\n\n` +
-                            `Description: ${command.description || 'No description available'}\n` +
+                        const helpText = `*Command: ${commandName}*\n` +
+                            `Description: ${command.description || 'No description'}\n` +
                             `Usage: ${command.usage || `!${commandName}`}\n` +
-                            `Category: ${command.category || 'misc'}\n` +
-                            `Cooldown: ${command.cooldown || 3} seconds\n` +
-                            `Group Only: ${command.groupOnly ? 'Yes' : 'No'}\n` +
-                            `Permissions: ${command.permissions?.join(', ') || 'user'}`;
-
+                            `Category: ${command.category || 'misc'}`;
                         await safeSendText(sock, sender, helpText);
                     } else {
                         await safeSendText(sock, sender, `❌ Command "${commandName}" not found.`);
@@ -165,55 +88,64 @@ function addCoreCommands() {
                 } else {
                     await safeSendText(sock, sender, 
                         '*💡 Help Menu*\n\n' +
-                        'Use !help <command> to get detailed information about a specific command.\n\n' +
-                        'Example:\n!help ping\n\n' +
-                        'Use !menu to see all available commands.'
+                        'Use !help <command> for detailed information\n' +
+                        'Use !menu to see all commands'
                     );
                 }
             } catch (err) {
                 logger.error('Error in help command:', err);
             }
         },
-        description: 'Get detailed help for commands',
+        description: 'Get help with commands',
         usage: '!help <command>',
         category: 'core',
-        cooldown: 3,
-        groupOnly: false,
-        permissions: ['user'],
         enabled: true
     });
 }
 
-// Load commands from a directory
-async function loadCommandsFromDir(dir) {
+// Load command modules from directory
+async function loadCommandModules() {
     try {
-        const files = await fs.readdir(dir, { withFileTypes: true });
-        const configs = await loadCommandConfigs();
+        const commandsDir = path.join(process.cwd(), 'src/commands');
 
+        // Check if directory exists
+        try {
+            await fsPromises.access(commandsDir);
+        } catch (err) {
+            logger.error('Commands directory not found:', commandsDir);
+            return false;
+        }
+
+        // Get all .js files recursively
+        async function getJsFiles(dir) {
+            const items = await fsPromises.readdir(dir, { withFileTypes: true });
+            const files = await Promise.all(items.map(item => {
+                const fullPath = path.join(dir, item.name);
+                return item.isDirectory() ? getJsFiles(fullPath) : fullPath;
+            }));
+            return files.flat().filter(file => file.endsWith('.js'));
+        }
+
+        const files = await getJsFiles(commandsDir);
+        logger.log(`Found ${files.length} command files`);
+
+        // Load each command module
         for (const file of files) {
-            const fullPath = path.join(dir, file.name);
-
-            if (file.isDirectory()) {
-                await loadCommandsFromDir(fullPath);
-            } else if (file.name.endsWith('.js') && !file.name.startsWith('index')) {
+            if (file.endsWith('.js') && !file.includes('index.js')) {
                 try {
-                    delete require.cache[require.resolve(fullPath)];
-                    const module = require(fullPath);
-                    const category = path.basename(path.dirname(fullPath));
+                    delete require.cache[require.resolve(file)];
+                    const module = require(file);
+                    const category = path.basename(path.dirname(file));
 
                     if (module.commands) {
                         Object.entries(module.commands).forEach(([name, handler]) => {
                             if (typeof handler === 'function' && name !== 'init') {
-                                const config = configs.get(name) || {};
                                 commands.set(name, {
                                     execute: handler,
-                                    description: config.description || `${name} command`,
-                                    usage: config.usage || `!${name}`,
-                                    category: config.category || category,
-                                    cooldown: config.cooldown || 3,
-                                    groupOnly: config.groupOnly || false,
-                                    permissions: config.permissions || ['user'],
-                                    enabled: config.enabled !== false
+                                    description: `${name} command`,
+                                    usage: `!${name}`,
+                                    category: category !== 'commands' ? category : 'general',
+                                    enabled: true
                                 });
                                 logger.log(`Loaded command: ${name} (${category})`);
                             }
@@ -221,19 +153,23 @@ async function loadCommandsFromDir(dir) {
 
                         if (typeof module.init === 'function') {
                             await module.init();
+                            logger.log(`Initialized module: ${path.basename(file)}`);
                         }
                     }
                 } catch (err) {
-                    logger.error(`Error loading commands from ${fullPath}:`, err);
+                    logger.error(`Error loading module ${file}:`, err);
                 }
             }
         }
+
+        return true;
     } catch (err) {
-        logger.error(`Error reading directory ${dir}:`, err);
+        logger.error('Error loading command modules:', err);
+        return false;
     }
 }
 
-// Enhanced message handler
+// Process incoming messages
 async function messageHandler(sock, message) {
     try {
         if (!message?.message || !message.key?.remoteJid) return;
@@ -253,7 +189,6 @@ async function messageHandler(sock, message) {
             const args = content.slice(1).trim().split(/\s+/);
             const commandName = args.shift().toLowerCase();
 
-            // Show typing indicator
             try {
                 await sock.sendPresenceUpdate('composing', message.key.remoteJid);
             } catch (err) {
@@ -266,27 +201,16 @@ async function messageHandler(sock, message) {
                     await command.execute(sock, message, args);
                 } catch (err) {
                     logger.error(`Error executing command ${commandName}:`, err);
-                    await safeSendText(sock, message.key.remoteJid, 
-                        '❌ Error executing command. Please try again.'
-                    );
+                    await safeSendMessage(sock, message.key.remoteJid, {
+                        text: '❌ Error executing command'
+                    });
                 }
             } else {
-                // Find similar commands
-                const similarCommands = Array.from(commands.keys())
-                    .filter(cmd => levenshteinDistance(cmd, commandName) <= 2)
-                    .slice(0, 3);
-
-                let suggestion = '';
-                if (similarCommands.length > 0) {
-                    suggestion = `\n\nDid you mean: ${similarCommands.map(cmd => `!${cmd}`).join(', ')}?`;
-                }
-
-                await safeSendText(sock, message.key.remoteJid,
-                    `❌ Command not found: ${commandName}. Use !help to see available commands.${suggestion}`
-                );
+                await safeSendMessage(sock, message.key.remoteJid, {
+                    text: `❌ Command not found: ${commandName}\nUse !help to see available commands`
+                });
             }
 
-            // Stop typing indicator
             try {
                 await sock.sendPresenceUpdate('paused', message.key.remoteJid);
             } catch (err) {
@@ -304,25 +228,14 @@ async function init() {
         // Clear existing commands
         commands.clear();
 
-        // Add core commands first
+        // Add core commands
         addCoreCommands();
 
-        // Load all commands from the commands directory
-        const commandsDir = path.join(process.cwd(), 'src/commands');
-        await loadCommandsFromDir(commandsDir);
-
-        // Load reactions module separately to ensure proper initialization
-        try {
-            const reactionsPath = path.join(process.cwd(), 'src/commands/reactions.js');
-            if (fs.existsSync(reactionsPath)) {
-                const reactionsModule = require(reactionsPath);
-                if (typeof reactionsModule.init === 'function') {
-                    await reactionsModule.init();
-                    logger.log('Reactions module initialized');
-                }
-            }
-        } catch (err) {
-            logger.error('Error loading reactions module:', err);
+        // Load command modules
+        const success = await loadCommandModules();
+        if (!success) {
+            logger.error('Failed to load command modules');
+            return false;
         }
 
         logger.log(`Initialized with ${commands.size} commands`);

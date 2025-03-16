@@ -1,66 +1,58 @@
 /**
  * Enhanced Reaction Commands for WhatsApp Bot
  * Sends animated GIFs with proper mention formatting
- * Includes improved GIF loading and caching for better performance
  */
 
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 const logger = require('../utils/logger');
 const { safeSendMessage } = require('../utils/jidHelper');
 const { convertGifToMp4 } = require('../utils/gifConverter');
 
-// Path to reaction GIFs directory - only using data/reaction_gifs
+// Path to reaction GIFs directory
 const REACTIONS_DIR = path.join(process.cwd(), 'data', 'reaction_gifs');
 
-// Import the REACTION_GIF_MAPPING from the enhanced-reaction-fix to ensure consistency
+// Import the REACTION_GIF_MAPPING from the enhanced-reaction-fix
 const enhancedReactionFix = require('../enhanced-reaction-fix');
 const REACTION_GIF_MAPPING = enhancedReactionFix.REACTION_GIF_MAPPING;
 
 // Create reaction GIFs directory if it doesn't exist
 function ensureDirectoriesExist() {
     if (!fs.existsSync(REACTIONS_DIR)) {
-        logger.info(`Creating reaction GIFs directory: ${REACTIONS_DIR}`);
-        fs.mkdirSync(REACTIONS_DIR, { recursive: true });
+        try {
+            fs.mkdirSync(REACTIONS_DIR, { recursive: true });
+            logger.info(`Created reaction GIFs directory: ${REACTIONS_DIR}`);
+        } catch (err) {
+            logger.error(`Failed to create directory: ${err.message}`);
+        }
     }
 }
 
-// Verify reaction GIFs exist in data/reaction_gifs directory only
+// Verify reaction GIFs exist
 function verifyReactionGifs() {
-    // Log that we're only using data/reaction_gifs directory
-    logger.info(`Using ONLY data/reaction_gifs directory for reaction commands`);
-    console.log(`Using ONLY data/reaction_gifs directory for reaction commands`);
+    logger.info(`Using reaction GIFs from: ${REACTIONS_DIR}`);
+    console.log(`Using reaction GIFs from: ${REACTIONS_DIR}`);
 
-    // Process each command to ensure the GIF exists in data/reaction_gifs
     Object.keys(commands).forEach(command => {
-        if (command === 'init') return; // Skip init function
+        if (command === 'init') return;
 
         const gifPath = path.join(REACTIONS_DIR, `${command}.gif`);
-
-        // Check if GIF exists
         if (fs.existsSync(gifPath)) {
             try {
                 const stats = fs.statSync(gifPath);
                 if (stats.size > 1024) {
-                    logger.info(`✅ Verified ${command}.gif exists in data/reaction_gifs (${stats.size} bytes)`);
+                    logger.info(`✅ Verified ${command}.gif exists (${stats.size} bytes)`);
                 } else {
-                    logger.warn(`⚠️ GIF for ${command} exists but is too small: ${stats.size} bytes`);
+                    logger.warn(`⚠️ GIF for ${command} is too small: ${stats.size} bytes`);
                 }
             } catch (err) {
                 logger.error(`Error checking GIF for ${command}: ${err.message}`);
             }
         } else {
-            logger.warn(`❌ Missing GIF for ${command} in data/reaction_gifs directory`);
+            logger.warn(`❌ Missing GIF for ${command}`);
         }
     });
 }
-
-// Ensure directories exist when module loads
-ensureDirectoriesExist();
-// We'll verify GIFs in the init() function to avoid the "commands not initialized" error
-
-// GIF buffer cache to improve performance
-const gifCache = new Map();
 
 // Helper function to get user name from message
 async function getUserName(sock, jid) {
@@ -69,8 +61,8 @@ async function getUserName(sock, jid) {
         if (jid.endsWith('@g.us')) return "Group Chat";
 
         const phoneNumber = jid.split('@')[0];
-
         let name = null;
+
         if (sock.store && sock.store.contacts) {
             const contact = sock.store.contacts[jid];
             if (contact) {
@@ -80,11 +72,12 @@ async function getUserName(sock, jid) {
 
         return name || `+${phoneNumber}`;
     } catch (err) {
+        logger.error(`Error getting user name: ${err.message}`);
         return "User";
     }
 }
 
-// Simplified reaction command handler - with proper WhatsApp mentions
+// Simplified reaction command handler
 async function handleReaction(sock, message, type, args) {
     try {
         const jid = message.key.remoteJid;
@@ -106,20 +99,17 @@ async function handleReaction(sock, message, type, args) {
             targetName = args.join(' ');
         }
 
-        // Add sender to mentions list for proper highlighting
+        // Add sender to mentions list
         mentionedJids.push(senderJid);
-
-        // Define reaction message with proper mention formatting
-        let reactionMessage;
 
         // Format the sender name for mention
         const formattedSender = `@${senderJid.split('@')[0]}`;
-
-        // Format target for mention if we have their JID
         const formattedTarget = targetJid ? `@${targetJid.split('@')[0]}` : targetName;
 
+        // Define reaction message
+        let reactionMessage;
         switch (type) {
-            // Self-reactions (only mention the sender)
+            // Self-reactions
             case 'smile': reactionMessage = `${formattedSender} smiles 😊`; break;
             case 'happy': reactionMessage = `${formattedSender} is happy 😄`; break;
             case 'dance': reactionMessage = `${formattedSender} is dancing 💃`; break;
@@ -127,7 +117,7 @@ async function handleReaction(sock, message, type, args) {
             case 'blush': reactionMessage = `${formattedSender} is blushing 😳`; break;
             case 'laugh': reactionMessage = `${formattedSender} is laughing 😂`; break;
 
-            // Target-reactions (mention both sender and target)
+            // Target-reactions
             case 'hug': reactionMessage = `${formattedSender} hugs ${formattedTarget} 🤗`; break;
             case 'pat': reactionMessage = `${formattedSender} pats ${formattedTarget} 👋`; break;
             case 'kiss': reactionMessage = `${formattedSender} kisses ${formattedTarget} 😘`; break;
@@ -152,70 +142,54 @@ async function handleReaction(sock, message, type, args) {
             mentions: mentionedJids
         });
 
-        // Load the GIF from the data/reaction_gifs directory
-        let gifBuffer = null;
-        let gifFound = false;
-
+        // Check and send GIF
         const gifPath = path.join(REACTIONS_DIR, `${type}.gif`);
-
         if (fs.existsSync(gifPath)) {
             try {
-                gifBuffer = fs.readFileSync(gifPath);
-                gifFound = true;
-                logger.info(`Found GIF for ${type}: ${gifPath}`);
-            } catch (err) {
-                logger.error(`Error reading GIF for ${type}: ${err.message}`);
-            }
-        }
-
-        // Send the GIF if we found one
-        if (gifFound && gifBuffer) {
-            try {
-                // First try to send as a video with MP4 conversion
+                const gifBuffer = fs.readFileSync(gifPath);
                 try {
                     const videoBuffer = await convertGifToMp4(gifBuffer);
                     await sock.sendMessage(jid, {
                         video: videoBuffer,
                         gifPlayback: true,
                         caption: '',
-                        mimetype: 'video/mp4',
-                        ptt: false
+                        mimetype: 'video/mp4'
                     });
-                    logger.info(`Sent animated reaction for: ${type}`);
+                    logger.info(`Sent reaction GIF for: ${type}`);
                 } catch (conversionError) {
-                    logger.error(`GIF conversion failed for ${type}: ${conversionError.message}`);
-
-                    // Fallback to sending as image if conversion fails
+                    logger.error(`GIF conversion failed: ${conversionError.message}`);
                     await sock.sendMessage(jid, {
                         image: gifBuffer,
                         caption: '',
                         mimetype: 'image/gif'
                     });
-                    logger.info(`Sent reaction as image for: ${type} (fallback)`);
+                    logger.info(`Sent reaction as image (fallback)`);
                 }
-            } catch (sendError) {
-                logger.error(`Error sending reaction for ${type}: ${sendError.message}`);
+            } catch (err) {
+                logger.error(`Error sending reaction: ${err.message}`);
                 await safeSendMessage(sock, jid, {
-                    text: `❌ Failed to send ${type} reaction animation`
+                    text: `❌ Failed to send reaction animation`
                 });
             }
         } else {
             logger.warn(`Missing GIF for reaction: ${type}`);
             await safeSendMessage(sock, jid, {
-                text: `❌ Could not find animation for ${type} reaction`
+                text: `❌ Could not find animation for this reaction`
             });
         }
     } catch (error) {
-        logger.error(`Error in ${type} command: ${error.message}`);
+        logger.error(`Error in reaction command: ${error.message}`);
         try {
-            await safeSendMessage(sock, jid, { text: `❌ Could not send ${type} reaction` });
+            await safeSendMessage(sock, message.key.remoteJid, {
+                text: `❌ Could not process reaction command`
+            });
         } catch (err) {
             logger.error('Failed to send error message:', err);
         }
     }
 }
 
-// Command implementation with explicit commands
+// Command implementations
 const commands = {
     hug: async (sock, message, args) => await handleReaction(sock, message, 'hug', args),
     pat: async (sock, message, args) => await handleReaction(sock, message, 'pat', args),
@@ -239,58 +213,20 @@ const commands = {
     kill: async (sock, message, args) => await handleReaction(sock, message, 'kill', args)
 };
 
-/**
- * Initialize the module - validate all reaction GIFs
- */
 async function init() {
-    logger.info('Initializing reactions module...');
-
-    // Make sure directories exist
-    ensureDirectoriesExist();
-
-    // Verify that GIFs exist in data/reaction_gifs directory
-    // This must be called after commands are defined
-    verifyReactionGifs();
-
-    // Validate all reaction GIFs
-    const validGifs = [];
-    const missingGifs = [];
-
-    Object.keys(commands).forEach(cmdName => {
-        if (cmdName === 'init') return;
-
-        const gifPath = path.join(REACTIONS_DIR, `${cmdName}.gif`);
-
-        if (fs.existsSync(gifPath)) {
-            const stats = fs.statSync(gifPath);
-            if (stats.size > 1024) {
-                validGifs.push(cmdName);
-                logger.info(`✅ Found valid GIF for ${cmdName}: ${gifPath}`);
-            } else {
-                missingGifs.push(cmdName);
-                logger.warn(`⚠️ GIF file for ${cmdName} is too small: ${stats.size} bytes`);
-            }
-        } else {
-            missingGifs.push(cmdName);
-            logger.warn(`❌ Missing GIF for ${cmdName}`);
-        }
-    });
-
-    logger.info(`Reaction GIFs validation complete. Valid: ${validGifs.length}, Missing: ${missingGifs.length}`);
-
-    // Log all available reaction commands for troubleshooting
-    const allReactionCommands = Object.keys(commands).filter(cmd => cmd !== 'init');
-    logger.info(`Total reaction commands available: ${allReactionCommands.length}`);
-    logger.info(`Available reaction commands: ${allReactionCommands.join(', ')}`);
-    console.log(`[REACTIONS] Total reaction commands available: ${allReactionCommands.length}`);
-    console.log(`[REACTIONS] Available reaction commands: ${allReactionCommands.join(', ')}`);
-
-    return true;
+    try {
+        logger.info('Initializing reactions module...');
+        ensureDirectoriesExist();
+        verifyReactionGifs();
+        return true;
+    } catch (err) {
+        logger.error(`Error initializing reactions: ${err.message}`);
+        return false;
+    }
 }
 
-// Export module with appropriate properties
 module.exports = {
     commands,
-    category: 'reactions',
-    init
+    init,
+    category: 'reactions'
 };
