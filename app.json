@@ -1,23 +1,22 @@
 {
-  "name": "WhatsApp Bot",
-  "description": "A sophisticated WhatsApp multi-device bot with 490+ commands and reliable connection",
+  "name": "BLACKSKY-MD WhatsApp Bot",
+  "description": "A robust WhatsApp multi-device bot with advanced error handling and connection resilience",
   "repository": "https://github.com/yourusername/your-repo-name",
-  "logo": "https://raw.githubusercontent.com/yourusername/your-repo-name/main/generated-icon.png",
-  "keywords": ["whatsapp", "bot", "baileys", "node", "javascript"],
+  "logo": "https://raw.githubusercontent.com/yourusername/your-repo-name/main/assets/logo.png",
+  "keywords": ["whatsapp-bot", "baileys", "nodejs", "multi-device"],
   "env": {
-    "ADMIN_NUMBER": {
-      "description": "Your WhatsApp number with country code (no +)",
-      "value": "",
-      "required": true
-    },
-    "CREDS_JSON": {
-      "description": "Contents of your creds.json file from auth_info_baileys folder (alternative to file upload)",
-      "value": "",
+    "BOT_NAME": {
+      "description": "Name for your WhatsApp bot",
+      "value": "BLACKSKY-MD",
       "required": false
     },
-    "PORT": {
-      "description": "Port for web server (Heroku will set this automatically)",
-      "value": "5000",
+    "OWNER_NUMBER": {
+      "description": "Your WhatsApp number (without +)",
+      "required": true
+    },
+    "PREFIX": {
+      "description": "Prefix for bot commands",
+      "value": "!",
       "required": false
     },
     "NODE_ENV": {
@@ -29,9 +28,6 @@
   "buildpacks": [
     {
       "url": "heroku/nodejs"
-    },
-    {
-      "url": "https://github.com/heroku/heroku-buildpack-apt"
     }
   ],
   "formation": {
@@ -41,13 +37,6 @@
     }
   },
   "stack": "heroku-22",
-  "success_url": "/status",
-  "addons": [],
-  "environments": {
-    "test": {
-      "env": {
-        "NODE_ENV": "test"
-      }
-    }
-  }
+  "success_url": "/",
+  "addons": []
 }

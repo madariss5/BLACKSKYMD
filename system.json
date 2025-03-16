@@ -1,0 +1,26 @@
+{
+  "name": "blacksky-md-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot System Configuration",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "postinstall": "node scripts/post-install.js"
+  },
+  "engines": {
+    "node": "20.x",
+    "npm": "10.x"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.5.0",
+    "@hapi/boom": "^10.0.1",
+    "express": "^4.18.2",
+    "qrcode": "^1.5.3",
+    "pino": "^8.17.2",
+    "pino-pretty": "^10.3.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/your-repo-name.git"
+  }
+}

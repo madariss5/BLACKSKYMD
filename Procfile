@@ -1,1 +1,1 @@
-web: node heroku-bot.js
+web: node src/index.js
