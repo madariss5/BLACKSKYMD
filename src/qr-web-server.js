@@ -25,9 +25,17 @@ const {
 } = require('./utils/connectionErrorHandler');
 const { backupCredentials, sendCredsBackup } = require('./utils/credentialsBackup');
 
+// Import the direct copy script for reaction GIFs
+const directCopyReactionGifs = require('./direct-copy-reaction-gifs');
+
 // Auto-verify reaction GIFs with enhanced reliability
 const verifyReactionGifs = async () => {
-    // Check if data/reaction_gifs directory exists
+    // First, run the direct copy script to ensure all GIFs are properly copied
+    console.log('Running direct copy of reaction GIFs to ensure correct files are used...');
+    await directCopyReactionGifs.processAllReactions();
+    console.log('Direct copy of reaction GIFs completed.');
+    
+    // Now check if data/reaction_gifs directory exists
     const reactionGifsDir = path.join(process.cwd(), 'data', 'reaction_gifs');
     if (!fs.existsSync(reactionGifsDir)) {
         fs.mkdirSync(reactionGifsDir, { recursive: true });
