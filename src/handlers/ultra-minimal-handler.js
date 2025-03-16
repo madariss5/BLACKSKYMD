@@ -1,6 +1,6 @@
 /**
  * Ultra Minimal Message Handler
- * Designed for maximum reliability
+ * Enhanced with full command functionality
  */
 
 const fs = require('fs').promises;
@@ -11,25 +11,24 @@ const logger = console;
 const commands = new Map();
 const { safeSendText, safeSendMessage } = require('../utils/jidHelper');
 
-// Helper function to calculate Levenshtein distance between two strings
-// Used for suggesting similar commands when a command is not found
+// Helper function to calculate Levenshtein distance
 function levenshteinDistance(a, b) {
     const matrix = Array(b.length + 1).fill().map(() => Array(a.length + 1).fill(0));
-    
+
     for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
     for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
-    
+
     for (let j = 1; j <= b.length; j++) {
         for (let i = 1; i <= a.length; i++) {
             const substitutionCost = a[i - 1] === b[j - 1] ? 0 : 1;
             matrix[j][i] = Math.min(
-                matrix[j][i - 1] + 1, // deletion
-                matrix[j - 1][i] + 1, // insertion
-                matrix[j - 1][i - 1] + substitutionCost // substitution
+                matrix[j][i - 1] + 1,
+                matrix[j - 1][i] + 1,
+                matrix[j - 1][i - 1] + substitutionCost
             );
         }
     }
-    
+
     return matrix[b.length][a.length];
 }
 
@@ -39,7 +38,6 @@ async function loadCommandConfigs() {
         const configsMap = new Map();
         const configDir = path.join(process.cwd(), 'src/config/commands');
 
-        // Check if config directory exists
         try {
             await fs.access(configDir);
         } catch (err) {
@@ -47,7 +45,6 @@ async function loadCommandConfigs() {
             return configsMap;
         }
 
-        // Read all JSON config files
         const configFiles = await fs.readdir(configDir);
         for (const file of configFiles) {
             if (!file.endsWith('.json')) continue;
@@ -80,9 +77,8 @@ async function loadCommandConfigs() {
     }
 }
 
-// Add core commands that should always be available
+// Add core commands
 function addCoreCommands() {
-    // Add ping command
     commands.set('ping', {
         execute: async (sock, message) => {
             try {
@@ -93,11 +89,14 @@ function addCoreCommands() {
             }
         },
         description: 'Check if bot is responding',
+        usage: '!ping',
         category: 'core',
+        cooldown: 3,
+        groupOnly: false,
+        permissions: ['user'],
         enabled: true
     });
 
-    // Add menu command
     commands.set('menu', {
         execute: async (sock, message) => {
             try {
@@ -111,15 +110,19 @@ function addCoreCommands() {
                     if (!categories.has(category)) {
                         categories.set(category, []);
                     }
-                    categories.get(category).push(name);
+                    categories.get(category).push({
+                        name,
+                        description: cmd.description || 'No description available'
+                    });
                 }
 
-                // Build menu text
+                // Build menu text with descriptions
                 for (const [category, cmdList] of categories.entries()) {
                     menuText += `*${category.toUpperCase()}*\n`;
-                    cmdList.sort().forEach(cmd => {
-                        menuText += `• !${cmd}\n`;
-                    });
+                    cmdList.sort((a, b) => a.name.localeCompare(b.name))
+                        .forEach(cmd => {
+                            menuText += `• !${cmd.name} - ${cmd.description}\n`;
+                        });
                     menuText += '\n';
                 }
 
@@ -128,8 +131,55 @@ function addCoreCommands() {
                 logger.error('Error in menu command:', err);
             }
         },
-        description: 'Show available commands',
+        description: 'Show available commands with descriptions',
+        usage: '!menu',
         category: 'core',
+        cooldown: 5,
+        groupOnly: false,
+        permissions: ['user'],
+        enabled: true
+    });
+
+    commands.set('help', {
+        execute: async (sock, message, args) => {
+            try {
+                const sender = message.key.remoteJid;
+
+                if (args.length > 0) {
+                    const commandName = args[0].toLowerCase();
+                    const command = commands.get(commandName);
+
+                    if (command) {
+                        const helpText = `*Command: ${commandName}*\n\n` +
+                            `Description: ${command.description || 'No description available'}\n` +
+                            `Usage: ${command.usage || `!${commandName}`}\n` +
+                            `Category: ${command.category || 'misc'}\n` +
+                            `Cooldown: ${command.cooldown || 3} seconds\n` +
+                            `Group Only: ${command.groupOnly ? 'Yes' : 'No'}\n` +
+                            `Permissions: ${command.permissions?.join(', ') || 'user'}`;
+
+                        await safeSendText(sock, sender, helpText);
+                    } else {
+                        await safeSendText(sock, sender, `❌ Command "${commandName}" not found.`);
+                    }
+                } else {
+                    await safeSendText(sock, sender, 
+                        '*💡 Help Menu*\n\n' +
+                        'Use !help <command> to get detailed information about a specific command.\n\n' +
+                        'Example:\n!help ping\n\n' +
+                        'Use !menu to see all available commands.'
+                    );
+                }
+            } catch (err) {
+                logger.error('Error in help command:', err);
+            }
+        },
+        description: 'Get detailed help for commands',
+        usage: '!help <command>',
+        category: 'core',
+        cooldown: 3,
+        groupOnly: false,
+        permissions: ['user'],
         enabled: true
     });
 }
@@ -138,6 +188,8 @@ function addCoreCommands() {
 async function loadCommandsFromDir(dir) {
     try {
         const files = await fs.readdir(dir, { withFileTypes: true });
+        const configs = await loadCommandConfigs();
+
         for (const file of files) {
             const fullPath = path.join(dir, file.name);
 
@@ -152,10 +204,16 @@ async function loadCommandsFromDir(dir) {
                     if (module.commands) {
                         Object.entries(module.commands).forEach(([name, handler]) => {
                             if (typeof handler === 'function' && name !== 'init') {
+                                const config = configs.get(name) || {};
                                 commands.set(name, {
                                     execute: handler,
-                                    category,
-                                    enabled: true
+                                    description: config.description || `${name} command`,
+                                    usage: config.usage || `!${name}`,
+                                    category: config.category || category,
+                                    cooldown: config.cooldown || 3,
+                                    groupOnly: config.groupOnly || false,
+                                    permissions: config.permissions || ['user'],
+                                    enabled: config.enabled !== false
                                 });
                                 logger.log(`Loaded command: ${name} (${category})`);
                             }
@@ -192,8 +250,15 @@ async function messageHandler(sock, message) {
         const validPrefixes = ['!', '/', '.'];
 
         if (validPrefixes.includes(prefix)) {
-            const args = content.slice(1).trim().split(' ');
+            const args = content.slice(1).trim().split(/\s+/);
             const commandName = args.shift().toLowerCase();
+
+            // Show typing indicator
+            try {
+                await sock.sendPresenceUpdate('composing', message.key.remoteJid);
+            } catch (err) {
+                logger.error('Error setting presence:', err);
+            }
 
             if (commands.has(commandName)) {
                 try {
@@ -206,9 +271,26 @@ async function messageHandler(sock, message) {
                     );
                 }
             } else {
+                // Find similar commands
+                const similarCommands = Array.from(commands.keys())
+                    .filter(cmd => levenshteinDistance(cmd, commandName) <= 2)
+                    .slice(0, 3);
+
+                let suggestion = '';
+                if (similarCommands.length > 0) {
+                    suggestion = `\n\nDid you mean: ${similarCommands.map(cmd => `!${cmd}`).join(', ')}?`;
+                }
+
                 await safeSendText(sock, message.key.remoteJid,
-                    `❌ Command not found: ${commandName}. Use !help to see available commands.`
+                    `❌ Command not found: ${commandName}. Use !help to see available commands.${suggestion}`
                 );
+            }
+
+            // Stop typing indicator
+            try {
+                await sock.sendPresenceUpdate('paused', message.key.remoteJid);
+            } catch (err) {
+                logger.error('Error clearing presence:', err);
             }
         }
     } catch (err) {
@@ -228,6 +310,20 @@ async function init() {
         // Load all commands from the commands directory
         const commandsDir = path.join(process.cwd(), 'src/commands');
         await loadCommandsFromDir(commandsDir);
+
+        // Load reactions module separately to ensure proper initialization
+        try {
+            const reactionsPath = path.join(process.cwd(), 'src/commands/reactions.js');
+            if (fs.existsSync(reactionsPath)) {
+                const reactionsModule = require(reactionsPath);
+                if (typeof reactionsModule.init === 'function') {
+                    await reactionsModule.init();
+                    logger.log('Reactions module initialized');
+                }
+            }
+        } catch (err) {
+            logger.error('Error loading reactions module:', err);
+        }
 
         logger.log(`Initialized with ${commands.size} commands`);
         return true;
