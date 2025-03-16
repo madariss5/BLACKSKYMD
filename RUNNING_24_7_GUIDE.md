@@ -1,86 +1,64 @@
 # Running Your WhatsApp Bot 24/7
 
-This guide will help you keep your WhatsApp bot running 24/7, even when Replit is closed.
+This guide explains how to keep your WhatsApp bot running 24/7, even when you close your browser or shut down your computer.
 
-## Method 1: Using UptimeRobot (Free)
+## How It Works
 
-UptimeRobot is a service that can ping your Replit URL every 5 minutes to keep it from going to sleep.
+Your bot now has two server components:
+1. The main WhatsApp web server on port 5007 (for scanning QR codes)
+2. A keep-alive server on port 3000 (for maintaining 24/7 operation)
 
-1. Sign up for a free account at [UptimeRobot](https://uptimerobot.com/)
-2. Add a new monitor:
-   - Monitor Type: HTTP(s)
-   - Friendly Name: "WhatsApp Bot"
-   - URL: Your Replit URL (e.g., https://your-repl-name.yourusername.repl.co)
-   - Monitoring Interval: Every 5 minutes
+By regularly pinging the keep-alive server, you can prevent Replit from shutting down your bot due to inactivity.
 
-This will keep your Replit instance active. However, free Replit instances may still restart occasionally.
+## Setting Up UptimeRobot (Free Method)
 
-## Method 2: Using Replit's Always On Feature (Paid)
+1. **Create an account at [UptimeRobot](https://uptimerobot.com/)** (free tier is sufficient)
 
-If you have Replit Pro or Hacker Plan, you can use the "Always On" feature:
+2. **Add a new monitor**:
+   - Click "Add New Monitor"
+   - Select "HTTP(s)" as the monitor type
+   - Enter a friendly name (e.g., "WhatsApp Bot")
+   - Enter your Replit URL + port 3000 as the URL:
+     ```
+     https://your-replit-project.your-username.repl.co:3000
+     ```
+   - Set monitoring interval to 5 minutes
+   - Click "Create Monitor"
 
-1. Go to your Replit dashboard
-2. Select your WhatsApp bot project
-3. In the project overview, find and enable the "Always On" toggle
+3. **Verify the monitor is working**:
+   - The status should turn green within 5-10 minutes
+   - You can check the logs to see successful pings
 
-This is the most reliable method for keeping your bot running on Replit.
+## Testing 24/7 Operation
 
-## Method 3: Deploy to a VPS (Advanced)
+1. Connect your WhatsApp by scanning the QR code at port 5007
+2. Close your browser completely
+3. Wait a few hours
+4. Return to check if your bot is still responding to commands
 
-For the most reliable 24/7 operation, you can deploy to a Virtual Private Server:
+## Additional Persistence Tips
 
-1. Create an account on a VPS provider (DigitalOcean, Linode, etc.)
-2. Create a basic Ubuntu server ($5/month options are enough)
-3. SSH into your server and run these commands:
+### Session Management
 
-```bash
-# Update system and install Node.js
-sudo apt update
-sudo apt install -y nodejs npm git
+Your bot now stores authentication data in persistent directories:
+- Main auth directory: `/home/runner/workspace/auth_info_baileys`
+- Backup credentials: `/home/runner/workspace/sessions/creds_backup_*.json`
 
-# Clone your repository
-git clone https://github.com/yourusername/your-repo.git
-cd your-repo
+These files are preserved even when your Replit project is restarted, allowing your bot to reconnect without needing to scan the QR code again.
 
-# Install dependencies
-npm install
+### Troubleshooting Connection Issues
 
-# Install PM2 to keep the bot running
-npm install -g pm2
+If your bot disconnects frequently:
 
-# Start the bot with PM2
-pm2 start src/qr-web-server.js --name whatsapp-bot
+1. Try reconnecting by going to your bot's QR web interface (port 5007)
+2. If it shows "Connected" but doesn't respond to commands, restart the Replit
+3. Check UptimeRobot logs to ensure it's successfully pinging your keep-alive server
+4. Make sure you don't have multiple instances of the bot running
 
-# Make PM2 start the bot on server reboot
-pm2 startup
-pm2 save
-```
+## Advanced: Keeping Credentials Safe
 
-## Enhanced Session Management 
+Your bot automatically backs up credentials in several locations:
+- Multiple backup files with timestamps
+- Automatic cleanup of older backup files to prevent clutter
 
-I've implemented several features to improve your bot's ability to reconnect:
-
-1. **Multiple Backup Locations**: Your session is backed up in several directories for redundancy.
-2. **Automatic Backup**: The session is automatically backed up every 15 minutes.
-3. **Robust Restoration**: The bot will search multiple locations to find valid credentials when restarting.
-
-## Testing If Your Bot Stays Connected
-
-1. Connect your WhatsApp by scanning the QR code
-2. Send a few test messages like `.ping` to verify it's working
-3. Keep Replit running for at least 30 minutes to ensure backup systems work
-4. Check that backup files are created in the following locations:
-   - `./backups/`
-   - `./auth_info_baileys_backup/`
-   - `./data/session_backups/`
-
-## Troubleshooting
-
-If your bot disconnects:
-
-1. Check if Replit is still running
-2. Verify that your monitoring service (UptimeRobot) is active
-3. If restarting, check the logs for errors
-4. Try scanning the QR code again if needed
-
-Remember that WhatsApp Web sessions typically last 2-4 weeks before requiring a new login, even with perfect uptime.
+This ensures that even if one credential file gets corrupted, your bot can recover from backups.

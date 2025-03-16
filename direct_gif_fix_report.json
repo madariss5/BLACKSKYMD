@@ -1,0 +1,147 @@
+{
+  "timestamp": "2025-03-16T19:36:32.113Z",
+  "successCount": 20,
+  "errorCount": 0,
+  "results": [
+    {
+      "command": "smile",
+      "source": "heavenly-joy-jerkins-i-am-so-excited.gif",
+      "success": true,
+      "sourceSize": "198.64 KB",
+      "targetSize": "198.64 KB"
+    },
+    {
+      "command": "happy",
+      "source": "heavenly-joy-jerkins-i-am-so-excited.gif",
+      "success": true,
+      "sourceSize": "198.64 KB",
+      "targetSize": "198.64 KB"
+    },
+    {
+      "command": "dance",
+      "source": "B6ya.gif",
+      "success": true,
+      "sourceSize": "880.12 KB",
+      "targetSize": "880.12 KB"
+    },
+    {
+      "command": "cry",
+      "source": "long-tears.gif",
+      "success": true,
+      "sourceSize": "315.06 KB",
+      "targetSize": "315.06 KB"
+    },
+    {
+      "command": "blush",
+      "source": "0fd379b81bc8023064986c9c45f22253_w200.gif",
+      "success": true,
+      "sourceSize": "292.14 KB",
+      "targetSize": "292.14 KB"
+    },
+    {
+      "command": "laugh",
+      "source": "200w.gif",
+      "success": true,
+      "sourceSize": "107.79 KB",
+      "targetSize": "107.79 KB"
+    },
+    {
+      "command": "hug",
+      "source": "tumblr_cdeb20431732069e4456c4ab66b9534f_8178dd55_500.gif",
+      "success": true,
+      "sourceSize": "997.08 KB",
+      "targetSize": "997.08 KB"
+    },
+    {
+      "command": "pat",
+      "source": "cbfd2a06c6d350e19a0c173dec8dccde.gif",
+      "success": true,
+      "sourceSize": "234.80 KB",
+      "targetSize": "234.80 KB"
+    },
+    {
+      "command": "kiss",
+      "source": "tumblr_435925615ecd34c607dd730ab836eacf_4e338a28_540.gif",
+      "success": true,
+      "sourceSize": "7.97 MB",
+      "targetSize": "7.97 MB"
+    },
+    {
+      "command": "cuddle",
+      "source": "icegif-890.gif",
+      "success": true,
+      "sourceSize": "2.02 MB",
+      "targetSize": "2.02 MB"
+    },
+    {
+      "command": "wave",
+      "source": "BT_L5v.gif",
+      "success": true,
+      "sourceSize": "947.92 KB",
+      "targetSize": "947.92 KB"
+    },
+    {
+      "command": "wink",
+      "source": "21R.gif",
+      "success": true,
+      "sourceSize": "2.08 MB",
+      "targetSize": "2.08 MB"
+    },
+    {
+      "command": "poke",
+      "source": "1fg1og.gif",
+      "success": true,
+      "sourceSize": "3.13 MB",
+      "targetSize": "3.13 MB"
+    },
+    {
+      "command": "slap",
+      "source": "slap.gif",
+      "success": true,
+      "sourceSize": "645.38 KB",
+      "targetSize": "645.38 KB"
+    },
+    {
+      "command": "bonk",
+      "source": "icegif-255.gif",
+      "success": true,
+      "sourceSize": "414.48 KB",
+      "targetSize": "414.48 KB"
+    },
+    {
+      "command": "bite",
+      "source": "15d3d956bd674096c4e68f1d011e8023.gif",
+      "success": true,
+      "sourceSize": "1022.96 KB",
+      "targetSize": "1022.96 KB"
+    },
+    {
+      "command": "punch",
+      "source": "2Lmc.gif",
+      "success": true,
+      "sourceSize": "892.52 KB",
+      "targetSize": "892.52 KB"
+    },
+    {
+      "command": "highfive",
+      "source": "BT_L5v.gif",
+      "success": true,
+      "sourceSize": "947.92 KB",
+      "targetSize": "947.92 KB"
+    },
+    {
+      "command": "yeet",
+      "source": "15d3d956bd674096c4e68f1d011e8023.gif",
+      "success": true,
+      "sourceSize": "1022.96 KB",
+      "targetSize": "1022.96 KB"
+    },
+    {
+      "command": "kill",
+      "source": "giphy.gif",
+      "success": true,
+      "sourceSize": "9.70 MB",
+      "targetSize": "9.70 MB"
+    }
+  ]
+}

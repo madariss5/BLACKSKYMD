@@ -2,6 +2,9 @@
  * WhatsApp QR Web Server and Connection Manager
  * This file manages both the QR code display and the WhatsApp connection
  * The bot functionality is handled by the main index.js file
+ * 
+ * Enhanced with automatic reaction GIF verification and mapping
+ * Includes integration with enhanced-reaction-fix.js for reliable GIF mapping
  */
 
 const express = require('express');
@@ -21,6 +24,80 @@ const {
     resetConnectionStats 
 } = require('./utils/connectionErrorHandler');
 const { backupCredentials, sendCredsBackup } = require('./utils/credentialsBackup');
+
+// Auto-verify reaction GIFs with enhanced reliability
+const verifyReactionGifs = async () => {
+    // Check if data/reaction_gifs directory exists
+    const reactionGifsDir = path.join(process.cwd(), 'data', 'reaction_gifs');
+    if (!fs.existsSync(reactionGifsDir)) {
+        fs.mkdirSync(reactionGifsDir, { recursive: true });
+        logger.info(`Created reaction GIFs directory: ${reactionGifsDir}`);
+    }
+
+    // Verify each reaction GIF
+    const reactionCommands = [
+        'smile', 'happy', 'dance', 'cry', 'blush', 'laugh',
+        'hug', 'pat', 'kiss', 'cuddle', 'wave', 'wink', 'poke',
+        'slap', 'bonk', 'bite', 'punch', 'highfive', 'yeet', 'kill'
+    ];
+
+    let missingGifs = [];
+    let validGifs = [];
+
+    reactionCommands.forEach(cmd => {
+        const gifPath = path.join(reactionGifsDir, `${cmd}.gif`);
+        if (fs.existsSync(gifPath)) {
+            logger.info(`✅ Found valid GIF for ${cmd}: ${gifPath}`);
+            validGifs.push(cmd);
+        } else {
+            logger.warn(`❌ Missing GIF for ${cmd}: ${gifPath}`);
+            missingGifs.push(cmd);
+        }
+    });
+
+    logger.info(`Reaction GIFs validation complete. Valid: ${validGifs.length}, Missing: ${missingGifs.length}`);
+
+    // Always run enhanced fix to ensure correct GIF mapping
+    // This ensures that not only missing GIFs are fixed but also that 
+    // all GIFs properly match their commands semantically
+    try {
+        // First try the new enhanced reaction fix script
+        let enhancedFixApplied = false;
+        try {
+            const enhancedFixModule = require('./enhanced-reaction-fix');
+            await enhancedFixModule.fixReactionGifs();
+            logger.info('Enhanced reaction GIF fix applied successfully');
+            enhancedFixApplied = true;
+        } catch (enhancedErr) {
+            logger.warn(`Could not apply enhanced reaction GIF fix: ${enhancedErr.message}`);
+        }
+        
+        // If enhanced fix failed or missing GIFs still exist, try the original fix
+        if (!enhancedFixApplied || missingGifs.length > 0) {
+            try {
+                const reloadModule = require('./reload-reaction-gifs');
+                await reloadModule.reloadReactionGifs();
+                logger.info('Fallback reaction GIF fix applied');
+            } catch (reloadErr) {
+                logger.error(`Could not load reload-reaction-gifs module: ${reloadErr.message}`);
+                
+                // Last resort - try direct-gif-fix.js if it exists
+                try {
+                    const directFixModule = require('./direct-gif-fix');
+                    await directFixModule.fixReactionGifs();
+                    logger.info('Direct GIF fix applied as last resort');
+                } catch (directErr) {
+                    logger.error(`All reaction GIF fix methods failed: ${directErr.message}`);
+                    throw new Error('Failed to fix reaction GIFs using any available method');
+                }
+            }
+        }
+        
+        logger.info('Reaction GIFs verified and fixed on startup');
+    } catch (err) {
+        logger.error(`Error fixing reaction GIFs: ${err.message}`);
+    }
+};
 
 // Create Express app
 const app = express();
@@ -285,6 +362,24 @@ async function startConnection() {
         // Initialize handler
         await handler.init();
         logger.info('Command handler initialized');
+        
+        // Verify and fix reaction GIFs on startup
+        try {
+            // Run our enhanced verification function
+            await verifyReactionGifs();
+            
+            // Also check if the reactions command module exists in the commands folder
+            const reactionsPath = path.join(process.cwd(), 'src', 'commands', 'reactions.js');
+            if (fs.existsSync(reactionsPath)) {
+                // Require the module to trigger the ensureReactionGifs function
+                const reactionsModule = require('./commands/reactions');
+                if (typeof reactionsModule.init === 'function') {
+                    await reactionsModule.init();
+                }
+            }
+        } catch (error) {
+            logger.error(`Error verifying reaction GIFs: ${error.message}`);
+        }
         
         const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRECTORY);
         logger.info('Auth state loaded');

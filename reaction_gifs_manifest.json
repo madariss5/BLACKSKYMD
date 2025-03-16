@@ -1,0 +1,170 @@
+{
+  "timestamp": "2025-03-16T20:15:59.896Z",
+  "results": {
+    "successful": [],
+    "failed": [],
+    "missing": [],
+    "skipped": [
+      {
+        "type": "smile",
+        "sourceFile": "heavenly-joy-jerkins-i-am-so-excited.gif",
+        "targetFile": "smile.gif",
+        "size": 203404,
+        "formattedSize": "198.64 KB",
+        "checksum": "fe4a98702e9aca19179d9029aeb08962"
+      },
+      {
+        "type": "happy",
+        "sourceFile": "heavenly-joy-jerkins-i-am-so-excited.gif",
+        "targetFile": "happy.gif",
+        "size": 203404,
+        "formattedSize": "198.64 KB",
+        "checksum": "fe4a98702e9aca19179d9029aeb08962"
+      },
+      {
+        "type": "dance",
+        "sourceFile": "B6ya.gif",
+        "targetFile": "dance.gif",
+        "size": 901246,
+        "formattedSize": "880.12 KB",
+        "checksum": "80b20c59b438550ad32a68ee8a30ed82"
+      },
+      {
+        "type": "cry",
+        "sourceFile": "long-tears.gif",
+        "targetFile": "cry.gif",
+        "size": 322626,
+        "formattedSize": "315.06 KB",
+        "checksum": "e0dc2746cc316bb30b37ff4f99fd6fe3"
+      },
+      {
+        "type": "blush",
+        "sourceFile": "0fd379b81bc8023064986c9c45f22253_w200.gif",
+        "targetFile": "blush.gif",
+        "size": 299152,
+        "formattedSize": "292.14 KB",
+        "checksum": "cbbee238c14e566332207b47323a1218"
+      },
+      {
+        "type": "laugh",
+        "sourceFile": "laugh.gif",
+        "targetFile": "laugh.gif",
+        "size": 122820,
+        "formattedSize": "119.94 KB",
+        "checksum": "eb76feb922e1e90275049c91e71938e5"
+      },
+      {
+        "type": "hug",
+        "sourceFile": "tumblr_cdeb20431732069e4456c4ab66b9534f_8178dd55_500.gif",
+        "targetFile": "hug.gif",
+        "size": 1021013,
+        "formattedSize": "997.08 KB",
+        "checksum": "c4829a8e73ff1b918299906717328720"
+      },
+      {
+        "type": "pat",
+        "sourceFile": "pat.gif",
+        "targetFile": "pat.gif",
+        "size": 862748,
+        "formattedSize": "842.53 KB",
+        "checksum": "4d22f711336d2d4ce889a69c8980487e"
+      },
+      {
+        "type": "kiss",
+        "sourceFile": "tumblr_435925615ecd34c607dd730ab836eacf_4e338a28_540.gif",
+        "targetFile": "kiss.gif",
+        "size": 8357788,
+        "formattedSize": "7.97 MB",
+        "checksum": "0d7653967247cfc49aea3515f5fea7a6"
+      },
+      {
+        "type": "cuddle",
+        "sourceFile": "icegif-890.gif",
+        "targetFile": "cuddle.gif",
+        "size": 2113299,
+        "formattedSize": "2.02 MB",
+        "checksum": "fab5a53ad6b79de98f911b8b9c3bf1d1"
+      },
+      {
+        "type": "wave",
+        "sourceFile": "wave.gif",
+        "targetFile": "wave.gif",
+        "size": 41304,
+        "formattedSize": "40.34 KB",
+        "checksum": "0b4d9c629c3c554929f76f957790e521"
+      },
+      {
+        "type": "wink",
+        "sourceFile": "wink.gif",
+        "targetFile": "wink.gif",
+        "size": 228284,
+        "formattedSize": "222.93 KB",
+        "checksum": "f182aaa3bfbe09ff4617276e4b90a7a4"
+      },
+      {
+        "type": "poke",
+        "sourceFile": "poke.gif",
+        "targetFile": "poke.gif",
+        "size": 111691,
+        "formattedSize": "109.07 KB",
+        "checksum": "6756b61263101d4562f72d50aa99f6dd"
+      },
+      {
+        "type": "slap",
+        "sourceFile": "slap.gif",
+        "targetFile": "slap.gif",
+        "size": 660864,
+        "formattedSize": "645.38 KB",
+        "checksum": "7892c01d382ef3a2338c11455e07ee03"
+      },
+      {
+        "type": "bonk",
+        "sourceFile": "icegif-255.gif",
+        "targetFile": "bonk.gif",
+        "size": 424428,
+        "formattedSize": "414.48 KB",
+        "checksum": "14d65beb4758bd6c4d54940e6c56330a"
+      },
+      {
+        "type": "bite",
+        "sourceFile": "15d3d956bd674096c4e68f1d011e8023.gif",
+        "targetFile": "bite.gif",
+        "size": 1047514,
+        "formattedSize": "1022.96 KB",
+        "checksum": "15d3d956bd674096c4e68f1d011e8023"
+      },
+      {
+        "type": "punch",
+        "sourceFile": "2Lmc.gif",
+        "targetFile": "punch.gif",
+        "size": 913942,
+        "formattedSize": "892.52 KB",
+        "checksum": "f1b9a9c74680d9bad1b3fc207768fdb6"
+      },
+      {
+        "type": "highfive",
+        "sourceFile": "BT_L5v.gif",
+        "targetFile": "highfive.gif",
+        "size": 970665,
+        "formattedSize": "947.92 KB",
+        "checksum": "6838d2b21f3eddb8d27bfc94d1e6669b"
+      },
+      {
+        "type": "yeet",
+        "sourceFile": "15d3d956bd674096c4e68f1d011e8023.gif",
+        "targetFile": "yeet.gif",
+        "size": 1047514,
+        "formattedSize": "1022.96 KB",
+        "checksum": "15d3d956bd674096c4e68f1d011e8023"
+      },
+      {
+        "type": "kill",
+        "sourceFile": "giphy.gif",
+        "targetFile": "kill.gif",
+        "size": 10174760,
+        "formattedSize": "9.70 MB",
+        "checksum": "9db2b063a06c35921babf8db81be8bcb"
+      }
+    ]
+  }
+}
