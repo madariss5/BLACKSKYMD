@@ -1,0 +1,56 @@
+<% if (path !== '') { %>
+  <div class="breadcrumb">
+    <a href="/">Root</a>
+    <% 
+      let parts = path.split('/');
+      let currentPath = '';
+      parts.forEach((part, index) => {
+        if (part) {
+          currentPath += '/' + part;
+          if (index < parts.length - 1) { %>
+            / <a href="/browse<%= currentPath %>"><%= part %></a>
+          <% } else { %>
+            / <span><%= part %></span>
+          <% }
+        }
+      });
+    %>
+  </div>
+<% } %>
+
+<h2>Files and Directories</h2>
+
+<ul class="file-list">
+  <% if (path !== '') { %>
+    <li>
+      <span class="icon">⬆️</span>
+      <a href="/browse<%= path.split('/').slice(0, -1).join('/') %>" class="folder">.. (Parent Directory)</a>
+    </li>
+  <% } %>
+  
+  <% contents.forEach(item => { %>
+    <li>
+      <% if (item.type === 'dir') { %>
+        <span class="icon">📁</span>
+        <a href="/browse<%= path + '/' + item.name %>" class="folder"><%= item.name %></a>
+      <% } else { %>
+        <span class="icon">📄</span>
+        <a href="/edit<%= path + '/' + item.name %>" class="file"><%= item.name %></a>
+      <% } %>
+    </li>
+  <% }); %>
+</ul>
+
+<div class="create-form">
+  <h3>Create New File</h3>
+  <form action="/create" method="post">
+    <input type="hidden" name="directory" value="<%= path %>">
+    
+    <div class="form-group">
+      <label for="filename">File Name:</label>
+      <input type="text" id="filename" name="filename" class="form-control" required>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Create New File</button>
+  </form>
+</div>

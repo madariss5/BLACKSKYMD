@@ -1,0 +1,39 @@
+<div class="breadcrumb">
+  <a href="/">Root</a>
+  <% 
+    let parts = path.split('/');
+    let currentPath = '';
+    parts.forEach((part, index) => {
+      if (part) {
+        currentPath += '/' + part;
+        if (index < parts.length - 1) { %>
+          / <a href="/browse<%= currentPath %>"><%= part %></a>
+        <% } else { %>
+          / <span><%= part %></span>
+        <% }
+      }
+    });
+  %>
+</div>
+
+<h2>Editing: <%= path %></h2>
+
+<form action="/save" method="post">
+  <input type="hidden" name="path" value="<%= path %>">
+  <input type="hidden" name="sha" value="<%= sha %>">
+  
+  <div class="editor-container">
+    <textarea name="content" class="editor"><%= content %></textarea>
+  </div>
+  
+  <div class="editor-actions">
+    <div>
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+      <a href="/browse<%= path.split('/').slice(0, -1).join('/') %>" class="btn btn-secondary">Cancel</a>
+    </div>
+    
+    <div>
+      <input type="text" name="commitMessage" class="form-control" placeholder="Commit message" value="Update <%= path.split('/').pop() %>" required>
+    </div>
+  </div>
+</form>

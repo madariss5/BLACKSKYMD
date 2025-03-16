@@ -1,153 +1,115 @@
-# Complete Guide to Editing Files on GitHub
+# GitHub Direct Editing Guide
 
-This comprehensive guide will help you edit files directly on GitHub's web interface or through other methods.
+This guide provides detailed instructions for setting up and using the direct GitHub file editing capabilities of the BLACKSKY-MD WhatsApp bot.
 
-## Method 1: Direct Editing on GitHub Web Interface
+## Prerequisites
 
-1. **Navigate to Your Repository**
-   - Go to https://github.com/madariss5/BLACKSKY
-   - Make sure you're logged in to your GitHub account (madariss5)
+Before you can edit GitHub files directly, you need:
 
-2. **Browse to the File You Want to Edit**
-   - Click through the folders to find the file
-   - For example, to edit `src/index.js`, first click on the `src` folder, then click on `index.js`
+1. A GitHub account
+2. A Personal Access Token with proper permissions
+3. The BLACKSKY-MD repository (either as owner or with write access)
 
-3. **Start Editing**
-   - Click the pencil icon (✏️) in the top-right corner of the file view
-   - If you don't see this icon, you might not be logged in or have permission issues
+## Setting Up Your GitHub Token
 
-4. **Make Your Changes**
-   - Edit the file content directly in the browser
-   - You can preview changes by clicking the "Preview" tab
+To create a GitHub token with proper permissions:
 
-5. **Commit Changes**
-   - Scroll down to the "Commit changes" section
-   - Add a brief description of your changes
-   - Choose whether to commit directly to the main branch or create a new branch
-   - Click "Commit changes"
+1. Go to [GitHub Personal Access Tokens](https://github.com/settings/tokens)
+2. Click "Generate new token" > "Generate new token (classic)"
+3. Fill in the following:
+   - **Note**: WhatsApp Bot GitHub Access
+   - **Expiration**: Select an appropriate expiration (90 days recommended)
+4. Select the following permissions:
+   - **repo** (Full control of private repositories)
+5. Click "Generate token" at the bottom
+6. **IMPORTANT**: Copy your token immediately, as you won't be able to see it again!
 
-## Method 2: Creating New Files on GitHub
+## Adding Your Token to the Bot
 
-1. **Navigate to the Directory Where You Want to Create a File**
-   - Browse to the folder where the file should be located
+1. In your Replit environment, go to the Secrets panel (lock icon)
+2. Add a new secret:
+   - **Key**: `GITHUB_TOKEN`
+   - **Value**: Your GitHub token
 
-2. **Start Creating**
-   - Click "Add file" button at the top of the file list
-   - Choose "Create new file" from the dropdown
+## Using the GitHub Editor Tools
 
-3. **Name and Edit the File**
-   - Enter the filename at the top (including extension, like `example.js`)
-   - Add content in the editor
-   - Commit the file as described in Method 1, Step 5
+We provide several tools to help you edit files directly on GitHub:
 
-## Method 3: Uploading Files to GitHub
+### Simple Web-Based Editor
 
-1. **Navigate to the Directory Where You Want to Upload Files**
-   - Browse to the destination folder 
+The web-based GitHub Editor provides an interactive interface for browsing and editing your repository:
 
-2. **Upload Files**
-   - Click "Add file" button at the top of the file list
-   - Choose "Upload files" from the dropdown
-   - Drag and drop files or click to browse your computer
-   - Add a commit message and commit the changes
+1. Start the editor workflow (it automatically uses your GitHub token)
+2. Choose from the menu options:
+   - Browse repository
+   - Edit a file
+   - Create a new file
+   - Verify GitHub token
 
-## Method 4: GitHub Desktop App
+### Command-Line Direct Editor
 
-If web editing isn't working, GitHub Desktop might be a good alternative:
+For non-interactive editing, use our direct editor script:
 
-1. **Install GitHub Desktop**
-   - Download from https://desktop.github.com/
-   - Install and log in with your GitHub account
+```bash
+# List files in the repository
+node github-tools/direct-github-editor.js list
 
-2. **Clone Your Repository**
-   - Click "Clone a repository from the Internet..."
-   - Select your BLACKSKY repository
-   - Choose where to save it locally
-   - Click "Clone"
+# View a file
+node github-tools/direct-github-editor.js view README.md
 
-3. **Edit Files Locally**
-   - Make changes using your favorite text editor
-   - Save the files
+# Create a new file
+node github-tools/direct-github-editor.js create test.md "# Test File" "Create test file"
 
-4. **Commit and Push Changes**
-   - In GitHub Desktop, you'll see the changed files listed
-   - Add a summary and description
-   - Click "Commit to main"
-   - Click "Push origin" to upload changes to GitHub
+# Update an existing file
+node github-tools/direct-github-editor.js update README.md "# Updated README" "Update README"
 
-## Method 5: Working with GitHub Using Command Line
+# Delete a file
+node github-tools/direct-github-editor.js delete test.md "Remove test file"
+```
 
-If you prefer command line:
+### Checking Token Permissions
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/madariss5/BLACKSKY.git
-   cd BLACKSKY
-   ```
+If you're having trouble editing files, check your token permissions:
 
-2. **Edit Files**
-   - Use your favorite text editor
+```bash
+node github-tools/token-permission-fix.js
+```
 
-3. **Commit and Push Changes**
-   ```bash
-   git add .
-   git commit -m "Your commit message"
-   git push
-   ```
+This script will:
+1. Verify if your token is valid
+2. Check if it has write permissions
+3. Provide instructions to fix any permission issues
 
-## Troubleshooting GitHub Edit Issues
+## Troubleshooting
 
-If you're still having issues editing files, try these steps:
+### Common Issues
 
-1. **Check Browser Issues**
-   - Clear your browser cache and cookies
-   - Try a different browser (Chrome, Firefox, Edge)
-   - Disable browser extensions that might interfere with GitHub
+1. **"Not authorized" or 401 errors**
+   - Your token may be invalid or expired
+   - Generate a new token following the instructions above
 
-2. **Check GitHub Status**
-   - Visit https://www.githubstatus.com/ to ensure GitHub is operating normally
+2. **"Not found" or 404 errors**
+   - Ensure you're using the correct repository name
+   - Check if the file path is correct
 
-3. **Re-authenticate Your Account**
-   - Log out of GitHub and log back in
-   - Check if you're using the correct account (madariss5)
+3. **"You don't have permission" or 403 errors**
+   - Your token may not have sufficient permissions
+   - Ensure your token has the "repo" scope
+   - Check if you have write access to the repository
 
-4. **Regenerate GitHub Token**
-   - Go to your GitHub settings
-   - Navigate to Developer settings > Personal access tokens
-   - Generate a new token with appropriate permissions (repo scope)
-   - Update your token in your environment variables
+4. **Editor crashes or hangs**
+   - Try using the direct-github-editor.js tool instead
 
-5. **Network Issues**
-   - Check if your network allows GitHub connections
-   - Try using a different network if possible
+## Best Practices
 
-6. **Fork the Repository**
-   - As a last resort, you can fork the repository to your account
-   - Make changes to the fork
-   - Create a pull request to merge changes back to the original repo
+1. Make targeted, specific changes
+2. Write clear commit messages
+3. Don't include sensitive information in commits
+4. Test your changes after pushing them
 
-## GitHub Permission Types Explained
+## Security Notes
 
-Understanding GitHub permissions can help diagnose issues:
-
-- **Read**: Can only view and clone the repository
-- **Triage**: Can read and manage issues and pull requests
-- **Write**: Can read, clone, push, and manage repository content
-- **Maintain**: Same as write, plus some admin functions
-- **Admin**: Full control over the repository
-
-According to our permissions check, you have Admin access which should allow you to edit any file.
-
-## Contact GitHub Support
-
-If none of these methods work, you may need to contact GitHub support:
-
-1. Visit https://support.github.com/
-2. Click "Contact a human"
-3. Describe your issue in detail
-
-Remember to include specifics about what happens when you try to edit files.
-
-## Need Further Help?
-
-If you're still having trouble after trying these methods, please let me know the specific error messages you're seeing, and I can provide more targeted assistance.
+- Never share your GitHub token
+- Don't commit your token to the repository
+- Set an expiration date for your token
+- Use the minimum permissions necessary
