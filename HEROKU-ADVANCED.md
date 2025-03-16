@@ -45,7 +45,29 @@ git push heroku main
 
 ## Authentication Transfer (CRITICAL)
 
-The most important step is transferring your WhatsApp authentication from your local machine:
+You have two options for transferring your WhatsApp authentication:
+
+### Option 1: Using CREDS_JSON Environment Variable (Recommended)
+
+This is the easiest method that doesn't require manually uploading auth files:
+
+1. After successfully running `local-connect.js` locally, locate the `auth_info_baileys` folder
+2. Find the `creds.json` file in this folder
+3. Open it and copy the entire contents
+4. Set this as the `CREDS_JSON` environment variable in Heroku:
+   ```bash
+   heroku config:set CREDS_JSON='{"clientID":"your-content-here",...}'
+   ```
+   (Make sure to include the entire contents of the file)
+
+5. Restart your dyno:
+   ```bash
+   heroku dyno:restart
+   ```
+
+### Option 2: Manual File Upload
+
+If you can't use the environment variable method:
 
 1. After successfully running `local-connect.js` locally, locate the `auth_info_baileys` folder
 2. Create a zip file of this folder:
