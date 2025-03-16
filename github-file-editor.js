@@ -54,6 +54,14 @@ const rl = readline.createInterface({
 // Helper function to prompt for input
 function prompt(question) {
   return new Promise((resolve) => {
+    // Only create a new readline instance if needed
+    if (rl.closed) {
+      rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+    }
+    
     rl.question(question, (answer) => {
       resolve(answer);
     });
@@ -497,7 +505,7 @@ async function main() {
   // Check if GitHub token exists
   if (!GITHUB_TOKEN) {
     log('GitHub token not found. Please set the GITHUB_TOKEN environment variable.', 'error');
-    rl.close();
+    if (!rl.closed) rl.close();
     return;
   }
   
@@ -505,12 +513,18 @@ async function main() {
   const isTokenValid = await verifyGitHubToken();
   if (!isTokenValid) {
     log('Please check your GitHub token and permissions.', 'error');
-    rl.close();
+    if (!rl.closed) rl.close();
     return;
   }
   
-  // Start the main menu
-  await mainMenu();
+  try {
+    // Start the main menu
+    await mainMenu();
+  } catch (error) {
+    console.error('Error in main menu:', error);
+  } finally {
+    if (!rl.closed) rl.close();
+  }
 }
 
 // Handle SIGINT (Ctrl+C)
@@ -523,5 +537,8 @@ process.on('SIGINT', () => {
 // Run the main function
 main().catch(error => {
   console.error('Unhandled error:', error);
-  rl.close();
+  if (!rl.closed) rl.close();
+}).finally(() => {
+  // Make sure readline is closed to avoid process hanging
+  if (!rl.closed) rl.close();
 });
