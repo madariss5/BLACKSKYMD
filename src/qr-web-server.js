@@ -1,5 +1,6 @@
 /**
  * WhatsApp QR Web Server and Connection Manager
+ * Enhanced with persistent session management
  */
 
 const express = require('express');
@@ -11,7 +12,7 @@ const path = require('path');
 const pino = require('pino');
 const logger = require('./utils/logger');
 
-// Load the handler with full debug info
+// Load the handler
 process.env.DEBUG_BOT = 'true';
 const handler = require('./handlers/ultra-minimal-handler');
 const { 
@@ -19,8 +20,389 @@ const {
     handleConnectionError, 
     resetConnectionStats 
 } = require('./utils/connectionErrorHandler');
-const { backupCredentials } = require('./utils/credentialsBackup'); //Removed sendCredsBackup
 
+// Use a persistent auth directory
+const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info_baileys');
+const BACKUP_AUTH_DIR = path.join(process.cwd(), 'auth_info_backup');
+
+// Create Express app
+const app = express();
+const server = http.createServer(app);
+const PORT = 5000;
+
+// Connection state
+let latestQR = null;
+let connectionStatus = 'disconnected';
+let sock = null;
+let qrGenerationAttempt = 0;
+let isReconnecting = false;
+
+// Create auth directories
+[AUTH_DIRECTORY, BACKUP_AUTH_DIR].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        try {
+            fs.mkdirSync(dir, { recursive: true });
+            logger.info(`Created auth directory: ${dir}`);
+        } catch (err) {
+            logger.error(`Failed to create auth directory: ${err.message}`);
+        }
+    }
+});
+
+// Enhanced connection function with persistent sessions
+async function startConnection() {
+    if (isReconnecting) {
+        logger.info('Already attempting to reconnect...');
+        return;
+    }
+
+    try {
+        isReconnecting = true;
+        connectionStatus = 'connecting';
+
+        // Initialize handler
+        await handler.init();
+        logger.info('Command handler initialized');
+
+        // Load auth state
+        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRECTORY);
+        logger.info('Auth state loaded');
+
+        // Create WhatsApp socket connection with enhanced settings
+        sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: true,
+            logger: pino({ level: 'silent' }),
+            browser: ['BLACKSKY-MD', 'Chrome', '108.0.0'],
+            connectTimeoutMs: 60000,
+            keepAliveIntervalMs: 15000,
+            retryRequestDelayMs: 2000,
+            defaultQueryTimeoutMs: 60000,
+            markOnlineOnConnect: true,
+            syncFullHistory: false,
+            patchMessageBeforeSending: true,
+            shouldIgnoreJid: jid => isJidBroadcast(jid)
+        });
+
+        // Handle connection updates
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr && !fs.existsSync(path.join(AUTH_DIRECTORY, 'creds.json'))) {
+                logger.info('New QR code received');
+                latestQR = qr;
+                connectionStatus = 'qr_ready';
+                qrGenerationAttempt++;
+            }
+
+            if (connection === 'open') {
+                connectionStatus = 'connected';
+                latestQR = null;
+                isReconnecting = false;
+
+                // Backup auth state
+                try {
+                    const files = fs.readdirSync(AUTH_DIRECTORY);
+                    for (const file of files) {
+                        fs.copyFileSync(
+                            path.join(AUTH_DIRECTORY, file),
+                            path.join(BACKUP_AUTH_DIR, file)
+                        );
+                    }
+                    logger.info('Auth state backed up successfully');
+                } catch (err) {
+                    logger.error('Failed to backup auth state:', err.message);
+                }
+
+                resetConnectionStats();
+                logger.info('Connection established successfully!');
+            }
+
+            if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+                connectionStatus = 'disconnected';
+                isReconnecting = false;
+                logger.info(`Connection closed with status code: ${statusCode}`);
+
+                if (shouldReconnect) {
+                    if (isConnectionError(lastDisconnect?.error)) {
+                        await handleConnectionError(sock, lastDisconnect.error, 'connection-closed', startConnection);
+                    } else {
+                        logger.info('Attempting to reconnect...');
+                        setTimeout(startConnection, 3000);
+                    }
+                } else if (statusCode === DisconnectReason.loggedOut) {
+                    logger.warn('Session ended. Restoring from backup...');
+                    try {
+                        // Restore from backup
+                        const files = fs.readdirSync(BACKUP_AUTH_DIR);
+                        for (const file of files) {
+                            fs.copyFileSync(
+                                path.join(BACKUP_AUTH_DIR, file),
+                                path.join(AUTH_DIRECTORY, file)
+                            );
+                        }
+                        logger.info('Auth state restored from backup');
+                        setTimeout(startConnection, 3000);
+                    } catch (err) {
+                        logger.error('Failed to restore auth state:', err.message);
+                    }
+                }
+            }
+        });
+
+        // Handle credentials update
+        sock.ev.on('creds.update', saveCreds);
+
+        // Wire up message handler
+        sock.ev.on('messages.upsert', async (m) => {
+            if (m.type === 'notify') {
+                try {
+                    await handler.messageHandler(sock, m.messages[0]);
+                } catch (err) {
+                    logger.error('Message handling error:', err);
+                }
+            }
+        });
+
+    } catch (err) {
+        logger.error('Error in connection:', err);
+        connectionStatus = 'error';
+        isReconnecting = false;
+
+        if (isConnectionError(err)) {
+            await handleConnectionError(sock, err, 'connection-start', startConnection);
+        } else {
+            setTimeout(startConnection, 3000);
+        }
+    }
+}
+
+// Helper function to check broadcast JIDs
+function isJidBroadcast(jid) {
+    return jid === 'status@broadcast';
+}
+
+// Serve static HTML page with QR code
+app.get('/', (req, res) => {
+    // Create a simple HTML page to display the QR
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>BLACKSKY-MD WhatsApp Bot</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="refresh" content="30">
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f0f4f7;
+                margin: 0;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                text-align: center;
+            }
+            .container {
+                background-color: white;
+                border-radius: 15px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                padding: 30px;
+                max-width: 500px;
+                width: 100%;
+            }
+            h1 {
+                color: #128C7E;
+                margin-bottom: 5px;
+            }
+            h2 {
+                color: #075E54;
+                font-size: 1.2em;
+                margin-top: 0;
+            }
+            .qr-container {
+                background-color: white;
+                padding: 20px;
+                border-radius: 10px;
+                margin: 20px auto;
+                display: inline-block;
+            }
+            .status {
+                font-weight: bold;
+                padding: 10px;
+                border-radius: 5px;
+                margin: 15px 0;
+            }
+            .disconnected { background-color: #ffcccc; color: #d32f2f; }
+            .connecting { background-color: #fff8e1; color: #ff8f00; }
+            .connected { background-color: #e8f5e9; color: #2e7d32; }
+            .qr_ready {background-color: #ffffcc; color: #ff8f00;}
+            .refresh-button {
+                background-color: #128C7E;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 1em;
+                margin-top: 10px;
+            }
+            .instructions {
+                font-size: 0.9em;
+                color: #666;
+                margin-top: 20px;
+                line-height: 1.5;
+                text-align: left;
+            }
+            .instructions ol {
+                margin-top: 10px;
+                padding-left: 25px;
+            }
+            img {
+                max-width: 100%;
+                height: auto;
+            }
+            .bot-status {
+                margin-top: 20px;
+                padding: 15px;
+                background-color: #f5f5f5;
+                border-radius: 5px;
+                font-size: 0.9em;
+            }
+            .command-examples {
+                text-align: left;
+                background-color: #f0f8ff;
+                padding: 15px;
+                border-radius: 5px;
+                margin-top: 15px;
+            }
+            .command-examples h3 {
+                margin-top: 0;
+                font-size: 1em;
+            }
+            .command-examples code {
+                background-color: #e6f2ff;
+                padding: 2px 4px;
+                border-radius: 3px;
+                font-family: monospace;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>BLACKSKY-MD</h1>
+            <h2>WhatsApp Bot Connection</h2>
+            <div class="status ${connectionStatus}">
+                Status: ${connectionStatus === 'connected' 
+                        ? 'Connected ✓' 
+                        : connectionStatus === 'connecting' 
+                            ? 'Connecting...' 
+                            : connectionStatus === 'qr_ready'
+                                ? 'QR Code Ready'
+                                : 'Waiting for QR Code...'}
+            </div>
+            <div class="qr-container">
+                ${latestQR 
+                    ? `<img src="${latestQR}" alt="WhatsApp QR Code" width="300" height="300">`
+                    : connectionStatus === 'connected'
+                        ? `<p>✅ Successfully connected to WhatsApp!</p>
+                           <p>Your bot is now active and responding to commands.</p>`
+                        : connectionStatus === 'qr_ready'
+                            ? `<p>Scan the QR code above to connect.</p>`
+                            : `<p>Generating QR code... Please wait.</p>
+                               <p>If no QR appears after 15 seconds, click refresh.</p>`
+                }
+            </div>
+            ${connectionStatus === 'connected' ? `
+                <div class="bot-status">
+                    <strong>Bot Status:</strong> Active and ready to use<br>
+                    <strong>Commands Available:</strong> ${handler?.commands?.size || 'Loading...'} loaded / ${(() => {
+                        try {
+                            // Get the config directory path
+                            const configDir = path.join(process.cwd(), 'src/config/commands');
+                            let count = 0;
+
+                            // Check if the directory exists before trying to read
+                            if (fs.existsSync(configDir)) {
+                                // Read all JSON files
+                                const configFiles = fs.readdirSync(configDir);
+
+                                // Count commands in each JSON file
+                                for (const file of configFiles) {
+                                    if (file.endsWith('.json')) {
+                                        const filePath = path.join(configDir, file);
+                                        const fileContent = fs.readFileSync(filePath, 'utf8');
+                                        try {
+                                            const config = JSON.parse(fileContent);
+                                            if (Array.isArray(config.commands)) {
+                                                count += config.commands.length;
+                                            }
+                                        } catch (e) {
+                                            // JSON parsing error, skip this file
+                                        }
+                                    }
+                                }
+                            }
+                            return count;
+                        } catch (err) {
+                            return '?';
+                        }
+                    })()} configured<br>
+                    <strong>Prefix:</strong> !, /, or .
+                </div>
+                <div class="command-examples">
+                    <h3>Try these commands in WhatsApp:</h3>
+                    <ul>
+                        <li><code>!ping</code> - Check if bot is responding</li>
+                        <li><code>!menu</code> - View all available commands</li>
+                        <li><code>!help</code> - Get help with using the bot</li>
+                        <li><code>!hug @user</code> - Send a reaction GIF to someone</li>
+                    </ul>
+                    <p style="margin-top:10px;">
+                        <a href="/reaction-commands" style="color:#128C7E;text-decoration:none;font-weight:bold;">
+                            View All Reaction Commands →
+                        </a>
+                    </p>
+                </div>
+            ` : `
+                <button class="refresh-button" onclick="location.reload()">Refresh</button>
+            `}
+            <div class="instructions">
+                <strong>Instructions:</strong>
+                <ol>
+                    <li>Open WhatsApp on your phone</li>
+                    <li>Tap Menu ⋮ or Settings ⚙ and select "Linked Devices"</li>
+                    <li>Tap on "Link a Device"</li>
+                    <li>Point your phone camera at this QR code to scan</li>
+                </ol>
+                <p><strong>Note:</strong> Page refreshes automatically every 30 seconds.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    res.send(html);
+});
+
+
+// Generate and display QR code
+async function displayQR(qr) {
+    try {
+        // Generate QR code as data URL
+        latestQR = await qrcode.toDataURL(qr);
+        connectionStatus = 'connecting';
+        qrGenerationAttempt++;
+        logger.info(`QR Code generated (attempt ${qrGenerationAttempt}). Visit http://localhost:${PORT} to scan.`);
+    } catch (err) {
+        logger.error('Failed to generate QR code:', err);
+    }
+}
 
 // Import the direct copy script for reaction GIFs
 const directCopyReactionGifs = require('./direct-copy-reaction-gifs');
@@ -82,364 +464,6 @@ const verifyReactionGifs = async () => {
         logger.error(`Error fixing reaction GIFs: ${err.message}`);
     }
 };
-
-// Create Express app
-const app = express();
-const server = http.createServer(app);
-const PORT = 5000; // Using port 5000 to match Replit requirements
-
-// QR code state
-let latestQR = null;
-let connectionStatus = 'disconnected';
-let sock = null;
-let qrGenerationAttempt = 0;
-
-// Use a single auth directory for persistence
-const AUTH_DIRECTORY = path.join(process.cwd(), 'auth_info_baileys');
-
-// Create auth directory if it doesn't exist
-if (!fs.existsSync(AUTH_DIRECTORY)) {
-    try {
-        fs.mkdirSync(AUTH_DIRECTORY, { recursive: true });
-        logger.info(`Created auth directory: ${AUTH_DIRECTORY}`);
-    } catch (err) {
-        logger.error(`Failed to create auth directory: ${err.message}`);
-    }
-}
-
-
-// Serve static HTML page with QR code
-app.get('/', (req, res) => {
-    // Create a simple HTML page to display the QR
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>BLACKSKY-MD WhatsApp Bot</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="refresh" content="30">
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background-color: #f0f4f7;
-                margin: 0;
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                min-height: 100vh;
-                text-align: center;
-            }
-            .container {
-                background-color: white;
-                border-radius: 15px;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-                padding: 30px;
-                max-width: 500px;
-                width: 100%;
-            }
-            h1 {
-                color: #128C7E;
-                margin-bottom: 5px;
-            }
-            h2 {
-                color: #075E54;
-                font-size: 1.2em;
-                margin-top: 0;
-            }
-            .qr-container {
-                background-color: white;
-                padding: 20px;
-                border-radius: 10px;
-                margin: 20px auto;
-                display: inline-block;
-            }
-            .status {
-                font-weight: bold;
-                padding: 10px;
-                border-radius: 5px;
-                margin: 15px 0;
-            }
-            .disconnected { background-color: #ffcccc; color: #d32f2f; }
-            .connecting { background-color: #fff8e1; color: #ff8f00; }
-            .connected { background-color: #e8f5e9; color: #2e7d32; }
-            .refresh-button {
-                background-color: #128C7E;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 1em;
-                margin-top: 10px;
-            }
-            .instructions {
-                font-size: 0.9em;
-                color: #666;
-                margin-top: 20px;
-                line-height: 1.5;
-                text-align: left;
-            }
-            .instructions ol {
-                margin-top: 10px;
-                padding-left: 25px;
-            }
-            img {
-                max-width: 100%;
-                height: auto;
-            }
-            .bot-status {
-                margin-top: 20px;
-                padding: 15px;
-                background-color: #f5f5f5;
-                border-radius: 5px;
-                font-size: 0.9em;
-            }
-            .command-examples {
-                text-align: left;
-                background-color: #f0f8ff;
-                padding: 15px;
-                border-radius: 5px;
-                margin-top: 15px;
-            }
-            .command-examples h3 {
-                margin-top: 0;
-                font-size: 1em;
-            }
-            .command-examples code {
-                background-color: #e6f2ff;
-                padding: 2px 4px;
-                border-radius: 3px;
-                font-family: monospace;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>BLACKSKY-MD</h1>
-            <h2>WhatsApp Bot Connection</h2>
-            <div class="status ${connectionStatus}">
-                Status: ${connectionStatus === 'connected' 
-                        ? 'Connected ✓' 
-                        : connectionStatus === 'connecting' 
-                            ? 'Connecting...' 
-                            : 'Waiting for QR Code...'}
-            </div>
-            <div class="qr-container">
-                ${latestQR 
-                    ? `<img src="${latestQR}" alt="WhatsApp QR Code" width="300" height="300">`
-                    : connectionStatus === 'connected'
-                        ? `<p>✅ Successfully connected to WhatsApp!</p>
-                           <p>Your bot is now active and responding to commands.</p>`
-                        : `<p>Generating QR code... Please wait.</p>
-                           <p>If no QR appears after 15 seconds, click refresh.</p>`
-                }
-            </div>
-            ${connectionStatus === 'connected' ? `
-                <div class="bot-status">
-                    <strong>Bot Status:</strong> Active and ready to use<br>
-                    <strong>Commands Available:</strong> ${handler?.commands?.size || 'Loading...'} loaded / ${(() => {
-                        try {
-                            // Get the config directory path
-                            const configDir = path.join(process.cwd(), 'src/config/commands');
-                            let count = 0;
-                            
-                            // Check if the directory exists before trying to read
-                            if (fs.existsSync(configDir)) {
-                                // Read all JSON files
-                                const configFiles = fs.readdirSync(configDir);
-                                
-                                // Count commands in each JSON file
-                                for (const file of configFiles) {
-                                    if (file.endsWith('.json')) {
-                                        const filePath = path.join(configDir, file);
-                                        const fileContent = fs.readFileSync(filePath, 'utf8');
-                                        try {
-                                            const config = JSON.parse(fileContent);
-                                            if (Array.isArray(config.commands)) {
-                                                count += config.commands.length;
-                                            }
-                                        } catch (e) {
-                                            // JSON parsing error, skip this file
-                                        }
-                                    }
-                                }
-                            }
-                            return count;
-                        } catch (err) {
-                            return '?';
-                        }
-                    })()} configured<br>
-                    <strong>Prefix:</strong> !, /, or .
-                </div>
-                <div class="command-examples">
-                    <h3>Try these commands in WhatsApp:</h3>
-                    <ul>
-                        <li><code>!ping</code> - Check if bot is responding</li>
-                        <li><code>!menu</code> - View all available commands</li>
-                        <li><code>!help</code> - Get help with using the bot</li>
-                        <li><code>!hug @user</code> - Send a reaction GIF to someone</li>
-                    </ul>
-                    <p style="margin-top:10px;">
-                        <a href="/reaction-commands" style="color:#128C7E;text-decoration:none;font-weight:bold;">
-                            View All Reaction Commands →
-                        </a>
-                    </p>
-                </div>
-            ` : `
-                <button class="refresh-button" onclick="location.reload()">Refresh</button>
-            `}
-            <div class="instructions">
-                <strong>Instructions:</strong>
-                <ol>
-                    <li>Open WhatsApp on your phone</li>
-                    <li>Tap Menu ⋮ or Settings ⚙ and select "Linked Devices"</li>
-                    <li>Tap on "Link a Device"</li>
-                    <li>Point your phone camera at this QR code to scan</li>
-                </ol>
-                <p><strong>Note:</strong> Page refreshes automatically every 30 seconds.</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
-
-    res.send(html);
-});
-
-// Generate and display QR code
-async function displayQR(qr) {
-    try {
-        // Generate QR code as data URL
-        latestQR = await qrcode.toDataURL(qr);
-        connectionStatus = 'connecting';
-        qrGenerationAttempt++;
-        logger.info(`QR Code generated (attempt ${qrGenerationAttempt}). Visit http://localhost:${PORT} to scan.`);
-    } catch (err) {
-        logger.error('Failed to generate QR code:', err);
-    }
-}
-
-// Start WhatsApp connection
-async function startConnection() {
-    try {
-        // Initialize handler
-        await handler.init();
-        logger.info('Command handler initialized');
-
-        // Verify and fix reaction GIFs on startup
-        try {
-            // Run our enhanced verification function
-            await verifyReactionGifs();
-            
-            // Also check if the reactions command module exists in the commands folder
-            const reactionsPath = path.join(process.cwd(), 'src', 'commands', 'reactions.js');
-            if (fs.existsSync(reactionsPath)) {
-                // Require the module to trigger the ensureReactionGifs function
-                const reactionsModule = require('./commands/reactions');
-                if (typeof reactionsModule.init === 'function') {
-                    await reactionsModule.init();
-                }
-            }
-        } catch (error) {
-            logger.error(`Error verifying reaction GIFs: ${error.message}`);
-        }
-        
-        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIRECTORY);
-        logger.info('Auth state loaded');
-        
-        // Create WhatsApp socket connection
-        sock = makeWASocket({
-            auth: state,
-            printQRInTerminal: true,
-            browser: ['BLACKSKY-MD', 'Chrome', '100.0.0'],
-            logger: pino({ level: 'silent' }),
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 60000,
-            markOnlineOnConnect: true,
-            syncFullHistory: false
-        });
-
-        // Handle connection events
-        sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-            logger.info('Connection update:', update?.connection || 'No connection data');
-
-            if (qr) {
-                await displayQR(qr);
-            }
-
-            if (connection === 'open') {
-                connectionStatus = 'connected';
-                latestQR = null; // Clear QR code once connected
-                await saveCreds();
-                logger.info('Connection established successfully!');
-
-                // Reset connection error stats after successful connection
-                resetConnectionStats();
-                
-            }
-
-            if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                const error = lastDisconnect?.error;
-
-                connectionStatus = 'disconnected';
-                logger.info(`Connection closed with status code: ${statusCode || 'Unknown'}`);
-
-                if (shouldReconnect) {
-                    if (error && isConnectionError(error)) {
-                        // Handle connection error with specialized module
-                        await handleConnectionError(
-                            sock, 
-                            error, 
-                            'connection-closed', 
-                            () => startConnection()
-                        );
-                    } else {
-                        // Standard reconnection
-                        logger.info('Reconnecting with standard procedure...');
-                        setTimeout(startConnection, 5000);
-                    }
-                } else {
-                    logger.info('Not reconnecting - user logged out');
-                }
-            }
-        });
-
-        // Handle credentials update - simple save only
-        sock.ev.on('creds.update', saveCreds);
-
-        // Wire up message handler
-        sock.ev.on('messages.upsert', async (m) => {
-            if (m.type === 'notify') {
-                try {
-                    await handler.messageHandler(sock, m.messages[0]);
-                } catch (err) {
-                    logger.error('Message handling error:', err);
-                }
-            }
-        });
-
-        return sock;
-    } catch (err) {
-        logger.error('Error starting connection:', err);
-        connectionStatus = 'disconnected';
-
-        if (isConnectionError(err)) {
-            await handleConnectionError(
-                sock, 
-                err, 
-                'connection-initialization', 
-                () => startConnection()
-            );
-        } else {
-            setTimeout(startConnection, 5000);
-        }
-    }
-}
 
 // Enable JSON parsing for request bodies
 app.use(express.json());
@@ -746,6 +770,7 @@ app.get('/test-reaction', (req, res) => {
     }
 });
 
+
 // API endpoint to get list of all available reaction commands
 app.get('/reaction-commands', async (req, res) => {
     const reactionGifsDir = path.join(process.cwd(), 'data', 'reaction_gifs');
@@ -851,7 +876,7 @@ app.get('/reaction-commands', async (req, res) => {
                 padding: 15px;
                 background-color: #e8f5e9;
                 border-radius: 5px;
-                text-align: left;
+                text-align:left;
             }
         </style>
     </head>
@@ -956,9 +981,32 @@ server.listen(PORT, '0.0.0.0', () => {
     startConnection();
 });
 
-module.exports = {
-    displayQR,
-    updateConnectionStatus: (status) => {
-        connectionStatus = status;
+// Handle process termination gracefully
+process.on('SIGTERM', async () => {
+    logger.info('Received SIGTERM');
+    if (sock?.ws?.readyState !== sock?.ws?.CLOSED) {
+        sock.ws.close();
     }
-};
+    setTimeout(() => process.exit(0), 1000);
+});
+
+process.on('SIGINT', async () => {
+    logger.info('Received SIGINT');
+    if (sock?.ws?.readyState !== sock?.ws?.CLOSED) {
+        sock.ws.close();
+    }
+    setTimeout(() => process.exit(0), 1000);
+});
+
+// Handle uncaught errors
+process.on('uncaughtException', (err) => {
+    logger.error('Uncaught Exception:', err);
+    if (!isReconnecting) startConnection();
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection:', reason);
+    if (!isReconnecting) startConnection();
+});
+
+module.exports = { startConnection };
