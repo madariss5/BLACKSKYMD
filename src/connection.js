@@ -1,16 +1,19 @@
 /**
- * Simplified WhatsApp Connection Manager
+ * Stable WhatsApp Connection Manager
+ * Based on proven connection patterns from terminal-qr.js
  */
 
-const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const path = require('path');
 const fs = require('fs');
 const pino = require('pino');
 const logger = require('./utils/logger');
 const SessionManager = require('./utils/sessionManager');
 
-// Global state
+// Global state management
 let sock = null;
+let isConnecting = false;
+let hasSession = false;
 const AUTH_FOLDER = 'auth_info_baileys';
 const sessionManager = new SessionManager();
 
@@ -23,39 +26,69 @@ try {
     logger.warn('Message handler not loaded yet');
 }
 
-// Connection configuration
-const connectionConfig = {
-    printQRInTerminal: true,
+// Browser configuration - Using Safari which has proven more stable
+const browserConfig = {
     browser: ['BLACKSKY-MD', 'Safari', '17.0'],
-    version: [2, 2323, 4],
-    logger: pino({ level: 'silent' }),
-    auth: undefined,
-    markOnlineOnConnect: false,
-    defaultQueryTimeoutMs: 20000,
-    connectTimeoutMs: 30000,
-    fireInitQueries: false,
-    downloadHistory: false,
-    syncFullHistory: false
+    browserDescription: ['Safari on Mac', 'Desktop', '17.0'],
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
 };
 
-// Clean up existing connection
+// Enhanced connection configuration
+const connectionConfig = {
+    ...browserConfig,
+    printQRInTerminal: true,
+    logger: pino({ level: 'silent' }),
+    auth: undefined,
+    version: [2, 2323, 4],
+    connectTimeoutMs: 60000,
+    qrTimeout: 40000,
+    defaultQueryTimeoutMs: 20000,
+    customUploadHosts: [],
+    retryRequestDelayMs: 250,
+    fireInitQueries: false,
+    downloadHistory: false,
+    syncFullHistory: false,
+    shouldSyncHistoryMessage: false,
+    markOnlineOnConnect: false,
+    emitOwnEvents: false
+};
+
+// Clean up connection and state
 async function cleanup() {
     try {
         if (sock) {
-            logger.info('Cleaning up existing connection...');
-            sock.ev.removeAllListeners();
-            await sock.logout().catch(() => {});
+            logger.info('Cleaning up connection...');
+            // Remove all listeners first
+            sock.ev.removeAllListeners('connection.update');
+            sock.ev.removeAllListeners('messages.upsert');
+            sock.ev.removeAllListeners('creds.update');
+
+            // Then attempt graceful logout
+            try {
+                await sock.logout();
+            } catch (logoutErr) {
+                logger.warn('Logout error:', logoutErr);
+            }
+
             sock = null;
         }
+        isConnecting = false;
     } catch (err) {
         logger.error('Cleanup error:', err);
         sock = null;
+        isConnecting = false;
     }
 }
 
 // Main connection function
 async function startConnection() {
+    if (isConnecting) {
+        logger.warn('Connection attempt already in progress...');
+        return;
+    }
+
     try {
+        isConnecting = true;
         await cleanup();
 
         // Initialize auth state
@@ -67,7 +100,7 @@ async function startConnection() {
         const { state, saveCreds } = await useMultiFileAuthState(authFolder);
         connectionConfig.auth = state;
 
-        // Create socket
+        // Create socket with enhanced config
         sock = makeWASocket(connectionConfig);
 
         // Handle connection updates
@@ -75,7 +108,9 @@ async function startConnection() {
             const { connection, lastDisconnect } = update;
 
             if (connection === 'open') {
-                logger.info('Connection established');
+                logger.info('Connection established successfully');
+                isConnecting = false;
+                hasSession = true;
 
                 // Save credentials
                 await saveCreds();
@@ -83,16 +118,18 @@ async function startConnection() {
                 // Send credentials backup after connection stabilizes
                 setTimeout(async () => {
                     try {
-                        await sessionManager.sendCredentialsToSelf();
-                        logger.info('Credentials backup sent');
+                        if (sock?.user) {  // Check if still connected
+                            await sessionManager.sendCredentialsToSelf();
+                            logger.info('Credentials backup sent successfully');
+                        }
                     } catch (err) {
                         logger.error('Failed to send credentials backup:', err);
                     }
                 }, 5000);
 
                 // Handle messages
-                const messageHandler = async ({ messages, type }) => {
-                    if (type !== 'notify') return;
+                const handleMessage = async ({ messages, type }) => {
+                    if (type !== 'notify' || !messageHandler) return;
 
                     for (const message of messages) {
                         try {
@@ -104,45 +141,43 @@ async function startConnection() {
                     }
                 };
 
-                // Attach message handler only once
-                sock.ev.on('messages.upsert', messageHandler);
+                // Add message handler
+                sock.ev.on('messages.upsert', handleMessage);
             }
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
+                logger.info(`Connection closed. Status code: ${statusCode}`);
 
-                // Don't reconnect if logged out
-                if (statusCode === DisconnectReason.loggedOut) {
-                    logger.info('Connection closed - logged out');
-                    process.exit(0);
+                if (statusCode === DisconnectReason.loggedOut || 
+                    statusCode === DisconnectReason.connectionReplaced) {
+                    logger.info('Session ended:', statusCode === DisconnectReason.loggedOut ? 'Logged out' : 'Replaced');
+                    hasSession = false;
+                    await cleanup();
+                    process.exit();
                     return;
                 }
 
-                // Don't reconnect on connection takeover
-                if (statusCode === DisconnectReason.connectionReplaced) {
-                    logger.info('Connection replaced');
-                    process.exit(0);
-                    return;
-                }
-
-                logger.info('Connection closed, cleaning up...');
-                await cleanup();
-
-                // Start fresh connection
-                process.nextTick(startConnection);
+                // For other disconnections, wait a bit and try reconnecting once
+                setTimeout(async () => {
+                    await cleanup();
+                    await startConnection();
+                }, 3000);
             }
         });
 
-        // Handle credential updates
+        // Handle credentials update
         sock.ev.on('creds.update', saveCreds);
 
         return sock;
     } catch (err) {
         logger.error('Connection error:', err);
-        await cleanup();
+        isConnecting = false;
 
-        // Retry connection after a delay
-        setTimeout(startConnection, 3000);
+        // Single retry after error
+        setTimeout(async () => {
+            await startConnection();
+        }, 3000);
     }
 }
 
@@ -153,10 +188,11 @@ async function handleShutdown() {
     process.exit(0);
 }
 
+// Setup shutdown handlers
 process.on('SIGINT', handleShutdown);
 process.on('SIGTERM', handleShutdown);
 
-// Start the connection
+// Start connection
 startConnection().catch(err => {
     logger.error('Fatal error:', err);
     process.exit(1);
