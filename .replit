@@ -44,7 +44,8 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node easy-start.js"
+args = "node src/index.js"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Heroku Web Server"

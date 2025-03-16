@@ -24,7 +24,7 @@ try {
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5000;
 
 // Configure logger with more detailed output
 const logger = pino({
@@ -495,9 +495,11 @@ app.listen(PORT, '0.0.0.0', async () => {
     logger.info(`Server running on port ${PORT}`);
     logger.info('Starting WhatsApp connection...');
     
+
     // Start the connection
     await startWhatsAppConnection();
     
+
     // Start monitoring once socket is created
     if (sock) {
         logger.info('Starting connection monitoring...');
