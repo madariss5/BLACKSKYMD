@@ -1,6 +1,6 @@
 /**
  * BLACKSKY-MD WhatsApp Bot - Main Entry Point
- * Using @whiskeysockets/baileys for better compatibility
+ * Using @whiskeysockets/baileys with enhanced connection persistence
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
@@ -23,10 +23,13 @@ const PORT = process.env.PORT || 5000;
 let client = null;
 let qrCode = null;
 let connectionState = 'disconnected';
+let reconnectAttempts = 0;
+let isReconnecting = false;
 
 // Constants
 const SESSION_PATH = path.join(__dirname, '..', 'sessions');
-const MAX_RETRIES = 5;
+const MAX_RECONNECT_RETRIES = 999999; // Effectively infinite retries
+const RECONNECT_INTERVAL = 3000;
 const COMMAND_MODULES = [
     './commands/educational',
     './commands/example-with-error-handling',
@@ -44,12 +47,9 @@ if (!fs.existsSync(SESSION_PATH)) {
 async function initializeCommands() {
     try {
         logger.info('Initializing command modules...');
-
-        // Initialize the main handler first
         await handler.init();
         logger.info('Main handler initialized');
 
-        // Load additional command modules
         for (const modulePath of COMMAND_MODULES) {
             try {
                 const module = require(modulePath);
@@ -70,29 +70,40 @@ async function initializeCommands() {
     }
 }
 
-// Initialize WhatsApp client
-async function startWhatsAppClient() {
+// Enhanced connection manager
+async function startWhatsAppClient(forceReconnect = false) {
+    if (isReconnecting && !forceReconnect) {
+        logger.info('Already attempting to reconnect...');
+        return;
+    }
+
     try {
         logger.info('Starting WhatsApp client...');
         logger.info('Session path:', SESSION_PATH);
         connectionState = 'connecting';
+        isReconnecting = true;
 
         // Initialize commands before starting client
         await initializeCommands();
 
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
 
-        // Create WhatsApp socket with minimal configuration
+        // Create WhatsApp socket with enhanced persistence
         client = makeWASocket({
             auth: state,
             printQRInTerminal: true,
             logger: logger.child({ level: 'silent' }),
             browser: ['BLACKSKY-Bot', 'Chrome', '108.0.0'],
             connectTimeoutMs: 60000,
-            qrTimeout: 60000
+            keepAliveIntervalMs: 15000, // Send keep-alive every 15 seconds
+            retryRequestDelayMs: 2000,
+            defaultQueryTimeoutMs: 60000,
+            markOnlineOnConnect: true, // Stay online
+            syncFullHistory: false,
+            throwOnError: false, // Don't throw on non-fatal errors
         });
 
-        // Handle connection updates
+        // Enhanced connection monitoring
         client.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             logger.debug('Connection update:', update);
@@ -101,14 +112,17 @@ async function startWhatsAppClient() {
                 logger.info('New QR code received');
                 qrCode = qr;
                 connectionState = 'qr_ready';
+                reconnectAttempts = 0;
             }
 
             if (connection === 'open') {
                 logger.info('Connection established successfully!');
                 connectionState = 'connected';
+                isReconnecting = false;
                 qrCode = null;
+                reconnectAttempts = 0;
 
-                // Handle incoming messages with error boundary
+                // Initialize message handler with error boundary
                 client.ev.on('messages.upsert', async (m) => {
                     if (m.type === 'notify') {
                         try {
@@ -130,16 +144,35 @@ async function startWhatsAppClient() {
                         }
                     }
                 });
+
+                // Periodic connection check
+                setInterval(() => {
+                    if (client?.ws?.readyState !== client?.ws?.OPEN) {
+                        logger.warn('Detected connection issue, initiating reconnection...');
+                        startWhatsAppClient(true);
+                    }
+                }, 30000);
             }
 
             if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                logger.info('Connection closed. Reason:', lastDisconnect?.error?.message);
-                connectionState = 'disconnected';
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
+                logger.info('Connection closed. Status:', statusCode);
+                connectionState = 'disconnected';
+                isReconnecting = false;
+
+                // Aggressive reconnection strategy
                 if (shouldReconnect) {
-                    logger.info('Attempting to reconnect...');
-                    setTimeout(startWhatsAppClient, 5000);
+                    reconnectAttempts++;
+                    const delay = Math.min(RECONNECT_INTERVAL * Math.pow(1.5, reconnectAttempts - 1), 300000);
+
+                    logger.info(`Reconnecting in ${delay/1000}s (Attempt ${reconnectAttempts})...`);
+                    setTimeout(() => startWhatsAppClient(true), delay);
+                } else {
+                    logger.warn('Logged out. Manual reconnection required.');
+                    if (client?.ws) client.ws.close();
+                    setTimeout(() => startWhatsAppClient(true), 60000);
                 }
             }
         });
@@ -150,7 +183,11 @@ async function startWhatsAppClient() {
     } catch (err) {
         logger.error('Error starting WhatsApp client:', err);
         connectionState = 'error';
-        setTimeout(startWhatsAppClient, 5000);
+        isReconnecting = false;
+
+        // Always attempt to reconnect
+        const delay = Math.min(RECONNECT_INTERVAL * Math.pow(1.5, reconnectAttempts), 300000);
+        setTimeout(() => startWhatsAppClient(true), delay);
     }
 }
 
@@ -296,21 +333,38 @@ app.listen(PORT, '0.0.0.0', async () => {
     await startWhatsAppClient();
 });
 
-// Handle graceful shutdown
+// Handle process signals
 process.on('SIGTERM', async () => {
-    logger.info('Shutting down...');
-    if (client) {
-        await client.end();
+    logger.info('Received SIGTERM signal');
+    // Instead of shutting down, attempt to reconnect
+    if (client?.ws?.readyState !== client?.ws?.OPEN) {
+        await startWhatsAppClient(true);
     }
-    process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-    logger.info('Shutting down...');
-    if (client) {
-        await client.end();
+    logger.info('Received SIGINT signal');
+    // Instead of shutting down, attempt to reconnect
+    if (client?.ws?.readyState !== client?.ws?.OPEN) {
+        await startWhatsAppClient(true);
     }
-    process.exit(0);
+});
+
+// Add error handlers to prevent crashes
+process.on('uncaughtException', (err) => {
+    logger.error('Uncaught Exception:', err);
+    // Attempt recovery
+    if (client?.ws?.readyState !== client?.ws?.OPEN) {
+        startWhatsAppClient(true);
+    }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Attempt recovery
+    if (client?.ws?.readyState !== client?.ws?.OPEN) {
+        startWhatsAppClient(true);
+    }
 });
 
 module.exports = { app, startWhatsAppClient };
