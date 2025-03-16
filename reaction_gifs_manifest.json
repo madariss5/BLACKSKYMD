@@ -1,41 +1,41 @@
 {
-  "timestamp": "2025-03-16T21:03:19.287Z",
+  "timestamp": "2025-03-16T21:27:05.833Z",
   "results": {
     "valid": [
       {
         "type": "smile",
         "targetFile": "smile.gif",
-        "size": 203404,
-        "formattedSize": "198.64 KB",
-        "checksum": "fe4a98702e9aca19179d9029aeb08962"
+        "size": 8357788,
+        "formattedSize": "7.97 MB",
+        "checksum": "0d7653967247cfc49aea3515f5fea7a6"
       },
       {
         "type": "happy",
         "targetFile": "happy.gif",
-        "size": 203404,
-        "formattedSize": "198.64 KB",
-        "checksum": "fe4a98702e9aca19179d9029aeb08962"
+        "size": 8357788,
+        "formattedSize": "7.97 MB",
+        "checksum": "0d7653967247cfc49aea3515f5fea7a6"
       },
       {
         "type": "dance",
         "targetFile": "dance.gif",
-        "size": 901246,
-        "formattedSize": "880.12 KB",
-        "checksum": "80b20c59b438550ad32a68ee8a30ed82"
+        "size": 3167088,
+        "formattedSize": "3.02 MB",
+        "checksum": "442e1248f4e0bfcc035c140f257b3bd2"
       },
       {
         "type": "cry",
         "targetFile": "cry.gif",
-        "size": 322626,
-        "formattedSize": "315.06 KB",
-        "checksum": "e0dc2746cc316bb30b37ff4f99fd6fe3"
+        "size": 122820,
+        "formattedSize": "119.94 KB",
+        "checksum": "eb76feb922e1e90275049c91e71938e5"
       },
       {
         "type": "blush",
         "targetFile": "blush.gif",
-        "size": 299152,
-        "formattedSize": "292.14 KB",
-        "checksum": "cbbee238c14e566332207b47323a1218"
+        "size": 8357788,
+        "formattedSize": "7.97 MB",
+        "checksum": "0d7653967247cfc49aea3515f5fea7a6"
       },
       {
         "type": "laugh",
@@ -47,9 +47,9 @@
       {
         "type": "hug",
         "targetFile": "hug.gif",
-        "size": 1021013,
-        "formattedSize": "997.08 KB",
-        "checksum": "c4829a8e73ff1b918299906717328720"
+        "size": 1047514,
+        "formattedSize": "1022.96 KB",
+        "checksum": "15d3d956bd674096c4e68f1d011e8023"
       },
       {
         "type": "pat",
@@ -61,16 +61,16 @@
       {
         "type": "kiss",
         "targetFile": "kiss.gif",
-        "size": 8357788,
-        "formattedSize": "7.97 MB",
-        "checksum": "0d7653967247cfc49aea3515f5fea7a6"
+        "size": 402888,
+        "formattedSize": "393.45 KB",
+        "checksum": "66abd66c19131daadfc07989caeb350d"
       },
       {
         "type": "cuddle",
         "targetFile": "cuddle.gif",
-        "size": 2113299,
-        "formattedSize": "2.02 MB",
-        "checksum": "fab5a53ad6b79de98f911b8b9c3bf1d1"
+        "size": 1047514,
+        "formattedSize": "1022.96 KB",
+        "checksum": "15d3d956bd674096c4e68f1d011e8023"
       },
       {
         "type": "wave",
@@ -96,44 +96,44 @@
       {
         "type": "slap",
         "targetFile": "slap.gif",
-        "size": 660864,
-        "formattedSize": "645.38 KB",
-        "checksum": "7892c01d382ef3a2338c11455e07ee03"
+        "size": 3286626,
+        "formattedSize": "3.13 MB",
+        "checksum": "c59fc04d8246cae6a890078e0cd64c7c"
       },
       {
         "type": "bonk",
         "targetFile": "bonk.gif",
-        "size": 424428,
-        "formattedSize": "414.48 KB",
-        "checksum": "14d65beb4758bd6c4d54940e6c56330a"
+        "size": 3286626,
+        "formattedSize": "3.13 MB",
+        "checksum": "c59fc04d8246cae6a890078e0cd64c7c"
       },
       {
         "type": "bite",
         "targetFile": "bite.gif",
-        "size": 1047514,
-        "formattedSize": "1022.96 KB",
-        "checksum": "15d3d956bd674096c4e68f1d011e8023"
+        "size": 402888,
+        "formattedSize": "393.45 KB",
+        "checksum": "66abd66c19131daadfc07989caeb350d"
       },
       {
         "type": "punch",
         "targetFile": "punch.gif",
-        "size": 913942,
-        "formattedSize": "892.52 KB",
-        "checksum": "f1b9a9c74680d9bad1b3fc207768fdb6"
+        "size": 982948,
+        "formattedSize": "959.91 KB",
+        "checksum": "1f3d523276ec9bcf33da47415e3a49e3"
       },
       {
         "type": "highfive",
         "targetFile": "highfive.gif",
-        "size": 970665,
-        "formattedSize": "947.92 KB",
-        "checksum": "6838d2b21f3eddb8d27bfc94d1e6669b"
+        "size": 862748,
+        "formattedSize": "842.53 KB",
+        "checksum": "4d22f711336d2d4ce889a69c8980487e"
       },
       {
         "type": "yeet",
         "targetFile": "yeet.gif",
-        "size": 1047514,
-        "formattedSize": "1022.96 KB",
-        "checksum": "15d3d956bd674096c4e68f1d011e8023"
+        "size": 2179855,
+        "formattedSize": "2.08 MB",
+        "checksum": "d869a72396931b2120bd18c483e5b69d"
       },
       {
         "type": "kill",

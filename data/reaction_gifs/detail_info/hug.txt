@@ -1,4 +1,0 @@
-Reaction: hug
-File: hug.gif
-Size: 1023K
-Source: Anime/Other

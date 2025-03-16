@@ -1,4 +1,0 @@
-Reaction: highfive
-File: highfive.gif
-Size: 1.2M
-Source: Fast & Furious

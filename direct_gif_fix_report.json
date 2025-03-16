@@ -1,36 +1,36 @@
 {
-  "timestamp": "2025-03-16T21:03:19.160Z",
+  "timestamp": "2025-03-16T21:27:05.713Z",
   "results": {
     "success": [
       {
         "reaction": "smile",
-        "source": "heavenly-joy-jerkins-i-am-so-excited.gif",
+        "source": "smile.gif",
         "target": "smile.gif",
-        "size": 203404
+        "size": 8357788
       },
       {
         "reaction": "happy",
-        "source": "heavenly-joy-jerkins-i-am-so-excited.gif",
+        "source": "smile.gif",
         "target": "happy.gif",
-        "size": 203404
+        "size": 8357788
       },
       {
         "reaction": "dance",
-        "source": "B6ya.gif",
+        "source": "dance.gif",
         "target": "dance.gif",
-        "size": 901246
+        "size": 3167088
       },
       {
         "reaction": "cry",
-        "source": "long-tears.gif",
+        "source": "laugh.gif",
         "target": "cry.gif",
-        "size": 322626
+        "size": 122820
       },
       {
         "reaction": "blush",
-        "source": "0fd379b81bc8023064986c9c45f22253_w200.gif",
+        "source": "smile.gif",
         "target": "blush.gif",
-        "size": 299152
+        "size": 8357788
       },
       {
         "reaction": "laugh",
@@ -40,9 +40,9 @@
       },
       {
         "reaction": "hug",
-        "source": "tumblr_cdeb20431732069e4456c4ab66b9534f_8178dd55_500.gif",
+        "source": "hug.gif",
         "target": "hug.gif",
-        "size": 1021013
+        "size": 1047514
       },
       {
         "reaction": "pat",
@@ -52,15 +52,15 @@
       },
       {
         "reaction": "kiss",
-        "source": "tumblr_435925615ecd34c607dd730ab836eacf_4e338a28_540.gif",
+        "source": "kiss.gif",
         "target": "kiss.gif",
-        "size": 8357788
+        "size": 402888
       },
       {
         "reaction": "cuddle",
-        "source": "icegif-890.gif",
+        "source": "hug.gif",
         "target": "cuddle.gif",
-        "size": 2113299
+        "size": 1047514
       },
       {
         "reaction": "wave",
@@ -84,41 +84,41 @@
         "reaction": "slap",
         "source": "slap.gif",
         "target": "slap.gif",
-        "size": 660864
+        "size": 3286626
       },
       {
         "reaction": "bonk",
-        "source": "icegif-255.gif",
+        "source": "slap.gif",
         "target": "bonk.gif",
-        "size": 424428
+        "size": 3286626
       },
       {
         "reaction": "bite",
-        "source": "15d3d956bd674096c4e68f1d011e8023.gif",
+        "source": "kiss.gif",
         "target": "bite.gif",
-        "size": 1047514
+        "size": 402888
       },
       {
         "reaction": "punch",
-        "source": "2Lmc.gif",
+        "source": "punch.gif",
         "target": "punch.gif",
-        "size": 913942
+        "size": 982948
       },
       {
         "reaction": "highfive",
-        "source": "BT_L5v.gif",
+        "source": "pat.gif",
         "target": "highfive.gif",
-        "size": 970665
+        "size": 862748
       },
       {
         "reaction": "yeet",
-        "source": "15d3d956bd674096c4e68f1d011e8023.gif",
+        "source": "yeet.gif",
         "target": "yeet.gif",
-        "size": 1047514
+        "size": 2179855
       },
       {
         "reaction": "kill",
-        "source": "giphy.gif",
+        "source": "kill.gif",
         "target": "kill.gif",
         "size": 10174760
       }

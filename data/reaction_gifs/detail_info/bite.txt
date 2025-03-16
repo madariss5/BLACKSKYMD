@@ -1,4 +1,0 @@
-Reaction: bite
-File: bite.gif
-Size: 234K
-Source: Walking Dead

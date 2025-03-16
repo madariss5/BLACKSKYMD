@@ -1,0 +1,110 @@
+{
+  "yeet.gif": {
+    "success": true,
+    "size": 2179855,
+    "sizeFormatted": "2.08 MB",
+    "sourceSize": 2179855,
+    "targetSize": 2179855,
+    "sourceChecksum": "d869a72396931b2120bd18c483e5b69d",
+    "targetChecksum": "d869a72396931b2120bd18c483e5b69d"
+  },
+  "wink.gif": {
+    "success": true,
+    "size": 228284,
+    "sizeFormatted": "222.93 KB",
+    "sourceSize": 228284,
+    "targetSize": 228284,
+    "sourceChecksum": "f182aaa3bfbe09ff4617276e4b90a7a4",
+    "targetChecksum": "f182aaa3bfbe09ff4617276e4b90a7a4"
+  },
+  "wave.gif": {
+    "success": true,
+    "size": 41304,
+    "sizeFormatted": "40.34 KB",
+    "sourceSize": 41304,
+    "targetSize": 41304,
+    "sourceChecksum": "0b4d9c629c3c554929f76f957790e521",
+    "targetChecksum": "0b4d9c629c3c554929f76f957790e521"
+  },
+  "slap.gif": {
+    "success": true,
+    "size": 3286626,
+    "sizeFormatted": "3.13 MB",
+    "sourceSize": 3286626,
+    "targetSize": 3286626,
+    "sourceChecksum": "c59fc04d8246cae6a890078e0cd64c7c",
+    "targetChecksum": "c59fc04d8246cae6a890078e0cd64c7c"
+  },
+  "smile.gif": {
+    "success": true,
+    "size": 8357788,
+    "sizeFormatted": "7.97 MB",
+    "sourceSize": 8357788,
+    "targetSize": 8357788,
+    "sourceChecksum": "0d7653967247cfc49aea3515f5fea7a6",
+    "targetChecksum": "0d7653967247cfc49aea3515f5fea7a6"
+  },
+  "poke.gif": {
+    "success": true,
+    "size": 111691,
+    "sizeFormatted": "109.07 KB",
+    "sourceSize": 111691,
+    "targetSize": 111691,
+    "sourceChecksum": "6756b61263101d4562f72d50aa99f6dd",
+    "targetChecksum": "6756b61263101d4562f72d50aa99f6dd"
+  },
+  "punch.gif": {
+    "success": true,
+    "size": 982948,
+    "sizeFormatted": "959.91 KB",
+    "sourceSize": 982948,
+    "targetSize": 982948,
+    "sourceChecksum": "1f3d523276ec9bcf33da47415e3a49e3",
+    "targetChecksum": "1f3d523276ec9bcf33da47415e3a49e3"
+  },
+  "pat.gif": {
+    "success": true,
+    "size": 862748,
+    "sizeFormatted": "842.53 KB",
+    "sourceSize": 862748,
+    "targetSize": 862748,
+    "sourceChecksum": "4d22f711336d2d4ce889a69c8980487e",
+    "targetChecksum": "4d22f711336d2d4ce889a69c8980487e"
+  },
+  "laugh.gif": {
+    "success": true,
+    "size": 122820,
+    "sizeFormatted": "119.94 KB",
+    "sourceSize": 122820,
+    "targetSize": 122820,
+    "sourceChecksum": "eb76feb922e1e90275049c91e71938e5",
+    "targetChecksum": "eb76feb922e1e90275049c91e71938e5"
+  },
+  "kiss.gif": {
+    "success": true,
+    "size": 402888,
+    "sizeFormatted": "393.45 KB",
+    "sourceSize": 402888,
+    "targetSize": 402888,
+    "sourceChecksum": "66abd66c19131daadfc07989caeb350d",
+    "targetChecksum": "66abd66c19131daadfc07989caeb350d"
+  },
+  "kill.gif": {
+    "success": true,
+    "size": 10174760,
+    "sizeFormatted": "9.70 MB",
+    "sourceSize": 10174760,
+    "targetSize": 10174760,
+    "sourceChecksum": "9db2b063a06c35921babf8db81be8bcb",
+    "targetChecksum": "9db2b063a06c35921babf8db81be8bcb"
+  },
+  "hug.gif": {
+    "success": true,
+    "size": 1047514,
+    "sizeFormatted": "1022.96 KB",
+    "sourceSize": 1047514,
+    "targetSize": 1047514,
+    "sourceChecksum": "15d3d956bd674096c4e68f1d011e8023",
+    "targetChecksum": "15d3d956bd674096c4e68f1d011e8023"
+  }
+}

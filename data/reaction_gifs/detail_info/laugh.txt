@@ -1,4 +1,0 @@
-Reaction: laugh
-File: laugh.gif
-Size: 8.0M
-Source: Anime/Other

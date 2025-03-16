@@ -1,6 +1,0 @@
-Title: Unnamed GIF
-Search Query: anime wave
-Source: Tenor API
-Tenor ID: 11090258776526258059
-Downloaded: 2025-03-14T21:54:14.517Z
-Tenor URL: https://tenor.com/bF5kp.gif

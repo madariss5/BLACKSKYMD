@@ -1,4 +1,0 @@
-Reaction: blush
-File: blush.gif
-Size: 235K
-Source: Anime/Other

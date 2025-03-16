@@ -1,4 +1,0 @@
-Reaction: cuddle
-File: cuddle.gif
-Size: 415K
-Source: Anime/Other

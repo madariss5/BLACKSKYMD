@@ -17,28 +17,28 @@ const TARGET_DIR = path.join(process.cwd(), 'data', 'reaction_gifs');
 // These mappings ensure semantic matches between commands and GIF content
 const REACTION_GIF_MAPPING = {
     // Self-reactions
-    'smile': 'heavenly-joy-jerkins-i-am-so-excited.gif', // Happy smiling animation
-    'happy': 'heavenly-joy-jerkins-i-am-so-excited.gif', // Happy excitement
-    'dance': 'B6ya.gif', // Dance animation
-    'cry': 'long-tears.gif', // Crying animation
-    'blush': '0fd379b81bc8023064986c9c45f22253_w200.gif', // Blushing animation
-    'laugh': 'laugh.gif', // Updated laugh animation with person laughing
+    'smile': 'smile.gif', // Happy smiling animation
+    'happy': 'smile.gif', // Happy excitement (using smile as fallback)
+    'dance': 'dance.gif', // Dance animation
+    'cry': 'laugh.gif', // Crying animation (using laugh as fallback)
+    'blush': 'smile.gif', // Blushing animation (using smile as fallback)
+    'laugh': 'laugh.gif', // Laugh animation
     
     // Target-reactions
-    'hug': 'tumblr_cdeb20431732069e4456c4ab66b9534f_8178dd55_500.gif', // Hugging animation
-    'pat': 'pat.gif', // Updated patting animation with Stitch
-    'kiss': 'tumblr_435925615ecd34c607dd730ab836eacf_4e338a28_540.gif', // Kissing animation
-    'cuddle': 'icegif-890.gif', // Cuddling animation
-    'wave': 'wave.gif', // Updated waving animation with character waving
-    'wink': 'wink.gif', // Updated winking animation with person winking
-    'poke': 'poke.gif', // Updated poking animation with chickens
+    'hug': 'hug.gif', // Hugging animation
+    'pat': 'pat.gif', // Patting animation
+    'kiss': 'kiss.gif', // Kissing animation
+    'cuddle': 'hug.gif', // Cuddling animation (using hug as fallback)
+    'wave': 'wave.gif', // Waving animation
+    'wink': 'wink.gif', // Winking animation
+    'poke': 'poke.gif', // Poking animation
     'slap': 'slap.gif', // Slapping animation
-    'bonk': 'icegif-255.gif', // Bonking animation
-    'bite': '15d3d956bd674096c4e68f1d011e8023.gif', // Biting-like animation
-    'punch': '2Lmc.gif', // Punching animation
-    'highfive': 'BT_L5v.gif', // High fiving (waving) animation
-    'yeet': '15d3d956bd674096c4e68f1d011e8023.gif', // Throwing (bite-like) animation
-    'kill': 'giphy.gif' // Intense animation for "kill" command
+    'bonk': 'slap.gif', // Bonking animation (using slap as fallback)
+    'bite': 'kiss.gif', // Biting animation (using kiss as fallback)
+    'punch': 'punch.gif', // Punching animation
+    'highfive': 'pat.gif', // High fiving animation (using pat as fallback)
+    'yeet': 'yeet.gif', // Throwing animation
+    'kill': 'kill.gif' // Kill animation
 };
 
 /**
