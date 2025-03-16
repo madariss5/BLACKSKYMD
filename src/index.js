@@ -9,24 +9,15 @@ const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
-const handler = require('./handlers/ultra-minimal-handler');
+
+// Import handlers and utilities
+const handler = require('./handlers/simpleMessageHandler');
+const { handleError } = require('./utils/error');
+const logger = require('./utils/logger');
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
-
-// Configure logger
-const logger = pino({
-    level: 'debug',
-    transport: {
-        target: 'pino-pretty',
-        options: { 
-            colorize: true,
-            translateTime: true,
-            ignore: 'pid,hostname'
-        }
-    }
-});
 
 // Global state
 let client = null;
@@ -34,12 +25,49 @@ let qrCode = null;
 let connectionState = 'disconnected';
 
 // Constants
-const SESSION_PATH = path.join(__dirname, '..', 'sessions', 'blacksky-session');
+const SESSION_PATH = path.join(__dirname, '..', 'sessions');
 const MAX_RETRIES = 5;
+const COMMAND_MODULES = [
+    './commands/educational',
+    './commands/example-with-error-handling',
+    './commands/basic',
+    './commands/owner',
+    './commands/utility'
+];
 
 // Ensure session directory exists
 if (!fs.existsSync(SESSION_PATH)) {
     fs.mkdirSync(SESSION_PATH, { recursive: true });
+}
+
+// Initialize command modules
+async function initializeCommands() {
+    try {
+        logger.info('Initializing command modules...');
+
+        // Initialize the main handler first
+        await handler.init();
+        logger.info('Main handler initialized');
+
+        // Load additional command modules
+        for (const modulePath of COMMAND_MODULES) {
+            try {
+                const module = require(modulePath);
+                if (typeof module.init === 'function') {
+                    await module.init();
+                    logger.info(`Initialized command module: ${modulePath}`);
+                }
+            } catch (err) {
+                logger.warn(`Failed to load command module ${modulePath}:`, err.message);
+            }
+        }
+
+        logger.info('All command modules initialized');
+        return true;
+    } catch (err) {
+        logger.error('Error initializing commands:', err);
+        return false;
+    }
 }
 
 // Initialize WhatsApp client
@@ -48,6 +76,9 @@ async function startWhatsAppClient() {
         logger.info('Starting WhatsApp client...');
         logger.info('Session path:', SESSION_PATH);
         connectionState = 'connecting';
+
+        // Initialize commands before starting client
+        await initializeCommands();
 
         const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
 
@@ -77,17 +108,22 @@ async function startWhatsAppClient() {
                 connectionState = 'connected';
                 qrCode = null;
 
-                // Handle incoming messages
+                // Handle incoming messages with error boundary
                 client.ev.on('messages.upsert', async (m) => {
                     if (m.type === 'notify') {
                         try {
-                            await handler.messageHandler(client, m.messages[0]);
+                            const msg = m.messages[0];
+                            await handler.messageHandler(client, msg);
                         } catch (err) {
-                            logger.error('Error handling message:', err);
+                            logger.error('Message handling error:', err);
                             try {
-                                await client.sendMessage(m.messages[0].key.remoteJid, {
-                                    text: "Sorry, I encountered an error processing your message. Please try again."
-                                });
+                                const remoteJid = m.messages[0].key.remoteJid;
+                                await handleError(
+                                    client,
+                                    remoteJid,
+                                    err,
+                                    'Error processing command'
+                                );
                             } catch (sendErr) {
                                 logger.error('Error sending error message:', sendErr);
                             }
