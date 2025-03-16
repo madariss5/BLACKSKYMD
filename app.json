@@ -9,6 +9,10 @@
       "description": "Your WhatsApp number without the + sign (e.g., 1234567890)",
       "required": true
     },
+    "CREDS_JSON": {
+      "description": "WhatsApp authentication credentials (creds.json content). Paste the entire contents of the creds.json file here for direct deployment without uploading auth files.",
+      "required": false
+    },
     "LOG_LEVEL": {
       "description": "Logging level (info, warn, error, debug)",
       "required": false,
@@ -52,7 +56,7 @@
     }
   },
   "scripts": {
-    "postdeploy": "echo 'IMPORTANT: You must manually copy auth_info_baileys contents to auth_info_heroku folder!'"
+    "postdeploy": "echo 'IMPORTANT: If you did not provide CREDS_JSON, you must manually copy auth_info_baileys contents to auth_info_heroku folder!'"
   },
   "success_url": "/",
   "addons": []

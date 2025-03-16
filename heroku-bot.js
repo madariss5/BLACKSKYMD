@@ -1,7 +1,7 @@
 /**
  * WhatsApp Bot for Heroku Deployment
  * Optimized for 24/7 connection reliability in Heroku cloud environment
- * Version: 1.0.0
+ * Version: 1.1.0 - With CREDS_JSON environment variable support
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
@@ -54,10 +54,23 @@ let startTime = Date.now();
 let messageCount = 0;
 let autoReconnectHandler = null;
 
+// Check for credentials in environment variables
+const credsJson = process.env.CREDS_JSON;
+
 // Ensure directories exist
 if (!fs.existsSync(AUTH_FOLDER)) {
   fs.mkdirSync(AUTH_FOLDER, { recursive: true });
   logger.info(`Created auth folder: ${AUTH_FOLDER}`);
+  
+  // If CREDS_JSON is available, write it to creds.json in the auth folder
+  if (credsJson) {
+    try {
+      fs.writeFileSync(`${AUTH_FOLDER}/creds.json`, credsJson);
+      logger.info('Successfully loaded credentials from CREDS_JSON environment variable');
+    } catch (error) {
+      logger.error('Failed to write credentials from CREDS_JSON:', error);
+    }
+  }
 }
 
 if (!fs.existsSync('public')) {
