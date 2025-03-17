@@ -21,10 +21,6 @@ args = "Terminal QR Connect"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Advanced Connection Manager"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "High Performance Bot"
 
 [[workflows.workflow]]
@@ -63,20 +59,6 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd /home/runner/workspace && node terminal-qr-connect.js"
-
-[[workflows.workflow]]
-name = "Advanced Connection Manager"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node connection-manager.js"
 
 [[workflows.workflow]]
 name = "High Performance Bot"
