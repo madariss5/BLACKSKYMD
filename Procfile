@@ -1,1 +1,1 @@
-web: node src/cloud-qr-server.js
+web: PORT=$PORT node src/cloud-qr-server.js
