@@ -1,130 +1,217 @@
 /**
- * Simple Logger Utility for BLACKSKY-MD
- * Provides standardized logging across the application
+ * Enhanced Logging Utility
+ * Provides consistent logging with timestamp and level indicators
  */
 
-// Define log levels
+const fs = require('fs');
+const path = require('path');
+const pino = require('pino');
+
+// Constants
 const LOG_LEVELS = {
-    DEBUG: 0,
-    INFO: 1,
-    SUCCESS: 2,
-    WARN: 3,
-    ERROR: 4
+    debug: 20,
+    info: 30,
+    success: 35,
+    warn: 40,
+    error: 50
 };
 
-// Current log level (can be changed at runtime)
-let currentLogLevel = LOG_LEVELS.INFO;
+// Log configuration
+let config = {
+    level: 'info',
+    enableConsole: true,
+    enableFile: true,
+    logDirectory: path.join(process.cwd(), 'logs'),
+    logFilename: 'whatsapp-bot.log'
+};
 
-// Log to file flag
-let logToFile = false;
-let logFilePath = './logs/bot.log';
-
-// Function to format current timestamp
-function getTimestamp() {
-    return new Date().toISOString();
+// Create log directory if it doesn't exist
+function ensureLogDirectory() {
+    if (!fs.existsSync(config.logDirectory)) {
+        fs.mkdirSync(config.logDirectory, { recursive: true });
+    }
 }
 
-// Create formatted log message
-function formatLogMessage(level, message, ...args) {
-    const timestamp = getTimestamp();
-    let formattedMessage = `[${timestamp}] [${level}] ${message}`;
+// Get current timestamp
+function getTimestamp() {
+    const now = new Date();
+    return now.toISOString();
+}
 
-    // Add any additional arguments
-    if (args && args.length > 0) {
+// Format log message with timestamp and level
+function formatLogMessage(level, message, ...args) {
+    let formattedMessage = message;
+    
+    // Handle object or error messages
+    if (typeof message === 'object') {
+        if (message instanceof Error) {
+            formattedMessage = message.stack || message.toString();
+        } else {
+            try {
+                formattedMessage = JSON.stringify(message);
+            } catch (e) {
+                formattedMessage = String(message);
+            }
+        }
+    }
+    
+    // Format additional arguments
+    if (args.length > 0) {
         args.forEach(arg => {
             if (typeof arg === 'object') {
-                try {
-                    formattedMessage += ' ' + JSON.stringify(arg);
-                } catch (err) {
-                    formattedMessage += ' [Object]';
+                if (arg instanceof Error) {
+                    formattedMessage += ' ' + (arg.stack || arg.toString());
+                } else {
+                    try {
+                        formattedMessage += ' ' + JSON.stringify(arg);
+                    } catch (e) {
+                        formattedMessage += ' ' + String(arg);
+                    }
                 }
             } else {
-                formattedMessage += ' ' + arg;
+                formattedMessage += ' ' + String(arg);
             }
         });
     }
-
-    return formattedMessage;
+    
+    const timestamp = getTimestamp();
+    return `[${timestamp}] [${level.toUpperCase()}] ${formattedMessage}`;
 }
 
-// Write log to file if enabled
+// Write log to file
 function writeToLogFile(message) {
-    if (!logToFile) return;
-
-    try {
-        const fs = require('fs');
-        const path = require('path');
-
-        // Ensure the log directory exists
-        const dir = path.dirname(logFilePath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-
-        // Append to log file
-        fs.appendFileSync(logFilePath, message + '\n');
-    } catch (err) {
-        console.error('Error writing to log file:', err.message);
-    }
+    if (!config.enableFile) return;
+    
+    ensureLogDirectory();
+    const logFilePath = path.join(config.logDirectory, config.logFilename);
+    
+    fs.appendFileSync(logFilePath, message + '\n');
 }
 
-// Logger object with methods for each log level
+// Create Pino logger for pretty console output
+const pinoLogger = pino({
+    customLevels: {
+        success: 35
+    },
+    transport: {
+        target: 'pino-pretty',
+        options: {
+            colorize: true,
+            translateTime: 'SYS:standard',
+            ignore: 'pid,hostname'
+        }
+    }
+});
+
+// Logger object
 const logger = {
     debug(message, ...args) {
-        if (currentLogLevel <= LOG_LEVELS.DEBUG) {
-            const logMessage = formatLogMessage('DEBUG', message, ...args);
-            console.debug(logMessage);
-            writeToLogFile(logMessage);
+        if (LOG_LEVELS[config.level] <= LOG_LEVELS.debug) {
+            const formattedMessage = formatLogMessage('debug', message, ...args);
+            
+            if (config.enableConsole) {
+                pinoLogger.debug(formattedMessage);
+            }
+            
+            writeToLogFile(formattedMessage);
         }
     },
-
+    
     info(message, ...args) {
-        if (currentLogLevel <= LOG_LEVELS.INFO) {
-            const logMessage = formatLogMessage('INFO', message, ...args);
-            console.info(logMessage);
-            writeToLogFile(logMessage);
+        if (LOG_LEVELS[config.level] <= LOG_LEVELS.info) {
+            const formattedMessage = formatLogMessage('info', message, ...args);
+            
+            if (config.enableConsole) {
+                pinoLogger.info(formattedMessage);
+            }
+            
+            writeToLogFile(formattedMessage);
         }
     },
-
+    
     success(message, ...args) {
-        if (currentLogLevel <= LOG_LEVELS.SUCCESS) {
-            const logMessage = formatLogMessage('SUCCESS', message, ...args);
-            console.log('\x1b[32m%s\x1b[0m', logMessage); // Green color for success
-            writeToLogFile(logMessage);
+        if (LOG_LEVELS[config.level] <= LOG_LEVELS.success) {
+            const formattedMessage = formatLogMessage('success', message, ...args);
+            
+            if (config.enableConsole) {
+                pinoLogger.success(formattedMessage);
+            }
+            
+            writeToLogFile(formattedMessage);
         }
     },
-
+    
     warn(message, ...args) {
-        if (currentLogLevel <= LOG_LEVELS.WARN) {
-            const logMessage = formatLogMessage('WARN', message, ...args);
-            console.warn(logMessage);
-            writeToLogFile(logMessage);
+        if (LOG_LEVELS[config.level] <= LOG_LEVELS.warn) {
+            const formattedMessage = formatLogMessage('warn', message, ...args);
+            
+            if (config.enableConsole) {
+                pinoLogger.warn(formattedMessage);
+            }
+            
+            writeToLogFile(formattedMessage);
         }
     },
-
+    
     error(message, ...args) {
-        if (currentLogLevel <= LOG_LEVELS.ERROR) {
-            const logMessage = formatLogMessage('ERROR', message, ...args);
-            console.error(logMessage);
-            writeToLogFile(logMessage);
+        if (LOG_LEVELS[config.level] <= LOG_LEVELS.error) {
+            const formattedMessage = formatLogMessage('error', message, ...args);
+            
+            if (config.enableConsole) {
+                pinoLogger.error(formattedMessage);
+            }
+            
+            writeToLogFile(formattedMessage);
         }
     },
-
-    // Set current log level
+    
     setLogLevel(level) {
-        if (level in LOG_LEVELS) {
-            currentLogLevel = LOG_LEVELS[level];
-        } else if (typeof level === 'number' && level >= 0 && level <= 4) {
-            currentLogLevel = level;
+        if (LOG_LEVELS[level]) {
+            config.level = level;
         }
     },
-
-    // Enable or disable file logging
+    
     enableFileLogging(enable = true, filePath = null) {
-        logToFile = enable;
+        config.enableFile = enable;
+        
         if (filePath) {
-            logFilePath = filePath;
+            config.logFilename = path.basename(filePath);
+            config.logDirectory = path.dirname(filePath);
         }
+    },
+    
+    // Module initialization start logging - used by command modules to indicate initialization beginning
+    moduleInit(moduleName) {
+        const formattedMessage = formatLogMessage('info', `🔄 Initializing module: ${moduleName}`);
+        
+        if (config.enableConsole) {
+            pinoLogger.info(formattedMessage);
+        }
+        
+        writeToLogFile(formattedMessage);
+    },
+    
+    // Module success logging - used by command modules to indicate successful initialization
+    moduleSuccess(moduleName) {
+        const formattedMessage = formatLogMessage('success', `✅ Module initialized: ${moduleName}`);
+        
+        if (config.enableConsole) {
+            pinoLogger.success(formattedMessage);
+        }
+        
+        writeToLogFile(formattedMessage);
+    },
+    
+    // Module error logging - used by command modules to indicate initialization failure
+    moduleError(moduleName, error) {
+        const errorMessage = error instanceof Error ? error.stack || error.message : String(error);
+        const formattedMessage = formatLogMessage('error', `❌ Module initialization failed: ${moduleName}`, errorMessage);
+        
+        if (config.enableConsole) {
+            pinoLogger.error(formattedMessage);
+        }
+        
+        writeToLogFile(formattedMessage);
     }
 };
 

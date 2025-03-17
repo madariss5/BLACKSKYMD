@@ -19,8 +19,8 @@ function ensureDirectoryExists(dir) {
             logger.info(`Created directory: ${dir}`);
         }
         return true;
-    } catch (err) {
-        logger.error(`Error creating directory ${dir}:`, err);
+    } catch (error) {
+        logger.error(`Error creating directory ${dir}:`, error);
         return false;
     }
 }
@@ -33,12 +33,14 @@ function ensureDirectoryExists(dir) {
 function readJsonFile(filePath) {
     try {
         if (!fs.existsSync(filePath)) {
+            logger.warn(`File does not exist: ${filePath}`);
             return null;
         }
+        
         const data = fs.readFileSync(filePath, 'utf8');
         return JSON.parse(data);
-    } catch (err) {
-        logger.error(`Error reading JSON file ${filePath}:`, err);
+    } catch (error) {
+        logger.error(`Error reading JSON file ${filePath}:`, error);
         return null;
     }
 }
@@ -51,13 +53,15 @@ function readJsonFile(filePath) {
  */
 function writeJsonFile(filePath, data) {
     try {
+        // Ensure directory exists
         const dir = path.dirname(filePath);
         ensureDirectoryExists(dir);
         
+        // Write file with pretty formatting
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
         return true;
-    } catch (err) {
-        logger.error(`Error writing JSON file ${filePath}:`, err);
+    } catch (error) {
+        logger.error(`Error writing JSON file ${filePath}:`, error);
         return false;
     }
 }
@@ -68,12 +72,7 @@ function writeJsonFile(filePath, data) {
  * @returns {boolean} - Whether the file exists
  */
 function fileExists(filePath) {
-    try {
-        return fs.existsSync(filePath);
-    } catch (err) {
-        logger.error(`Error checking if file exists ${filePath}:`, err);
-        return false;
-    }
+    return fs.existsSync(filePath);
 }
 
 /**
@@ -85,32 +84,40 @@ function fileExists(filePath) {
  * @returns {Array} - Array of file paths
  */
 async function listFiles(dir, options = {}) {
-    const { recursive = false, extensions = null } = options;
+    const results = [];
     
     try {
         if (!fs.existsSync(dir)) {
-            return [];
+            return results;
         }
         
-        const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-        const files = await Promise.all(entries.map(async entry => {
-            const fullPath = path.join(dir, entry.name);
-            
-            if (entry.isDirectory()) {
-                return recursive ? listFiles(fullPath, options) : [];
-            } else {
-                if (extensions && !extensions.some(ext => fullPath.endsWith(ext))) {
-                    return [];
-                }
-                return [fullPath];
-            }
-        }));
+        const list = fs.readdirSync(dir);
         
-        return files.flat();
-    } catch (err) {
-        logger.error(`Error listing files in ${dir}:`, err);
-        return [];
+        for (const file of list) {
+            const filePath = path.join(dir, file);
+            const stat = fs.statSync(filePath);
+            
+            if (stat.isDirectory() && options.recursive) {
+                // Recursively list files in subdirectory
+                const subResults = await listFiles(filePath, options);
+                results.push(...subResults);
+            } else if (stat.isFile()) {
+                // Check extensions if specified
+                if (options.extensions && options.extensions.length > 0) {
+                    const ext = path.extname(file);
+                    if (options.extensions.includes(ext)) {
+                        results.push(filePath);
+                    }
+                } else {
+                    results.push(filePath);
+                }
+            }
+        }
+    } catch (error) {
+        logger.error(`Error listing files in ${dir}:`, error);
     }
+    
+    return results;
 }
 
 /**
@@ -120,13 +127,14 @@ async function listFiles(dir, options = {}) {
  */
 function deleteFile(filePath) {
     try {
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            return true;
+        if (!fs.existsSync(filePath)) {
+            return true; // Already doesn't exist
         }
-        return false;
-    } catch (err) {
-        logger.error(`Error deleting file ${filePath}:`, err);
+        
+        fs.unlinkSync(filePath);
+        return true;
+    } catch (error) {
+        logger.error(`Error deleting file ${filePath}:`, error);
         return false;
     }
 }
@@ -140,16 +148,18 @@ function deleteFile(filePath) {
 function copyFile(sourcePath, destPath) {
     try {
         if (!fs.existsSync(sourcePath)) {
+            logger.warn(`Source file does not exist: ${sourcePath}`);
             return false;
         }
         
+        // Ensure destination directory exists
         const destDir = path.dirname(destPath);
         ensureDirectoryExists(destDir);
         
         fs.copyFileSync(sourcePath, destPath);
         return true;
-    } catch (err) {
-        logger.error(`Error copying file from ${sourcePath} to ${destPath}:`, err);
+    } catch (error) {
+        logger.error(`Error copying file from ${sourcePath} to ${destPath}:`, error);
         return false;
     }
 }

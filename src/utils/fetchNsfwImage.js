@@ -20,7 +20,9 @@ const API_ENDPOINTS = {
     WAIFU: 'https://api.waifu.pics',
     NEKOS: 'https://api.nekos.fun/api',
     HMTAI: 'https://hmtai.hatsunia.cfd/v2', // Updated endpoint
-    TENOR: 'https://tenor.googleapis.com/v2'
+    TENOR: 'https://tenor.googleapis.com/v2',
+    HMFULL: 'https://hmtai.herokuapp.com/v2',
+    NEKOBOT: 'https://nekobot.xyz/api'
 };
 
 // Guaranteed working direct GIF URLs as ultimate fallbacks
@@ -57,7 +59,8 @@ const CATEGORY_MAPPING = {
         primary: 'https://api.nekos.fun/api/boobs',
         fallbacks: [
             'https://hmtai.hatsunia.cfd/v2/nsfw/boobs',
-            'https://api.waifu.im/search/?included_tags=paizuri&is_nsfw=true'
+            'https://api.waifu.im/search/?included_tags=paizuri&is_nsfw=true',
+            'https://nekobot.xyz/api/image?type=boobs'
         ],
         directFallback: 'https://media.tenor.com/NwS54VoQH9YAAAAC/anime-boobs.gif',
         gif: true
@@ -66,7 +69,8 @@ const CATEGORY_MAPPING = {
         primary: 'https://api.nekos.fun/api/ass',
         fallbacks: [
             'https://hmtai.hatsunia.cfd/v2/nsfw/ass',
-            'https://api.waifu.im/search/?included_tags=hentai&is_nsfw=true'
+            'https://api.waifu.im/search/?included_tags=hentai&is_nsfw=true',
+            'https://nekobot.xyz/api/image?type=hass'
         ],
         directFallback: 'https://media.tenor.com/N41zKEDABuUAAAAC/anime-butt.gif',
         gif: true
@@ -75,10 +79,85 @@ const CATEGORY_MAPPING = {
         primary: 'https://api.nekos.fun/api/hentai',
         fallbacks: [
             'https://hmtai.hatsunia.cfd/v2/nsfw/hentai',
+            'https://api.waifu.im/search/?included_tags=hentai&is_nsfw=true',
+            'https://nekobot.xyz/api/image?type=hentai'
+        ],
+        directFallback: 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
+        gif: true
+    },
+    'pussy': {
+        primary: 'https://api.nekos.fun/api/pussy',
+        fallbacks: [
+            'https://hmtai.hatsunia.cfd/v2/nsfw/pussy',
+            'https://nekobot.xyz/api/image?type=pussy',
             'https://api.waifu.im/search/?included_tags=hentai&is_nsfw=true'
         ],
         directFallback: 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
         gif: true
+    },
+    'blowjob': {
+        primary: 'https://api.nekos.fun/api/blowjob',
+        fallbacks: [
+            'https://hmtai.hatsunia.cfd/v2/nsfw/blowjob',
+            'https://nekobot.xyz/api/image?type=blowjob',
+            'https://api.waifu.pics/nsfw/blowjob'
+        ],
+        directFallback: 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif',
+        gif: true
+    },
+    'gifboobs': {
+        primary: 'https://api.nekos.fun/api/boobs',
+        fallbacks: [
+            'https://hmtai.hatsunia.cfd/v2/nsfw/boobs',
+            'https://nekobot.xyz/api/image?type=boobs'
+        ],
+        directFallback: 'https://media.tenor.com/NwS54VoQH9YAAAAC/anime-boobs.gif',
+        gif: true
+    },
+    'gifass': {
+        primary: 'https://api.nekos.fun/api/ass',
+        fallbacks: [
+            'https://hmtai.hatsunia.cfd/v2/nsfw/ass',
+            'https://nekobot.xyz/api/image?type=hass'
+        ],
+        directFallback: 'https://media.tenor.com/N41zKEDABuUAAAAC/anime-butt.gif',
+        gif: true
+    },
+    'gifhentai': {
+        primary: 'https://api.nekos.fun/api/hentai',
+        fallbacks: [
+            'https://hmtai.hatsunia.cfd/v2/nsfw/hentai',
+            'https://nekobot.xyz/api/image?type=hentai'
+        ],
+        directFallback: 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
+        gif: true
+    },
+    'gifblowjob': {
+        primary: 'https://api.nekos.fun/api/blowjob',
+        fallbacks: [
+            'https://hmtai.hatsunia.cfd/v2/nsfw/blowjob',
+            'https://nekobot.xyz/api/image?type=blowjob'
+        ],
+        directFallback: 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif',
+        gif: true
+    },
+    'anal': {
+        primary: 'https://api.nekos.fun/api/anal',
+        fallbacks: [
+            'https://hmtai.hatsunia.cfd/v2/nsfw/anal',
+            'https://nekobot.xyz/api/image?type=hanal'
+        ],
+        directFallback: 'https://media.tenor.com/N41zKEDABuUAAAAC/anime-butt.gif',
+        gif: true
+    },
+    'feet': {
+        primary: 'https://api.nekos.fun/api/feet',
+        fallbacks: [
+            'https://hmtai.hatsunia.cfd/v2/nsfw/foot',
+            'https://api.waifu.pics/nsfw/feet'
+        ],
+        directFallback: 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
+        gif: false
     }
 };
 
@@ -371,7 +450,8 @@ async function fetchNsfwImage(category, requireGif = false) {
             if (response) {
                 const url = response.url || 
                           (response.images && response.images[0]?.url) ||
-                          (response.data && response.data.url);
+                          (response.data && response.data.url) ||
+                          (response.message && response.message);
                 
                 if (url) {
                     // Cache successful URL
@@ -397,7 +477,8 @@ async function fetchNsfwImage(category, requireGif = false) {
         if (response) {
             const url = response.url || 
                       (response.images && response.images[0]?.url) ||
-                      (response.data && response.data.url);
+                      (response.data && response.data.url) ||
+                      (response.message && response.message);
             
             if (url) {
                 // Cache successful URL

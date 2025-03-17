@@ -1,42 +1,11 @@
 /**
- * Centralized Error Handler for WhatsApp Bot Commands
- * Provides standardized error handling and reporting for all command modules
+ * Command Error Handler
+ * Provides standardized error handling for command execution
  */
 
-// Load logger
-let logger;
-try {
-    logger = require('./logger');
-} catch (err) {
-    // Fallback to console if logger isn't available
-    logger = {
-        info: console.log,
-        error: console.error,
-        warn: console.warn,
-        debug: console.log
-    };
-}
-
-// Load safe message helpers
-let jidHelper;
-try {
-    jidHelper = require('./jidHelper');
-} catch (err) {
-    // Fallback if jidHelper isn't available
-    jidHelper = {
-        safeSendMessage: async (sock, jid, content) => {
-            try {
-                return await sock.sendMessage(jid, content);
-            } catch (err) {
-                logger.error(`Error sending message: ${err.message}`);
-                return null;
-            }
-        }
-    };
-}
-
-// Counter for retry attempts per command
-const retryCounter = new Map();
+const logger = require('./logger');
+const { safeSendText } = require('./jidHelper');
+const { languageManager } = require('./language');
 
 /**
  * Handle an error that occurred during command execution
@@ -54,7 +23,7 @@ const retryCounter = new Map();
  * @returns {Promise<void>}
  */
 async function handleCommandError(sock, jid, error, commandName, moduleName, options = {}) {
-    // Default options
+    // Set default options
     const {
         reply = true,
         logError = true,
@@ -63,40 +32,46 @@ async function handleCommandError(sock, jid, error, commandName, moduleName, opt
         useRetry = true
     } = options;
     
-    // Always log errors unless specifically disabled
+    // Log error
     if (logError) {
-        logger.error(`Error in command "${commandName}" from module "${moduleName}": ${error.message}`);
-        if (error.stack) {
-            logger.error(`Stack trace: ${error.stack}`);
-        }
+        logger.error(`Error in command '${commandName}' from module '${moduleName}':`, error);
     }
     
-    // Skip reply if disabled
-    if (!reply || !sock || !jid) return;
+    if (!reply) return;
+    
+    // Get error category for better user messages
+    const category = categorizeError(error);
     
     try {
-        // Determine user-friendly message based on error type
-        const errorCategory = categorizeError(error);
-        let userMessage = userFriendly 
-            ? getUserFriendlyErrorMessage(errorCategory, commandName)
-            : `Error executing command ${commandName}: ${error.message}`;
-            
+        // Prepare user-friendly error message
+        let errorMessage = '';
+        
+        if (userFriendly) {
+            // Get standardized error message based on category
+            errorMessage = getUserFriendlyErrorMessage(category, commandName);
+        } else {
+            // Use raw error message
+            errorMessage = error.message || String(error);
+        }
+        
         // Add technical details if requested
         if (detailed) {
-            userMessage += `\n\nTechnical details: ${error.message}`;
-            if (error.code) {
-                userMessage += `\nError code: ${error.code}`;
+            errorMessage += `\n\nTechnical details: ${error.message || String(error)}`;
+            
+            if (error.stack) {
+                const firstLine = error.stack.split('\n')[0];
+                errorMessage += `\nType: ${firstLine}`;
             }
         }
         
-        // Send error message with retry mechanism
+        // Send error message with retry
         if (useRetry) {
-            await retryMessageSend(sock, jid, { text: userMessage });
+            await retryMessageSend(sock, jid, { text: errorMessage });
         } else {
-            await jidHelper.safeSendMessage(sock, jid, { text: userMessage });
+            await safeSendText(sock, jid, errorMessage);
         }
-    } catch (sendErr) {
-        logger.error(`Failed to send error message: ${sendErr.message}`);
+    } catch (sendError) {
+        logger.error('Error sending error message:', sendError);
     }
 }
 
@@ -141,17 +116,11 @@ function wrapWithErrorHandler(commandFunction, commandName, moduleName) {
 function addErrorHandlingToAll(commandsObject, moduleName) {
     const wrappedCommands = {};
     
-    Object.keys(commandsObject).forEach(commandName => {
-        if (typeof commandsObject[commandName] === 'function') {
-            wrappedCommands[commandName] = wrapWithErrorHandler(
-                commandsObject[commandName],
-                commandName,
-                moduleName
-            );
-        } else {
-            wrappedCommands[commandName] = commandsObject[commandName];
+    for (const [commandName, commandFunction] of Object.entries(commandsObject)) {
+        if (typeof commandFunction === 'function') {
+            wrappedCommands[commandName] = wrapWithErrorHandler(commandFunction, commandName, moduleName);
         }
-    });
+    }
     
     return wrappedCommands;
 }
@@ -162,21 +131,16 @@ function addErrorHandlingToAll(commandsObject, moduleName) {
  * @returns {boolean} - Whether it's a user input error
  */
 function isUserInputError(error) {
-    if (!error) return false;
-    
-    // Check for common input error messages
-    const userInputErrorPatterns = [
-        /invalid (input|argument|parameter)/i,
-        /missing (required )?(input|argument|parameter)/i,
-        /incorrect format/i,
-        /too (few|many) arguments/i,
-        /argument out of range/i,
-        /invalid URL/i,
-        /user not found/i,
-        /group not found/i
-    ];
-    
-    return userInputErrorPatterns.some(pattern => pattern.test(error.message));
+    // Check for common input error patterns
+    return (
+        error.message?.includes('Invalid') ||
+        error.message?.includes('Missing') ||
+        error.message?.includes('required') ||
+        error.message?.includes('not found') ||
+        error.message?.includes('must be') ||
+        error.name === 'ValidationError' ||
+        error.name === 'InputError'
+    );
 }
 
 /**
@@ -187,38 +151,71 @@ function isUserInputError(error) {
 function categorizeError(error) {
     if (!error) return 'unknown';
     
-    // Check for input errors first
+    // Network errors
+    if (
+        error.code === 'ENOTFOUND' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNRESET' ||
+        error.code === 'ECONNREFUSED' ||
+        error.message?.includes('network') ||
+        error.message?.includes('connection')
+    ) {
+        return 'network';
+    }
+    
+    // Permission errors
+    if (
+        error.code === 'EACCES' ||
+        error.message?.includes('permission') ||
+        error.message?.includes('not allowed') ||
+        error.message?.includes('denied')
+    ) {
+        return 'permission';
+    }
+    
+    // User input errors
     if (isUserInputError(error)) {
         return 'input';
     }
     
-    // Network/connection related errors
-    if (/network|connection|timeout|econnrefused|fetch|request|unavailable/i.test(error.message)) {
-        return 'network';
+    // Resource not found
+    if (
+        error.code === 'ENOENT' ||
+        error.message?.includes('not found') ||
+        error.message?.includes('does not exist')
+    ) {
+        return 'not_found';
     }
     
-    // Permission related errors
-    if (/permission|unauthorized|forbidden|not allowed|admin only/i.test(error.message)) {
-        return 'permission';
+    // Timeout errors
+    if (
+        error.code === 'TIMEOUT' ||
+        error.message?.includes('timeout') ||
+        error.message?.includes('timed out')
+    ) {
+        return 'timeout';
     }
     
-    // Media/file related errors
-    if (/file|media|image|video|audio|download|upload|buffer|stream/i.test(error.message)) {
+    // Media processing errors
+    if (
+        error.message?.includes('image') ||
+        error.message?.includes('video') ||
+        error.message?.includes('audio') ||
+        error.message?.includes('media')
+    ) {
         return 'media';
     }
     
-    // WhatsApp specific errors
-    if (/whatsapp|wa|baileys|socket|jid|message|chat|group/i.test(error.message)) {
-        return 'whatsapp';
+    // Baileys-specific errors
+    if (
+        error.message?.includes('Baileys') ||
+        error.message?.includes('Connection') ||
+        error.message?.includes('closed')
+    ) {
+        return 'baileys';
     }
     
-    // Rate limiting
-    if (/rate|limit|too many|throttle/i.test(error.message)) {
-        return 'ratelimit';
-    }
-    
-    // Default to general error
-    return 'general';
+    return 'unknown';
 }
 
 /**
@@ -229,27 +226,37 @@ function categorizeError(error) {
  */
 function getUserFriendlyErrorMessage(category, commandName) {
     switch (category) {
-        case 'input':
-            return `⚠️ There seems to be an issue with the way you used the ${commandName} command. Please check the command format with .help ${commandName}.`;
-        
         case 'network':
-            return `⚠️ Sorry, I couldn't complete the ${commandName} command because of a network issue. Please try again later.`;
-        
+            return languageManager.getText('error.network') || 
+                'There seems to be a network issue. Please try again later.';
+            
         case 'permission':
-            return `⚠️ You don't have permission to use the ${commandName} command, or I need admin rights to perform this action.`;
-        
+            return languageManager.getText('error.permission') || 
+                'You do not have permission to use this command.';
+            
+        case 'input':
+            return languageManager.getText('error.input', null, commandName) || 
+                `Incorrect usage of the command. Try '!help ${commandName}' for instructions.`;
+            
+        case 'not_found':
+            return languageManager.getText('error.not_found') || 
+                'The requested resource could not be found.';
+            
+        case 'timeout':
+            return languageManager.getText('error.timeout') || 
+                'The operation timed out. Please try again later.';
+            
         case 'media':
-            return `⚠️ There was a problem processing the media for the ${commandName} command. Make sure you're sending a supported file type and it's not too large.`;
-        
-        case 'whatsapp':
-            return `⚠️ I encountered a WhatsApp-related issue while running the ${commandName} command. Please try again later.`;
-        
-        case 'ratelimit':
-            return `⚠️ You're using the ${commandName} command too frequently. Please wait a moment before trying again.`;
-        
-        case 'general':
+            return languageManager.getText('error.media') || 
+                'There was an error processing the media file.';
+            
+        case 'baileys':
+            return languageManager.getText('error.connection') || 
+                'There was an issue with the WhatsApp connection. Please try again later.';
+            
         default:
-            return `⚠️ An error occurred while running the ${commandName} command. Please try again later.`;
+            return languageManager.getText('error.unknown') || 
+                'An unknown error occurred. Please try again later.';
     }
 }
 
@@ -268,33 +275,31 @@ async function retryMessageSend(sock, jid, content, options = {}) {
     const {
         maxRetries = 3,
         initialDelay = 500,
-        sendFunction = jidHelper.safeSendMessage
+        sendFunction = safeSendText
     } = options;
     
-    let attempt = 0;
-    let delay = initialDelay;
+    let lastError = null;
     
-    while (attempt < maxRetries) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
+            // Try to send the message
             return await sendFunction(sock, jid, content);
-        } catch (err) {
-            attempt++;
+        } catch (error) {
+            lastError = error;
             
-            if (attempt >= maxRetries) {
-                logger.error(`Failed to send message after ${maxRetries} attempts: ${err.message}`);
-                return null;
+            // Log retry attempt
+            logger.warn(`Message send failed (attempt ${attempt + 1}/${maxRetries}):`, error.message);
+            
+            // Wait before retrying with exponential backoff
+            if (attempt < maxRetries - 1) {
+                const delay = initialDelay * Math.pow(2, attempt);
+                await new Promise(resolve => setTimeout(resolve, delay));
             }
-            
-            logger.warn(`Message send attempt ${attempt} failed: ${err.message}. Retrying in ${delay}ms`);
-            
-            // Wait before retry
-            await new Promise(resolve => setTimeout(resolve, delay));
-            
-            // Exponential backoff
-            delay *= 2;
         }
     }
     
+    // All retries failed
+    logger.error(`Failed to send message after ${maxRetries} attempts:`, lastError);
     return null;
 }
 

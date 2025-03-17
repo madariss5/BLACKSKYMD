@@ -18,7 +18,7 @@
     "archiver": "^7.0.1",
     "axios": "^1.8.3",
     "canvas": "^3.1.0",
-    "chalk": "^5.4.1",
+    "chalk": "^4.1.2",
     "chart.js": "^3.9.1",
     "chartjs-node-canvas": "^4.1.6",
     "countries-list": "^3.1.1",

@@ -1,200 +1,130 @@
-const fs = require('fs').promises;
+/**
+ * Language Manager
+ * Provides multi-language support with fallback for missing translations
+ */
+
+const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
-const config = require('../config/config');
+const { ensureDirectoryExists, readJsonFile, writeJsonFile } = require('./fileUtils');
+
+// Default language settings
+const DEFAULT_LANGUAGE = 'en';
+const TRANSLATIONS_DIR = path.join(process.cwd(), 'data', 'translations');
+
+// Default translations
+const DEFAULT_TRANSLATIONS = {
+    system: {
+        error: 'An error occurred: {0}',
+        command_not_found: 'Command not found: {0}',
+        missing_permissions: 'You do not have permission to use this command.',
+        command_on_cooldown: 'Please wait {0} seconds before using this command again.',
+        nsfw_not_allowed: 'NSFW content is not allowed in this group.'
+    },
+    basic: {
+        ping_response: 'Pong! Response time: {0}ms',
+        help_title: 'Help Menu',
+        help_description: 'Here are the available commands:',
+        info_title: 'Bot Information',
+        info_uptime: 'Uptime: {0}',
+        info_memory: 'Memory Usage: {0}MB'
+    },
+    menu: {
+        header: 'Command Menu',
+        footer: 'Use !help <command> for more information about a specific command.'
+    }
+};
 
 class LanguageManager {
     constructor(options = {}) {
-        this.translations = new Map();
-        this.defaultLanguage = options.defaultLanguage || 'en';
-        this.supportedLanguages = options.supportedLanguages || ['en', 'de']; // Explicitly define supported languages
-        this.autoloadTranslations = options.autoloadTranslations !== false; // Default to true
-        this.verbose = options.verbose !== false; // Default to true for enhanced logging
-        this.translationMissingLog = new Set(); // Track missing translations to avoid spam
-        this.maxLoggedMissing = options.maxLoggedMissing || 100; // Maximum number of missing translations to log
+        this.languages = {};
+        this.currentLanguage = options.defaultLanguage || DEFAULT_LANGUAGE;
+        this.translationsDir = options.translationsDir || TRANSLATIONS_DIR;
+        this.missingTranslationsLogged = new Set();
+
+        // Ensure translations directory exists
+        ensureDirectoryExists(this.translationsDir);
         
-        if (this.verbose) {
-            console.log(`Language Manager initialized with:
-- Default language: ${this.defaultLanguage}
-- Supported languages: ${this.supportedLanguages.join(', ')}
-- Auto-loading enabled: ${this.autoloadTranslations}
-- Verbose logging: ${this.verbose}`);
-        }
+        // Load English as default language
+        this.languages[DEFAULT_LANGUAGE] = { ...DEFAULT_TRANSLATIONS };
+        this.saveTranslation(DEFAULT_LANGUAGE, this.languages[DEFAULT_LANGUAGE]);
     }
 
+    /**
+     * Load translations from files
+     * @returns {Promise<boolean>} Whether loading was successful
+     */
     async loadTranslations() {
         try {
-            // Try multiple possible locations for translations directory
-            const possibleDirs = [
-                path.join(process.cwd(), 'src/translations'),
-                path.join(process.cwd(), 'translations')
-            ];
+            logger.info('Loading translations...');
             
-            let translationsDir = null;
+            const files = fs.readdirSync(this.translationsDir);
+            let translationsLoaded = 0;
             
-            // Find the first directory that exists
-            for (const dir of possibleDirs) {
-                try {
-                    await fs.access(dir);
-                    console.log(`✅ Found translations directory: ${dir}`);
-                    translationsDir = dir;
-                    break;
-                } catch (err) {
-                    console.log(`Directory not found: ${dir}`);
-                }
-            }
-            
-            // If no directory found, create one
-            if (!translationsDir) {
-                translationsDir = possibleDirs[0];
-                console.error(`❌ No translations directory found, creating: ${translationsDir}`);
-                await fs.mkdir(translationsDir, { recursive: true });
-                
-                // Initialize with empty translations to prevent crashes
-                this.translations.set(this.defaultLanguage, {});
-                return;
-            }
-            
-            const files = await fs.readdir(translationsDir);
-            console.log(`Found translation files: ${files.join(', ')}`);
-
-            // Process each translation file
             for (const file of files) {
                 if (file.endsWith('.json')) {
-                    const language = file.replace('.json', '');
-                    const filePath = path.join(translationsDir, file);
-                    console.log(`Processing translation file: ${filePath} (${language})`);
+                    const languageCode = file.replace('.json', '');
+                    const filePath = path.join(this.translationsDir, file);
                     
-                    try {
-                        // Read and parse the file
-                        const content = await fs.readFile(filePath, 'utf8');
-                        
-                        // Check if content is empty
-                        if (!content.trim()) {
-                            console.error(`Translation file ${filePath} is empty!`);
-                            continue;
-                        }
-                        
-                        try {
-                            const parsedContent = JSON.parse(content);
-                            this.translations.set(language, parsedContent);
-                            
-                            // Verify content has expected structure
-                            if (!parsedContent.system) {
-                                console.warn(`Translation file ${filePath} missing 'system' section`);
-                            } else if (!parsedContent.system.language_changed) {
-                                console.warn(`Translation file ${filePath} missing 'system.language_changed' key`);
-                            } else {
-                                console.log(`Translation key check - ${language}.system.language_changed: "${parsedContent.system.language_changed}"`);
-                            }
-                            
-                            console.log(`Successfully loaded translations for ${language} with ${Object.keys(parsedContent).length} top-level keys`);
-                        } catch (parseErr) {
-                            console.error(`JSON parsing error in ${filePath}:`, parseErr);
-                            console.log(`First 100 characters of file content: ${content.substring(0, 100)}...`);
-                        }
-                    } catch (readErr) {
-                        console.error(`Error reading translation file ${filePath}:`, readErr);
+                    const translation = readJsonFile(filePath);
+                    if (translation) {
+                        this.languages[languageCode] = translation;
+                        translationsLoaded++;
                     }
                 }
             }
-
-            // Validate all required languages are loaded
-            for (const lang of this.supportedLanguages) {
-                if (!this.translations.has(lang)) {
-                    console.error(`Required language '${lang}' translations not found`);
-                } else {
-                    // Log some keys to verify content
-                    const langData = this.translations.get(lang);
-                    console.log(`Validated translations for ${lang} with keys: ${Object.keys(langData).join(', ')}`);
-                    
-                    // Verify specific key exists
-                    if (langData.system && langData.system.language_changed) {
-                        console.log(`Verified ${lang}.system.language_changed is present`);
-                    } else {
-                        console.warn(`Missing key system.language_changed for language ${lang}`);
-                    }
-                }
-            }
-
-            // Log loaded languages
-            console.log(`Available languages: ${Array.from(this.translations.keys()).join(', ')}`);
-
+            
+            logger.info(`Loaded ${translationsLoaded} translations`);
+            
             // Ensure default language exists
-            if (!this.translations.has(this.defaultLanguage)) {
-                console.error(`Default language '${this.defaultLanguage}' translations not found`);
-                this.translations.set(this.defaultLanguage, {});
+            if (!this.languages[DEFAULT_LANGUAGE]) {
+                this.languages[DEFAULT_LANGUAGE] = { ...DEFAULT_TRANSLATIONS };
+                this.saveTranslation(DEFAULT_LANGUAGE, this.languages[DEFAULT_LANGUAGE]);
             }
-        } catch (err) {
-            console.error('Error loading translations:', err);
-            // Initialize with empty translations to prevent crashes
-            this.translations.set(this.defaultLanguage, {});
+            
+            return true;
+        } catch (error) {
+            logger.error('Error loading translations:', error);
+            
+            // Ensure default language is available even on error
+            this.languages[DEFAULT_LANGUAGE] = { ...DEFAULT_TRANSLATIONS };
+            
+            return false;
         }
     }
 
+    /**
+     * Get translated text for a key in the current language
+     * @param {string} key - Dot-notation key to look up (e.g., "system.error")
+     * @param {string|null} lang - Override language (uses current language if null)
+     * @param {...any} args - Arguments to format the string with
+     * @returns {string} - Translated text or key if not found
+     */
     getText(key, lang = null, ...args) {
-        try {
-            // Use provided language, fallback to config, then default
-            const language = lang || config.bot.language || this.defaultLanguage;
+        const language = lang || this.currentLanguage;
+        
+        // Try to get translation in requested language
+        let translation = this.getTranslationByKey(key, language);
+        
+        // Fall back to default language if not found
+        if (!translation && language !== DEFAULT_LANGUAGE) {
+            translation = this.getTranslationByKey(key, DEFAULT_LANGUAGE);
             
-            // Ensure we have translations loaded
-            if (this.translations.size === 0) {
-                logger.warn(`No translations loaded yet, returning key: ${key}`);
-                return key;
+            // Log missing translation (only once per key)
+            const logKey = `${language}:${key}`;
+            if (!this.missingTranslationsLogged.has(logKey)) {
+                this.logMissingOnce(`Missing translation for key '${key}' in language '${language}'`);
+                this.missingTranslationsLogged.add(logKey);
             }
-            
-            // Only enable verbose logging during development/debugging
-            if (this.verbose && process.env.DEBUG_TRANSLATIONS === 'true') {
-                logger.debug(`Requested key: ${key}, language: ${language}`);
-                logger.debug(`Available languages: ${Array.from(this.translations.keys()).join(', ')}`);
-            }
-
-            // Get translations for requested language
-            let langData = this.translations.get(language);
-
-            // If translation not found in requested language, try default
-            if (!langData && language !== this.defaultLanguage) {
-                if (this.verbose && process.env.DEBUG_TRANSLATIONS === 'true') {
-                    logger.debug(`Falling back to default language: ${this.defaultLanguage}`);
-                }
-                langData = this.translations.get(this.defaultLanguage);
-            }
-
-            // If still no translations found, return key
-            if (!langData) {
-                this.logMissingOnce(`No translations found for language: ${language}`);
-                return key;
-            }
-
-            // Split the key by dots to traverse nested objects
-            const keys = key.split('.');
-            let text = langData;
-
-            for (const k of keys) {
-                if (!text || typeof text !== 'object') {
-                    break;
-                }
-                text = text[k];
-            }
-
-            // If translation not found in requested language, try default
-            if (!text && language !== this.defaultLanguage) {
-                this.logMissingOnce(`Translation not found for ${key} in ${language}, trying default language`);
-                return this.getText(key, this.defaultLanguage, ...args);
-            }
-
-            // Return key if no translation found
-            if (!text) {
-                this.logMissingOnce(`Translation not found for key: ${key} in language: ${language}`);
-                return key;
-            }
-
-            // Replace placeholders with args
-            return text.replace(/%s/g, () => args.shift() || '%s');
-        } catch (err) {
-            logger.error(`Error getting translation for key ${key}:`, err);
+        }
+        
+        // If still not found, return the key itself
+        if (!translation) {
             return key;
         }
+        
+        // Format translation with arguments
+        return this.formatTranslation(translation, ...args);
     }
 
     /**
@@ -202,61 +132,38 @@ class LanguageManager {
      * @param {string} message - The message to log
      */
     logMissingOnce(message) {
-        if (this.translationMissingLog.size < this.maxLoggedMissing && !this.translationMissingLog.has(message)) {
-            logger.warn(message);
-            this.translationMissingLog.add(message);
-            
-            // If we've reached the limit, log a warning
-            if (this.translationMissingLog.size === this.maxLoggedMissing) {
-                logger.warn(`Reached maximum number of logged missing translations (${this.maxLoggedMissing}). Further missing translations will be suppressed.`);
-            }
-        }
+        logger.warn(message);
     }
-    
+
     /**
      * Get a list of missing translations for a specific language
      * @param {string} compareLanguage - The language to compare against default language
      * @returns {Array} - List of missing translation keys
      */
     getMissingTranslations(compareLanguage) {
-        const defaultLang = this.translations.get(this.defaultLanguage);
-        const compareLang = this.translations.get(compareLanguage);
+        const missing = [];
+        const defaultLang = this.languages[DEFAULT_LANGUAGE];
+        const compareLang = this.languages[compareLanguage] || {};
         
-        if (!defaultLang) {
-            console.error(`Default language ${this.defaultLanguage} not found`);
-            return [];
-        }
-        
-        if (!compareLang) {
-            console.error(`Compare language ${compareLanguage} not found`);
-            return [];
-        }
-        
-        const missingKeys = [];
-        
-        // Helper function to recursively find missing keys
-        const findMissingKeys = (defaultObj, compareObj, currentPath = '') => {
-            for (const key in defaultObj) {
+        // Helper function to check nested objects recursively
+        const checkNested = (obj1, obj2, currentPath = '') => {
+            for (const key in obj1) {
                 const newPath = currentPath ? `${currentPath}.${key}` : key;
                 
-                if (typeof defaultObj[key] === 'object' && defaultObj[key] !== null) {
-                    // If it's an object, recurse deeper
-                    if (!compareObj[key] || typeof compareObj[key] !== 'object') {
-                        missingKeys.push(newPath);
+                if (typeof obj1[key] === 'object' && obj1[key] !== null) {
+                    if (!obj2[key] || typeof obj2[key] !== 'object') {
+                        missing.push(newPath);
                     } else {
-                        findMissingKeys(defaultObj[key], compareObj[key], newPath);
+                        checkNested(obj1[key], obj2[key], newPath);
                     }
-                } else {
-                    // It's a leaf node (string, number, etc.)
-                    if (compareObj[key] === undefined) {
-                        missingKeys.push(newPath);
-                    }
+                } else if (obj2[key] === undefined) {
+                    missing.push(newPath);
                 }
             }
         };
         
-        findMissingKeys(defaultLang, compareLang);
-        return missingKeys;
+        checkNested(defaultLang, compareLang);
+        return missing;
     }
 
     /**
@@ -265,78 +172,165 @@ class LanguageManager {
      */
     getTranslationStats() {
         const stats = {};
-        const defaultLang = this.defaultLanguage;
-        const defaultTranslations = this.translations.get(defaultLang);
+        const defaultLang = this.languages[DEFAULT_LANGUAGE];
+        const defaultCount = this.countLeafKeys(defaultLang);
         
-        if (!defaultTranslations) {
-            return { error: 'Default language translations not found' };
-        }
-        
-        // Count total keys in default language
-        let totalKeys = 0;
-        const countKeys = (obj) => {
-            for (const key in obj) {
-                if (typeof obj[key] === 'object' && obj[key] !== null) {
-                    countKeys(obj[key]);
-                } else {
-                    totalKeys++;
-                }
-            }
-        };
-        
-        countKeys(defaultTranslations);
-        stats.totalKeys = totalKeys;
-        stats.languages = {};
-        
-        // Calculate stats for each language
-        for (const [lang, translations] of this.translations.entries()) {
-            if (lang === defaultLang) {
-                stats.languages[lang] = {
-                    keys: totalKeys,
-                    missing: 0,
+        for (const lang in this.languages) {
+            if (lang === DEFAULT_LANGUAGE) {
+                stats[lang] = {
+                    total: defaultCount,
+                    translated: defaultCount,
                     percentage: 100
                 };
                 continue;
             }
             
-            const missingKeys = this.getMissingTranslations(lang);
-            const percentage = Math.round(((totalKeys - missingKeys.length) / totalKeys) * 100);
+            const langObj = this.languages[lang];
+            const missing = this.getMissingTranslations(lang);
+            const translated = defaultCount - missing.length;
+            const percentage = Math.round((translated / defaultCount) * 100);
             
-            stats.languages[lang] = {
-                keys: totalKeys - missingKeys.length,
-                missing: missingKeys.length,
-                percentage
+            stats[lang] = {
+                total: defaultCount,
+                translated,
+                percentage,
+                missing
             };
         }
         
         return stats;
     }
 
+    /**
+     * Check if a language is supported
+     * @param {string} language - Language code to check
+     * @returns {boolean} - Whether the language is supported
+     */
     isLanguageSupported(language) {
-        const isSupported = this.supportedLanguages.includes(language);
-        if (this.verbose) {
-            logger.debug(`Language support check: ${language} -> ${isSupported}`);
-        }
-        return isSupported;
+        return !!this.languages[language];
     }
 
+    /**
+     * Get list of available languages
+     * @returns {Array<string>} - List of language codes
+     */
     getAvailableLanguages() {
-        return this.supportedLanguages;
+        return Object.keys(this.languages);
+    }
+
+    /**
+     * Get specific translation from a language
+     * @param {string} key - Dot-notation key
+     * @param {string} language - Language code
+     * @returns {string|null} - Translation or null if not found
+     */
+    getTranslationByKey(key, language) {
+        const langObj = this.languages[language];
+        if (!langObj) return null;
+        
+        // Parse dot notation (e.g., "system.error")
+        const parts = key.split('.');
+        let current = langObj;
+        
+        for (const part of parts) {
+            if (current[part] === undefined) {
+                return null;
+            }
+            current = current[part];
+        }
+        
+        return current;
+    }
+
+    /**
+     * Format a translation string with arguments
+     * @param {string} translation - Translation string with placeholders
+     * @param {...any} args - Arguments to insert
+     * @returns {string} - Formatted translation
+     * @private
+     */
+    formatTranslation(translation, ...args) {
+        if (!args.length) return translation;
+        
+        return translation.replace(/{(\d+)}/g, (match, index) => {
+            const argIndex = Number(index);
+            return args[argIndex] !== undefined ? args[argIndex] : match;
+        });
+    }
+
+    /**
+     * Count total number of leaf keys in a nested object
+     * @param {Object} obj - The object to count keys in
+     * @returns {number} - Number of leaf keys
+     * @private
+     */
+    countLeafKeys(obj) {
+        let count = 0;
+        
+        const countNested = (o) => {
+            for (const key in o) {
+                if (typeof o[key] === 'object' && o[key] !== null) {
+                    countNested(o[key]);
+                } else {
+                    count++;
+                }
+            }
+        };
+        
+        countNested(obj);
+        return count;
+    }
+
+    /**
+     * Set current language
+     * @param {string} language - Language code to set
+     * @returns {boolean} - Whether the language was set successfully
+     */
+    setLanguage(language) {
+        if (this.isLanguageSupported(language)) {
+            this.currentLanguage = language;
+            logger.info(`Language set to ${language}`);
+            return true;
+        }
+        
+        logger.warn(`Language ${language} is not supported`);
+        return false;
+    }
+
+    /**
+     * Add a new language or update an existing one
+     * @param {string} language - Language code
+     * @param {Object} translations - Translation object
+     * @returns {boolean} - Whether the operation was successful
+     */
+    addLanguage(language, translations) {
+        this.languages[language] = translations;
+        this.saveTranslation(language, translations);
+        return true;
+    }
+
+    /**
+     * Save a translation to file
+     * @param {string} language - Language code
+     * @param {Object} translations - Translation object
+     * @returns {boolean} - Whether the operation was successful
+     * @private
+     */
+    saveTranslation(language, translations) {
+        const filePath = path.join(this.translationsDir, `${language}.json`);
+        return writeJsonFile(filePath, translations);
     }
 }
 
-// Create a singleton instance
+// Create singleton instance
 const languageManager = new LanguageManager();
 
-// Initialize translations
+// Ensure translations are loaded when the module is imported
 (async () => {
-    try {
-        console.log('Initializing language manager...');
-        await languageManager.loadTranslations();
-        console.log('Language manager initialization complete');
-    } catch (err) {
-        console.error('Failed to initialize language manager:', err);
-    }
+    await languageManager.loadTranslations();
 })();
 
-module.exports = { languageManager };
+module.exports = {
+    LanguageManager,
+    languageManager
+};

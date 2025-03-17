@@ -17,15 +17,7 @@ args = "GitHub Editor"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Terminal QR Connect"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "High Performance Bot"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Enhanced WhatsApp Bot"
+args = "WhatsApp Bot"
 
 [[workflows.workflow]]
 name = "Run Bot"
@@ -51,35 +43,7 @@ task = "shell.exec"
 args = "cd /home/runner/workspace/github-tools && node minimal-github-editor.js"
 
 [[workflows.workflow]]
-name = "Terminal QR Connect"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd /home/runner/workspace && node terminal-qr-connect.js"
-
-[[workflows.workflow]]
-name = "High Performance Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node high-performance-whatsapp.js"
-
-[[workflows.workflow]]
-name = "Enhanced WhatsApp Bot"
+name = "WhatsApp Bot"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -91,7 +55,6 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node src/index.js"
-waitForPort = 5000
 
 [deployment]
 run = ["sh", "-c", "cd /home/runner/workspace && node src/qr-web-server-fixed.js"]
