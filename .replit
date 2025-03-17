@@ -90,7 +90,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node src/core/Bot.js"
+args = "node src/core/index.js"
 
 [deployment]
 run = ["sh", "-c", "cd /home/runner/workspace && node src/qr-web-server-fixed.js"]

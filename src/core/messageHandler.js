@@ -1,6 +1,6 @@
 /**
  * Advanced Message Handler with Middleware Support
- * Handles incoming messages, commands, and responses
+ * Combined features from popular MD bots
  */
 
 const EventEmitter = require('events');
@@ -12,6 +12,7 @@ class MessageHandler extends EventEmitter {
         this.config = {
             prefix: '!',
             commandCooldown: 3000,
+            maxProcessingTime: 30000,
             ...config
         };
 
@@ -19,6 +20,8 @@ class MessageHandler extends EventEmitter {
         this.commands = new Map();
         this.cooldowns = new Map();
         this.activeProcesses = new Map();
+        this.messageQueue = new Map();
+        this.errorHandlers = new Map();
     }
 
     use(middleware) {
@@ -36,6 +39,9 @@ class MessageHandler extends EventEmitter {
                 cooldown: this.config.commandCooldown,
                 requiresAuth: false,
                 category: 'misc',
+                description: '',
+                usage: '',
+                aliases: [],
                 ...options
             }
         });
@@ -46,7 +52,7 @@ class MessageHandler extends EventEmitter {
             const msg = message.messages?.[0];
             if (!msg || msg.key.fromMe) return;
 
-            // Create message context
+            // Enhanced message context
             const context = {
                 socket,
                 message: msg,
@@ -55,30 +61,59 @@ class MessageHandler extends EventEmitter {
                 content: msg.message?.conversation || 
                         msg.message?.extendedTextMessage?.text || 
                         msg.message?.imageMessage?.caption || 
+                        msg.message?.videoMessage?.caption ||
                         '',
                 raw: msg,
-                replied: false
+                replied: false,
+                quotedMessage: msg.message?.extendedTextMessage?.contextInfo?.quotedMessage,
+                mentionedJids: msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [],
+                timestamp: msg.messageTimestamp,
+                type: Object.keys(msg.message || {})[0],
+                isCommand: false
             };
 
-            // Run middleware pipeline
+            // Track message processing
+            const processId = `${context.sender}_${Date.now()}`;
+            this.activeProcesses.set(processId, {
+                context,
+                startTime: Date.now()
+            });
+
+            // Run enhanced middleware pipeline
             for (const middleware of this.middleware) {
                 try {
-                    const result = await middleware(context);
-                    if (result === false) return; // Middleware chain stopped
-                    Object.assign(context, result); // Merge middleware modifications
+                    const result = await Promise.race([
+                        middleware(context),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Middleware timeout')), 
+                            this.config.maxProcessingTime)
+                        )
+                    ]);
+
+                    if (result === false) {
+                        this.activeProcesses.delete(processId);
+                        return;
+                    }
+                    Object.assign(context, result);
                 } catch (error) {
                     logger.error('Middleware error:', error);
+                    await this.handleMiddlewareError(error, context);
+                    this.activeProcesses.delete(processId);
                     return;
                 }
             }
 
-            // Command handling
+            // Enhanced command handling
             if (context.content.startsWith(this.config.prefix)) {
+                context.isCommand = true;
                 await this.handleCommand(context);
             }
 
             // Emit message event for custom handlers
             this.emit('message', context);
+
+            // Cleanup
+            this.activeProcesses.delete(processId);
 
         } catch (error) {
             logger.error('Message handling error:', error);
@@ -95,7 +130,7 @@ class MessageHandler extends EventEmitter {
         const command = this.commands.get(cmd);
         if (!command) return;
 
-        // Check cooldown
+        // Enhanced cooldown system
         const cooldownKey = `${context.sender}:${cmd}`;
         const cooldownTime = this.cooldowns.get(cooldownKey);
         if (cooldownTime && Date.now() < cooldownTime) {
@@ -105,21 +140,37 @@ class MessageHandler extends EventEmitter {
         }
 
         try {
-            // Set cooldown
-            this.cooldowns.set(cooldownKey, Date.now() + command.options.cooldown);
-            setTimeout(() => this.cooldowns.delete(cooldownKey), command.options.cooldown);
+            // Set cooldown with progressive increase for spam prevention
+            const currentCooldown = this.cooldowns.get(`${context.sender}:count`) || 0;
+            const cooldownDuration = command.options.cooldown * Math.pow(1.1, currentCooldown);
 
-            // Track active process
-            this.activeProcesses.set(context.message.key.id, {
+            this.cooldowns.set(cooldownKey, Date.now() + cooldownDuration);
+            this.cooldowns.set(`${context.sender}:count`, currentCooldown + 1);
+
+            // Auto-reset cooldown count after 5 minutes
+            setTimeout(() => {
+                this.cooldowns.delete(`${context.sender}:count`);
+            }, 300000);
+
+            // Track command execution
+            const commandId = `${context.message.key.id}_${Date.now()}`;
+            this.activeProcesses.set(commandId, {
                 command: cmd,
-                startTime: Date.now()
+                startTime: Date.now(),
+                context
             });
 
-            // Execute command
-            await command.handler(context, ...args);
+            // Execute command with timeout
+            await Promise.race([
+                command.handler(context, ...args),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Command execution timeout')), 
+                    this.config.maxProcessingTime)
+                )
+            ]);
 
             // Cleanup
-            this.activeProcesses.delete(context.message.key.id);
+            this.activeProcesses.delete(commandId);
 
         } catch (error) {
             logger.error(`Command error (${cmd}):`, error);
@@ -138,7 +189,7 @@ class MessageHandler extends EventEmitter {
             };
 
             await socket.sendMessage(message.messages[0].key.remoteJid, errorMessage);
-            
+
             // Log detailed error for debugging
             logger.error('Detailed error:', {
                 error: error.message,
@@ -168,6 +219,17 @@ class MessageHandler extends EventEmitter {
         }
     }
 
+    async handleMiddlewareError(error, context) {
+        logger.error('Middleware error:', {
+            error: error.message,
+            middleware: error.middleware,
+            context: {
+                sender: context.sender,
+                content: context.content
+            }
+        });
+    }
+
     async sendCooldownMessage(context, remaining) {
         try {
             await context.socket.sendMessage(context.sender, {
@@ -182,8 +244,23 @@ class MessageHandler extends EventEmitter {
         return Array.from(this.activeProcesses.entries()).map(([id, process]) => ({
             id,
             command: process.command,
-            runtime: Date.now() - process.startTime
+            runtime: Date.now() - process.startTime,
+            context: process.context ? {
+                sender: process.context.sender,
+                content: process.context.content,
+                type: process.context.type
+            } : undefined
         }));
+    }
+
+    getCooldowns() {
+        const now = Date.now();
+        return Array.from(this.cooldowns.entries())
+            .filter(([key, time]) => time > now)
+            .map(([key, time]) => ({
+                key,
+                remainingTime: Math.ceil((time - now) / 1000)
+            }));
     }
 }
 
