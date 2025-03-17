@@ -101,6 +101,51 @@
       ],
       "customTitle": "",
       "warnings": 0
+    },
+    "923286432632@s.whatsapp.net": {
+      "name": "User",
+      "age": 0,
+      "xp": 27,
+      "level": 1,
+      "coins": 0,
+      "bio": "",
+      "language": "en",
+      "registeredAt": "2025-03-17T00:42:50.156Z",
+      "lastDaily": null,
+      "inventory": [],
+      "achievements": [],
+      "customTitle": "",
+      "warnings": 0
+    },
+    "923145423218@s.whatsapp.net": {
+      "name": "User",
+      "age": 0,
+      "xp": 13,
+      "level": 1,
+      "coins": 0,
+      "bio": "",
+      "language": "en",
+      "registeredAt": "2025-03-17T00:43:04.864Z",
+      "lastDaily": null,
+      "inventory": [],
+      "achievements": [],
+      "customTitle": "",
+      "warnings": 0
+    },
+    "4917681284781@s.whatsapp.net": {
+      "name": "User",
+      "age": 0,
+      "xp": 15,
+      "level": 1,
+      "coins": 0,
+      "bio": "",
+      "language": "en",
+      "registeredAt": "2025-03-17T01:13:07.389Z",
+      "lastDaily": null,
+      "inventory": [],
+      "achievements": [],
+      "customTitle": "",
+      "warnings": 0
     }
   },
   "games": {},
@@ -114,8 +159,8 @@
   "lottery": [],
   "_meta": {
     "version": 1,
-    "savedAt": "2025-03-17T00:42:06.932Z",
-    "profileCount": 6,
+    "savedAt": "2025-03-17T01:28:04.300Z",
+    "profileCount": 9,
     "invalidProfileCount": 0
   }
 }

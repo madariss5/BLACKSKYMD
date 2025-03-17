@@ -94,7 +94,7 @@ const achievementsList = [
 
 // Level thresholds
 const levelThresholds = [0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600, 4500, 5500, 6600, 7800, 9100, 10500, 12000, 13600, 15300, 17100, 19000];
-const { safeSendText, safeSendMessage, safeSendImage, formatJidForLogging } = require('../utils/jidHelper');
+const { safeSendText, safeSendMessage, safeSendImage, safeSendGroupMessage, formatJidForLogging } = require('../utils/jidHelper');
 
 /**
  * Create temp directories if they don't exist
@@ -560,12 +560,35 @@ const userCommands = {
                     await fs.mkdir(TEMP_DIR, { recursive: true });
                     logger.info(`Attempting to fetch WhatsApp profile picture for ${formatJidForLogging(targetJid)}`);
                     
-                    // Try to get profile picture URL from WhatsApp
-                    const ppUrl = await sock.profilePictureUrl(targetJid, 'image').catch(() => null);
+                    // Try to get profile picture URL from WhatsApp with better error handling for group participants
+                    let ppUrl = null;
+                    
+                    // If this is a group participant, ensure we're using the correct JID format
+                    const normalizedJid = targetJid.endsWith('@g.us') ? 
+                        (message.key.participant || targetJid) : targetJid;
+                    
+                    // Try to fetch the profile picture with proper error handling
+                    try {
+                        ppUrl = await sock.profilePictureUrl(normalizedJid, 'image');
+                    } catch (ppError) {
+                        logger.warn(`Could not fetch profile picture for ${formatJidForLogging(normalizedJid)}: ${ppError.message}`);
+                        // Try with alternative JID format if this is a group participant
+                        if (isGroup && normalizedJid.includes('@g.us')) {
+                            try {
+                                // Extract user ID from participant JID
+                                const participantId = (message.key.participant || '').split('@')[0];
+                                if (participantId) {
+                                    ppUrl = await sock.profilePictureUrl(`${participantId}@s.whatsapp.net`, 'image');
+                                }
+                            } catch (altError) {
+                                logger.warn(`Alternative profile picture fetch failed: ${altError.message}`);
+                            }
+                        }
+                    }
                     
                     if (ppUrl) {
                         // Download profile picture
-                        const profilePicPath = path.join(TEMP_DIR, `profile_${targetJid.split('@')[0]}_${Date.now()}.jpg`);
+                        const profilePicPath = path.join(TEMP_DIR, `profile_${normalizedJid.split('@')[0]}_${Date.now()}.jpg`);
                         
                         // Use axios to download the image
                         const axios = require('axios');
@@ -925,12 +948,25 @@ ${rankText}
         }
     },
 
-    async level(sock, sender) {
+    async level(sock, message) {
         try {
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+            
             // Use our userDatabase and levelingSystem
             const profile = userDatabase.getUserProfile(sender);
             if (!profile) {
-                await safeSendText(sock, sender, '❌ You need to register first! Use .register to create a profile.' );
+                if (isGroup) {
+                    await safeSendGroupMessage(sock, message, {
+                        text: '❌ You need to register first! Use .register to create a profile.'
+                    }, { mentionSender: true });
+                } else {
+                    await safeSendText(sock, sender, '❌ You need to register first! Use .register to create a profile.' );
+                }
                 return;
             }
 
@@ -946,7 +982,12 @@ ${rankText}
 📉 Progress: ${progress.progressBar}
             `.trim();
 
-            await safeSendText(sock, sender, levelText );
+            // Send the level information with proper handling for groups
+            if (isGroup) {
+                await safeSendGroupMessage(sock, message, { text: levelText }, { mentionSender: true });
+            } else {
+                await safeSendText(sock, sender, levelText );
+            }
             
             // Generate and send level card image
             try {
@@ -954,18 +995,32 @@ ${rankText}
                 const cardResult = await levelingSystem.getLevelCardBuffer(sender, profile);
                 if (cardResult && cardResult.buffer) {
                     try {
-                        await safeSendMessage(sock, sender, {
-                            image: cardResult.buffer,
-                            caption: `🏆 Your Level ${progress.currentLevel} Status Card`
-                        });
+                        if (isGroup) {
+                            await safeSendGroupMessage(sock, message, {
+                                image: cardResult.buffer,
+                                caption: `🏆 Your Level ${progress.currentLevel} Status Card`
+                            }, { mentionSender: true });
+                        } else {
+                            await safeSendMessage(sock, sender, {
+                                image: cardResult.buffer,
+                                caption: `🏆 Your Level ${progress.currentLevel} Status Card`
+                            });
+                        }
                     } catch (cardErr) {
                         logger.error(`Error sending level card buffer: ${cardErr.message}`);
                         // If buffer fails, try URL as fallback
                         if (cardResult.path && await fs.access(cardResult.path).then(() => true).catch(() => false)) {
-                            await safeSendMessage(sock, sender, {
-                                image: { url: cardResult.path },
-                                caption: `🏆 Your Level ${progress.currentLevel} Status Card`
-                            });
+                            if (isGroup) {
+                                await safeSendGroupMessage(sock, message, {
+                                    image: { url: cardResult.path },
+                                    caption: `🏆 Your Level ${progress.currentLevel} Status Card`
+                                }, { mentionSender: true });
+                            } else {
+                                await safeSendMessage(sock, sender, {
+                                    image: { url: cardResult.path },
+                                    caption: `🏆 Your Level ${progress.currentLevel} Status Card`
+                                });
+                            }
                         }
                     }
                 }
@@ -974,8 +1029,122 @@ ${rankText}
                 // Continue execution even if card generation fails
             }
         } catch (err) {
-            logger.error(`Error in level command for ${formatJidForLogging(sender)}:`, err);
-            await safeSendText(sock, sender, '❌ Error fetching level information.' );
+            logger.error(`Error in level command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
+            
+            // Ensure we reply to the correct JID (participant in group, or remote JID in private chat)
+            const replyJid = message.key.participant || message.key.remoteJid;
+            
+            await safeSendText(sock, replyJid, '❌ Error fetching level information.' );
+        }
+    },
+    
+    async rank(sock, message) {
+        try {
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+            
+            // Use our userDatabase and levelingSystem
+            const profile = userDatabase.getUserProfile(sender);
+            if (!profile) {
+                if (isGroup) {
+                    await safeSendGroupMessage(sock, message, {
+                        text: '❌ You need to register first! Use .register to create a profile.'
+                    }, { mentionSender: true });
+                } else {
+                    await safeSendText(sock, sender, '❌ You need to register first! Use .register to create a profile.');
+                }
+                return;
+            }
+
+            // Get leaderboard data
+            const leaderboard = levelingSystem.getLeaderboard(100);
+            
+            // Find user's position in leaderboard
+            const userIndex = leaderboard.findIndex(user => user.id === sender);
+            const userRank = userIndex !== -1 ? userIndex + 1 : 'Not ranked';
+            
+            // Get the top 5 users for display
+            const top5 = leaderboard.slice(0, 5);
+            
+            // Create formatted leaderboard text
+            let rankText = `
+*🏆 User Ranking*
+
+Your rank: #${userRank} of ${leaderboard.length} users
+Your level: ${profile.level}
+Your XP: ${profile.xp}
+
+*🔝 Top 5 Users:*
+`;
+
+            // Add top 5 users to the text
+            for (let i = 0; i < top5.length; i++) {
+                const userData = top5[i];
+                const userProfile = userDatabase.getUserProfile(userData.id);
+                if (userProfile) {
+                    // Add medal emoji for top 3
+                    let medal = '';
+                    if (i === 0) medal = '🥇';
+                    else if (i === 1) medal = '🥈';
+                    else if (i === 2) medal = '🥉';
+                    else medal = `${i+1}.`;
+                    
+                    // Format the leaderboard entry
+                    rankText += `${medal} ${userProfile.name}: Level ${userProfile.level} (${userData.xp} XP)\n`;
+                }
+            }
+            
+            // Add user's position if not in top 5
+            if (userIndex >= 5) {
+                const userProfile = userDatabase.getUserProfile(sender);
+                rankText += `...\n#${userRank}. ${userProfile.name}: Level ${userProfile.level} (${profile.xp} XP) 👈 You\n`;
+            }
+            
+            // Send the ranking information with proper handling for groups
+            if (isGroup) {
+                await safeSendGroupMessage(sock, message, { text: rankText.trim() }, { mentionSender: true });
+            } else {
+                await safeSendText(sock, sender, rankText.trim());
+            }
+            
+            // Generate and send rank card image if available
+            try {
+                // Check if the levelingSystem has a rank card generation method
+                if (typeof levelingSystem.generateRankCard === 'function') {
+                    const rankCardPath = await levelingSystem.generateRankCard(sender, userRank, leaderboard.length);
+                    
+                    if (rankCardPath && await fs.access(rankCardPath).then(() => true).catch(() => false)) {
+                        // Read the image as buffer for better reliability
+                        const rankCardBuffer = await fs.readFile(rankCardPath);
+                        
+                        if (isGroup) {
+                            await safeSendGroupMessage(sock, message, {
+                                image: rankCardBuffer,
+                                caption: `🏆 Your Rank: #${userRank} of ${leaderboard.length} users`
+                            }, { mentionSender: true });
+                        } else {
+                            await safeSendMessage(sock, sender, {
+                                image: rankCardBuffer,
+                                caption: `🏆 Your Rank: #${userRank} of ${leaderboard.length} users`
+                            });
+                        }
+                    }
+                }
+            } catch (err) {
+                logger.error(`Error generating rank card for ${formatJidForLogging(sender)}:`, err);
+                // Continue without rank card if there's an error
+            }
+        } catch (err) {
+            logger.error(`Error in rank command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
+            
+            // Ensure we reply to the correct JID (participant in group, or remote JID in private chat)
+            const replyJid = message.key.participant || message.key.remoteJid;
+            
+            await safeSendText(sock, replyJid, '❌ Error fetching rank information.');
         }
     },
 

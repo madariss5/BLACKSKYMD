@@ -23,6 +23,10 @@ args = "Terminal QR Connect"
 task = "workflow.run"
 args = "Advanced Connection Manager"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "High Performance Bot"
+
 [[workflows.workflow]]
 name = "Run Bot"
 author = 40502297
@@ -73,6 +77,20 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd /home/runner/workspace && node connection-manager.js"
+
+[[workflows.workflow]]
+name = "High Performance Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node high-performance-whatsapp.js"
 
 [deployment]
 run = ["sh", "-c", "cd /home/runner/workspace && node src/qr-web-server-fixed.js"]

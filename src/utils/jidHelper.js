@@ -98,13 +98,29 @@ function validateJid(jid) {
     if (typeof jid === 'object' && jid !== null) {
         // Check if it's a message object with key.remoteJid
         if (jid.key && jid.key.remoteJid) {
-            console.log(`[JID-HELPER] Converting message object to JID: ${jid.key.remoteJid}`);
-            jid = jid.key.remoteJid;
+            // If this is a group message, check for participant
+            if (jid.key.remoteJid.endsWith('@g.us') && jid.key.participant) {
+                console.log(`[JID-HELPER] Converting group message to participant JID: ${jid.key.participant}`);
+                jid = jid.key.participant;
+            } else {
+                console.log(`[JID-HELPER] Converting message object to JID: ${jid.key.remoteJid}`);
+                jid = jid.key.remoteJid;
+            }
         } 
+        // Check for participant property in group message
+        else if (jid.key && jid.key.participant) {
+            console.log(`[JID-HELPER] Using participant JID from message: ${jid.key.participant}`);
+            jid = jid.key.participant;
+        }
         // If it has remoteJid property directly
         else if (jid.remoteJid) {
             console.log(`[JID-HELPER] Converting object with remoteJid to JID: ${jid.remoteJid}`);
             jid = jid.remoteJid;
+        }
+        // If it has participant property directly (group context)
+        else if (jid.participant) {
+            console.log(`[JID-HELPER] Converting object with participant to JID: ${jid.participant}`);
+            jid = jid.participant;
         }
         // If it's a participant object
         else if (jid.id) {
@@ -520,6 +536,99 @@ function optimizeJid(jid) {
     return normalizeJid(ensureJidString(jid));
 }
 
+/**
+ * Safely send a message in group context with proper participant handling
+ * This function handles the complexities of determining whether to reply to the 
+ * group or directly to the participant based on context
+ * 
+ * @param {Object} sock - WhatsApp socket connection
+ * @param {Object} message - Original message object (with key.remoteJid and key.participant)
+ * @param {Object} content - Message content to send
+ * @param {Object} options - Additional options
+ * @param {boolean} options.replyPrivately - Whether to reply directly to participant instead of in group
+ * @param {boolean} options.mentionSender - Whether to mention the original sender in group reply
+ * @returns {Promise<Object|null>} - Message sending result or null if failed
+ */
+async function safeSendGroupMessage(sock, message, content, options = {}) {
+    if (!message || !message.key) {
+        console.error('[JID-HELPER] Invalid message object for group message');
+        return null;
+    }
+    
+    // Default options
+    const opts = {
+        replyPrivately: false,
+        mentionSender: false,
+        ...options
+    };
+    
+    try {
+        // Extract group JID and participant JID
+        const groupJid = message.key.remoteJid;
+        const participantJid = message.key.participant;
+        
+        // Validate we're actually in a group context
+        if (!isJidGroup(groupJid)) {
+            console.error('[JID-HELPER] Not a group JID, using standard message sending');
+            return await safeSendMessage(sock, groupJid, content);
+        }
+        
+        // Determine target JID based on options
+        const targetJid = opts.replyPrivately && participantJid ? 
+            participantJid : groupJid;
+        
+        // Clone content to avoid modifying the original
+        let enhancedContent = { ...content };
+        
+        // Add mention if needed for group replies
+        if (!opts.replyPrivately && opts.mentionSender && participantJid) {
+            if (enhancedContent.text) {
+                // If content is text, add @mention
+                const userNumber = participantJid.split('@')[0];
+                
+                // Only add mention if not already present
+                if (!enhancedContent.text.includes(`@${userNumber}`)) {
+                    enhancedContent.text = `@${userNumber} ${enhancedContent.text}`;
+                }
+                
+                // Add mentions array if not present
+                if (!enhancedContent.mentions) {
+                    enhancedContent.mentions = [participantJid];
+                } else if (!enhancedContent.mentions.includes(participantJid)) {
+                    enhancedContent.mentions.push(participantJid);
+                }
+            } else if (enhancedContent.image || enhancedContent.video) {
+                // For media messages, add mention in caption
+                const userNumber = participantJid.split('@')[0];
+                const caption = enhancedContent.caption || '';
+                
+                // Only add mention if not already present
+                if (!caption.includes(`@${userNumber}`)) {
+                    enhancedContent.caption = `@${userNumber} ${caption}`;
+                }
+                
+                // Add mentions array if not present
+                if (!enhancedContent.mentions) {
+                    enhancedContent.mentions = [participantJid];
+                } else if (!enhancedContent.mentions.includes(participantJid)) {
+                    enhancedContent.mentions.push(participantJid);
+                }
+            }
+        }
+        
+        // Special reply handling for quoted messages
+        if (message.key.id && !opts.replyPrivately) {
+            enhancedContent.quoted = message;
+        }
+        
+        // Send message
+        return await safeSendMessage(sock, targetJid, enhancedContent);
+    } catch (err) {
+        console.error('[JID-HELPER] Error sending group message:', err);
+        return null;
+    }
+}
+
 module.exports = {
     // Base JID utilities
     isJidGroup,
@@ -537,6 +646,7 @@ module.exports = {
     safeSendImage,
     safeSendVideo,
     safeSendAnimatedGif,
+    safeSendGroupMessage,
     
     // Statistics and monitoring
     getMessageStats,

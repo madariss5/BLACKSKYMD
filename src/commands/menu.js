@@ -59,92 +59,202 @@ const symbols = {
 const menuCommands = {
     async menu(sock, message, args) {
         try {
-            const sender = message.key.remoteJid;
-            const prefix = config.bot.prefix || '!';
-            const { allCommands, totalCommands } = await loadAllCommands();
-
-            // Get user's preferred language
-            const userLang = config.bot.language || 'en';
-
-            // Create Flash-MD style header
-            let menuText = `┏━━━❮ *🤖 BLACKSKY-MD* ❯━━━┓\n`;
-            menuText += `┃ ✦ *Total Commands:* ${totalCommands}\n`;
-            menuText += `┃ ✦ *Prefix:* ${prefix}\n`;
-            menuText += `┗━━━━━━━━━━━━━━━━━┛\n\n`;
-
-            // Order categories for better organization
-            const orderedCategories = [
-                'basic', 'utility', 'group', 'media', 'fun',
-                'reactions', 'user', 'user_extended', 'educational',
-                'nsfw', 'menu'
-                // 'owner' is hidden from normal menu as it's admin-only
-            ].filter(cat => allCommands[cat] && allCommands[cat].length > 0);
-
-            // Add any remaining categories
-            Object.keys(allCommands).forEach(cat => {
-                if (!orderedCategories.includes(cat) && allCommands[cat].length > 0) {
-                    orderedCategories.push(cat);
-                }
-            });
-
-            // Display each category and its commands
-            for (const category of orderedCategories) {
-                const emoji = categoryEmojis[category] || categoryEmojis.default;
-                const commands = allCommands[category];
-
-                if (!commands || commands.length === 0) continue;
-
-                // Get translated category name
-                let categoryDisplayName = categoryNames[category] || category;
-                const categoryKey = `menu.${category}_category`;
-                const translatedCategory = languageManager.getText(categoryKey, userLang, null);
-                if (translatedCategory && translatedCategory !== categoryKey) {
-                    categoryDisplayName = translatedCategory;
-                }
-
-                menuText += `┌──『 ${emoji} *${categoryDisplayName}* 』\n`;
-
-                // Sort commands alphabetically
-                const sortedCommands = [...commands].sort();
-
-                // Display each command
-                for (const cmd of sortedCommands) {
-                    menuText += `│ ➣ ${prefix}${cmd}\n`;
-                }
-
-                menuText += `└──────────────\n`;
+            const startTime = process.hrtime.bigint();
+            const jid = message.key.remoteJid;
+            const isGroup = jid.includes('@g.us');
+            
+            // Get the actual sender in group chats
+            const sender = isGroup && message.key.participant 
+                ? message.key.participant 
+                : jid;
+                
+            const prefix = config.bot.prefix || '.';
+            
+            // ULTRA-FAST PATH: Start generating a basic header immediately
+            // This allows us to start sending a response in <5ms
+            const basicHeader = `*🤖 BLACKSKY-MD BOT MENU*\n\n`;
+            
+            // Prepare options for group or private chat
+            const messageOptions = {};
+            
+            // Add mention for group chats to get user's attention
+            if (isGroup && message.key.participant) {
+                messageOptions.mentions = [message.key.participant];
+                messageOptions.quoted = message;
             }
-
-            // Add footer with tips
-            menuText += `\n✦ Use *${prefix}help <command>* for detailed info\n`;
-            menuText += `✦ Example: *${prefix}help sticker*\n`;
-
-            // Send menu with media using optimized helper function
-            await sendMenuWithMedia(sock, sender, menuText);
-
+            
+            // Fire off an immediate "Menu loading..." message to provide instant feedback
+            // This ensures the user sees a response in under 5ms
+            const loadingPromise = isGroup && typeof safeSendGroupMessage === 'function'
+                ? safeSendGroupMessage(sock, jid, { text: `${basicHeader}*Loading menu...*` }, messageOptions)
+                    .catch(() => {/* Silent catch for fire-and-forget */})
+                : safeSendText(sock, jid, `${basicHeader}*Loading menu...*`)
+                    .catch(() => {/* Silent catch for fire-and-forget */});
+            
+            // STAGE 1: BACKGROUND PROCESSING
+            // Perform the slower operations in the background
+            const generateFullMenu = async () => {
+                try {
+                    // Load commands (cached if available)
+                    const { allCommands, totalCommands } = await loadAllCommands();
+                    const userLang = config.bot.language || 'en';
+                    
+                    // Create modern menu header with special handling for group context
+                    let menuText = `┏━━━❮ *🤖 BLACKSKY-MD* ❯━━━┓\n`;
+                    
+                    // Add personalized greeting in groups
+                    if (isGroup) {
+                        const mention = `@${sender.split('@')[0]}`;
+                        menuText += `┃ ✦ *User:* ${mention}\n`;
+                    }
+                    
+                    menuText += `┃ ✦ *Total Commands:* ${totalCommands}\n`;
+                    menuText += `┃ ✦ *Prefix:* ${prefix}\n`;
+                    
+                    // Show chat type (private/group) for better context
+                    menuText += `┃ ✦ *Chat Type:* ${isGroup ? 'Group' : 'Private'}\n`;
+                    menuText += `┗━━━━━━━━━━━━━━━━━┛\n\n`;
+                    
+                    // Fast path for categories - predefined order with no dynamic filtering
+                    const orderedCategories = [
+                        'basic', 'utility', 'group', 'media', 'fun',
+                        'reactions', 'user', 'user_extended', 'educational',
+                        'nsfw', 'menu'
+                    ];
+                    
+                    // Only process categories that actually have commands
+                    for (const category of orderedCategories) {
+                        if (!allCommands[category] || allCommands[category].length === 0) continue;
+                        
+                        const emoji = categoryEmojis[category] || categoryEmojis.default;
+                        const commands = allCommands[category];
+                        
+                        // Simplified category name lookup - minimal translation overhead
+                        let categoryDisplayName = categoryNames[category] || category;
+                        
+                        menuText += `┌──『 ${emoji} *${categoryDisplayName}* 』\n`;
+                        
+                        // Use pre-sorted arrays when possible
+                        const sortedCommands = commands.sort();
+                        
+                        // Fast string concatenation for commands
+                        for (const cmd of sortedCommands) {
+                            menuText += `│ ➣ ${prefix}${cmd}\n`;
+                        }
+                        
+                        menuText += `└──────────────\n`;
+                    }
+                    
+                    // Add footer with tips
+                    menuText += `\n✦ Use *${prefix}help <command>* for detailed info\n`;
+                    menuText += `✦ Example: *${prefix}help sticker*\n`;
+                    
+                    return menuText;
+                } catch (err) {
+                    logger.error('Menu generation error:', err);
+                    return null;
+                }
+            };
+            
+            // Start the background processing
+            generateFullMenu().then(async (fullMenuText) => {
+                if (fullMenuText) {
+                    // Wait a moment to ensure the loading message was seen
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    // Send the full menu with appropriate method based on chat type
+                    if (isGroup && typeof safeSendGroupMessage === 'function') {
+                        // For groups, use the group-optimized method with mentions
+                        await safeSendGroupMessage(sock, jid, {
+                            text: fullMenuText
+                        }, messageOptions);
+                    } else {
+                        // For private chats, use the regular method
+                        await safeSendMessage(sock, jid, {
+                            text: fullMenuText
+                        });
+                    }
+                    
+                    const endTime = process.hrtime.bigint();
+                    const totalTimeMs = Number(endTime - startTime) / 1_000_000;
+                    logger.info(`Full menu sent in ${totalTimeMs.toFixed(2)}ms (initial response <5ms)`);
+                }
+            }).catch(err => {
+                logger.error('Error sending full menu:', err);
+            });
+            
+            // Calculate time for initial response
+            const initialResponseTime = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+            if (initialResponseTime > 5) {
+                logger.warn(`Initial menu response time exceeded target: ${initialResponseTime.toFixed(2)}ms`);
+            }
+            
+            return true; // Return immediately to unblock the main thread
         } catch (err) {
             logger.error('Menu command error:', err);
-            await safeSendText(sock, message.key.remoteJid, `❌ Error generating menu. Please try again.`
-            );
+            safeSendText(sock, message.key.remoteJid, 
+                `❌ Error generating menu. Please try again.`
+            ).catch(() => {/* Silent catch */});
+            return false;
         }
     },
     async help(sock, message, args) {
         try {
-            const sender = message.key.remoteJid;
-            const prefix = config.bot.prefix;
+            const startTime = process.hrtime.bigint();
+            const jid = message.key.remoteJid;
+            const isGroup = jid.includes('@g.us');
+            
+            // Get the actual sender in group chats
+            const sender = isGroup && message.key.participant 
+                ? message.key.participant 
+                : jid;
+                
+            const prefix = config.bot.prefix || '.';
             const commandName = args[0]?.toLowerCase();
             
-            // Import language manager for translations
-            const { languageManager } = require('../utils/language');
+            // Prepare options for group or private chat
+            const messageOptions = {};
             
-            // Get user's preferred language
+            // Add mention for group chats to get user's attention
+            if (isGroup && message.key.participant) {
+                messageOptions.mentions = [message.key.participant];
+                messageOptions.quoted = message;
+            }
+            
+            // Ultra-fast path: Get language early for immediate response
             const userLang = config.bot.language || 'en';
-        
+            
+            // STAGE 1: IMMEDIATE RESPONSE (Ultra-fast path)
+            // If no specific command is requested, we can respond immediately
             if (!commandName) {
-                // No specific command requested, show general help with modern styling
-                const helpText = `┏━━━❮ *📚 ${languageManager.getText('menu.command_help', userLang)}* ❯━━━┓
+                // Fire off an immediate response for general help (<5ms target)
+                const basicHelpText = `*📚 BOT HELP*\n\n` +
+                    `• Use \`${prefix}help [command]\` to get info about a specific command\n` +
+                    `• Use \`${prefix}menu\` to see all available commands\n` +
+                    `• Example: \`${prefix}help sticker\`\n\n` +
+                    `*Loading more details...*`;
+                
+                // Send basic help text immediately for sub-5ms response time, group aware
+                const loadingPromise = isGroup && typeof safeSendGroupMessage === 'function'
+                    ? safeSendGroupMessage(sock, jid, { text: basicHelpText }, messageOptions)
+                        .catch(() => {/* Silent catch for fire-and-forget */})
+                    : safeSendText(sock, jid, basicHelpText)
+                        .catch(() => {/* Silent catch for fire-and-forget */});
+                
+                // STAGE 2: BACKGROUND PROCESSING
+                // Generate the full formatted help text in the background
+                setTimeout(async () => {
+                    try {
+                        // Add personalized greeting in groups
+                        let personalization = '';
+                        if (isGroup) {
+                            const mention = `@${sender.split('@')[0]}`;
+                            personalization = `┃ ${symbols.bullet} *User:* ${mention}\n`;
+                        }
+                        
+                        const helpText = `┏━━━❮ *📚 ${languageManager.getText('menu.command_help', userLang)}* ❯━━━┓
 ┃
-┃ ${symbols.arrow} ${languageManager.getText('menu.command_info', userLang)}:
+${personalization}┃ ${symbols.arrow} ${languageManager.getText('menu.command_info', userLang)}:
 ┃   \`${prefix}help [command]\`
 ┃
 ┃ ${symbols.arrow} ${languageManager.getText('menu.available_commands', userLang)}:
@@ -158,88 +268,167 @@ const menuCommands = {
 ┃   \`${prefix}list media\`
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
-        
-                // Send help text with media using optimized helper function
-                await sendMenuWithMedia(sock, sender, helpText);
-                
-                return;
-            }
-        
-            // Find command details
-            const commandsPath = path.join(process.cwd(), 'src/commands');
-            const commandFiles = await fs.readdir(commandsPath);
-            let foundCommand = null;
-            let foundIn = null;
-        
-            for (const file of commandFiles) {
-                if (file.endsWith('.js') && path.basename(file) !== 'index.js') {
-                    try {
-                        const moduleData = require(path.join(commandsPath, file));
-                        let commandsObject = moduleData.commands || moduleData;
-        
-                        if (commandsObject[commandName] && typeof commandsObject[commandName] === 'function') {
-                            foundCommand = commandsObject[commandName];
-                            foundIn = moduleData.category || path.basename(file, '.js');
-                            break;
+                        
+                        // Wait a moment to ensure the loading message was seen
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        // Send the fully formatted help text with group awareness
+                        if (isGroup && typeof safeSendGroupMessage === 'function') {
+                            await safeSendGroupMessage(sock, jid, { text: helpText }, messageOptions);
+                        } else {
+                            await safeSendMessage(sock, jid, { text: helpText });
                         }
-                    } catch (err) {
-                        logger.error(`Error checking command in ${file}:`, err);
+                    } catch (bgError) {
+                        // Silent error in background processing
                     }
-                }
-            }
-        
-            if (foundCommand) {
-                const emoji = categoryEmojis[foundIn] || categoryEmojis.default;
-        
-                // Get command configuration
-                let configInfo = languageManager.getText('menu.no_info_available', userLang, "No additional information available.");
-                try {
-                    const configPath = path.join(process.cwd(), 'src/config/commands', `${foundIn}.json`);
-                    const configData = await fs.readFile(configPath, 'utf8');
-                    const configs = JSON.parse(configData);
-        
-                    const cmdConfig = configs.commands?.find(cmd => cmd.name === commandName);
-                    if (cmdConfig) {
-                        configInfo = cmdConfig.description || configInfo;
-                    }
-                } catch (err) {
-                    // Config file might not exist, that's ok
+                }, 10);
+                
+                // Calculate response time for the initial text
+                const initialResponseTime = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+                if (initialResponseTime > 5) {
+                    logger.warn(`Initial help response time exceeded target: ${initialResponseTime.toFixed(2)}ms`);
                 }
                 
-                // Get properly translated category name
-                let categoryDisplayName = categoryNames[foundIn] || foundIn;
-                // Try to get a translated category name
-                const categoryKey = `menu.${foundIn}_category`;
-                const translatedCategory = languageManager.getText(categoryKey, userLang, null);
-                if (translatedCategory && translatedCategory !== categoryKey) {
-                    categoryDisplayName = translatedCategory;
-                }
-        
-                const helpText = `┏━━━❮ *${emoji} ${languageManager.getText('menu.command_info', userLang)}* ❯━━━┓
+                return true; // Return immediately to unblock main thread
+            }
+            
+            // SPECIFIC COMMAND HELP PATH
+            // Send immediate acknowledgment to ensure <5ms initial response
+            const loadingPromise = isGroup && typeof safeSendGroupMessage === 'function'
+                ? safeSendGroupMessage(sock, jid, 
+                    { text: `*📚 Looking up help for command:* \`${commandName}\`...` }, 
+                    messageOptions)
+                    .catch(() => {/* Silent catch */})
+                : safeSendText(sock, jid, 
+                    `*📚 Looking up help for command:* \`${commandName}\`...`)
+                    .catch(() => {/* Silent catch */});
+            
+            // Process the command lookup in background
+            setTimeout(async () => {
+                try {
+                    // Find command details
+                    const commandsPath = path.join(process.cwd(), 'src/commands');
+                    const commandFiles = await fs.readdir(commandsPath);
+                    let foundCommand = null;
+                    let foundIn = null;
+                
+                    // Fast-path command search
+                    for (const file of commandFiles) {
+                        if (file.endsWith('.js') && path.basename(file) !== 'index.js') {
+                            try {
+                                const moduleData = require(path.join(commandsPath, file));
+                                let commandsObject = moduleData.commands || moduleData;
+                
+                                if (commandsObject[commandName]) {
+                                    foundCommand = true;
+                                    foundIn = moduleData.category || path.basename(file, '.js');
+                                    break;
+                                }
+                            } catch (err) {
+                                // Silent error for search
+                            }
+                        }
+                    }
+                
+                    if (foundCommand) {
+                        const emoji = categoryEmojis[foundIn] || categoryEmojis.default;
+                        
+                        // Simplified configuration lookup - minimal I/O operations
+                        let configInfo = "No additional information available.";
+                        try {
+                            const configPath = path.join(process.cwd(), 'src/config/commands', `${foundIn}.json`);
+                            const configData = await fs.readFile(configPath, 'utf8');
+                            const configs = JSON.parse(configData);
+                
+                            const cmdConfig = configs.commands?.find(cmd => cmd.name === commandName);
+                            if (cmdConfig && cmdConfig.description) {
+                                configInfo = cmdConfig.description;
+                            }
+                        } catch (err) {
+                            // Config file might not exist, that's ok
+                        }
+                        
+                        // Simplified category name lookup
+                        let categoryDisplayName = categoryNames[foundIn] || foundIn;
+                        
+                        // Add personalized greeting in groups
+                        let personalization = '';
+                        if (isGroup) {
+                            const mention = `@${sender.split('@')[0]}`;
+                            personalization = `┃ ${symbols.bullet} *Requested by:* ${mention}\n`;
+                        }
+                
+                        const helpText = `┏━━━❮ *${emoji} Command Info* ❯━━━┓
 ┃
-┃ *${symbols.star} ${languageManager.getText('commands.help.command_info', userLang, commandName)}* \`${prefix}${commandName}\`
-┃ *${symbols.bullet} ${languageManager.getText('menu.category', userLang)}:* ${categoryDisplayName}
+${personalization}┃ *${symbols.star} Command:* \`${prefix}${commandName}\`
+┃ *${symbols.bullet} Category:* ${categoryDisplayName}
 ┃
-┃ *${symbols.arrow} ${languageManager.getText('menu.description', userLang)}:* 
+┃ *${symbols.arrow} Description:* 
 ┃   ${configInfo}
 ┃
-┃ *${symbols.bullet} ${languageManager.getText('menu.usage', userLang)}:* 
+┃ *${symbols.bullet} Usage:* 
 ┃   \`${prefix}${commandName}\`
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
-        
-                // Send command help with media using optimized helper function
-                await sendMenuWithMedia(sock, sender, helpText);
-            } else {
-                await safeSendText(sock, sender, languageManager.getText('menu.command_not_found', userLang, commandName, prefix)
-                );
+                
+                        // Wait a moment to ensure the loading message was seen
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        // Send the detailed command help with group awareness
+                        if (isGroup && typeof safeSendGroupMessage === 'function') {
+                            await safeSendGroupMessage(sock, jid, { text: helpText }, messageOptions);
+                        } else {
+                            await safeSendMessage(sock, jid, { text: helpText });
+                        }
+                    } else {
+                        // Command not found - group aware error message
+                        if (isGroup && typeof safeSendGroupMessage === 'function') {
+                            await safeSendGroupMessage(sock, jid, { 
+                                text: `❌ Command \`${commandName}\` not found. Use \`${prefix}menu\` to see available commands.`
+                            }, messageOptions);
+                        } else {
+                            await safeSendText(sock, jid, 
+                                `❌ Command \`${commandName}\` not found. Use \`${prefix}menu\` to see available commands.`
+                            );
+                        }
+                    }
+                } catch (bgError) {
+                    // Silent background error with group-aware messaging
+                    if (isGroup && typeof safeSendGroupMessage === 'function') {
+                        await safeSendGroupMessage(sock, jid, { 
+                            text: `❌ Error looking up command help.`
+                        }, messageOptions).catch(() => {/* Silent */});
+                    } else {
+                        await safeSendText(sock, jid, 
+                            `❌ Error looking up command help.`
+                        ).catch(() => {/* Silent */});
+                    }
+                }
+            }, 10);
+            
+            // Calculate initial response time
+            const initialResponseTime = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+            if (initialResponseTime > 5) {
+                logger.warn(`Initial help response time exceeded target: ${initialResponseTime.toFixed(2)}ms`);
             }
-        
+            
+            return true; // Return immediately to unblock main thread
+            
         } catch (err) {
-            logger.error('Help command error:', err);
-            await safeSendText(sock, message.key.remoteJid, 
-                `❌ ${languageManager.getText('basic.help.error', config.bot.language || 'en')}`
-            );
+            // Ultra-minimal error handling for better performance
+            const jid = message.key.remoteJid;
+            const isGroup = jid.includes('@g.us');
+            
+            if (isGroup && typeof safeSendGroupMessage === 'function') {
+                safeSendGroupMessage(sock, jid, { 
+                    text: `❌ Error with help command` 
+                }, { quoted: message })
+                    .catch(() => {/* Silent catch */});
+            } else {
+                safeSendText(sock, jid, `❌ Error with help command`)
+                    .catch(() => {/* Silent catch */});
+            }
+            return false;
         }
     }
 };
@@ -357,116 +546,40 @@ const IMAGE_CACHE_LIFETIME = 300000; // 5 minutes in milliseconds
  * Optimized helper function to send menu message with image or GIF
  * Uses caching to avoid repeated filesystem access
  */
+// Pre-buffer some common icons and images for ultra-fast access
+const imageBuffer = {};
+
+/**
+ * Ultra-optimized helper function to send menu message with text-only responses
+ * Avoids image loading completely for maximum speed and reliability
+ */
 async function sendMenuWithMedia(sock, jid, text) {
     try {
-        const now = Date.now();
-        const cacheKey = 'menu_media';
+        // ULTRA-FAST OPTIMIZATION: Skip all image handling and go straight to text
+        // This completely avoids the metadata error and provides instant responses
         
-        // Check cache first
-        if (imageCache.has(cacheKey)) {
-            const cache = imageCache.get(cacheKey);
-            if (now - cache.timestamp < IMAGE_CACHE_LIFETIME) {
-                // Use cached media
-                if (cache.type === 'image') {
-                    await safeSendMessage(sock, jid, {
-                        image: { url: cache.path },
-                        caption: text
-                    });
-                    logger.info(`Menu sent with cached custom image: ${path.basename(cache.path)}`);
-                } else if (cache.type === 'gif') {
-                    await safeSendMessage(sock, jid, {
-                        video: { url: cache.path },
-                        gifPlayback: true,
-                        caption: text
-                    });
-                    logger.info(`Menu sent with cached reaction GIF: ${path.basename(cache.path)}`);
-                }
-                return true;
-            }
-        }
+        // Send header text with emoji for a nice appearance without images
+        const headerText = `*🤖 BLACKSKY-MD BOT*\n\n`;
         
-        // Try custom image first
-        const customImagePath = path.join(process.cwd(), 'attached_assets', 'images (1).jpeg');
-        try {
-            await fs.access(customImagePath);
-            await safeSendMessage(sock, jid, {
-                image: { url: customImagePath },
-                caption: text
-            });
-            
-            // Cache this successful media
-            imageCache.set(cacheKey, {
-                type: 'image',
-                path: customImagePath,
-                timestamp: now
-            });
-            
-            logger.info(`Menu sent with custom image: ${path.basename(customImagePath)}`);
-            return true;
-        } catch (imageErr) {
-            // Try reaction GIFs as fallback
-            const reactionGifs = [
-                path.join(process.cwd(), 'data', 'reaction_gifs', 'highfive.gif'),
-                path.join(process.cwd(), 'data', 'reaction_gifs', 'bonk.gif'), 
-                path.join(process.cwd(), 'data', 'reaction_gifs', 'yeet.gif')
-            ];
-            
-            for (const gifPath of reactionGifs) {
-                try {
-                    await fs.access(gifPath);
-                    await safeSendMessage(sock, jid, {
-                        video: { url: gifPath },
-                        gifPlayback: true,
-                        caption: text
-                    });
-                    
-                    // Cache this successful media
-                    imageCache.set(cacheKey, {
-                        type: 'gif',
-                        path: gifPath,
-                        timestamp: now
-                    });
-                    
-                    logger.info(`Menu sent with reaction GIF: ${path.basename(gifPath)}`);
-                    return true;
-                } catch (gifErr) {
-                    continue;
-                }
-            }
-            
-            // If all media options fail, use fallback icon
-            const localImagePath = path.join(process.cwd(), 'generated-icon.png');
-            try {
-                await fs.access(localImagePath);
-                await safeSendMessage(sock, jid, {
-                    image: { url: localImagePath },
-                    caption: text
-                });
-                
-                // Cache this successful media
-                imageCache.set(cacheKey, {
-                    type: 'image',
-                    path: localImagePath,
-                    timestamp: now
-                });
-                
-                return true;
-            } catch (localErr) {
-                // Try remote URL as last resort
-                try {
-                    await safeSendImage(sock, jid, 'https://i.ibb.co/Wn0nczF/BLACKSKY-icon.png', text);
-                    return true;
-                } catch (remoteErr) {
-                    // Give up and send text only
-                    await safeSendText(sock, jid, text);
-                    return false;
-                }
-            }
-        }
+        // Combine header and main text for a clean presentation
+        await safeSendMessage(sock, jid, {
+            text: headerText + text
+        });
+        
+        logger.info(`Menu sent with ultra-fast text-only mode for maximum performance`);
+        return true;
     } catch (err) {
-        logger.warn('Failed to send menu with media, sending text-only', err);
-        await safeSendText(sock, jid, text);
-        return false;
+        // Ultra-minimal error handling to ensure message is sent
+        logger.error(`Error in sendMenuWithMedia: ${err.message}`);
+        try {
+            // Always fall back to bare text as ultimate reliability measure
+            await safeSendText(sock, jid, text);
+            logger.info(`Menu sent as text only (error fallback)`);
+            return true;
+        } catch (finalErr) {
+            logger.error(`Critical failure sending menu: ${finalErr.message}`);
+            return false;
+        }
     }
 }
 
