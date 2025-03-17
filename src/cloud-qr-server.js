@@ -12,15 +12,15 @@ const fs = require('fs');
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 
-// Initialize Express app
-const app = express();
-const server = http.createServer(app);
-
 // Configuration with enhanced environment variable support
 const PORT = process.env.PORT || 5000;
 const HOST = '0.0.0.0'; // Required for Heroku
 const AUTH_FOLDER = process.env.AUTH_FOLDER || path.join(__dirname, '../auth_info_baileys');
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// Initialize Express app
+const app = express();
+const server = http.createServer(app);
 
 // View settings
 app.set('view engine', 'ejs');
@@ -42,8 +42,11 @@ const logger = pino({
     }
 });
 
-// WebSocket server
-const wss = new WebSocket.Server({ server });
+// WebSocket server with proper configuration for Heroku
+const wss = new WebSocket.Server({ 
+    server,
+    clientTracking: true
+});
 
 // Create required directories
 [AUTH_FOLDER, path.join(__dirname, '../views'), path.join(__dirname, '../public')].forEach(dir => {
@@ -63,7 +66,12 @@ let connectionState = {
     maxReconnectAttempts: IS_PRODUCTION ? 20 : 10
 };
 
-// Routes
+// Basic health check route for Heroku
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
+// Main QR route
 app.get('/', (req, res) => {
     res.render('qr');
 });
@@ -103,7 +111,7 @@ async function startConnection() {
     }
 }
 
-// Start the server
+// Start server with proper error handling
 async function startServer() {
     try {
         server.listen(PORT, HOST, () => {
@@ -281,11 +289,11 @@ module.exports = {
 
                 return {
                     text: \`*BLACKSKY-MD Bot Commands*
-
+                    
                     • {prefix}ping - Check if bot is online
                     • {prefix}help - Show this help message
                     • {prefix}info - Show bot information
-
+                    
                     _Type {prefix}help [command] for specific command help_\`
                 };
             }
@@ -298,11 +306,11 @@ module.exports = {
             handler: async (sock, msg, args) => {
                 return {
                     text: \`*BLACKSKY-MD WhatsApp Bot*
-
+                    
                     Version: 1.0.0
                     Running on: Cloud Server
                     Made with: @whiskeysockets/baileys
-
+                    
                     _Type {prefix}help for available commands_\`
                 };
             }
