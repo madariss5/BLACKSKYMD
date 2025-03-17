@@ -5,7 +5,6 @@
 
 const express = require('express');
 const http = require('http');
-const https = require('https');
 const WebSocket = require('ws');
 const qrcode = require('qrcode');
 const path = require('path');
@@ -15,12 +14,7 @@ const pino = require('pino');
 
 // Initialize Express app
 const app = express();
-const server = process.env.NODE_ENV === 'production' ? 
-    https.createServer({
-        // Heroku handles SSL termination
-        allowHTTP1: true
-    }, app) : 
-    http.createServer(app);
+const server = http.createServer(app);
 
 // WebSocket server with proper configuration for Heroku
 const wss = new WebSocket.Server({ 
@@ -45,26 +39,15 @@ const wss = new WebSocket.Server({
 
 // Enhanced logging for Heroku environment
 const logger = pino({
-    level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+    level: process.env.LOG_LEVEL || 'info',
     transport: {
         target: 'pino-pretty',
         options: {
             colorize: true,
             translateTime: true,
             ignore: 'pid,hostname',
-            messageFormat: process.env.NODE_ENV === 'production' ? 
-                '[{time}] {msg} {context}' : 
-                '[{time}] {level} {msg} {context}'
+            messageFormat: '[{time}] {level} {msg}'
         }
-    },
-    mixin() {
-        return {
-            context: {
-                env: process.env.NODE_ENV,
-                dyno: process.env.DYNO,
-                region: process.env.REGION
-            }
-        };
     }
 });
 
@@ -319,15 +302,12 @@ async function startConnection() {
  */
 async function startServer() {
     try {
-        // Enhanced server startup for Heroku
         server.listen(PORT, HOST, () => {
-            logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-            if (IS_PRODUCTION && HEROKU_APP_NAME) {
-                logger.info(`App should be accessible at https://${HEROKU_APP_NAME}.herokuapp.com`);
-            }
+            logger.info(`Server running on port ${PORT}`);
+            logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
         });
 
-        // Enhanced error handling for Heroku
+        // Enhanced error handling
         server.on('error', (error) => {
             logger.error('Server error:', error);
             if (error.code === 'EADDRINUSE') {
@@ -339,31 +319,7 @@ async function startServer() {
         // Start WhatsApp connection
         await startConnection();
 
-        // Enhanced error handling for production
-        process.on('uncaughtException', (err) => {
-            logger.error('Uncaught exception:', err);
-            if (IS_PRODUCTION) {
-                // In production, attempt recovery instead of exiting
-                setTimeout(() => {
-                    logger.info('Attempting recovery from uncaught exception...');
-                    startConnection().catch(logger.error);
-                }, 5000);
-            } else {
-                process.exit(1);
-            }
-        });
-
-        process.on('unhandledRejection', (reason, promise) => {
-            logger.error('Unhandled rejection at:', promise, 'reason:', reason);
-            if (IS_PRODUCTION) {
-                // In production, log and continue
-                logger.warn('Continuing despite unhandled rejection in production');
-            } else {
-                process.exit(1);
-            }
-        });
-
-        // Heroku-specific shutdown handling
+        // Graceful shutdown handling
         process.on('SIGTERM', () => {
             logger.info('Received SIGTERM signal, initiating graceful shutdown');
             server.close(() => {
@@ -380,7 +336,7 @@ async function startServer() {
 
 // Helper functions
 function handleWebSocketConnection(ws, req) {
-    const isSecure = IS_PRODUCTION || req.headers['x-forwarded-proto'] === 'https';
+    const isSecure = req.headers['x-forwarded-proto'] === 'https';
     const protocol = isSecure ? 'wss' : 'ws';
     const host = req.headers.host;
 

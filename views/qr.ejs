@@ -68,15 +68,15 @@
 <body>
     <div class="container">
         <h1>BLACKSKY-MD WhatsApp</h1>
-        
+
         <div id="statusContainer">
             <div class="status waiting" id="status">Waiting for QR Code...</div>
         </div>
-        
+
         <div id="qrcontainer">
             <div id="qrcode"></div>
         </div>
-        
+
         <div class="instructions">
             <h3>How to connect:</h3>
             <ol>
@@ -86,7 +86,7 @@
                 <li>Point your phone to this screen to scan the QR code</li>
             </ol>
         </div>
-        
+
         <div class="info">
             <p>This connection is secure and uses WhatsApp's official multi-device API.</p>
             <p>The QR code refreshes automatically when needed. Keep this page open.</p>
@@ -95,35 +95,60 @@
     </div>
 
     <script>
-        const socket = new WebSocket('ws://' + window.location.host);
-        const qrElement = document.getElementById('qrcode');
-        const statusElement = document.getElementById('status');
-        
-        socket.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            
-            if (data.type === 'qr') {
-                qrElement.innerHTML = data.qr;
-                statusElement.className = 'status waiting';
-                statusElement.innerText = 'Scan this QR code with WhatsApp';
-            } else if (data.type === 'connection') {
-                if (data.connected) {
-                    qrElement.innerHTML = '<img src="/success.svg" width="200" height="200" />';
-                    statusElement.className = 'status connected';
-                    statusElement.innerText = 'Connected Successfully!';
-                } else {
-                    statusElement.className = 'status disconnected';
-                    statusElement.innerText = 'Disconnected: ' + (data.reason || 'Unknown reason');
+        function connectWebSocket() {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}`;
+
+            const socket = new WebSocket(wsUrl);
+            const qrElement = document.getElementById('qrcode');
+            const statusElement = document.getElementById('status');
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'qr') {
+                    qrElement.innerHTML = data.qr;
+                    statusElement.className = 'status waiting';
+                    statusElement.innerText = 'Scan this QR code with WhatsApp';
+                } else if (data.type === 'connection') {
+                    if (data.connected) {
+                        qrElement.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="#4CAF50" /><path d="M83.5 136.5l-42-42 12-12 30 30 63-63 12 12z" fill="white" /></svg>';
+                        statusElement.className = 'status connected';
+                        statusElement.innerText = 'Connected Successfully!';
+                    } else {
+                        statusElement.className = 'status disconnected';
+                        statusElement.innerText = 'Disconnected: ' + (data.reason || 'Unknown reason');
+                        // Try to reconnect after a short delay
+                        setTimeout(connectWebSocket, 5000);
+                    }
+                } else if (data.type === 'status') {
+                    statusElement.innerText = data.message;
                 }
-            } else if (data.type === 'status') {
-                statusElement.innerText = data.message;
+            };
+
+            socket.onclose = function() {
+                statusElement.className = 'status disconnected';
+                statusElement.innerText = 'Server connection lost. Reconnecting...';
+                // Try to reconnect after a short delay
+                setTimeout(connectWebSocket, 5000);
+            };
+
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                statusElement.className = 'status disconnected';
+                statusElement.innerText = 'Connection error. Retrying...';
+            };
+        }
+
+        // Start WebSocket connection
+        connectWebSocket();
+
+        // Reconnect when the page becomes visible again
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                connectWebSocket();
             }
-        };
-        
-        socket.onclose = function() {
-            statusElement.className = 'status disconnected';
-            statusElement.innerText = 'Server connection lost. Please refresh the page.';
-        };
+        });
     </script>
 </body>
 </html>
