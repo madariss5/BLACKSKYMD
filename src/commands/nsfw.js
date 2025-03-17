@@ -276,13 +276,54 @@ async function fetchAndSendNsfwImage(sock, jid, category, caption, requireGif = 
         await safeSendText(sock, jid, 'Fetching image...');
 
         // Try optimized fetchNsfwImage utility first with parallel operation
-        const imageUrl = await nsfwUtils.fetchNsfwImage(category, requireGif);
+        const result = await nsfwUtils.fetchNsfwImage(category, requireGif);
+        
+        // Handle buffer result from local files
+        if (result && result.buffer && result.isLocalFile) {
+            logger.info(`Using local file buffer for ${category} (${result.buffer.length} bytes)`);
+            
+            try {
+                if (requireGif || category.startsWith('gif')) {
+                    // Convert GIF to MP4 for better animation if it's a GIF
+                    const { convertGifToMp4 } = require('../utils/gifConverter');
+                    const videoBuffer = await convertGifToMp4(result.buffer);
+                    
+                    if (videoBuffer) {
+                        // Send as video with gifPlayback for proper animation
+                        await safeSendMessage(sock, jid, {
+                            video: videoBuffer,
+                            caption: caption || `${category.toUpperCase()} 🔞`,
+                            gifPlayback: true,
+                            mimetype: 'video/mp4'
+                        });
+                    } else {
+                        // Fallback to standard animated GIF
+                        await safeSendAnimatedGif(sock, jid, result.buffer, caption || `${category.toUpperCase()} 🔞`);
+                    }
+                } else {
+                    // For static images, use standard image sending
+                    await safeSendImage(sock, jid, result.buffer, caption || `${category.toUpperCase()} 🔞`);
+                }
+                
+                logger.info(`NSFW ${category} sent using local file buffer to ${formatJidForLogging(jid)}`);
+                return true;
+            } catch (bufferError) {
+                logger.error(`Error sending local file buffer: ${bufferError.message}`);
+                // Continue with URL fallbacks
+            }
+        }
+        
+        // Process URL result (backwards compatibility)
+        // Check if result is a string URL (old format) or contains a URL property
+        const imageUrl = typeof result === 'string' ? result : 
+                        (result && result.url) ? result.url : null;
         
         if (imageUrl) {
             // Fast path for known optimized domains
-            const isOptimizedDomain = imageUrl.includes('tenor.com') || 
-                                     imageUrl.includes('imgur.com') || 
-                                     imageUrl.includes('giphy.com');
+            const isOptimizedDomain = typeof imageUrl === 'string' && (
+                imageUrl.includes('tenor.com') || 
+                imageUrl.includes('imgur.com') || 
+                imageUrl.includes('giphy.com'));
             
             // For GIFs from optimized domains, send directly without buffer conversion
             if (isOptimizedDomain && (requireGif || category.includes('gif'))) {
@@ -805,24 +846,32 @@ NSFW Statistics:
 
             try {
                 // Try to use the optimized fetchNsfwImage utility first
-                const imageUrl = await nsfwUtils.fetchNsfwImage('hentai', false);
+                const result = await nsfwUtils.fetchNsfwImage('hentai', false);
                 
-                if (imageUrl) {
-                    // Download the image to a buffer instead of sending URL directly
-                    logger.info(`Downloading image from ${imageUrl}`);
-                    const axios = require('axios');
-                    const response = await axios.get(imageUrl, { 
-                        responseType: 'arraybuffer',
-                        timeout: 5000
-                    });
-                    
-                    const buffer = Buffer.from(response.data);
-                    
-                    // Send the image as a buffer instead of URL to prevent "cannot use 'in' operator" error
-                    await safeSendImage(sock, sender, buffer, '🔞 Hentai');
-                    
-                    logger.info(`NSFW hentai image sent to ${formatJidForLogging(sender)}`);
-                    return;
+                if (result) {
+                    // Check if we got a buffer object (new format) or URL (old format)
+                    if (result.buffer && Buffer.isBuffer(result.buffer)) {
+                        logger.info(`Using buffer directly from fetchNsfwImage (${result.isLocalFile ? 'local file' : 'remote source'})`);
+                        // Use the buffer directly
+                        await safeSendImage(sock, sender, result.buffer, '🔞 Hentai');
+                        
+                        logger.info(`NSFW hentai image sent to ${formatJidForLogging(sender)}`);
+                        return;
+                    } else if (typeof result === 'string') {
+                        // Legacy URL support
+                        logger.info(`Downloading image from URL: ${result}`);
+                        const axios = require('axios');
+                        const response = await axios.get(result, { 
+                            responseType: 'arraybuffer',
+                            timeout: 5000
+                        });
+                        
+                        const buffer = Buffer.from(response.data);
+                        await safeSendImage(sock, sender, buffer, '🔞 Hentai');
+                        
+                        logger.info(`NSFW hentai image sent to ${formatJidForLogging(sender)}`);
+                        return;
+                    }
                 }
             } catch (fetchErr) {
                 logger.warn(`Error fetching from optimized utility: ${fetchErr.message}, falling back to direct method`);
@@ -919,24 +968,32 @@ NSFW Statistics:
 
             try {
                 // Try to use the optimized fetchNsfwImage utility first
-                const imageUrl = await nsfwUtils.fetchNsfwImage('ass', false);
+                const result = await nsfwUtils.fetchNsfwImage('ass', false);
                 
-                if (imageUrl) {
-                    // Download the image to a buffer instead of sending URL directly
-                    logger.info(`Downloading image from ${imageUrl}`);
-                    const axios = require('axios');
-                    const response = await axios.get(imageUrl, { 
-                        responseType: 'arraybuffer',
-                        timeout: 5000
-                    });
-                    
-                    const buffer = Buffer.from(response.data);
-                    
-                    // Send the image as a buffer instead of URL to prevent "cannot use 'in' operator" error
-                    await safeSendImage(sock, sender, buffer, '🔞 Ass');
-                    
-                    logger.info(`NSFW ass image sent to ${formatJidForLogging(sender)}`);
-                    return;
+                if (result) {
+                    // Check if we got a buffer object (new format) or URL (old format)
+                    if (result.buffer && Buffer.isBuffer(result.buffer)) {
+                        logger.info(`Using buffer directly from fetchNsfwImage (${result.isLocalFile ? 'local file' : 'remote source'})`);
+                        // Use the buffer directly
+                        await safeSendImage(sock, sender, result.buffer, '🔞 Ass');
+                        
+                        logger.info(`NSFW ass image sent to ${formatJidForLogging(sender)}`);
+                        return;
+                    } else if (typeof result === 'string') {
+                        // Legacy URL support
+                        logger.info(`Downloading image from URL: ${result}`);
+                        const axios = require('axios');
+                        const response = await axios.get(result, { 
+                            responseType: 'arraybuffer',
+                            timeout: 5000
+                        });
+                        
+                        const buffer = Buffer.from(response.data);
+                        await safeSendImage(sock, sender, buffer, '🔞 Ass');
+                        
+                        logger.info(`NSFW ass image sent to ${formatJidForLogging(sender)}`);
+                        return;
+                    }
                 }
             } catch (fetchErr) {
                 logger.warn(`Error fetching from optimized utility: ${fetchErr.message}, falling back to direct method`);

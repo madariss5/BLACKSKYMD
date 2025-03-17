@@ -1,6 +1,8 @@
 /**
- * Utility functions for checking user permissions in groups
+ * Utility functions for checking user permissions in groups and bot ownership
  */
+
+const { owner: ownerConfig } = require('../config/config');
 
 /**
  * Check if a user is an admin in a group
@@ -34,15 +36,12 @@ async function isAdmin(sock, groupId, userId) {
             }
         }
         
-        // For groups where bot is not admin but we want it to work anyway
-        // This makes the bot more user-friendly in casual groups
-        // Comment or remove this line if strict admin enforcement is required
-        return true;
+        return false; // Strict admin check - return false if not an admin
         
     } catch (err) {
         console.error('Error checking admin status:', err);
-        // Fail open to prevent blocking functionality in case of errors
-        return true;
+        // Fail closed for security
+        return false;
     }
 }
 
@@ -58,8 +57,8 @@ async function isBotAdmin(sock, groupId) {
         const botId = sock.user?.id;
         
         if (!botId) {
-            console.warn('Bot ID not available, assuming admin status');
-            return true;
+            console.warn('Bot ID not available, assuming not admin');
+            return false;
         }
         
         // Normalize the bot ID
@@ -78,14 +77,13 @@ async function isBotAdmin(sock, groupId) {
             }
         }
         
-        // For testing in groups where the bot isn't admin
-        // This makes development easier - remove in production if strict enforcement is needed
-        return true;
+        // Return false if bot is not in admin list
+        return false;
         
     } catch (err) {
         console.error('Error checking bot admin status:', err);
-        // Fail open to prevent blocking functionality during testing
-        return true;
+        // For critical group admin commands, it's safer to fail closed
+        return false;
     }
 }
 
@@ -121,19 +119,53 @@ async function isOwner(sock, groupId, userId) {
             return true;
         }
         
-        // For testing or development environments
-        // Comment this out for production if strict owner checks are needed
-        return true;
+        return false; // Strict owner check - return false if not the group owner
         
     } catch (err) {
         console.error('Error checking owner status:', err);
-        // Fail open for development purposes
-        return true;
+        return false; // Fail closed for security
+    }
+}
+
+/**
+ * Check if a user is the bot owner (based on config and environment variables)
+ * @param {string} userId - The user's JID
+ * @returns {boolean} - Whether the user is the bot owner
+ */
+function isBotOwner(userId) {
+    try {
+        // Self-check for commands executed by the bot itself
+        if (!userId) return false;
+        
+        // Get configured owner number from config or environment
+        const ownerNumber = process.env.OWNER_NUMBER ? 
+            process.env.OWNER_NUMBER.replace(/[^0-9]/g, '') : 
+            ownerConfig.number;
+            
+        if (!ownerNumber) {
+            console.warn('No owner number configured');
+            return false;
+        }
+        
+        // Extract just the number part from the JID
+        const userNumber = userId.split('@')[0];
+        
+        // Clean both numbers and compare
+        const cleanUserNumber = userNumber.replace(/[^0-9]/g, '');
+        const cleanOwnerNumber = ownerNumber.replace(/[^0-9]/g, '');
+        
+        // Check exact match
+        return cleanUserNumber === cleanOwnerNumber;
+    } catch (err) {
+        console.error('Error checking bot owner status:', err);
+        // Fail closed for security
+        return false;
     }
 }
 
 module.exports = {
     isAdmin,
     isBotAdmin,
-    isOwner
+    isOwner,
+    isBotOwner
 };

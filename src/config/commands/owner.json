@@ -2,6 +2,13 @@
   "category": "owner",
   "commands": [
     {
+      "name": "setowner",
+      "description": "Change bot owner number",
+      "usage": ".setowner your_number",
+      "cooldown": 60,
+      "permissions": ["owner"]
+    },
+    {
       "name": "system",
       "description": "Show system information",
       "usage": "!system",

@@ -309,9 +309,8 @@ class StandardCommandLoader {
      */
     async hasPermission(sender, requiredPermissions, ownerSettings = {}) {
         try {
-            // Default owner from environment or settings
-            const ownerNumber = process.env.OWNER_NUMBER || 
-                               (ownerSettings.number || '').replace(/[^0-9]/g, '');
+            // Import the permission helpers - use require inside function to avoid circular dependencies
+            const { isBotOwner } = require('./permissions');
             
             // If no specific permissions required or user permission is enough
             if (!requiredPermissions?.length || requiredPermissions.includes('user')) {
@@ -320,9 +319,8 @@ class StandardCommandLoader {
             
             // Check for owner permission
             if (requiredPermissions.includes('owner')) {
-                // Clean and compare phone numbers
-                const senderNumber = sender.split('@')[0];
-                return senderNumber === ownerNumber;
+                // Use the centralized isBotOwner function for consistent owner checking
+                return isBotOwner(sender);
             }
             
             // Admin permissions would be checked here

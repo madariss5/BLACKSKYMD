@@ -1,125 +1,97 @@
+/**
+ * BLACKSKY-MD Configuration File
+ * Contains all bot configuration settings
+ */
+
 const config = {
-    // Bot Owner Info
+    /**
+     * Bot Owner Configuration
+     * This configuration determines who can use owner-only commands
+     */
     owner: {
-        name: process.env.OWNER_NAME || 'Bot Owner',  
-        number: process.env.OWNER_NUMBER ? 
-            process.env.OWNER_NUMBER.replace(/[^0-9]/g, '') : 
-            '4915563151347',
-        email: process.env.OWNER_EMAIL || '',
+        /**
+         * Bot owner's phone number
+         * Format: full phone number without any special characters
+         * Example: '12025550199'
+         * 
+         * This can also be set via environment variable OWNER_NUMBER
+         */
+        number: process.env.OWNER_NUMBER || '',
+        
+        /**
+         * Whether to strictly validate owner number
+         * When true, owner commands will only work for exact match with configured number
+         * When false, some flexibility is provided (not recommended for production)
+         */
+        strictValidation: true
     },
-
-    // Bot Configuration
-    bot: {
-        name: process.env.BOT_NAME || '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻',
-        version: process.env.BOT_VERSION || '1.0.1',
-        prefix: process.env.BOT_PREFIX || '.',
-        language: process.env.BOT_LANGUAGE || 'en',
-        debug: process.env.NODE_ENV !== 'production',
+    
+    /**
+     * Bot Security Configuration
+     */
+    security: {
+        /**
+         * Whether to enforce admin permissions for group commands
+         * When true, commands marked as requiring admin will only work for actual admins
+         * When false, these commands will be available to all users (not recommended)
+         */
+        enforceAdminPermissions: true,
+        
+        /**
+         * Whether to require the bot to be an admin to execute admin commands
+         * Some commands require the bot to have admin privileges to work properly
+         */
+        requireBotAdminStatus: true
     },
-
-    // Server Configuration
-    server: {
-        port: process.env.PORT || 5000,
-        host: '0.0.0.0',
+    
+    /**
+     * Command Configuration
+     */
+    commands: {
+        /**
+         * Default command prefix
+         * This is used to trigger commands, e.g., !help
+         */
+        prefix: '!',
+        
+        /**
+         * Whether to allow multiple prefixes
+         * When true, commands can be triggered with any of the specified prefixes
+         */
+        allowMultiplePrefixes: true,
+        
+        /**
+         * Alternative prefixes to use if allowMultiplePrefixes is true
+         */
+        alternatePrefixes: ['/', '.', '#'],
+        
+        /**
+         * Whether to enable case-insensitive command matching
+         * When true, !Help, !HELP, and !help will all trigger the help command
+         */
+        caseInsensitive: true
     },
-
-    // API Keys Configuration
-    apis: {
-        openweather: process.env.OPENWEATHERMAP_API_KEY || '',
-        google: process.env.GOOGLE_API_KEY || '',
-        googleSearch: process.env.GOOGLE_SEARCH_API_KEY || '',
-        googleTranslate: process.env.GOOGLE_TRANSLATE_API_KEY || '',
-        googleMaps: process.env.GOOGLE_MAPS_API_KEY || '',
-        youtube: process.env.YOUTUBE_API_KEY || process.env.GOOGLE_API_KEY || '',
-        removebg: process.env.REMOVEBG_API_KEY || '',
-        imageEnhance: process.env.IMAGE_ENHANCE_API_KEY || '',
-        wolfram: process.env.WOLFRAM_APP_ID || '',
-        dictionary: process.env.DICTIONARY_API_KEY || '',
-        news: process.env.NEWS_API_KEY || '',
-        weather: process.env.WEATHER_API_KEY || process.env.OPENWEATHERMAP_API_KEY || '',
-        spotify: {
-            clientId: process.env.SPOTIFY_CLIENT_ID || '',
-            clientSecret: process.env.SPOTIFY_CLIENT_SECRET || '',
-        },
-        currencyConverter: process.env.CURRENCY_API_KEY || '',
-        financialData: process.env.FINANCIAL_API_KEY || '',
-        rapidapi: process.env.RAPIDAPI_KEY || '',
-        deepl: process.env.DEEPL_API_KEY || '',
-        twitter: {
-            apiKey: process.env.TWITTER_API_KEY || '',
-            apiSecret: process.env.TWITTER_API_SECRET || '',
-            bearerToken: process.env.TWITTER_BEARER_TOKEN || '',
-        },
-        anilist: process.env.ANILIST_API_KEY || '',
-        steam: process.env.STEAM_API_KEY || '',
-        openai: process.env.OPENAI_API_KEY || '',
-        tmdb: process.env.TMDB_API_KEY || '',
-
-        getKey: function(name) {
-            if (this[name] !== undefined) return this[name];
-            for (const key in this) {
-                if (typeof this[key] === 'object' && this[key] !== null) {
-                    if (this[key][name] !== undefined) return this[key][name];
-                }
-            }
-            return '';
-        }
-    },
-
-    // Validation function for required environment variables
-    validateConfig: () => {
-        const missingVars = [];
-        const warnings = [];
-        const recommendedApis = [
-            'OPENWEATHERMAP_API_KEY',
-            'GOOGLE_API_KEY',
-            'YOUTUBE_API_KEY', 
-            'NEWS_API_KEY',
-            'SPOTIFY_CLIENT_ID', 
-            'SPOTIFY_CLIENT_SECRET'
-        ];
-
-        if (!process.env.OWNER_NUMBER) {
-            console.warn('⚠️ OWNER_NUMBER not set in environment. Using default from config.js');
-            console.warn('Format: Country code + number without any special characters');
-            console.warn('Example: For +1 (234) 567-8900, set OWNER_NUMBER=12345678900');
-        }
-
-        if (process.env.OWNER_NUMBER) {
-            const cleanNumber = process.env.OWNER_NUMBER.replace(/[^0-9]/g, '');
-            if (!cleanNumber.match(/^\d+$/)) {
-                missingVars.push('OWNER_NUMBER (invalid format)');
-                console.error('Invalid OWNER_NUMBER format. Please provide only numbers including country code (e.g., 12345678900)');
-            }
-        }
-
-        recommendedApis.forEach(api => {
-            if (!process.env[api]) {
-                warnings.push(api);
-            }
-        });
-
-        if (warnings.length > 0) {
-            console.warn('⚠️ Some recommended API keys are missing:');
-            warnings.forEach(api => {
-                console.warn(`   - ${api}: Required for certain features`);
-            });
-            console.warn('You can set these in your .env file to enable full functionality.');
-        }
-
-        return {
-            isValid: missingVars.length === 0,
-            missingVars,
-            warnings
-        };
-    },
-
-    // Application Settings
-    settings: {
-        autoRead: true,
-        autoTyping: false,
-        autoRecord: false,
-        logLevel: process.env.NODE_ENV === 'production' ? 'info' : 'debug'
+    
+    /**
+     * Message Processing Configuration
+     */
+    messaging: {
+        /**
+         * Maximum message processing queue size
+         * Messages beyond this limit will be dropped during high traffic
+         */
+        maxQueueSize: 100,
+        
+        /**
+         * Whether to delete command messages after processing
+         * Only works in groups where the bot is an admin
+         */
+        deleteCommandMessages: false,
+        
+        /**
+         * Whether to send "typing..." indicator before responding
+         */
+        sendTypingIndicator: true
     }
 };
 

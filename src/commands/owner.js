@@ -13,7 +13,105 @@ function formatTime(seconds) {
     return `${days}d ${hours}h ${minutes}m ${secs}s`;
 }
 
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
+
 const ownerCommands = {
+    /**
+     * Set or change the owner number
+     * @param {Object} sock - The WhatsApp socket
+     * @param {Object} message - The message object
+     * @param {Array<string>} args - Command arguments
+     */
+    async setowner(sock, message, args) {
+        const remoteJid = message.key.remoteJid;
+        const currentJid = message.key.participant || message.key.remoteJid;
+        const currentNumber = currentJid.split('@')[0];
+        
+        try {
+            // Check if command is sent by the current owner or from the same number in .env
+            const configOwnerNumber = process.env.OWNER_NUMBER?.replace(/[^0-9]/g, '') || '4915563151347';
+            const senderNumber = currentJid.split('@')[0];
+            
+            if (senderNumber !== configOwnerNumber) {
+                await safeSendText(sock, remoteJid, '❌ Only the current owner can change the owner number.');
+                return;
+            }
+            
+            if (!args || args.length === 0) {
+                await safeSendText(sock, remoteJid, `
+*Current Owner Number Settings*
+
+Number: ${configOwnerNumber}
+
+To change the owner number, use:
+.setowner your_number
+
+Example:
+.setowner 123456789012
+
+Note: Use your number in international format without any + sign, spaces, or dashes.
+                `.trim());
+                return;
+            }
+            
+            // Get the new owner number from args
+            const newOwnerNumber = args[0].replace(/[^0-9]/g, '');
+            
+            if (!newOwnerNumber || !/^\d+$/.test(newOwnerNumber)) {
+                await safeSendText(sock, remoteJid, '❌ Invalid phone number format. Please provide numbers only, without + sign, spaces, or dashes.');
+                return;
+            }
+            
+            // Update the .env file
+            const envPath = path.join(process.cwd(), '.env');
+            if (fs.existsSync(envPath)) {
+                try {
+                    // Read the current .env file
+                    let envContent = fs.readFileSync(envPath, 'utf8');
+                    
+                    // Check if OWNER_NUMBER exists and update it
+                    if (envContent.includes('OWNER_NUMBER=')) {
+                        envContent = envContent.replace(
+                            /OWNER_NUMBER=.*/,
+                            `OWNER_NUMBER=${newOwnerNumber}`
+                        );
+                    } else {
+                        // Add OWNER_NUMBER if it doesn't exist
+                        envContent += `\nOWNER_NUMBER=${newOwnerNumber}\n`;
+                    }
+                    
+                    // Write back to .env file
+                    fs.writeFileSync(envPath, envContent);
+                    
+                    // Update the environment variable in current process
+                    process.env.OWNER_NUMBER = newOwnerNumber;
+                    
+                    await safeSendText(sock, remoteJid, `✅ Owner number successfully updated to ${newOwnerNumber}.\n\nChanges will take full effect after bot restart.`);
+                    
+                    // Log the change
+                    logger.info(`Owner number changed from ${configOwnerNumber} to ${newOwnerNumber}`);
+                } catch (writeErr) {
+                    logger.error('Error updating .env file:', writeErr);
+                    await safeSendText(sock, remoteJid, '❌ Failed to update .env file. Check server logs for details.');
+                }
+            } else {
+                // If .env doesn't exist, inform the user to update manually
+                logger.warn('.env file not found, cannot update automatically');
+                await safeSendText(sock, remoteJid, 
+                    '⚠️ Could not find .env file. Please update your owner number manually:\n\n' +
+                    '1. Create or edit your .env file\n' +
+                    `2. Add or update this line: OWNER_NUMBER=${newOwnerNumber}\n` +
+                    '3. Restart the bot'
+                );
+            }
+        } catch (err) {
+            logger.error('Error in setowner command:', err);
+            await safeSendText(sock, remoteJid, '❌ An error occurred while setting owner number. Please check logs.');
+        }
+    },
+    
     // System Management
     async restart(sock, message, args) {
         const remoteJid = message.key.remoteJid;
