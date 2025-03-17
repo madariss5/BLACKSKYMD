@@ -25,7 +25,7 @@ args = "High Performance Bot"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "WhatsApp Bot"
+args = "Enhanced WhatsApp Bot"
 
 [[workflows.workflow]]
 name = "Run Bot"
@@ -79,7 +79,7 @@ task = "shell.exec"
 args = "node high-performance-whatsapp.js"
 
 [[workflows.workflow]]
-name = "WhatsApp Bot"
+name = "Enhanced WhatsApp Bot"
 author = "agent"
 
 [workflows.workflow.metadata]
