@@ -40,7 +40,7 @@ const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 function log(message, type = 'info') {
   const timestamp = new Date().toISOString();
   let coloredMessage = message;
-  
+
   switch (type) {
     case 'success':
       coloredMessage = `${COLORS.green}${message}${COLORS.reset}`;
@@ -58,7 +58,7 @@ function log(message, type = 'info') {
       coloredMessage = `${COLORS.cyan}${COLORS.bright}${message}${COLORS.reset}`;
       break;
   }
-  
+
   console.log(coloredMessage);
   logStream.write(`[${timestamp}] ${message}\n`);
 }
@@ -67,22 +67,22 @@ function log(message, type = 'info') {
 function executeCommand(command) {
   return new Promise((resolve, reject) => {
     log(`Executing: ${command}`, 'info');
-    
+
     exec(command, (error, stdout, stderr) => {
       if (error) {
         log(`Error: ${error.message}`, 'error');
         reject(error);
         return;
       }
-      
+
       if (stderr) {
         log(`Command output (stderr): ${stderr}`, 'warning');
       }
-      
+
       if (stdout) {
         log(`Command output: ${stdout}`, 'info');
       }
-      
+
       resolve({ stdout, stderr });
     });
   });
@@ -135,16 +135,16 @@ async function setupGitignore() {
     '*.swo',
     '*.auth.json'
   ];
-  
+
   let content = '';
-  
+
   if (fs.existsSync(gitignorePath)) {
     content = fs.readFileSync(gitignorePath, 'utf8');
     log('Existing .gitignore file found, updating if needed', 'info');
   } else {
     log('Creating .gitignore file', 'info');
   }
-  
+
   let needsUpdate = false;
   for (const entry of standardEntries) {
     if (!content.includes(entry)) {
@@ -152,7 +152,7 @@ async function setupGitignore() {
       needsUpdate = true;
     }
   }
-  
+
   if (needsUpdate) {
     fs.writeFileSync(gitignorePath, content, 'utf8');
     log('.gitignore file updated', 'success');
@@ -171,20 +171,20 @@ async function configureGitCredentials() {
   try {
     // Use the token in the remote URL for authentication
     log('Configuring Git credentials with token authentication', 'info');
-    
+
     // Parse the URL to insert the token
     const urlMatch = REPO_URL.match(/https:\/\/github\.com\/([^\/]+)\/([^\.]+)(\.git)?/);
     if (!urlMatch) {
       log('Invalid GitHub repository URL format.', 'error');
       throw new Error('Invalid repository URL format');
     }
-    
+
     const [_, username, repo] = urlMatch;
     const tokenUrl = `https://${GITHUB_TOKEN}@github.com/${username}/${repo}.git`;
-    
+
     // Check if remote already exists
     const { stdout } = await executeCommand('git remote -v');
-    
+
     if (stdout.includes(DEFAULT_REMOTE)) {
       log(`Remote '${DEFAULT_REMOTE}' already exists, updating...`, 'info');
       await executeCommand(`git remote set-url ${DEFAULT_REMOTE} ${tokenUrl}`);
@@ -192,7 +192,7 @@ async function configureGitCredentials() {
       log(`Adding remote '${DEFAULT_REMOTE}'...`, 'info');
       await executeCommand(`git remote add ${DEFAULT_REMOTE} ${tokenUrl}`);
     }
-    
+
     log('Git remote configured successfully with token authentication', 'success');
   } catch (error) {
     log('Failed to configure Git credentials', 'error');
@@ -203,19 +203,19 @@ async function configureGitCredentials() {
 // Add files to git
 async function addFilesToGit() {
   log('Adding files to git...', 'info');
-  
+
   // Main code files
   await executeCommand('git add src/ data/ public/ views/');
-  
+
   // Configuration files
   await executeCommand('git add package.json package-lock.json *.js .replit .env.example');
-  
+
   // Documentation
   await executeCommand('git add *.md LICENSE Procfile app.json');
-  
+
   // Docker and deployment files
   await executeCommand('git add Dockerfile heroku.yml .slugignore');
-  
+
   log('Files added successfully', 'success');
 }
 
@@ -244,10 +244,10 @@ async function pushChanges() {
     return true;
   } catch (error) {
     log('Failed to push changes', 'error');
-    
+
     if (error.message.includes('rejected')) {
       log('Remote contains work that you do not have locally. Trying to pull first.', 'warning');
-      
+
       try {
         log('Pulling latest changes...', 'info');
         await executeCommand(`git pull ${DEFAULT_REMOTE} ${DEFAULT_BRANCH}`);
@@ -270,35 +270,35 @@ async function main() {
   log('================================================', 'header');
   log('       BLACKSKY-MD GitHub Update Script        ', 'header');
   log('================================================', 'header');
-  
+
   try {
     // Check if git is installed
     const gitInstalled = await checkGitInstalled();
     if (!gitInstalled) {
       process.exit(1);
     }
-    
+
     // Initialize git repository if needed
     await initializeGitRepo();
-    
+
     // Setup .gitignore
     await setupGitignore();
-    
+
     // Configure git credentials
     await configureGitCredentials();
-    
+
     // Add files to git
     await addFilesToGit();
-    
+
     // Show git status
     await executeCommand('git status');
-    
+
     // Commit changes
     await commitChanges();
-    
+
     // Push changes to GitHub
     const pushed = await pushChanges();
-    
+
     log('================================================', 'header');
     if (pushed) {
       log('GitHub update completed successfully!', 'success');
