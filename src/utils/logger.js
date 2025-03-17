@@ -7,8 +7,9 @@
 const LOG_LEVELS = {
     DEBUG: 0,
     INFO: 1,
-    WARN: 2,
-    ERROR: 3
+    SUCCESS: 2,
+    WARN: 3,
+    ERROR: 4
 };
 
 // Current log level (can be changed at runtime)
@@ -27,7 +28,7 @@ function getTimestamp() {
 function formatLogMessage(level, message, ...args) {
     const timestamp = getTimestamp();
     let formattedMessage = `[${timestamp}] [${level}] ${message}`;
-    
+
     // Add any additional arguments
     if (args && args.length > 0) {
         args.forEach(arg => {
@@ -42,24 +43,24 @@ function formatLogMessage(level, message, ...args) {
             }
         });
     }
-    
+
     return formattedMessage;
 }
 
 // Write log to file if enabled
 function writeToLogFile(message) {
     if (!logToFile) return;
-    
+
     try {
         const fs = require('fs');
         const path = require('path');
-        
+
         // Ensure the log directory exists
         const dir = path.dirname(logFilePath);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        
+
         // Append to log file
         fs.appendFileSync(logFilePath, message + '\n');
     } catch (err) {
@@ -76,7 +77,7 @@ const logger = {
             writeToLogFile(logMessage);
         }
     },
-    
+
     info(message, ...args) {
         if (currentLogLevel <= LOG_LEVELS.INFO) {
             const logMessage = formatLogMessage('INFO', message, ...args);
@@ -84,7 +85,15 @@ const logger = {
             writeToLogFile(logMessage);
         }
     },
-    
+
+    success(message, ...args) {
+        if (currentLogLevel <= LOG_LEVELS.SUCCESS) {
+            const logMessage = formatLogMessage('SUCCESS', message, ...args);
+            console.log('\x1b[32m%s\x1b[0m', logMessage); // Green color for success
+            writeToLogFile(logMessage);
+        }
+    },
+
     warn(message, ...args) {
         if (currentLogLevel <= LOG_LEVELS.WARN) {
             const logMessage = formatLogMessage('WARN', message, ...args);
@@ -92,7 +101,7 @@ const logger = {
             writeToLogFile(logMessage);
         }
     },
-    
+
     error(message, ...args) {
         if (currentLogLevel <= LOG_LEVELS.ERROR) {
             const logMessage = formatLogMessage('ERROR', message, ...args);
@@ -100,16 +109,16 @@ const logger = {
             writeToLogFile(logMessage);
         }
     },
-    
+
     // Set current log level
     setLogLevel(level) {
         if (level in LOG_LEVELS) {
             currentLogLevel = LOG_LEVELS[level];
-        } else if (typeof level === 'number' && level >= 0 && level <= 3) {
+        } else if (typeof level === 'number' && level >= 0 && level <= 4) {
             currentLogLevel = level;
         }
     },
-    
+
     // Enable or disable file logging
     enableFileLogging(enable = true, filePath = null) {
         logToFile = enable;

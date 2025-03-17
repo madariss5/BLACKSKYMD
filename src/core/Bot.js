@@ -8,6 +8,7 @@ const MessageHandler = require('./messageHandler');
 const SessionHandler = require('./sessionHandler');
 const ResponseHandler = require('./responseHandler');
 const logger = require('../utils/logger');
+const { DisconnectReason } = require('@whiskeysockets/baileys');
 
 class Bot {
     constructor(config = {}) {
@@ -24,6 +25,9 @@ class Bot {
         this.responseHandler = new ResponseHandler(config.response);
 
         this.setupMessageHandler();
+        this.isStarting = false;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
     }
 
     setupMessageHandler() {
@@ -33,7 +37,7 @@ class Bot {
             ctx.reply = async (content, options = {}) => {
                 return this.responseHandler.replyToMessage(ctx.socket, ctx.raw, content, options);
             };
-            
+
             ctx.send = async (content, options = {}) => {
                 return this.responseHandler.sendResponse(ctx.socket, ctx.sender, content, options);
             };
@@ -48,22 +52,63 @@ class Bot {
 
     async start() {
         try {
-            logger.info('Starting bot...');
-            
-            // Set message handler in connection
-            this.connection.setMessageHandler(this.messageHandler);
-            
-            // Connect to WhatsApp
-            const socket = await this.connection.connect();
-            
-            if (!socket) {
-                throw new Error('Failed to create WhatsApp connection');
+            if (this.isStarting) {
+                logger.warn('Bot is already starting...');
+                return null;
             }
 
-            logger.success(`${this.config.name} is ready!`);
+            this.isStarting = true;
+            logger.info(`Starting ${this.config.name}...`);
+
+            // Set message handler in connection
+            this.connection.setMessageHandler(this.messageHandler);
+
+            // Connect to WhatsApp
+            const socket = await this.connection.connect().catch(error => {
+                this.isStarting = false;
+                logger.error('Connection failed:', error);
+                throw error;
+            });
+
+            if (!socket) {
+                this.isStarting = false;
+                throw new Error('Failed to initialize WhatsApp connection');
+            }
+
+            // Setup event listeners for the session
+            socket.ev.on('connection.update', async (update) => {
+                const { connection, lastDisconnect } = update;
+
+                if (connection === 'open') {
+                    logger.success(`${this.config.name} is ready!`);
+                    this.isStarting = false;
+                    this.reconnectAttempts = 0;
+                } else if (connection === 'close') {
+                    const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+
+                    if (shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+                        this.reconnectAttempts++;
+                        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30000);
+                        logger.info(`Connection closed. Attempting reconnect ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay/1000}s`);
+
+                        setTimeout(() => {
+                            if (!this.isStarting) {
+                                this.start();
+                            }
+                        }, delay);
+                    } else if (lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
+                        logger.warn('Session logged out. Please scan QR code to reconnect.');
+                        await this.sessionHandler.deleteSession('default');
+                        this.isStarting = false;
+                        this.start();
+                    }
+                }
+            });
+
             return socket;
 
         } catch (error) {
+            this.isStarting = false;
             logger.error('Error starting bot:', error);
             throw error;
         }
@@ -99,7 +144,9 @@ class Bot {
             connected: this.connection.isConnected,
             activeSessions: this.sessionHandler.getActiveSessions(),
             activeProcesses: this.messageHandler.getActiveProcesses(),
-            messageQueue: this.responseHandler.getQueueStatus()
+            messageQueue: this.responseHandler.getQueueStatus(),
+            startupState: this.isStarting,
+            reconnectAttempts: this.reconnectAttempts
         };
     }
 }
