@@ -358,10 +358,10 @@ app.get('/', (req, res) => {
                 <div class="command-examples">
                     <h3>Try these commands in WhatsApp:</h3>
                     <ul>
-                        <li><code>!ping</code> - Check if bot is responding</li>
-                        <li><code>!menu</code> - View all available commands</li>
-                        <li><code>!help</code> - Get help with using the bot</li>
-                        <li><code>!hug @user</code> - Send a reaction GIF to someone</li>
+                        <li><code>.ping</code> - Check if bot is responding</li>
+                        <li><code>.menu</code> - View all available commands</li>
+                        <li><code>.help</code> - Get help with using the bot</li>
+                        <li><code>.hug @user</code> - Send a reaction GIF to someone</li>
                     </ul>
                     <p style="margin-top:10px;">
                         <a href="/reaction-commands" style="color:#128C7E;text-decoration:none;font-weight:bold;">
@@ -684,7 +684,7 @@ app.get('/reaction-commands', (req, res) => {
                         <div class="reaction-details">
                             <div class="reaction-name">${reaction.name}</div>
                             <div class="reaction-size">Size: ${reaction.sizeFormatted}</div>
-                            <div class="reaction-command">!${reaction.name} @user</div>
+                            <div class="reaction-command">.${reaction.name} @user</div>
                         </div>
                     </div>
                 `).join('')}
@@ -887,8 +887,8 @@ app.get('/reaction-commands', async (req, res) => {
             
             <div class="usage-instructions">
                 <strong>How to use:</strong>
-                <p>Send <code>!{command} @user</code> to send a reaction to someone.</p>
-                <p>For example, to send a hug to someone, type: <code>!hug @user</code></p>
+                <p>Send <code>.{command} @user</code> to send a reaction to someone.</p>
+                <p>For example, to send a hug to someone, type: <code>.hug @user</code></p>
                 <p>The bot will automatically send the reaction GIF in your chat.</p>
             </div>
             
@@ -897,7 +897,7 @@ app.get('/reaction-commands', async (req, res) => {
                     <div class="reaction-item">
                         <img src="/test-reaction?type=${reaction}" class="reaction-gif" alt="${reaction} reaction">
                         <div class="reaction-name">${reaction.charAt(0).toUpperCase() + reaction.slice(1)}</div>
-                        <div class="reaction-command">!${reaction}</div>
+                        <div class="reaction-command">.${reaction}</div>
                     </div>
                 `).join('')}
             </div>
@@ -927,7 +927,7 @@ app.post('/test-command', async (req, res) => {
                 id: `mock-${Date.now()}`
             },
             message: {
-                conversation: `!${command} ${args.join(' ')}`.trim()
+                conversation: `.${command} ${args.join(' ')}`.trim()
             }
         };
         

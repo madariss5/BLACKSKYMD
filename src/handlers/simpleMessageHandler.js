@@ -8,7 +8,7 @@ const logger = require('../utils/logger');
 
 // Bot configuration
 const config = {
-    prefix: process.env.BOT_PREFIX || '!',
+    prefix: process.env.BOT_PREFIX || '.',
     owner: process.env.OWNER_NUMBER || ''
 };
 

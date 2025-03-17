@@ -90,7 +90,7 @@ const commands = {
         const text = args.join(' ');
         
         if (!text) {
-            await safeSend.safeSendText(sock, jid, 'You need to provide text to echo! Example: !echo hello world');
+            await safeSend.safeSendText(sock, jid, 'You need to provide text to echo! Example: .echo hello world');
             return;
         }
         
@@ -110,7 +110,7 @@ const commands = {
                       `• Node Version: ${process.version}\n` +
                       `• Platform: ${process.platform}\n` +
                       `• Uptime: ${Math.floor(process.uptime())} seconds\n` +
-                      `• Commands: Use !help to see available commands\n\n` +
+                      `• Commands: Use .help to see available commands\n\n` +
                       `Bot is currently active and ready to use!`;
         
         await safeSend.safeSendText(sock, jid, infoText);
@@ -123,12 +123,12 @@ const commands = {
         console.log(`Executing help command for ${jid}`);
         
         const helpText = `*Available Commands*\n\n` +
-                      `!ping - Check if bot is active\n` +
-                      `!echo [text] - Repeat a message back to you\n` +
-                      `!info - Show information about the bot\n` +
-                      `!status - Check bot connection status\n` +
-                      `!help - Show this help message\n\n` +
-                      `For reaction commands, type !reactions`;
+                      `.ping - Check if bot is active\n` +
+                      `.echo [text] - Repeat a message back to you\n` +
+                      `.info - Show information about the bot\n` +
+                      `.status - Check bot connection status\n` +
+                      `.help - Show this help message\n\n` +
+                      `For reaction commands, type .reactions`;
         
         await safeSend.safeSendText(sock, jid, helpText);
         console.log('Help command completed');

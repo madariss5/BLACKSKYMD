@@ -23,7 +23,7 @@ const config = {
     bot: {
         name: process.env.BOT_NAME || '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻',
         version: process.env.BOT_VERSION || '1.0.1', // Updated version number
-        prefix: process.env.BOT_PREFIX || '!', // Changed default to ! to match owner commands
+        prefix: process.env.BOT_PREFIX || '.', // Changed default to . as per user request
         language: process.env.BOT_LANGUAGE || 'en',
         debug: process.env.NODE_ENV !== 'production',
     },
@@ -195,7 +195,7 @@ const config = {
     },
     settings: {
         autoRead: true,
-        autoTyping: true,
+        autoTyping: false, // Disabled typing indicators as per user request
         autoRecord: false,
         backupInterval: 6 * 60 * 60 * 1000, // 6 hours
         keepAlive: process.env.NODE_ENV === 'production',

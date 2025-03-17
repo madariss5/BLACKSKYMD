@@ -28,7 +28,7 @@ async function loadCommandModules(sock) {
                 
                 // Add all registered commands to help text
                 commandHandlers.forEach((handler, cmd) => {
-                    helpText += `!${cmd} - ${handler.description || 'No description'}\n`;
+                    helpText += `.${cmd} - ${handler.description || 'No description'}\n`;
                 });
                 
                 await sock.sendMessage(jid, { text: helpText });
@@ -139,7 +139,7 @@ function initializeBasicCommands() {
             let helpText = '*Available Commands*\n\n';
             
             commandHandlers.forEach((handler, cmd) => {
-                helpText += `!${cmd} - ${handler.description || 'No description'}\n`;
+                helpText += `.${cmd} - ${handler.description || 'No description'}\n`;
             });
             
             await sock.sendMessage(jid, { text: helpText });
@@ -233,6 +233,9 @@ async function init(sock) {
     // Create queue for message processing with priority
     const messageQueue = [];
     let processingMessage = false;
+    
+    // Create a map to track recently processed message IDs to prevent duplicates
+    const processedMessages = new Map();
 
     // Optimized message handler with reduced logging
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
@@ -259,7 +262,7 @@ async function init(sock) {
                                (msg.message.extendedTextMessage?.text) || '';
             
             // Fast command detection
-            if (messageText.startsWith('!')) {
+            if (messageText.startsWith('.')) {
                 console.log(`Message text: "${messageText}"`);
                 
                 // Parse command with optimized splitting
@@ -291,12 +294,7 @@ async function init(sock) {
                                 
                                 const { handler } = handlerInfo;
                                 
-                                // Start typing indicator for better UX
-                                try {
-                                    sock.sendPresenceUpdate('composing', remoteJid);
-                                } catch (e) {
-                                    // Ignore typing errors
-                                }
+                                // Typing indicator disabled as per user request
                                 
                                 // Execute command with optimized error handling
                                 await executeCommand(handler, sock, msg, args);
@@ -304,7 +302,7 @@ async function init(sock) {
                             } else {
                                 // Unknown command - fast response
                                 await safeSend.safeSendText(remoteJid, 
-                                    `Command '${commandName}' not found. Type !help to see available commands.`
+                                    `Command '${commandName}' not found. Type .help to see available commands.`
                                 );
                             }
                         } catch (err) {
@@ -326,6 +324,61 @@ async function init(sock) {
                 }
             } else {
                 console.log('Message is not a command');
+                
+                // Handle XP gain for normal messages
+                try {
+                    // Load levelingSystem module
+                    let levelingSystem;
+                    try {
+                        levelingSystem = require('./utils/levelingSystem');
+                    } catch (moduleErr) {
+                        // Try alternate path
+                        try {
+                            levelingSystem = require('../src/utils/levelingSystem');
+                        } catch (altErr) {
+                            console.log('Leveling system module not available');
+                            levelingSystem = null;
+                        }
+                    }
+                    
+                    if (levelingSystem && typeof levelingSystem.addXP === 'function') {
+                        // Add XP for the message and check for level up
+                        const isGroup = remoteJid.endsWith('@g.us');
+                        const activityType = isGroup ? 'groupChat' : 'privateChat';
+                        
+                        // Get the actual user's JID (whether in group or not)
+                        const userJid = isGroup ? (msg.key.participant || remoteJid) : remoteJid;
+                        
+                        // Pass the user's JID as first parameter to properly track XP for the user, not the group
+                        const levelUpData = await levelingSystem.addXP(userJid, activityType, isGroup ? remoteJid : null);
+                        
+                        // Send level up notification if user leveled up
+                        if (levelUpData && levelingSystem.hasLevelUpNotificationEnabled(userJid)) {
+                            // Load safe send utility
+                            let safeSendUtil;
+                            try {
+                                safeSendUtil = require('./utils/jidHelper');
+                            } catch (e) {
+                                try {
+                                    safeSendUtil = require('../src/utils/jidHelper');
+                                } catch (e2) {
+                                    // Use direct sock.sendMessage as fallback
+                                    safeSendUtil = {
+                                        safeSendText: async (sock, jid, text) => sock.sendMessage(jid, { text })
+                                    };
+                                }
+                            }
+                            
+                            const levelUpMessage = `*🎉 Congratulations!*\nYou leveled up from ${levelUpData.oldLevel} to ${levelUpData.newLevel}!\n\n*💰 Reward:* ${levelUpData.coinReward} coins\n*🏆 Rank:* ${levelUpData.rankTitle}`;
+                            
+                            await safeSendUtil.safeSendText(sock, remoteJid, levelUpMessage);
+                            console.log(`Sent level up notification to ${userJid} (in chat ${remoteJid}) for reaching level ${levelUpData.newLevel}`);
+                        }
+                    }
+                } catch (xpError) {
+                    // Log but don't interrupt message flow for XP errors
+                    console.error(`Error processing XP for message: ${xpError.message}`);
+                }
             }
             
             console.log(`==== MESSAGE PROCESSING COMPLETE ====\n`);

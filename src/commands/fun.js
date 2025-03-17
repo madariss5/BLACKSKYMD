@@ -1115,7 +1115,7 @@ const funCommands = {
             if (!global.currentRiddles) global.currentRiddles = new Map();
             global.currentRiddles.set(sender, randomRiddle);
             
-            await safeSendText(sock, sender, `🧩 Riddle\n\n${randomRiddle.question}\n\nUse !reveal to see the answer`);
+            await safeSendText(sock, sender, `🧩 Riddle\n\n${randomRiddle.question}\n\nUse .reveal to see the answer`);
             
         } catch (err) {
             logger.error('Riddle error:', err);
@@ -1128,7 +1128,7 @@ const funCommands = {
             const sender = message.key.remoteJid;
             
             if (!global.currentRiddles || !global.currentRiddles.has(sender)) {
-                await safeSendText(sock, sender, "❌ There's no active riddle to reveal. Use !riddle to get a new riddle.");
+                await safeSendText(sock, sender, "❌ There's no active riddle to reveal. Use .riddle to get a new riddle.");
                 return;
             }
             

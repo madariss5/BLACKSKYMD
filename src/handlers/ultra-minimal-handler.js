@@ -88,8 +88,8 @@ function addCoreCommands() {
                 } else {
                     await safeSendText(sock, sender, 
                         '*💡 Help Menu*\n\n' +
-                        'Use !help <command> for detailed information\n' +
-                        'Use !menu to see all commands'
+                        'Use .help <command> for detailed information\n' +
+                        'Use .menu to see all commands'
                     );
                 }
             } catch (err) {
@@ -97,7 +97,7 @@ function addCoreCommands() {
             }
         },
         description: 'Get help with commands',
-        usage: '!help <command>',
+        usage: '.help <command>',
         category: 'core',
         enabled: true
     });
@@ -143,7 +143,7 @@ async function loadCommandModules() {
                                 commands.set(name, {
                                     execute: handler,
                                     description: `${name} command`,
-                                    usage: `!${name}`,
+                                    usage: `.${name}`,
                                     category: category !== 'commands' ? category : 'general',
                                     enabled: true
                                 });
@@ -189,11 +189,7 @@ async function messageHandler(sock, message) {
             const args = content.slice(1).trim().split(/\s+/);
             const commandName = args.shift().toLowerCase();
 
-            try {
-                await sock.sendPresenceUpdate('composing', message.key.remoteJid);
-            } catch (err) {
-                logger.error('Error setting presence:', err);
-            }
+            // Typing indicator disabled as per user request
 
             if (commands.has(commandName)) {
                 try {
@@ -207,15 +203,11 @@ async function messageHandler(sock, message) {
                 }
             } else {
                 await safeSendMessage(sock, message.key.remoteJid, {
-                    text: `❌ Command not found: ${commandName}\nUse !help to see available commands`
+                    text: `❌ Command not found: ${commandName}\nUse .help to see available commands`
                 });
             }
 
-            try {
-                await sock.sendPresenceUpdate('paused', message.key.remoteJid);
-            } catch (err) {
-                logger.error('Error clearing presence:', err);
-            }
+            // Clearing typing indicator disabled as per user request
         }
     } catch (err) {
         logger.error('Error in message handler:', err);

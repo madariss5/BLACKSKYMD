@@ -110,7 +110,7 @@ async function connectToWhatsApp() {
                     await messageHandler.init(sock);
                     console.log('Message handler initialized! Bot is now ready to respond to commands.');
                     console.log('Command modules have been loaded from both /commands and /src/commands folders.');
-                    console.log('Try sending "!help" to the bot to see available commands.');
+                    console.log('Try sending ".help" to the bot to see available commands.');
                 } catch (err) {
                     console.error(`Error initializing message handler: ${err.message}`);
                     console.error('The bot will work but won\'t respond to commands');

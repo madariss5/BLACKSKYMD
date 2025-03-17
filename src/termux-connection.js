@@ -74,7 +74,7 @@ const minimalMessageHandler = async (sock, message) => {
                            (message.message?.extendedTextMessage?.text) || 
                            '';
         
-        if (textMessage.startsWith('!')) {
+        if (textMessage.startsWith('.')) {
             const [command, ...args] = textMessage.slice(1).split(' ');
             
             // Basic command handling
@@ -84,11 +84,11 @@ const minimalMessageHandler = async (sock, message) => {
                 await sock.sendMessage(message.key.remoteJid, { 
                     text: 'BLACKSKY-MD Bot\n\nRunning in Termux lightweight mode\nPrefix: !\n\n' +
                          'Basic Commands:\n' +
-                         '!ping - Check if bot is running\n' +
-                         '!help - Show this help message\n' +
-                         '!info - Show bot information\n' +
-                         '!status - Show command system status\n' +
-                         '!debug - Diagnostics for troubleshooting\n\n' +
+                         '.ping - Check if bot is running\n' +
+                         '.help - Show this help message\n' +
+                         '.info - Show bot information\n' +
+                         '.status - Show command system status\n' +
+                         '.debug - Diagnostics for troubleshooting\n\n' +
                          'All regular commands should also work!' 
                 });
             } else if (command === 'info') {
@@ -364,14 +364,14 @@ async function connectToWhatsApp() {
             
             try {
                 // Get config for prefix
-                let prefix = '!';
+                let prefix = '.';
                 try {
                     const config = require('./config/config');
                     if (config.bot && config.bot.prefix) {
                         prefix = config.bot.prefix;
                     }
                 } catch (configErr) {
-                    console.log('Using default prefix: !');
+                    console.log('Using default prefix: .');
                 }
                 
                 // Try to use main message handler first

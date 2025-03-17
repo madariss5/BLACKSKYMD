@@ -412,7 +412,12 @@ function wrapText(ctx, text, maxWidth, fontSize) {
 const userCommands = {
     async register(sock, message, args) {
         try {
-            const sender = message.key.remoteJid;
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
             
             // Extract name and age from arguments
             const name = args.slice(0, -1).join(' ') || args[0];
@@ -493,16 +498,31 @@ const userCommands = {
             logger.info(`New user registered: ${formatJidForLogging(sender)} (${name}, ${ageInt})`);
         } catch (err) {
             logger.error(`Error in register command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
-            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to register. Please try again.'
+            
+            // Ensure we reply to the correct JID (participant in group, or remote JID in private chat)
+            const replyJid = message.key.participant || message.key.remoteJid;
+            
+            await safeSendText(sock, replyJid, '*❌ Error:* Failed to register. Please try again.'
             );
         }
     },
 
     async profile(sock, message, args) {
         try {
-            const sender = message.key.remoteJid;
-            const targetUser = args[0]?.replace(/[^0-9]/g, '') || sender;
-            const targetJid = targetUser.includes('@') ? targetUser : `${targetUser}@s.whatsapp.net`;
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+            
+            // If args are provided, use that as target, otherwise use sender
+            const targetUser = args[0]?.replace(/[^0-9]/g, '') || (sender.includes('@g.us') ? null : sender);
+            
+            // Convert to standard JID format if needed
+            const targetJid = targetUser ? 
+                (targetUser.includes('@') ? targetUser : `${targetUser}@s.whatsapp.net`) : 
+                sender;
             
             // Send initial feedback
             await safeSendText(sock, sender, '🔍 Fetching profile information...');
@@ -687,7 +707,11 @@ ${rankText}
             }
         } catch (err) {
             logger.error(`Error in profile command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
-            await safeSendText(sock, message.key.remoteJid, 
+            
+            // Ensure we reply to the correct JID (participant in group, or remote JID in private chat)
+            const replyJid = message.key.participant || message.key.remoteJid;
+            
+            await safeSendText(sock, replyJid, 
                 '*❌ Error:* Failed to fetch profile. Please try again.\n\n' +
                 'If this error persists, please try registering with .register [name] [age]'
             );
@@ -696,7 +720,13 @@ ${rankText}
 
     async setbio(sock, message, args) {
         try {
-            const sender = message.key.remoteJid;
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+            
             const profile = userProfiles.get(sender);
 
             if (!profile) {
@@ -747,7 +777,13 @@ ${rankText}
     
     async settheme(sock, message, args) {
         try {
-            const sender = message.key.remoteJid;
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+            
             const profile = userDatabase.getUserProfile(sender);
             
             if (!profile) {
@@ -815,7 +851,13 @@ ${rankText}
     
     async setprofilepic(sock, message, args) {
         try {
-            const sender = message.key.remoteJid;
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+            
             const profile = userDatabase.getUserProfile(sender);
             
             if (!profile) {
@@ -939,7 +981,13 @@ ${rankText}
 
     async daily(sock, message) {
         try {
-            const sender = message.key.remoteJid;
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+            
             const profile = userDatabase.getUserProfile(sender);
 
             if (!profile) {
@@ -1073,7 +1121,11 @@ ${rankText}
             }
         } catch (err) {
             logger.error(`Error in daily command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
-            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to claim daily reward. Please try again.'
+            
+            // Ensure we reply to the correct JID (participant in group, or remote JID in private chat)
+            const replyJid = message.key.participant || message.key.remoteJid;
+            
+            await safeSendText(sock, replyJid, '*❌ Error:* Failed to claim daily reward. Please try again.'
             );
         }
     },
@@ -1173,7 +1225,12 @@ ${profile.achievements && profile.achievements.length > 0 ? profile.achievements
     
     async stats(sock, message) {
         try {
-            const sender = message.key.remoteJid;
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
             
             // Get detailed user stats from the leveling system
             const stats = levelingSystem.getUserStats(sender);
@@ -1233,13 +1290,23 @@ ${profile.achievements && profile.achievements.length > 0 ? profile.achievements
             
         } catch (err) {
             logger.error(`Error in stats command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
-            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to retrieve user statistics.');
+            
+            // Ensure we reply to the correct JID (participant in group, or remote JID in private chat)
+            const replyJid = message.key.participant || message.key.remoteJid;
+            
+            await safeSendText(sock, replyJid, '*❌ Error:* Failed to retrieve user statistics.');
         }
     },
     
     async checkin(sock, message) {
         try {
-            const sender = message.key.remoteJid;
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+            
             const profile = userDatabase.getUserProfile(sender);
             
             if (!profile) {
@@ -1317,7 +1384,11 @@ ${profile.achievements && profile.achievements.length > 0 ? profile.achievements
             
         } catch (err) {
             logger.error(`Error in checkin command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
-            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to complete daily check-in. Please try again.');
+            
+            // Ensure we reply to the correct JID (participant in group, or remote JID in private chat)
+            const replyJid = message.key.participant || message.key.remoteJid;
+            
+            await safeSendText(sock, replyJid, '*❌ Error:* Failed to complete daily check-in. Please try again.');
         }
     },
 
@@ -1341,7 +1412,7 @@ ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty
     async transfer(sock, sender, args) {
         const [target, amount] = args;
         if (!target || !amount || isNaN(amount)) {
-            await safeSendText(sock, sender, '💰 Usage: !transfer @user [amount]' 
+            await safeSendText(sock, sender, '💰 Usage: .transfer @user [amount]' 
             );
             return;
         }
@@ -1375,7 +1446,13 @@ ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty
     
     async streaks(sock, message) {
         try {
-            const sender = message.key.remoteJid;
+            // Get the proper user JID, checking if we're in a group chat
+            const remoteJid = message.key.remoteJid;
+            const isGroup = remoteJid.endsWith('@g.us');
+            
+            // Get the actual sender JID, whether in group or not
+            const sender = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+            
             const profile = userDatabase.getUserProfile(sender);
             
             if (!profile) {
@@ -1433,7 +1510,11 @@ ${profile.inventory.map(item => `• ${item}`).join('\n') || 'Inventory is empty
             
         } catch (err) {
             logger.error(`Error in streaks command for ${formatJidForLogging(message.key.remoteJid)}:`, err);
-            await safeSendText(sock, message.key.remoteJid, '*❌ Error:* Failed to retrieve streak information.');
+            
+            // Ensure we reply to the correct JID (participant in group, or remote JID in private chat)
+            const replyJid = message.key.participant || message.key.remoteJid;
+            
+            await safeSendText(sock, replyJid, '*❌ Error:* Failed to retrieve streak information.');
         }
     }
 };

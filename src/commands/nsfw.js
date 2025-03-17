@@ -291,11 +291,8 @@ async function fetchAndSendNsfwImage(sock, jid, category, caption, requireGif = 
         // Start timing for performance tracking
         const startTime = Date.now();
         
-        // Send typing indicator and interim message concurrently for better UX
-        await Promise.all([
-            sock.sendPresenceUpdate('composing', jid),
-            safeSendText(sock, jid, 'Fetching image...')
-        ]);
+        // Send interim message (typing indicator disabled as per user request)
+        await safeSendText(sock, jid, 'Fetching image...');
 
         // Try optimized fetchNsfwImage utility first with parallel operation
         const imageUrl = await fetchNsfwImage(category, requireGif);
@@ -585,7 +582,7 @@ NSFW Statistics:
             const parsedAge = parseInt(age);
 
             if (!age || isNaN(parsedAge)) {
-                await safeSendText(sock, sender, '⚠️ Usage: !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ Usage: .verify <your_age>');
                 return;
             }
 
@@ -607,7 +604,7 @@ NSFW Statistics:
     async nsfwhelp(sock, sender) {
         try {
             if (!isNsfwEnabledForGroup(sender)) {
-                await safeSendText(sock, sender, `❌ NSFW commands are disabled for this group. An admin can enable them with !togglensfw on`);
+                await safeSendText(sock, sender, `❌ NSFW commands are disabled for this group. An admin can enable them with .togglensfw on`);
                 return;
             }
 
@@ -615,32 +612,32 @@ NSFW Statistics:
 📜 *NSFW Commands List*
 
 *Verification*
-!verify <age> - Verify your age (18+)
+.verify <age> - Verify your age (18+)
 
 *Image Commands*
-!waifu - Random waifu image
-!neko - Catgirl image
-!hentai - Hentai image
-!boobs - Breast image
-!ass - Butt image
-!pussy - Vagina image
-!blowjob - Oral act image
-!anal - Anal act image
-!feet - Feet image
+.waifu - Random waifu image
+.neko - Catgirl image
+.hentai - Hentai image
+.boobs - Breast image
+.ass - Butt image
+.pussy - Vagina image
+.blowjob - Oral act image
+.anal - Anal act image
+.feet - Feet image
 
 *GIF Commands*
-!gifboobs - Breast animation
-!gifass - Butt animation
-!gifhentai - Hentai animation
-!gifblowjob - Oral animation
+.gifboobs - Breast animation
+.gifass - Butt animation
+.gifhentai - Hentai animation
+.gifblowjob - Oral animation
 
 *Fetish Commands*
-!uniform - School/work uniform
-!thighs - Thigh image
-!femdom - Female dominance
-!tentacle - Tentacle genre
-!pantsu - Underwear image
-!kitsune - Fox girl image
+.uniform - School/work uniform
+.thighs - Thigh image
+.femdom - Female dominance
+.tentacle - Tentacle genre
+.pantsu - Underwear image
+.kitsune - Fox girl image
 
 *All commands require age verification.*
             `.trim();
@@ -661,7 +658,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -699,7 +696,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -737,7 +734,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -810,7 +807,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -851,7 +848,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -924,7 +921,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -952,7 +949,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -980,7 +977,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1008,7 +1005,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1037,7 +1034,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1066,7 +1063,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1094,7 +1091,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1130,7 +1127,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 status = 'unverified';
                 return;
             }
@@ -1239,7 +1236,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1280,7 +1277,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1321,7 +1318,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1362,7 +1359,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1403,7 +1400,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 
@@ -1444,7 +1441,7 @@ NSFW Statistics:
             }
 
             if (!isUserVerified(sender)) {
-                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use !verify <your_age>');
+                await safeSendText(sock, sender, '⚠️ You need to verify your age first. Use .verify <your_age>');
                 return;
             }
 

@@ -23,7 +23,7 @@ commands.set('ping', async (sock, message) => {
 commands.set('help', async (sock, message) => {
     try {
         const sender = message.key.remoteJid;
-        await safeSendText(sock, sender, '*Available Commands:*\n!ping - Check if bot is running\n!help - Show this help message' 
+        await safeSendText(sock, sender, '*Available Commands:*\n.ping - Check if bot is running\n.help - Show this help message' 
         );
     } catch (err) {
         console.error('Error in help command:', err);
@@ -52,8 +52,8 @@ async function messageHandler(sock, message) {
             return;
         }
 
-        // Process commands (using ! as prefix)
-        if (content.startsWith('!')) {
+        // Process commands (using . as prefix)
+        if (content.startsWith('.')) {
             const commandName = content.slice(1).trim().split(' ')[0].toLowerCase();
             const command = commands.get(commandName);
             
@@ -62,7 +62,7 @@ async function messageHandler(sock, message) {
                 console.log(`Executed command: ${commandName}`);
             } else {
                 await safeSendMessage(sock, sender, { 
-                    text: `Unknown command: ${commandName}. Use !help for available commands.` 
+                    text: `Unknown command: ${commandName}. Use .help for available commands.` 
                 });
             }
         }

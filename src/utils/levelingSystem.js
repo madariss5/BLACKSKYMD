@@ -312,12 +312,15 @@ async function addXP(userId, activityType = 'message', groupJid = null) {
             }
         }
         
-        // Update rank title based on level
+        // Update rank title based on level - ensuring consistent rank calculation
         let rankTitle = 'Novice';
         for (const range in RANK_TITLES) {
             const [min, max] = range.split('-');
-            if ((max === '+' && newLevel >= parseInt(min)) || 
-                (newLevel >= parseInt(min) && newLevel <= parseInt(max))) {
+            // Parse as integers and handle the "+" case for max levels
+            const minLevel = parseInt(min, 10);
+            const maxLevel = max === '+' ? Infinity : parseInt(max, 10);
+            
+            if (newLevel >= minLevel && newLevel <= maxLevel) {
                 rankTitle = RANK_TITLES[range];
                 break;
             }

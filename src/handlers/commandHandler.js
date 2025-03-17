@@ -206,16 +206,16 @@ async function loadCommands() {
                                 .sort((a, b) => a[0].localeCompare(b[0])); // Sort alphabetically
                             
                             if (categoryCommands.length === 0) {
-                                await safeSendText(sock, sender, `❌ No commands found in category: ${requestedCategory}\nUse !help to see all available categories.`);
+                                await safeSendText(sock, sender, `❌ No commands found in category: ${requestedCategory}\nUse .help to see all available categories.`);
                                 return;
                             }
                             
                             const commandList = categoryCommands.map(([name, cmd]) => {
-                                return `!${name} - ${cmd.description || 'No description'}`;
+                                return `.${name} - ${cmd.description || 'No description'}`;
                             }).join('\n');
                             
                             await safeSendMessage(sock, sender, {
-                                text: `*Commands in category "${requestedCategory}":*\n\n${commandList}\n\nUse !help [command] for specific command details.`
+                                text: `*Commands in category "${requestedCategory}":*\n\n${commandList}\n\nUse .help [command] for specific command details.`
                             });
                             return;
                         }
@@ -228,7 +228,7 @@ async function loadCommands() {
                             await safeSendMessage(sock, sender, {
                                 text: `*Command: ${cmdName}*\n\n` +
                                       `Description: ${cmd.description || 'No description'}\n` +
-                                      `Usage: ${cmd.usage || '!' + cmdName}\n` +
+                                      `Usage: ${cmd.usage || '.' + cmdName}\n` +
                                       `Cooldown: ${cmd.cooldown || 3}s\n` +
                                       `Category: ${cmd.category || 'Uncategorized'}\n` +
                                       `Group Only: ${cmd.groupOnly ? 'Yes' : 'No'}`
@@ -252,7 +252,7 @@ async function loadCommands() {
                             categoryList += `📁 ${category} (${cmdList.length} commands)\n`;
                         }
                         
-                        categoryList += '\nUse !help [category] to list commands in a category.\nUse !help [command] for specific command details.';
+                        categoryList += '\nUse .help [category] to list commands in a category.\nUse .help [command] for specific command details.';
                         
                         await safeSendMessage(sock, sender, {
                             text: categoryList
@@ -265,7 +265,7 @@ async function loadCommands() {
                 cooldown: 10,
                 groupOnly: false,
                 description: 'Get help with bot commands',
-                usage: '!help [category/command]',
+                usage: '.help [category/command]',
                 category: 'basic'
             });
         }
@@ -309,7 +309,7 @@ async function loadCommands() {
                 execute: async (sock, message, args, options = {}) => {
                     try {
                         const sender = message.key.remoteJid;
-                        await safeSendText(sock, sender, `*Available Commands:*\n\n!ping - Bot status check\n!help - Show this help message`
+                        await safeSendText(sock, sender, `*Available Commands:*\n\n.ping - Bot status check\n.help - Show this help message`
                         );
                     } catch (err) {
                         logger.error('Error executing help command:', err);
@@ -410,15 +410,15 @@ async function processCommand(sock, message, commandText, options = {}) {
         }
         
         // Command not found - only send message for actual command attempts (starting with !)
-        if (commandText.startsWith('!')) {
-            await safeSendText(sock, sender, `❌ Unknown command: ${cmdName}\nUse !help to see available commands.`);
+        if (commandText.startsWith('.')) {
+            await safeSendText(sock, sender, `❌ Unknown command: ${cmdName}\nUse .help to see available commands.`);
         }
     } catch (err) {
         // Streamlined error logging
         logger.error(`Command error (${commandText}): ${err.message}`);
         
         try {
-            await safeSendText(sock, sender, '❌ Command failed. Please try again.\n\nUse !help to see available commands.');
+            await safeSendText(sock, sender, '❌ Command failed. Please try again.\n\nUse .help to see available commands.');
         } catch (sendErr) {
             // Silent fail for error message
         }

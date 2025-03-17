@@ -115,7 +115,7 @@ async function setupMessageHandler(socket) {
                             const msgText = msgType === 'conversation' ? msg.message.conversation :
                                 msgType === 'extendedTextMessage' ? msg.message.extendedTextMessage.text : '';
                             
-                            if (msgText && msgText.startsWith('!')) {
+                            if (msgText && msgText.startsWith('.')) {
                                 logger.info(`Received command: ${msgText}`);
                                 // Simply respond that the bot is starting up
                                 const sender = msg.key.remoteJid;

@@ -230,7 +230,7 @@ function categorizeError(error) {
 function getUserFriendlyErrorMessage(category, commandName) {
     switch (category) {
         case 'input':
-            return `⚠️ There seems to be an issue with the way you used the ${commandName} command. Please check the command format with !help ${commandName}.`;
+            return `⚠️ There seems to be an issue with the way you used the ${commandName} command. Please check the command format with .help ${commandName}.`;
         
         case 'network':
             return `⚠️ Sorry, I couldn't complete the ${commandName} command because of a network issue. Please try again later.`;

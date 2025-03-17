@@ -118,7 +118,7 @@ async function initializeMessageHandler(sock) {
         await messageHandler.init(sock);
         console.log('Message handler initialized! Bot is now ready to respond to commands.');
         console.log('Command modules have been loaded from both /commands and /src/commands folders.');
-        console.log('Try sending "!help" to the bot to see available commands.');
+        console.log('Try sending ".help" to the bot to see available commands.');
         messageHandlerInitialized = true;
         return true;
     } catch (err) {

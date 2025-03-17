@@ -151,22 +151,11 @@ function checkCommandCooldown(userId, command) {
 }
 
 /**
- * Show typing indicator
+ * Show typing indicator - DISABLED
  */
 async function showTypingIndicator(sock, jid) {
-    try {
-        if (!typingStates.get(jid)) {
-            typingStates.set(jid, true);
-            await sock.sendPresenceUpdate('composing', jid);
-
-            setTimeout(async () => {
-                await sock.sendPresenceUpdate('paused', jid);
-                typingStates.set(jid, false);
-            }, 1000);
-        }
-    } catch (err) {
-        logger.error('Error showing typing indicator:', err);
-    }
+    // Function disabled as per user request
+    return;
 }
 
 // Message content extraction function - optimized for performance
@@ -275,7 +264,7 @@ async function messageHandler(sock, message) {
             } catch (err) {
                 // Simplified error handling
                 console.error(`Command error: ${err.message}`);
-                safeSendText(sock, sender, '❌ Command failed. Try !help for assistance.');
+                safeSendText(sock, sender, '❌ Command failed. Try .help for assistance.');
             }
         }
     } catch (err) {

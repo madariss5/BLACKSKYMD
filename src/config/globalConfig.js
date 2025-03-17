@@ -10,7 +10,7 @@ class GlobalConfig extends EventEmitter {
     constructor() {
         super();
         this._config = {
-            prefix: process.env.BOT_PREFIX || '!',
+            prefix: process.env.BOT_PREFIX || '.',
             owner: process.env.OWNER_NUMBER || '',
             version: '1.0.0',
             name: process.env.BOT_NAME || '𝔹𝕃𝔸ℂ𝕂𝕊𝕂𝕐-𝕄𝔻'
