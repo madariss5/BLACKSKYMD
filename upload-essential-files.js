@@ -3,361 +3,334 @@
  * This script uploads only the essential files for the WhatsApp bot to GitHub
  */
 
+const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-// GitHub configuration
+// Configuration - Update with your repository details
+const REPO_OWNER = 'madariss5';
+const REPO_NAME = 'BLACKSKYMD';
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const OWNER = 'madariss5';
-const REPO = 'BLACKSKYMD';
-const BRANCH = 'main';
+const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
 
-// List of essential files for the WhatsApp bot
-const ESSENTIAL_PATHS = [
+// Essential files to upload
+const ESSENTIAL_FILES = [
   // Core files
+  'src/connection.js',
+  'src/cloud-qr-server.js',
+  'src/qr-web-server-fixed.js',
+  'src/direct-gif-fix.js',
+  'src/index.js',
+  
+  // Config files
   'package.json',
   'Procfile',
+  'app.json',
   'Dockerfile',
   'heroku.yml',
-  '.slugignore',
-  'app.json',
-  'HEROKU_DEPLOYMENT.md',
+  'docker-compose.yml',
+  '.env.example',
   
-  // Source files
-  'src/cloud-qr-server.js',
-  'src/heroku-session-restore.js',
-  'src/index.js',
-  'src/reaction-gifs-fallback.js',
-  'src/simplified-message-handler.js',
+  // Documentation
+  'README.md',
+  'CLOUD_ENVIRONMENT_GUIDE.md',
+  'HEROKU_SETUP_GUIDE.md',
+  'REACTION_GIF_MATCHING_GUIDE.md',
+  'DOCKER_DEPLOYMENT_GUIDE.md',
+  'DEPLOY_TO_HEROKU.md',
+  'DEPLOYMENT_GUIDE.md',
   
-  // Command Files - already uploaded with upload-commands.js
-  'commands/basic.js',
-  'commands/reactions.js',
-  'commands/admin.js',
-  'commands/utility.js',
-  
-  // Utility files
-  'src/utils/fileUtils.js',
-  'src/utils/error.js',
-  'src/utils/errorHandler.js',
-  'src/utils/jidHelper.js',
-  'src/utils/backupManager.js',
-  'src/utils/calculationUtils.js',
-  'src/utils/commandLoader.js',
-  'src/utils/helpers.js',
-  'src/utils/fetchNsfwImage.js',
-  
-  // Additional deployment files
-  'README.md'
+  // GitHub files
+  'github-upload.js',
+  'github-update.js'
 ];
 
-// Check if files exist before attempting to upload
+// Helper function to check if file exists
 function fileExistsSync(filePath) {
   try {
     return fs.existsSync(filePath);
-  } catch (error) {
+  } catch (err) {
     return false;
   }
 }
 
-// Filter for files that actually exist
+// Filter out files that don't exist
 function filterExistingFiles(paths) {
-  const existingFiles = [];
-  const missingFiles = [];
+  return paths.filter(p => fileExistsSync(p));
+}
+
+// Console logging with colors
+const colors = {
+  reset: '\x1b[0m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m'
+};
+
+// Log helper function
+function log(message, type = 'info') {
+  const timestamp = new Date().toISOString();
+  let color;
   
-  for (const path of paths) {
-    if (fileExistsSync(path)) {
-      existingFiles.push(path);
-    } else {
-      missingFiles.push(path);
-    }
+  switch (type) {
+    case 'error': color = colors.red; break;
+    case 'success': color = colors.green; break;
+    case 'warning': color = colors.yellow; break;
+    case 'info': default: color = colors.blue; break;
   }
   
-  return { existingFiles, missingFiles };
+  console.log(`${color}[${timestamp}] [${type.toUpperCase()}] ${message}${colors.reset}`);
 }
 
-// Function to log with colors
-function log(message, type = 'info') {
-  const colors = {
-    info: '\x1b[34m',    // Blue
-    success: '\x1b[32m', // Green
-    error: '\x1b[31m',   // Red
-    warning: '\x1b[33m'  // Yellow
-  };
-  
-  const colorCode = colors[type] || colors.info;
-  const timestamp = new Date().toISOString();
-  console.log(`${colorCode}[${timestamp}] [${type.toUpperCase()}] ${message}\x1b[0m`);
-}
-
-// Function to make GitHub API requests
+// Make GitHub API request with authentication
 async function githubRequest(endpoint, method = 'GET', data = null) {
   try {
-    const url = `https://api.github.com/repos/${OWNER}/${REPO}${endpoint}`;
-    const headers = {
-      'Authorization': `token ${GITHUB_TOKEN}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'BLACKSKYMD-Upload-Script'
-    };
+    const url = endpoint.startsWith('http') ? endpoint : `${API_URL}${endpoint}`;
     
-    const options = {
+    const response = await axios({
+      url,
       method,
-      headers
-    };
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'BLACKSKYMD-Uploader'
+      },
+      data
+    });
     
-    if (data) {
-      options.body = JSON.stringify(data);
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    const response = await fetch(url, options);
-    
-    if (!response.ok && response.status !== 404) {
-      const errorText = await response.text();
-      throw new Error(`GitHub API error (${response.status}): ${errorText}`);
-    }
-    
-    if (method === 'GET' && response.status !== 404) {
-      return await response.json();
-    }
-    
-    return response;
+    return response.data;
   } catch (error) {
-    log(`API request error: ${error.message}`, 'error');
+    if (error.response) {
+      log(`GitHub API Error: ${error.response.status} - ${error.response.data.message}`, 'error');
+      return { error: error.response.data.message, status: error.response.status };
+    } else {
+      log(`GitHub API Request Failed: ${error.message}`, 'error');
+      return { error: error.message };
+    }
+  }
+}
+
+// Check if repository exists
+async function checkRepository() {
+  log(`Checking if repository ${REPO_OWNER}/${REPO_NAME} exists...`);
+  
+  try {
+    const result = await githubRequest('');
+    if (result && result.error) {
+      if (result.status === 404) {
+        log(`Repository ${REPO_OWNER}/${REPO_NAME} does not exist.`, 'warning');
+        return false;
+      } else {
+        throw new Error(result.error);
+      }
+    }
+    
+    log(`Repository ${REPO_OWNER}/${REPO_NAME} exists and is accessible.`, 'success');
+    return true;
+  } catch (error) {
+    log(`Error checking repository: ${error.message}`, 'error');
     throw error;
   }
 }
 
-// Function to check if repository exists
-async function checkRepository() {
-  try {
-    log(`Checking repository: ${OWNER}/${REPO}`);
-    const response = await githubRequest('');
-    
-    if (response && response.name) {
-      log(`Repository ${OWNER}/${REPO} exists and is accessible`, 'success');
-      return true;
-    }
-    return false;
-  } catch (error) {
-    log(`Failed to access repository: ${error.message}`, 'error');
-    return false;
-  }
-}
-
-// Function to create repository if it doesn't exist
+// Create a new repository if it doesn't exist
 async function createRepository() {
   try {
-    log(`Creating repository: ${REPO}`);
+    log(`Creating new repository: ${REPO_NAME}...`);
     
-    const url = 'https://api.github.com/user/repos';
-    const headers = {
-      'Authorization': `token ${GITHUB_TOKEN}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'BLACKSKYMD-Upload-Script'
-    };
-    
-    const data = {
-      name: REPO,
-      description: 'BLACKSKY-MD WhatsApp Bot',
+    const result = await githubRequest('https://api.github.com/user/repos', 'POST', {
+      name: REPO_NAME,
+      description: 'BLACKSKY-MD WhatsApp Bot with Heroku deployment support',
       private: false,
-      auto_init: true
-    };
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data)
+      has_issues: true,
+      has_projects: true,
+      has_wiki: true
     });
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to create repository: ${errorText}`);
+    if (result && result.error) {
+      throw new Error(result.error);
     }
     
-    log(`Repository ${REPO} created successfully`, 'success');
+    log(`Repository ${REPO_OWNER}/${REPO_NAME} created successfully!`, 'success');
     return true;
   } catch (error) {
-    log(`Error creating repository: ${error.message}`, 'error');
-    return false;
+    log(`Failed to create repository: ${error.message}`, 'error');
+    throw error;
   }
 }
 
-// Function to get file content
+// Get file content and convert to base64
 function getFileContent(filePath) {
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    return Buffer.from(content).toString('base64');
+    const content = fs.readFileSync(filePath);
+    return content.toString('base64');
   } catch (error) {
     log(`Error reading file ${filePath}: ${error.message}`, 'error');
-    return null;
+    throw error;
   }
 }
 
-// Function to upload a file to GitHub
+// Upload a single file to GitHub
 async function uploadFile(filePath) {
   try {
-    log(`Uploading ${filePath}...`);
+    log(`Uploading: ${filePath}...`);
     
-    // Check if file already exists
+    // Get base64 content
+    const content = getFileContent(filePath);
+    
+    // Check if file exists to get its SHA (needed for update)
     let sha = null;
     try {
       const existingFile = await githubRequest(`/contents/${filePath}`);
-      if (existingFile && existingFile.sha) {
+      if (existingFile && !existingFile.error) {
         sha = existingFile.sha;
-        log(`File exists, will update: ${filePath}`);
+        log(`File exists, will update: ${filePath}`, 'info');
       }
     } catch (error) {
-      // File doesn't exist, will create it
-      log(`File does not exist yet, will create: ${filePath}`);
+      // File doesn't exist, will create new
+      log(`File doesn't exist yet, will create: ${filePath}`, 'info');
     }
     
-    // Get file content
-    const content = getFileContent(filePath);
-    if (!content) {
-      log(`Failed to read file content: ${filePath}`, 'error');
-      return false;
+    // Check if we need to create directory structure
+    const dirPath = path.dirname(filePath);
+    if (dirPath !== '.' && dirPath !== '/') {
+      await createDirectoryStructure(dirPath);
     }
     
     // Create or update file
-    const data = {
-      message: `Upload file: ${filePath}`,
+    const result = await githubRequest(`/contents/${filePath}`, 'PUT', {
+      message: sha ? `Update ${filePath}` : `Add ${filePath}`,
       content: content,
-      branch: BRANCH
-    };
+      sha: sha
+    });
     
-    if (sha) {
-      data.sha = sha;
+    if (result && result.error) {
+      throw new Error(result.error);
     }
     
-    const response = await githubRequest(`/contents/${filePath}`, 'PUT', data);
-    
-    if (response.status === 200 || response.status === 201) {
-      log(`Successfully uploaded: ${filePath}`, 'success');
-      return true;
-    } else {
-      log(`Failed to upload: ${filePath}`, 'error');
-      return false;
-    }
+    log(`Successfully uploaded: ${filePath}`, 'success');
+    return true;
   } catch (error) {
-    log(`Error uploading file ${filePath}: ${error.message}`, 'error');
+    log(`Failed to upload ${filePath}: ${error.message}`, 'error');
     return false;
   }
 }
 
-// Function to create directory structure if needed
+// Create directory structure (recursive)
 async function createDirectoryStructure(filePath) {
-  const dirPath = path.dirname(filePath);
-  if (dirPath === '.') return true;
+  // Only proceed if the path has multiple levels
+  if (!filePath.includes('/')) return;
   
-  const parts = dirPath.split('/');
+  const parts = filePath.split('/');
   let currentPath = '';
   
   for (let i = 0; i < parts.length; i++) {
     currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
     
+    // Skip checking the last part (which is the actual file)
+    if (i === parts.length - 1) continue;
+    
     try {
-      // Check if directory exists by trying to get a file that likely doesn't exist
-      const checkPath = `${currentPath}/_directory_check_`;
-      await githubRequest(`/contents/${checkPath}`);
-      // If we get here without 404, something unexpected is happening
-      log(`Unexpected response when checking directory: ${currentPath}`, 'warning');
+      // Check if directory exists already
+      const checkResult = await githubRequest(`/contents/${currentPath}`);
+      if (checkResult && !checkResult.error) {
+        // Directory exists, continue
+        continue;
+      }
     } catch (error) {
-      // 404 is expected, any other error is a problem
-      if (error.message.includes('404')) {
-        // Directory might not exist, try to create a placeholder
-        if (i === parts.length - 1) {
-          // This is the last directory part, don't create a placeholder
-          continue;
-        }
+      // Directory doesn't exist, we need to create a placeholder file
+      try {
+        log(`Creating directory structure: ${currentPath}`, 'info');
         
-        try {
-          const placeholderPath = `${currentPath}/.gitkeep`;
-          const data = {
-            message: `Create directory: ${currentPath}`,
-            content: Buffer.from('').toString('base64'),
-            branch: BRANCH
-          };
-          
-          await githubRequest(`/contents/${placeholderPath}`, 'PUT', data);
-          log(`Created directory structure: ${currentPath}`, 'success');
-        } catch (dirError) {
-          log(`Error creating directory ${currentPath}: ${dirError.message}`, 'error');
-          return false;
+        // Create a .gitkeep file in the directory
+        const result = await githubRequest(`/contents/${currentPath}/.gitkeep`, 'PUT', {
+          message: `Create directory ${currentPath}`,
+          content: 'Cg==', // Base64 for empty string
+        });
+        
+        if (result && result.error) {
+          throw new Error(result.error);
         }
-      } else {
-        log(`Error checking directory ${currentPath}: ${error.message}`, 'error');
-        return false;
+      } catch (dirError) {
+        // If we get a 422 error, the directory probably already exists
+        if (!dirError.message.includes('422')) {
+          log(`Warning: Could not create directory ${currentPath}: ${dirError.message}`, 'warning');
+        }
       }
     }
   }
-  
-  return true;
 }
 
-// Function to upload essential files
+// Upload all essential files to GitHub
 async function uploadEssentialFiles(essentialPaths) {
   try {
-    // Check if repository exists and is accessible
-    const repoExists = await checkRepository();
-    if (!repoExists) {
-      log('Repository not accessible. Exiting.', 'error');
-      return false;
-    }
+    log(`Starting upload of ${essentialPaths.length} essential files...`);
     
-    // Upload each file
+    // Upload files one by one
     let successCount = 0;
-    let failureCount = 0;
+    let failCount = 0;
     
-    for (const filePath of essentialPaths) {
-      // Ensure directory structure exists for this file
-      await createDirectoryStructure(filePath);
+    for (let i = 0; i < essentialPaths.length; i++) {
+      const filePath = essentialPaths[i];
+      log(`Processing file ${i + 1} of ${essentialPaths.length}: ${filePath}`, 'info');
       
-      // Upload the file
       const success = await uploadFile(filePath);
-      
       if (success) {
         successCount++;
       } else {
-        failureCount++;
+        failCount++;
       }
       
       // Add a small delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     
-    log(`Upload complete. ${successCount} files uploaded successfully, ${failureCount} files failed.`, 
-        failureCount === 0 ? 'success' : 'warning');
-    
-    return failureCount === 0;
+    log(`Upload complete: ${successCount} files uploaded successfully, ${failCount} failed.`, 'info');
+    return { successCount, failCount };
   } catch (error) {
-    log(`Error in upload process: ${error.message}`, 'error');
-    return false;
+    log(`Error uploading files: ${error.message}`, 'error');
+    throw error;
   }
 }
 
 // Main function
 async function main() {
   try {
-    log('Starting essential files upload...');
-    
-    // Filter for files that exist
-    const { existingFiles, missingFiles } = filterExistingFiles(ESSENTIAL_PATHS);
-    
-    if (missingFiles.length > 0) {
-      log(`The following files are missing and will be skipped: ${missingFiles.join(', ')}`, 'warning');
+    // Check GitHub token
+    if (!GITHUB_TOKEN) {
+      log('GitHub token not provided. Set the GITHUB_TOKEN environment variable.', 'error');
+      process.exit(1);
     }
     
-    log(`Found ${existingFiles.length} out of ${ESSENTIAL_PATHS.length} essential files`);
+    log('Starting GitHub essential files upload process...', 'info');
+    log(`Target: https://github.com/${REPO_OWNER}/${REPO_NAME}`, 'info');
     
-    // Upload essential files
+    // Check if repository exists
+    const repoExists = await checkRepository();
+    
+    // Create repository if it doesn't exist
+    if (!repoExists) {
+      await createRepository();
+    }
+    
+    // Filter to only existing files
+    const existingFiles = filterExistingFiles(ESSENTIAL_FILES);
+    log(`Found ${existingFiles.length} essential files to upload.`, 'info');
+    
+    // Upload all essential files
     await uploadEssentialFiles(existingFiles);
     
-    log('Essential files upload process completed', 'success');
+    log('GitHub upload process completed successfully!', 'success');
+    log(`Your repository is available at: https://github.com/${REPO_OWNER}/${REPO_NAME}`, 'success');
   } catch (error) {
-    log(`Unhandled error: ${error.message}`, 'error');
+    log(`GitHub upload process failed: ${error.message}`, 'error');
     process.exit(1);
   }
 }
 
+// Execute main function
 main();
