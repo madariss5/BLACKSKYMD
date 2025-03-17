@@ -1,60 +1,306 @@
 /**
  * Advanced WhatsApp Connection Manager
- * Sequentially tries different browser fingerprints and connection methods
- * until one successfully establishes a connection
+ * Enhanced for 24/7 uptime and stability
  */
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
+const ConnectionMonitor = require('./src/utils/connectionMonitor');
+const pino = require('pino');
 
-// Configuration - optimized for faster responses
+// Configuration 
 const BASE_AUTH_FOLDER = './auth_info_manager';
-const MAX_QR_ATTEMPTS = 10;  // Reduced for faster cycling through browsers
-const CONNECTION_TIMEOUT = 30000; // Faster timeout for quicker response
-const MAX_CONNECTION_ATTEMPTS = 3; // Reduced for faster browser cycling
+const MAX_QR_ATTEMPTS = 5;
+const CONNECTION_TIMEOUT = 60000;
+const KEEP_ALIVE_INTERVAL = 10000;
+const MEMORY_CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutes
+const MEMORY_THRESHOLD = 800 * 1024 * 1024; // 800MB
 
-// Browser configurations to try (in order)
+// Enhanced browser configurations with rotating user agents
 const BROWSER_CONFIGS = [
     {
         name: 'Firefox',
         auth_folder: `${BASE_AUTH_FOLDER}_firefox`,
-        fingerprint: ['Firefox', 'Linux', '110.0'],
-        user_agent: 'Mozilla/5.0 (X11; Linux x86_64; rv:110.0) Gecko/20100101 Firefox/110.0'
-    },
-    {
-        name: 'Safari',
-        auth_folder: `${BASE_AUTH_FOLDER}_safari`,
-        fingerprint: ['Safari', 'Mac OS', '16.4'],
-        user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_3_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15'
+        fingerprint: ['Firefox', 'Linux', '115.0'],
+        user_agent: 'Mozilla/5.0 (X11; Linux x86_64; rv:115.0) Gecko/20100101 Firefox/115.0'
     },
     {
         name: 'Chrome',
         auth_folder: `${BASE_AUTH_FOLDER}_chrome`,
-        fingerprint: ['Chrome', 'Windows', '112.0.5615.49'],
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36'
+        fingerprint: ['Chrome', 'Windows', '120.0.0.0'],
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     },
     {
-        name: 'Edge',
-        auth_folder: `${BASE_AUTH_FOLDER}_edge`,
-        fingerprint: ['Edge', 'Windows', '112.0.1722.34'],
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36 Edg/112.0.1722.34'
-    },
-    {
-        name: 'Opera',
-        auth_folder: `${BASE_AUTH_FOLDER}_opera`,
-        fingerprint: ['Opera', 'Linux', '96.0.4693.50'],
-        user_agent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 OPR/93.0.0.0'
+        name: 'Safari',
+        auth_folder: `${BASE_AUTH_FOLDER}_safari`,
+        fingerprint: ['Safari', 'Mac OS', '17.0'],
+        user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
     }
 ];
 
-// State tracking
+// Connection state
 let currentBrowserIndex = 0;
 let connectionAttempts = 0;
 let qrAttempts = 0;
 let isConnected = false;
 let messageHandlerInitialized = false;
+let connectionMonitor = null;
+let currentSocket = null;
+let keepAliveInterval = null;
+
+// Initialize connection monitor
+function initConnectionMonitor(sock) {
+    connectionMonitor = new ConnectionMonitor({
+        checkIntervalMs: 30000,
+        maxReconnectAttempts: 10,
+        reconnectBackoffMs: 5000,
+        autoReconnect: true,
+        notifyDiscoveredIssues: true
+    });
+
+    connectionMonitor.startMonitoring(sock);
+}
+
+// Keep-alive mechanism
+function startKeepAlive(sock) {
+    if (keepAliveInterval) {
+        clearInterval(keepAliveInterval);
+    }
+
+    keepAliveInterval = setInterval(async () => {
+        try {
+            // Send keep-alive signal
+            if (sock?.ws?.readyState === sock?.ws?.OPEN) {
+                sock.ws.send('KeepAlive');
+            }
+
+            // Check connection health
+            const health = await connectionMonitor?.checkHealth();
+            if (health?.healthScore < 50) {
+                console.log('[KeepAlive] Poor connection health detected, initiating recovery...');
+                await handleConnectionRecovery(sock);
+            }
+        } catch (err) {
+            console.error('[KeepAlive] Error:', err.message);
+        }
+    }, KEEP_ALIVE_INTERVAL);
+}
+
+// Memory optimization
+function optimizeMemory() {
+    try {
+        const memUsage = process.memoryUsage();
+        const heapUsed = memUsage.heapUsed;
+
+        if (heapUsed > MEMORY_THRESHOLD) {
+            console.log('[Memory] High memory usage detected, performing cleanup...');
+
+            // Force garbage collection if available
+            if (global.gc) {
+                global.gc();
+            }
+
+            // Clear message caches
+            if (currentSocket?.store) {
+                currentSocket.store.messages.clear();
+                currentSocket.store.chats.clear();
+            }
+        }
+    } catch (err) {
+        console.error('[Memory] Optimization error:', err.message);
+    }
+}
+
+// Enhanced connection recovery
+async function handleConnectionRecovery(sock) {
+    try {
+        console.log('[Recovery] Initiating connection recovery...');
+
+        // Stop existing monitoring
+        connectionMonitor?.stopMonitoring();
+
+        // Clear intervals
+        if (keepAliveInterval) {
+            clearInterval(keepAliveInterval);
+        }
+
+        // Attempt graceful logout
+        try {
+            await sock?.logout();
+        } catch (err) {
+            // Ignore logout errors
+        }
+
+        // Initialize fresh connection
+        currentSocket = await initializeConnection();
+
+        if (currentSocket) {
+            console.log('[Recovery] Connection recovered successfully');
+            initConnectionMonitor(currentSocket);
+            startKeepAlive(currentSocket);
+        }
+    } catch (err) {
+        console.error('[Recovery] Error during recovery:', err.message);
+        // Try next browser profile
+        currentBrowserIndex = (currentBrowserIndex + 1) % BROWSER_CONFIGS.length;
+        setTimeout(() => tryNextBrowser(), 5000);
+    }
+}
+
+// Initialize connection with enhanced error handling
+async function initializeConnection() {
+    const config = BROWSER_CONFIGS[currentBrowserIndex];
+    console.log(`\n[Connection] Attempting connection with ${config.name} profile...`);
+
+    try {
+        const { state, saveCreds } = await useMultiFileAuthState(config.auth_folder);
+
+        const sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: true,
+            browser: config.fingerprint,
+            version: [2, 2323, 4],
+            connectTimeoutMs: CONNECTION_TIMEOUT,
+            keepAliveIntervalMs: KEEP_ALIVE_INTERVAL,
+            retryRequestDelayMs: 2000,
+            markOnlineOnConnect: true,
+            userAgent: config.user_agent,
+            logger: pino({ level: 'silent' }),
+            defaultQueryTimeoutMs: 60000,
+            emitOwnEvents: false
+        });
+
+        // Handle connection updates
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                handleQRCode(qr, config);
+            }
+
+            if (connection === 'open') {
+                handleSuccessfulConnection(sock, saveCreds);
+            }
+
+            if (connection === 'close') {
+                handleDisconnection(sock, lastDisconnect);
+            }
+        });
+
+        // Handle creds update
+        sock.ev.on('creds.update', saveCreds);
+
+        return sock;
+    } catch (err) {
+        console.error('[Connection] Error:', err.message);
+        return null;
+    }
+}
+
+// Handle QR code generation
+function handleQRCode(qr, config) {
+    qrAttempts++;
+    console.clear();
+    console.log('\n=== BLACKSKY-MD WHATSAPP QR ===');
+    console.log(`Browser: ${config.name} (Attempt ${qrAttempts}/${MAX_QR_ATTEMPTS})`);
+    qrcode.generate(qr, { small: true });
+
+    if (qrAttempts >= MAX_QR_ATTEMPTS) {
+        console.log('[QR] Max attempts reached, trying next browser...');
+        currentBrowserIndex = (currentBrowserIndex + 1) % BROWSER_CONFIGS.length;
+        qrAttempts = 0;
+        setTimeout(() => tryNextBrowser(), 2000);
+    }
+}
+
+// Handle successful connection
+async function handleSuccessfulConnection(sock, saveCreds) {
+    console.log('\n✅ Connected successfully!');
+    isConnected = true;
+    currentSocket = sock;
+
+    // Initialize monitoring
+    initConnectionMonitor(sock);
+    startKeepAlive(sock);
+
+    // Save credentials
+    await saveCreds();
+
+    // Initialize message handler
+    try {
+        if (!messageHandlerInitialized) {
+            const messageHandler = require('./src/simplified-message-handler');
+            await messageHandler.init(sock);
+            messageHandlerInitialized = true;
+            console.log('✅ Message handler initialized');
+        }
+    } catch (err) {
+        console.error('[Handler] Error:', err.message);
+    }
+}
+
+// Handle disconnection
+async function handleDisconnection(sock, lastDisconnect) {
+    const statusCode = lastDisconnect?.error?.output?.statusCode;
+    console.log(`[Disconnection] Status code: ${statusCode}`);
+
+    if (statusCode === DisconnectReason.loggedOut) {
+        console.log('[Auth] Logged out, switching profile...');
+        currentBrowserIndex = (currentBrowserIndex + 1) % BROWSER_CONFIGS.length;
+        setTimeout(() => tryNextBrowser(), 5000);
+    } else {
+        // Attempt recovery
+        await handleConnectionRecovery(sock);
+    }
+}
+
+// Start connection process
+async function startConnection() {
+    // Set up memory optimization interval
+    setInterval(optimizeMemory, MEMORY_CHECK_INTERVAL);
+
+    // Initialize connection
+    currentSocket = await initializeConnection();
+
+    if (!currentSocket) {
+        console.log('[Startup] Initial connection failed, retrying...');
+        setTimeout(() => tryNextBrowser(), 5000);
+    }
+}
+
+
+// Try connecting with the next browser configuration
+async function tryNextBrowser() {
+    // Reset if we've tried all browsers
+    if (currentBrowserIndex >= BROWSER_CONFIGS.length) {
+        console.log('Tried all browser configurations. Starting over with the first one...');
+        currentBrowserIndex = 0;
+    }
+
+    currentSocket = await initializeConnection();
+}
+
+
+// Initialize message handler once connected
+async function initializeMessageHandler(sock) {
+    if (messageHandlerInitialized) return true;
+
+    try {
+        const messageHandler = require('./src/simplified-message-handler');
+        await messageHandler.init(sock);
+        console.log('Message handler initialized! Bot is now ready to respond to commands.');
+        console.log('Command modules have been loaded from both /commands and /src/commands folders.');
+        console.log('Try sending ".help" to the bot to see available commands.');
+        messageHandlerInitialized = true;
+        return true;
+    } catch (err) {
+        console.error(`Error initializing message handler: ${err.message}`);
+        console.error('The bot will work but won\'t respond to commands');
+        return false;
+    }
+}
 
 // Create folders if they don't exist
 BROWSER_CONFIGS.forEach(config => {
@@ -72,20 +318,20 @@ function copyExistingCredentials() {
         './auth_info_terminal_qr',
         './auth_info_firefox'
     ];
-    
+
     for (const source of possibleSources) {
         if (fs.existsSync(source) && fs.lstatSync(source).isDirectory()) {
             const files = fs.readdirSync(source);
-            
+
             if (files.length > 0 && files.includes('creds.json')) {
                 console.log(`Found existing credentials in ${source}, copying to all browser auth folders...`);
-                
+
                 BROWSER_CONFIGS.forEach(config => {
                     try {
                         if (!fs.existsSync(config.auth_folder)) {
                             fs.mkdirSync(config.auth_folder, { recursive: true });
                         }
-                        
+
                         files.forEach(file => {
                             try {
                                 fs.copyFileSync(
@@ -100,344 +346,13 @@ function copyExistingCredentials() {
                         // Ignore folder errors
                     }
                 });
-                
+
                 return true;
             }
         }
     }
-    
+
     return false;
-}
-
-// Initialize message handler once connected
-async function initializeMessageHandler(sock) {
-    if (messageHandlerInitialized) return true;
-    
-    try {
-        const messageHandler = require('./src/simplified-message-handler');
-        await messageHandler.init(sock);
-        console.log('Message handler initialized! Bot is now ready to respond to commands.');
-        console.log('Command modules have been loaded from both /commands and /src/commands folders.');
-        console.log('Try sending ".help" to the bot to see available commands.');
-        messageHandlerInitialized = true;
-        return true;
-    } catch (err) {
-        console.error(`Error initializing message handler: ${err.message}`);
-        console.error('The bot will work but won\'t respond to commands');
-        return false;
-    }
-}
-
-// Try connecting with the next browser configuration
-async function tryNextBrowser() {
-    // Reset if we've tried all browsers
-    if (currentBrowserIndex >= BROWSER_CONFIGS.length) {
-        console.log('Tried all browser configurations. Starting over with the first one...');
-        currentBrowserIndex = 0;
-    }
-    
-    const config = BROWSER_CONFIGS[currentBrowserIndex];
-    console.log(`\nTrying connection with ${config.name} browser fingerprint (${currentBrowserIndex + 1}/${BROWSER_CONFIGS.length})`);
-    
-    connectionAttempts++;
-    qrAttempts = 0;
-    
-    try {
-        // Initialize auth state
-        const { state, saveCreds } = await useMultiFileAuthState(config.auth_folder);
-        
-        // Create socket with optimized configuration for faster responses
-        const sock = makeWASocket({
-            auth: state,
-            printQRInTerminal: true,
-            browser: config.fingerprint,
-            userAgent: config.user_agent,
-            connectTimeoutMs: CONNECTION_TIMEOUT,
-            defaultQueryTimeoutMs: 20000, // Faster query timeout
-            syncFullHistory: false,       // Don't sync history (faster)
-            markOnlineOnConnect: true,
-            qrTimeout: 30000,            // Faster QR timeout
-            fireInitQueries: false,      // Skip init queries for speed
-            keepAliveIntervalMs: 10000,  // More frequent keepalive
-            emitOwnEvents: false,        // Reduce event processing overhead
-            retryRequestDelayMs: 250,    // Faster retry for failed requests
-            transactionOpts: {
-                maxCommitRetries: 1,     // Fewer retries for faster operation
-                maxRetries: 2            // Reduce retries for failed messages
-            },
-            // Enhanced message patching for optimized delivery and better compatibility
-            patchMessageBeforeSending: msg => {
-                try {
-                    // Add viewOnce mode to images if they're marked for it (but missing the flag)
-                    if (msg.message?.imageMessage && msg.message.imageMessage.viewOnce === true) {
-                        msg.message = {
-                            viewOnceMessage: {
-                                message: {
-                                    ...msg.message
-                                }
-                            }
-                        };
-                    }
-                    
-                    // Add viewOnce mode to videos if they're marked for it (but missing the flag)
-                    if (msg.message?.videoMessage && msg.message.videoMessage.viewOnce === true) {
-                        msg.message = {
-                            viewOnceMessage: {
-                                message: {
-                                    ...msg.message
-                                }
-                            }
-                        };
-                    }
-                    
-                    // Enhance message with appropriate metadata for better delivery success
-                    if (msg.message) {
-                        // Add proper messaging metadata for non-group messages
-                        if (!msg.key.remoteJid.endsWith('@g.us') && !msg.message.protocolMessage) {
-                            msg.message.messageContextInfo = {
-                                deviceListMetadata: {},
-                                deviceListMetadataVersion: 2
-                            };
-                        }
-                    }
-                    
-                    // Ensure buttonId values are strings to prevent WhatsApp errors
-                    if (msg.message?.buttonsMessage?.buttons) {
-                        msg.message.buttonsMessage.buttons.forEach(button => {
-                            if (button.buttonId && typeof button.buttonId !== 'string') {
-                                button.buttonId = button.buttonId.toString();
-                            }
-                        });
-                    }
-                } catch (err) {
-                    console.log("Error in message patch function:", err);
-                    // Return original message on error
-                }
-                return msg;
-            }
-        });
-        
-        // Handle credential updates
-        sock.ev.on('creds.update', async () => {
-            await saveCreds();
-            
-            // Copy credentials to other folders for compatibility
-            if (isConnected) {
-                BROWSER_CONFIGS.forEach(browserConfig => {
-                    if (browserConfig.auth_folder !== config.auth_folder) {
-                        try {
-                            const files = fs.readdirSync(config.auth_folder);
-                            for (const file of files) {
-                                fs.copyFileSync(
-                                    path.join(config.auth_folder, file),
-                                    path.join(browserConfig.auth_folder, file)
-                                );
-                            }
-                        } catch (err) {
-                            // Ignore copy errors
-                        }
-                    }
-                });
-                
-                // Also copy to standard folders
-                const standardFolders = ['./auth_info_baileys', './auth_info'];
-                standardFolders.forEach(folder => {
-                    try {
-                        if (!fs.existsSync(folder)) {
-                            fs.mkdirSync(folder, { recursive: true });
-                        }
-                        
-                        const files = fs.readdirSync(config.auth_folder);
-                        for (const file of files) {
-                            fs.copyFileSync(
-                                path.join(config.auth_folder, file),
-                                path.join(folder, file)
-                            );
-                        }
-                    } catch (err) {
-                        // Ignore copy errors
-                    }
-                });
-            }
-        });
-        
-        // Handle connection updates
-        sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-            
-            // Handle QR code
-            if (qr) {
-                qrAttempts++;
-                
-                // Clear terminal and display QR code
-                console.clear();
-                console.log('\n\n');
-                console.log('▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄');
-                console.log(`█ BLACKSKY-MD WHATSAPP QR (${config.name.toUpperCase()}) █`);
-                console.log('▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀');
-                console.log('\n1. Open WhatsApp on your phone');
-                console.log('2. Tap Menu or Settings > Linked Devices');
-                console.log('3. Tap on "Link a Device"');
-                console.log('4. Point your phone camera to scan this QR code\n\n');
-                
-                // Try to use our custom QR resizer for better visibility if available
-                try {
-                    const qrResizer = require('./src/qr-resizer');
-                    qrResizer.displayQRWithHeader(qr, {
-                        headerText: `📱 Scan this QR code with your WhatsApp (browser: ${config.name})`,
-                        footerText: `⚠️ Keep this window open - QR attempt ${qrAttempts}/${MAX_QR_ATTEMPTS}`,
-                        small: true
-                    });
-                } catch (err) {
-                    // Fallback to standard QR code if resizer not available
-                    qrcode.generate(qr, { small: true });
-                    console.log(`\n[QR code generated - attempt ${qrAttempts}/${MAX_QR_ATTEMPTS}]`);
-                    console.log(`[Browser: ${config.name}, Connection attempt: ${connectionAttempts}]`);
-                    console.log('\nWaiting for you to scan the QR code...');
-                }
-                
-                // Try next browser if QR code isn't scanned after max attempts
-                if (qrAttempts >= MAX_QR_ATTEMPTS) {
-                    console.log(`Maximum QR attempts (${MAX_QR_ATTEMPTS}) reached with ${config.name}. Trying next browser...`);
-                    currentBrowserIndex++;
-                    setTimeout(() => {
-                        tryNextBrowser();
-                    }, 1000);
-                }
-            }
-            
-            // Handle connection status
-            if (connection === 'open') {
-                console.log(`\n✅ CONNECTED SUCCESSFULLY USING ${config.name.toUpperCase()} FINGERPRINT!\n`);
-                console.log('Connection details:');
-                console.log(`- Browser: ${config.fingerprint.join(', ')}`);
-                console.log(`- Auth folder: ${config.auth_folder}`);
-                
-                isConnected = true;
-                connectionAttempts = 0;
-                qrAttempts = 0;
-                
-                // Initialize message handler
-                await initializeMessageHandler(sock);
-            }
-            
-            // Handle disconnection
-            if (connection === 'close') {
-                isConnected = false;
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const errorName = lastDisconnect?.error?.name || '';
-                const errorMessage = lastDisconnect?.error?.message || '';
-                
-                console.log(`Connection closed with status code: ${statusCode || 'unknown'}`);
-                console.log(`Error name: ${errorName}, Message: ${errorMessage}`);
-                
-                // Check for decryption errors - patterns we've seen in logs
-                const isDecryptionError = 
-                    errorMessage.includes('decrypt') || 
-                    errorMessage.includes('encryption') || 
-                    errorMessage.includes('decryption') ||
-                    errorMessage.includes('failed to log in') ||
-                    errorName.includes('DecryptionError') ||
-                    (statusCode === 401 && errorMessage.includes('Connection Failure'));
-                
-                // Check for authentication state corruption issues
-                const isAuthCorruption = 
-                    errorName === 'NotFoundException' || 
-                    errorMessage.includes('auth creds') || 
-                    errorMessage.includes('authentication');
-                
-                if (isDecryptionError || isAuthCorruption) {
-                    console.log('❌ Encryption/authentication error detected. Cleaning auth files...');
-                    
-                    try {
-                        // Use our specialized connection fix utility
-                        const connectionFix = require('./src/utils/connection-fix');
-                        
-                        // Fix the decryption error by cleaning auth files
-                        connectionFix.clearAuthFiles(config.auth_folder);
-                        
-                        // If this is a persistent issue, try a full cleanup
-                        if (connectionAttempts > 2) {
-                            console.log('Persistent connection issue detected. Performing full auth cleanup...');
-                            connectionFix.cleanAllAuthFolders();
-                        }
-                    } catch (fixErr) {
-                        console.error(`Failed to run connection fix: ${fixErr.message}`);
-                        
-                        // Fallback to basic cleanup if the utility fails
-                        try {
-                            const fs = require('fs');
-                            const path = require('path');
-                            
-                            if (fs.existsSync(config.auth_folder)) {
-                                const files = fs.readdirSync(config.auth_folder);
-                                for (const file of files) {
-                                    try {
-                                        fs.unlinkSync(path.join(config.auth_folder, file));
-                                        console.log(`Deleted ${file} from ${config.auth_folder}`);
-                                    } catch (err) {
-                                        console.log(`Failed to delete ${file}: ${err.message}`);
-                                    }
-                                }
-                            }
-                        } catch (err) {
-                            console.error(`Error during basic cleanup: ${err.message}`);
-                        }
-                    }
-                    
-                    // Try with a fresh session using the next browser
-                    console.log('Switching to next browser with fresh session...');
-                    currentBrowserIndex++;
-                    setTimeout(() => {
-                        tryNextBrowser();
-                    }, 2000);
-                }
-                // Handle traditional disconnect reasons
-                else if (statusCode === DisconnectReason.loggedOut) {
-                    console.log('Logged out from WhatsApp. Trying with different browser...');
-                    currentBrowserIndex++;
-                    setTimeout(() => {
-                        tryNextBrowser();
-                    }, 2000);
-                } else if (statusCode === 428) {
-                    // Connection closed too many times, switch to the next browser
-                    console.log('Connection closed too many times. Trying next browser...');
-                    currentBrowserIndex++;
-                    setTimeout(() => {
-                        tryNextBrowser();
-                    }, 2000);
-                } else {
-                    // Standard reconnection with the same browser
-                    const delay = Math.min(5000 * Math.pow(1.5, connectionAttempts % 5), 30000);
-                    console.log(`Reconnecting with same browser in ${Math.floor(delay/1000)} seconds...`);
-                    
-                    setTimeout(() => {
-                        if (connectionAttempts >= MAX_CONNECTION_ATTEMPTS) {
-                            // Too many attempts with this browser, try the next one
-                            console.log(`Too many connection attempts with ${config.name}. Trying next browser...`);
-                            currentBrowserIndex++;
-                            tryNextBrowser();
-                        } else {
-                            // Retry with the same browser
-                            tryNextBrowser();
-                        }
-                    }, delay);
-                }
-            }
-        });
-        
-        return sock;
-    } catch (err) {
-        console.error(`Error connecting with ${config.name}: ${err.message}`);
-        
-        // Try the next browser after a short delay
-        currentBrowserIndex++;
-        setTimeout(() => {
-            tryNextBrowser();
-        }, 2000);
-        
-        return null;
-    }
 }
 
 // Display banner
@@ -461,74 +376,36 @@ console.log(`
 copyExistingCredentials();
 
 // Start connection sequence
-tryNextBrowser().catch(err => {
+startConnection().catch(err => {
     console.error('Fatal error:');
     console.error(err);
 });
 
-// Memory optimization and management
-const memoryLimit = 800 * 1024 * 1024; // 800MB threshold
-const memoryCheckInterval = 30 * 60 * 1000; // Check every 30 minutes
-
-/**
- * Optimize memory usage to prevent out-of-memory crashes
- */
-function optimizeMemory() {
-    try {
-        // Get current memory usage
-        const memUsage = process.memoryUsage();
-        
-        // Convert to MB for easier reading
-        const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-        const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
-        const rssMB = Math.round(memUsage.rss / 1024 / 1024);
-        
-        console.log(`Memory usage: ${heapUsedMB}MB used of ${heapTotalMB}MB heap. RSS: ${rssMB}MB`);
-        
-        // If memory usage exceeds our threshold, perform cleanup
-        if (memUsage.heapUsed > memoryLimit) {
-            console.log("Memory usage high, performing garbage collection");
-            
-            // Force garbage collection if possible
-            if (global.gc) {
-                global.gc();
-                console.log("Forced garbage collection completed");
-            } else {
-                console.log("No global garbage collection available. Consider running with --expose-gc");
-            }
-            
-            // Reset message cache to free up memory
-            try {
-                const jidHelper = require('./src/utils/jidHelper');
-                if (jidHelper && jidHelper.resetMessageStats) {
-                    jidHelper.resetMessageStats();
-                    console.log("Message cache cleared");
-                }
-            } catch (err) {
-                console.log("Failed to reset message cache:", err.message);
-            }
-        }
-    } catch (err) {
-        console.error("Error during memory optimization:", err);
-    }
-}
-
-// Set up periodic memory checks
-setInterval(optimizeMemory, memoryCheckInterval);
 
 // Handle process termination
-process.on('SIGINT', () => {
-    console.log('Process terminated by user');
+process.on('SIGINT', async () => {
+    console.log('\nReceived SIGINT, cleaning up...');
+    connectionMonitor?.stopMonitoring();
+    clearInterval(keepAliveInterval);
+
+    try {
+        await currentSocket?.logout();
+    } catch (err) {
+        // Ignore logout errors
+    }
+
     process.exit(0);
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
-    
+
     // Perform memory optimization in case it's a memory-related issue
     optimizeMemory();
-    
+
     // Continue running to maintain connection
     console.log('Bot will continue running despite the error');
 });
+
+module.exports = { startConnection };

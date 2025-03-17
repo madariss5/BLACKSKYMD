@@ -3,7 +3,7 @@
     "4915561048015@s.whatsapp.net": {
       "name": "Martin",
       "age": 20,
-      "xp": 100,
+      "xp": 133,
       "level": 1,
       "coins": 244,
       "bio": "ich bin ein hund",
@@ -159,7 +159,7 @@
   "lottery": [],
   "_meta": {
     "version": 1,
-    "savedAt": "2025-03-17T10:04:20.851Z",
+    "savedAt": "2025-03-17T10:18:51.982Z",
     "profileCount": 9,
     "invalidProfileCount": 0
   }
