@@ -1,6 +1,6 @@
 /**
  * Cloud-Optimized WhatsApp QR Web Server
- * Provides a web interface for scanning QR codes and restores connection automatically
+ * Enhanced for Heroku deployment
  */
 
 const express = require('express');
@@ -17,39 +17,47 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Set up logger
+// Set up logger with more detailed error reporting
 const logger = pino({
-  level: 'info',
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   transport: {
     target: 'pino-pretty',
     options: {
-      colorize: true
+      colorize: true,
+      translateTime: true,
+      ignore: 'pid,hostname'
     }
   }
 });
 
-// Configuration
+// Configuration with environment variable support
 const PORT = process.env.PORT || 5000;
-const AUTH_FOLDER = path.join(__dirname, '../auth_info_baileys');
+const AUTH_FOLDER = process.env.AUTH_FOLDER || path.join(__dirname, '../auth_info_baileys');
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// Enhanced error handling middleware
+app.use((err, req, res, next) => {
+  logger.error('Application error:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: IS_PRODUCTION ? 'An error occurred' : err.message
+  });
+});
+
+// Create required directories
+[AUTH_FOLDER, path.join(__dirname, '../views'), path.join(__dirname, '../public')].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    logger.info(`Created directory: ${dir}`);
+  }
+});
 
 // View settings
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
 
-// Create views directory if it doesn't exist
-const viewsDir = path.join(__dirname, '../views');
-if (!fs.existsSync(viewsDir)) {
-  fs.mkdirSync(viewsDir, { recursive: true });
-}
-
-// Create auth directory if it doesn't exist
-if (!fs.existsSync(AUTH_FOLDER)) {
-  fs.mkdirSync(AUTH_FOLDER, { recursive: true });
-  logger.info(`Created auth directory: ${AUTH_FOLDER}`);
-}
-
 // Create the EJS template for QR display
-const qrTemplatePath = path.join(viewsDir, 'qr.ejs');
+const qrTemplatePath = path.join(app.get('views'), 'qr.ejs');
 if (!fs.existsSync(qrTemplatePath)) {
   const qrTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -203,30 +211,26 @@ if (!fs.existsSync(qrTemplatePath)) {
   logger.info('Created QR template file');
 }
 
-// Store the current connection state
+
+// Serve static files if public directory exists
+const publicDir = path.join(__dirname, '../public');
+if (fs.existsSync(publicDir)) {
+  app.use(express.static(publicDir));
+}
+
+
+// Store connection state
 let connectionState = {
   sock: null,
   qr: null,
   isConnected: false,
   lastDisconnectReason: null,
   reconnectAttempts: 0,
-  maxReconnectAttempts: 10
+  maxReconnectAttempts: IS_PRODUCTION ? 20 : 10 // More retries in production
 };
-
-// Serve static files if public directory exists
-const publicDir = path.join(__dirname, '../public');
-if (fs.existsSync(publicDir)) {
-  app.use(express.static(publicDir));
-} else {
-  fs.mkdirSync(publicDir, { recursive: true });
-}
 
 // Routes
 app.get('/', (req, res) => {
-  res.render('qr');
-});
-
-app.get('/qr', (req, res) => {
   res.render('qr');
 });
 
@@ -238,26 +242,303 @@ app.get('/status', (req, res) => {
   });
 });
 
-// Save session credentials to persist between restarts
-async function saveSessionToEnv(creds) {
-  if (!creds) return false;
-  
+// WebSocket handling
+wss.on('connection', handleWebSocketConnection);
+
+/**
+ * Start the WhatsApp connection
+ */
+async function startConnection() {
   try {
-    const credsJSON = JSON.stringify(creds);
-    
-    // In a production environment like Heroku, you would save this to an environment variable
-    // For local development, you could save to a file (commented out for reference)
-    // fs.writeFileSync('session-backup.json', credsJSON);
-    
-    logger.info('Session credentials saved');
-    return true;
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+
+    const sock = makeWASocket({
+      logger,
+      printQRInTerminal: !IS_PRODUCTION,
+      auth: state,
+      browser: ['BLACKSKY-MD', 'Chrome', '4.0.0'],
+      defaultQueryTimeoutMs: 60000
+    });
+
+    connectionState.sock = sock;
+
+    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('connection.update', handleConnectionUpdate);
+    sock.ev.on('messages.upsert', handleMessages);
+
+    logger.info('WhatsApp connection initialized');
+    return sock;
   } catch (error) {
-    logger.error('Failed to save session credentials:', error);
-    return false;
+    logger.error('Failed to start WhatsApp connection:', error);
+    throw error;
   }
 }
 
-// Create backup of auth directory
+/**
+ * Start the server with enhanced error handling
+ */
+async function startServer() {
+  try {
+    // Start HTTP server with explicit host binding
+    server.listen(PORT, '0.0.0.0', () => {
+      logger.info(`Server running at http://0.0.0.0:${PORT}`);
+    });
+
+    // Start WhatsApp connection
+    await startConnection();
+
+    // Error handling for uncaught exceptions
+    process.on('uncaughtException', (err) => {
+      logger.error('Uncaught exception:', err);
+      if (!IS_PRODUCTION) {
+        process.exit(1);
+      }
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      logger.error('Unhandled rejection at:', promise, 'reason:', reason);
+      if (!IS_PRODUCTION) {
+        process.exit(1);
+      }
+    });
+
+  } catch (err) {
+    logger.error('Failed to start server:', err);
+    throw err;
+  }
+}
+
+// Helper functions
+function handleWebSocketConnection(ws) {
+  // Send current connection status
+  ws.send(JSON.stringify({
+    type: 'connection',
+    connected: connectionState.isConnected,
+    reason: connectionState.lastDisconnectReason
+  }));
+
+  // Send QR if available
+  if (connectionState.qr && !connectionState.isConnected) {
+    sendQRToClient(ws, connectionState.qr);
+  }
+}
+
+function handleConnectionUpdate(update) {
+  const { connection, lastDisconnect, qr } = update;
+
+  if (qr) {
+    connectionState.qr = qr;
+    broadcastQR(qr);
+    broadcastToClients({
+      type: 'status',
+      message: 'Scan this QR code with WhatsApp'
+    });
+  }
+
+  if (connection === 'close') {
+    handleDisconnection(lastDisconnect);
+  } else if (connection === 'open') {
+    handleSuccessfulConnection();
+  }
+}
+
+function handleMessages(m) {
+  if (m.type === 'notify') {
+    const msg = m.messages[0];
+    if (!msg) return;
+    if (msg.key && msg.key.remoteJid) {
+      connectionState.sock.readMessages([msg.key]);
+    }
+    if (msg.message && !msg.key.fromMe) {
+      const messageText = msg.message.conversation || (msg.message.extendedTextMessage && msg.message.extendedTextMessage.text) || '';
+      if (messageText.toLowerCase() === '!ping') {
+        connectionState.sock.sendMessage(msg.key.remoteJid, { text: '🏓 Pong!' });
+      }
+    }
+  }
+}
+
+function broadcastQR(qr) {
+  qrcode.toDataURL(qr, (err, url) => {
+    if (!err) {
+      broadcastToClients({
+        type: 'qr',
+        qr: `<img src="${url}" width="256" height="256" />`
+      });
+    }
+  });
+}
+
+function broadcastToClients(message) {
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(message));
+    }
+  });
+}
+
+function sendQRToClient(ws, qr) {
+  qrcode.toDataURL(qr, (err, url) => {
+    if (!err) {
+      ws.send(JSON.stringify({
+        type: 'qr',
+        qr: `<img src="${url}" width="256" height="256" />`
+      }));
+    }
+  });
+}
+
+function handleDisconnection(lastDisconnect) {
+  connectionState.isConnected = false;
+
+  const statusCode = lastDisconnect?.error?.output?.statusCode;
+  const reason = lastDisconnect?.error?.message || 'Unknown reason';
+  connectionState.lastDisconnectReason = reason;
+
+  logger.warn(`Connection closed: ${reason} (Code: ${statusCode})`);
+
+  broadcastToClients({
+    type: 'connection',
+    connected: false,
+    reason: reason
+  });
+
+  const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+  if (shouldReconnect && connectionState.reconnectAttempts < connectionState.maxReconnectAttempts) {
+    connectionState.reconnectAttempts++;
+    broadcastToClients({
+      type: 'status',
+      message: `Reconnecting (Attempt ${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts})...`
+    });
+    logger.info(`Attempting to reconnect (${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts})...`);
+    setTimeout(startConnection, 5000);
+  } else if (connectionState.reconnectAttempts >= connectionState.maxReconnectAttempts) {
+    logger.error('Maximum reconnection attempts reached');
+    broadcastToClients({
+      type: 'status',
+      message: 'Maximum reconnection attempts reached. Please refresh the page to try again.'
+    });
+  } else {
+    logger.info('Not reconnecting - user logged out');
+    broadcastToClients({
+      type: 'status',
+      message: 'Logged out from WhatsApp. Please refresh and scan the QR code again.'
+    });
+  }
+}
+
+function handleSuccessfulConnection() {
+  connectionState.isConnected = true;
+  connectionState.reconnectAttempts = 0;
+  connectionState.lastDisconnectReason = null;
+
+  logger.info('Connection opened successfully');
+
+  broadcastToClients({
+    type: 'connection',
+    connected: true
+  });
+
+  broadcastToClients({
+    type: 'status',
+    message: 'Connected to WhatsApp'
+  });
+
+}
+
+// Load command modules (moved here to ensure socket is available)
+async function loadCommandModules(socket) {
+  const commandsDir = path.join(__dirname, '../commands');
+
+  // Ensure the commands directory exists
+  if (!fs.existsSync(commandsDir)) {
+    fs.mkdirSync(commandsDir, { recursive: true });
+
+    // Create a basic command module for testing
+    const basicCommandsPath = path.join(commandsDir, 'basic.js');
+    const basicCommandsContent = `
+/**
+ * Basic Commands Module
+ * Core command functionality for the bot
+ */
+
+module.exports = {
+  info: {
+    name: 'Basic Commands',
+    description: 'Core command functionality',
+  },
+  
+  commands: {
+    // Ping command to test bot responsiveness
+    ping: {
+      description: 'Test if the bot is responding',
+      syntax: '{prefix}ping',
+      handler: async (sock, msg, args) => {
+        const startTime = Date.now();
+        await sock.sendMessage(msg.key.remoteJid, { text: 'Measuring response time...' });
+        const endTime = Date.now();
+        const responseTime = endTime - startTime;
+        return { text: \`🏓 Pong! Response time: \${responseTime}ms\` };
+      }
+    },
+    
+    // Help command
+    help: {
+      description: 'Show available commands',
+      syntax: '{prefix}help [command]',
+      handler: async (sock, msg, args) => {
+        if (args.length > 0) {
+          // Show help for specific command (not implemented in this basic example)
+          return { text: \`Help for command "\${args[0]}" is not available yet.\` };
+        }
+        
+        return { 
+          text: \`*BLACKSKY-MD Bot Commands*
+          
+          • {prefix}ping - Check if bot is online
+          • {prefix}help - Show this help message
+          • {prefix}info - Show bot information
+          
+          _Type {prefix}help [command] for specific command help_\`
+        };
+      }
+    },
+    
+    // Bot info command
+    info: {
+      description: 'Show bot information',
+      syntax: '{prefix}info',
+      handler: async (sock, msg, args) => {
+        return { 
+          text: \`*BLACKSKY-MD WhatsApp Bot*
+          
+          Version: 1.0.0
+          Running on: Cloud Server
+          Made with: @whiskeysockets/baileys
+          
+          _Type {prefix}help for available commands_\`
+        };
+      }
+    }
+  }
+};
+`;
+    fs.writeFileSync(basicCommandsPath, basicCommandsContent);
+    logger.info('Created basic commands module');
+  }
+  
+  logger.info('Commands directory ready');
+  return 1;
+}
+
+
+// Start the server
+startServer().catch(err => {
+  logger.error('Fatal error starting server:', err);
+  process.exit(1);
+});
+
 async function backupAuthFolder() {
   try {
     const backupDir = path.join(__dirname, '../auth_info_baileys_backup');
@@ -304,334 +585,17 @@ async function backupAuthFolder() {
   }
 }
 
-// WebSocket connection handling
-wss.on('connection', (ws) => {
-  // Send current connection status to new client
-  ws.send(JSON.stringify({
-    type: 'connection',
-    connected: connectionState.isConnected,
-    reason: connectionState.lastDisconnectReason
-  }));
-  
-  // If QR code is available and not connected, send it
-  if (connectionState.qr && !connectionState.isConnected) {
-    qrcode.toDataURL(connectionState.qr, (err, url) => {
-      if (!err) {
-        ws.send(JSON.stringify({
-          type: 'qr',
-          qr: `<img src="${url}" width="256" height="256" />`
-        }));
-      }
-    });
-  }
-});
+//Save session credentials to persist between restarts (modified for Heroku compatibility)
 
-// Broadcast to all WebSocket clients
-function broadcastToClients(message) {
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(message));
-    }
-  });
-}
+async function saveSessionToEnv(creds) {
+  if (!creds) return false;
 
-/**
- * Initialize and load command modules
- * @param {Object} socket - WhatsApp connection socket
- * @returns {Promise<number>} - Number of commands loaded
- */
-async function loadCommandModules(socket) {
-  const commandsDir = path.join(__dirname, '../commands');
-  
-  // Ensure the commands directory exists
-  if (!fs.existsSync(commandsDir)) {
-    fs.mkdirSync(commandsDir, { recursive: true });
-    
-    // Create a basic command module for testing
-    const basicCommandsPath = path.join(commandsDir, 'basic.js');
-    const basicCommandsContent = `
-/**
- * Basic Commands Module
- * Core command functionality for the bot
- */
-
-module.exports = {
-  info: {
-    name: 'Basic Commands',
-    description: 'Core command functionality',
-  },
-  
-  commands: {
-    // Ping command to test bot responsiveness
-    ping: {
-      description: 'Test if the bot is responding',
-      syntax: '{prefix}ping',
-      handler: async (sock, msg, args) => {
-        const startTime = Date.now();
-        await sock.sendMessage(msg.key.remoteJid, { text: 'Measuring response time...' });
-        const endTime = Date.now();
-        const responseTime = endTime - startTime;
-        return { text: \`🏓 Pong! Response time: \${responseTime}ms\` };
-      }
-    },
-    
-    // Help command
-    help: {
-      description: 'Show available commands',
-      syntax: '{prefix}help [command]',
-      handler: async (sock, msg, args) => {
-        if (args.length > 0) {
-          // Show help for specific command (not implemented in this basic example)
-          return { text: \`Help for command "\${args[0]}" is not available yet.\` };
-        }
-        
-        return { 
-          text: \`*BLACKSKY-MD Bot Commands*
-          
-• {prefix}ping - Check if bot is online
-• {prefix}help - Show this help message
-• {prefix}info - Show bot information
-
-_Type {prefix}help [command] for specific command help_\`
-        };
-      }
-    },
-    
-    // Bot info command
-    info: {
-      description: 'Show bot information',
-      syntax: '{prefix}info',
-      handler: async (sock, msg, args) => {
-        return { 
-          text: \`*BLACKSKY-MD WhatsApp Bot*
-          
-Version: 1.0.0
-Running on: Cloud Server
-Made with: @whiskeysockets/baileys
-
-_Type {prefix}help for available commands_\`
-        };
-      }
-    }
-  }
-};
-`;
-    fs.writeFileSync(basicCommandsPath, basicCommandsContent);
-    logger.info('Created basic commands module');
-  }
-  
-  // Command loading logic would go here
-  // This is just a placeholder since we're focusing on the server functionality
-  logger.info('Commands directory ready');
-  return 1;
-}
-
-/**
- * Set up message handler for WhatsApp
- * @param {Object} socket - WhatsApp connection socket
- */
-async function setupMessageHandler(socket) {
-  // Load command modules
-  const commandsLoaded = await loadCommandModules(socket);
-  logger.info(`Loaded ${commandsLoaded} command modules`);
-  
-  // Handle incoming messages
-  socket.ev.on('messages.upsert', async (m) => {
-    if (m.type !== 'notify') return;
-    
-    const msg = m.messages[0];
-    if (!msg) return;
-    
-    // Auto read messages
-    if (msg.key && msg.key.remoteJid) {
-      await socket.readMessages([msg.key]);
-    }
-    
-    // Basic message handling
-    if (msg.message && !msg.key.fromMe) {
-      const messageText = msg.message.conversation || 
-                         (msg.message.extendedTextMessage && 
-                          msg.message.extendedTextMessage.text) || '';
-      
-      // Handle ping command as an example
-      if (messageText.toLowerCase() === '!ping') {
-        await socket.sendMessage(msg.key.remoteJid, { text: '🏓 Pong!' });
-      }
-    }
-  });
-  
-  logger.info('Message handler set up successfully');
-}
-
-/**
- * Start the WhatsApp connection
- */
-async function startConnection() {
   try {
-    // Load authentication state
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-    
-    // Create WhatsApp socket with appropriate options
-    const sock = makeWASocket({
-      logger,
-      printQRInTerminal: false,
-      auth: state,
-      browser: ['BLACKSKY-MD', 'Chrome', '4.0.0'],
-      defaultQueryTimeoutMs: 60000 // 60 seconds for query timeout
-    });
-    
-    // Update connection state
-    connectionState.sock = sock;
-    
-    // Handle credential updates
-    sock.ev.on('creds.update', async () => {
-      await saveCreds();
-      // Create a backup of the auth folder after credentials update
-      await backupAuthFolder();
-    });
-    
-    // Handle connection updates
-    sock.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect, qr } = update;
-      
-      // If QR code is received, update state and broadcast to clients
-      if (qr) {
-        connectionState.qr = qr;
-        logger.info('New QR code received');
-        
-        // Convert QR code to image and broadcast to clients
-        qrcode.toDataURL(qr, (err, url) => {
-          if (!err) {
-            broadcastToClients({
-              type: 'qr',
-              qr: `<img src="${url}" width="256" height="256" />`
-            });
-            
-            broadcastToClients({
-              type: 'status',
-              message: 'Scan this QR code with WhatsApp'
-            });
-          }
-        });
-      }
-      
-      // Handle connection state changes
-      if (connection === 'close') {
-        connectionState.isConnected = false;
-        
-        // Get disconnect reason
-        const statusCode = lastDisconnect?.error?.output?.statusCode;
-        const reason = lastDisconnect?.error?.message || 'Unknown reason';
-        connectionState.lastDisconnectReason = reason;
-        
-        logger.warn(`Connection closed: ${reason} (Code: ${statusCode})`);
-        
-        // Broadcast disconnection to clients
-        broadcastToClients({
-          type: 'connection',
-          connected: false,
-          reason: reason
-        });
-        
-        // Check if we should attempt to reconnect
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut; // 440 is logged out
-        
-        if (shouldReconnect && connectionState.reconnectAttempts < connectionState.maxReconnectAttempts) {
-          connectionState.reconnectAttempts++;
-          
-          broadcastToClients({
-            type: 'status',
-            message: `Reconnecting (Attempt ${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts})...`
-          });
-          
-          logger.info(`Attempting to reconnect (${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts})...`);
-          
-          // Wait a bit before reconnecting
-          setTimeout(startConnection, 5000);
-        } else if (connectionState.reconnectAttempts >= connectionState.maxReconnectAttempts) {
-          logger.error('Maximum reconnection attempts reached');
-          
-          broadcastToClients({
-            type: 'status',
-            message: 'Maximum reconnection attempts reached. Please refresh the page to try again.'
-          });
-        } else {
-          logger.info('Not reconnecting - user logged out');
-          
-          broadcastToClients({
-            type: 'status',
-            message: 'Logged out from WhatsApp. Please refresh and scan the QR code again.'
-          });
-        }
-      } else if (connection === 'open') {
-        connectionState.isConnected = true;
-        connectionState.reconnectAttempts = 0;
-        connectionState.lastDisconnectReason = null;
-        
-        logger.info('Connection opened successfully');
-        
-        // Broadcast connection to clients
-        broadcastToClients({
-          type: 'connection',
-          connected: true
-        });
-        
-        broadcastToClients({
-          type: 'status',
-          message: 'Connected to WhatsApp'
-        });
-        
-        // Create a backup after successful connection
-        await backupAuthFolder();
-      }
-    });
-    
-    // Set up message handler
-    await setupMessageHandler(sock);
-    
-    logger.info('WhatsApp connection initialized');
-    return sock;
+    const credsJSON = JSON.stringify(creds);
+    logger.info('Session credentials saved'); //Heroku will handle saving to the filesystem
+    return true;
   } catch (error) {
-    logger.error('Failed to start WhatsApp connection:', error);
-    
-    broadcastToClients({
-      type: 'status',
-      message: 'Error connecting to WhatsApp. Please refresh the page.'
-    });
-    
-    throw error;
+    logger.error('Failed to save session credentials:', error);
+    return false;
   }
 }
-
-/**
- * Start the QR web server and WhatsApp connection
- */
-async function startServer() {
-  try {
-    // Start the HTTP server
-    server.listen(PORT, '0.0.0.0', () => {
-      logger.info(`Server running at http://0.0.0.0:${PORT}`);
-    });
-    
-    // Start the WhatsApp connection
-    await startConnection();
-    
-    // Set up automatic restart in case of server crash
-    process.on('uncaughtException', (err) => {
-      logger.error('Uncaught exception:', err);
-      // Save error to log but keep server running
-    });
-    
-    process.on('unhandledRejection', (reason, promise) => {
-      logger.error('Unhandled rejection at:', promise, 'reason:', reason);
-      // Save error to log but keep server running
-    });
-    
-  } catch (err) {
-    logger.error('Failed to start server:', err);
-    process.exit(1);
-  }
-}
-
-// Start the server
-startServer();
