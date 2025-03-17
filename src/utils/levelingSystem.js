@@ -174,10 +174,29 @@ function getUserLevelData(userId) {
  * @returns {number} Current level
  */
 function calculateLevel(xp) {
+    // Simple level tiers with fixed XP thresholds
+    // This is more intuitive than logarithmic scaling for users
     if (xp < BASE_XP) return 1;
     
-    // Level formula: level = log(xp/BASE_XP) / log(XP_MULTIPLIER) + 1
-    return Math.floor(Math.log(xp / BASE_XP) / Math.log(XP_MULTIPLIER) + 1);
+    // Simplified XP scale
+    // Level 1: 0-99 XP
+    // Level 2: 100-249 XP
+    // Level 3: 250-499 XP
+    // Level 4: 500-999 XP
+    // Level 5: 1000-1999 XP
+    // etc.
+    
+    if (xp >= 10000) return 10;
+    if (xp >= 5000) return 9;
+    if (xp >= 2500) return 8;
+    if (xp >= 2000) return 7;
+    if (xp >= 1500) return 6;
+    if (xp >= 1000) return 5;
+    if (xp >= 500) return 4;
+    if (xp >= 250) return 3;
+    if (xp >= 100) return 2;
+    
+    return 1;
 }
 
 /**
@@ -187,7 +206,20 @@ function calculateLevel(xp) {
  */
 function calculateRequiredXP(level) {
     if (level <= 1) return BASE_XP;
-    return Math.floor(BASE_XP * Math.pow(XP_MULTIPLIER, level - 1));
+    
+    // XP requirements for levels match our calculateLevel thresholds
+    switch(level) {
+        case 2: return 100;
+        case 3: return 250;
+        case 4: return 500;
+        case 5: return 1000;
+        case 6: return 1500;
+        case 7: return 2000;
+        case 8: return 2500;
+        case 9: return 5000;
+        case 10: return 10000;
+        default: return Math.floor(10000 + (level - 10) * 5000); // For levels above 10
+    }
 }
 
 /**

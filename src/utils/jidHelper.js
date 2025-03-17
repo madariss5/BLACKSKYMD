@@ -58,6 +58,12 @@ function ensureJidString(jid) {
     
     // If jid is an object with remoteJid property (message.key format)
     if (typeof jid === 'object') {
+        // First check for message.key format
+        if (jid.key && jid.key.remoteJid) {
+            return jid.key.remoteJid;
+        }
+        
+        // Then check for direct remoteJid property
         if (jid.remoteJid && typeof jid.remoteJid === 'string') {
             return jid.remoteJid;
         }
@@ -128,6 +134,12 @@ function formatJidForLogging(jid) {
         
         // If JID is an object, try to extract useful info
         if (jid && typeof jid === 'object') {
+            // First check for full message object (with key property)
+            if (jid.key && jid.key.remoteJid) {
+                return formatJidForLogging(jid.key.remoteJid);
+            }
+            
+            // Then check for direct key object
             if (jid.remoteJid) {
                 return formatJidForLogging(jid.remoteJid);
             }
@@ -222,6 +234,138 @@ async function safeSendImage(sock, jid, image, caption = '', options = {}) {
 }
 
 /**
+ * Safely send an animated GIF with optimized performance
+ * @param {Object} sock - WhatsApp socket connection
+ * @param {string} jid - Recipient JID
+ * @param {Buffer|string} gif - GIF buffer or URL
+ * @param {string} caption - GIF caption
+ * @param {Object} options - Additional options
+ * @returns {Promise<Object>} - Send result
+ */
+async function safeSendAnimatedGif(sock, jid, gif, caption = '', options = {}) {
+    // Ensure we have a valid JID
+    const safeJid = ensureJidString(jid);
+    if (!safeJid) {
+        logger.error('Invalid JID for safeSendAnimatedGif');
+        return null;
+    }
+    
+    // Handle both Buffer and URL inputs
+    let gifBuffer = gif;
+    if (typeof gif === 'string' && (gif.startsWith('http://') || gif.startsWith('https://'))) {
+        try {
+            const axios = require('axios');
+            const response = await axios.get(gif, { 
+                responseType: 'arraybuffer',
+                timeout: 5000
+            });
+            gifBuffer = Buffer.from(response.data);
+            logger.info(`Downloaded GIF from URL: ${gif.substring(0, 50)}...`);
+        } catch (downloadError) {
+            logger.error(`Failed to download GIF from URL: ${downloadError.message}`);
+            throw downloadError;
+        }
+    }
+    
+    // UPDATED APPROACH: Convert to MP4 first for best animation results
+    try {
+        // Import here to avoid circular dependencies
+        const { convertGifToMp4 } = require('./gifConverter');
+        
+        // Convert GIF to MP4 for better WhatsApp compatibility
+        logger.info(`Converting GIF to MP4 for animation support (${gifBuffer.length} bytes)`);
+        const videoBuffer = await convertGifToMp4(gifBuffer);
+        
+        if (videoBuffer && videoBuffer.length > 0) {
+            // Send as video with gifPlayback: true for proper animation
+            const content = {
+                video: videoBuffer,
+                caption: caption,
+                gifPlayback: true,
+                ptt: false, // Not voice note
+                seconds: 10, // Default duration hint
+                gifAttribution: 2, // WhatsApp animation attribution
+                mimetype: 'video/mp4'
+            };
+            
+            logger.info(`Sending converted MP4 with gifPlayback (${videoBuffer.length} bytes)`);
+            return await sock.sendMessage(safeJid, content, options);
+        } else {
+            logger.warn('Video conversion returned empty buffer, falling back to alternative methods');
+        }
+    } catch (conversionError) {
+        logger.warn(`MP4 conversion failed: ${conversionError.message}, trying alternatives...`);
+    }
+    
+    // FALLBACK METHODS if the MP4 conversion fails
+    
+    // Method 1: Send as Sticker (Good for some animations)
+    try {
+        const content = {
+            sticker: gifBuffer,
+            mimetype: 'image/webp' // Try WebP format which WhatsApp prefers
+        };
+        
+        logger.info(`Fallback: Sending animated GIF as sticker (${gifBuffer.length} bytes)`);
+        return await sock.sendMessage(safeJid, content, options);
+    } catch (stickerError) {
+        logger.warn(`Sticker method failed: ${stickerError.message}`);
+    }
+    
+    // Method 2: Send as video with original GIF buffer but MP4 mimetype
+    try {
+        const content = {
+            video: gifBuffer, 
+            caption: caption,
+            gifPlayback: true,
+            jpegThumbnail: null, // Skip thumbnail generation
+            mimetype: 'video/mp4'
+        };
+        
+        logger.info(`Fallback: Sending GIF as video with MP4 mimetype (${gifBuffer.length} bytes)`);
+        return await sock.sendMessage(safeJid, content, options);
+    } catch (videoError) {
+        logger.warn(`Video method failed: ${videoError.message}`);
+    }
+    
+    // Method 3: Send as document with animation flag
+    try {
+        const content = {
+            document: gifBuffer,
+            fileName: 'animation.gif',
+            mimetype: 'image/gif',
+            caption: caption
+        };
+        
+        logger.info(`Fallback: Sending as GIF document (${gifBuffer.length} bytes)`);
+        return await sock.sendMessage(safeJid, content, options);
+    } catch (documentError) {
+        logger.warn(`Document method failed: ${documentError.message}`);
+    }
+    
+    // Method 4: Send as standard image (won't animate but at least sends)
+    try {
+        const content = {
+            image: gifBuffer,
+            caption: caption || 'Animation'
+        };
+        
+        logger.info(`Last resort: Sending as standard image (${gifBuffer.length} bytes)`);
+        return await sock.sendMessage(safeJid, content, options);
+    } catch (finalError) {
+        logger.error(`All methods failed to send GIF: ${finalError.message}`);
+        
+        // Ultimate fallback - try to return something
+        try {
+            return await sock.sendMessage(safeJid, { text: caption || "Couldn't send animation" });
+        } catch (e) {
+            logger.error(`Even text fallback failed: ${e.message}`);
+            throw finalError;
+        }
+    }
+}
+
+/**
  * Safely reply to a message with optimized performance
  * @param {Object} sock - WhatsApp socket connection
  * @param {Object} message - Original message to reply to
@@ -257,5 +401,6 @@ module.exports = {
     safeSendText,
     safeSendMessage,
     safeSendImage,
+    safeSendAnimatedGif,
     safeReply
 };

@@ -10,11 +10,55 @@ const { safeSendMessage, safeSendImage } = require('../utils/jidHelper');
 const { languageManager } = require('../utils/language');
 const config = require('../config/config');
 
-// Import commands loader function from menu.js
-const { loadAllCommands } = require('./menu');
-
 // Path to menu image
 const MENU_IMAGE_PATH = path.join(process.cwd(), 'attached_assets/images (1).jpeg');
+
+/**
+ * Load all commands from command modules
+ * @returns {Promise<{allCommands: Object, totalCommands: number}>}
+ */
+async function loadAllCommands() {
+    try {
+        const commandsDir = path.join(process.cwd(), 'src/commands');
+        const files = await fs.readdir(commandsDir);
+        
+        const allCommands = {};
+        let totalCommands = 0;
+
+        for (const file of files) {
+            if (file.endsWith('.js') && file !== 'index.js') {
+                try {
+                    const modulePath = path.join(commandsDir, file);
+                    delete require.cache[require.resolve(modulePath)];
+                    const moduleData = require(modulePath);
+                    
+                    // Normalize module data - either commands property or direct export
+                    const commands = moduleData.commands || moduleData;
+                    const category = moduleData.category || path.basename(file, '.js');
+                    
+                    if (!allCommands[category]) {
+                        allCommands[category] = [];
+                    }
+                    
+                    // Add command names to the category
+                    for (const cmdName in commands) {
+                        if (typeof commands[cmdName] === 'function') {
+                            allCommands[category].push(cmdName);
+                            totalCommands++;
+                        }
+                    }
+                } catch (err) {
+                    logger.error(`Error loading commands from ${file}:`, err);
+                }
+            }
+        }
+        
+        return { allCommands, totalCommands };
+    } catch (err) {
+        logger.error('Error loading commands:', err);
+        return { allCommands: {}, totalCommands: 0 };
+    }
+}
 
 const menu1Commands = {
     async menu1(sock, message, args) {
@@ -79,6 +123,7 @@ async function generateMenuText(prefix, isGroup, sender) {
         let menuText = `*🤖 BLACKSKY-MD BOT*\n\n`;
         menuText += `✦ *Total Commands:* ${totalCommands}\n`;
         menuText += `✦ *Prefix:* ${prefix}\n`;
+        menuText += `✦ *Version:* 2.1.0\n`;
         
         // Add user mention in groups
         if (isGroup) {
@@ -156,14 +201,16 @@ module.exports = {
     commands: menu1Commands,
     category: 'menu',
     async init(sock) {
-        logger.info('Menu1 graphical menu command initialized');
-        
         // Verify menu image exists
         try {
             await fs.access(MENU_IMAGE_PATH);
-            logger.info(`Menu image found at ${MENU_IMAGE_PATH}`);
+            const stats = await fs.stat(MENU_IMAGE_PATH);
+            const sizeKB = Math.round(stats.size / 1024);
+            logger.info(`Menu1 command initialized - Image found (${sizeKB}KB): ${MENU_IMAGE_PATH}`);
+            console.log(`Menu1 command initialized - Image found (${sizeKB}KB): ${MENU_IMAGE_PATH}`);
         } catch (err) {
-            logger.warn(`Menu image not found at ${MENU_IMAGE_PATH}. Using text-only fallback.`);
+            logger.warn(`Menu1 command initialized - Image not found at ${MENU_IMAGE_PATH}. Using text-only fallback.`);
+            console.warn(`Menu1 command initialized - Image not found at ${MENU_IMAGE_PATH}. Using text-only fallback.`);
         }
         
         return true;

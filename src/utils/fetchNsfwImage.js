@@ -6,511 +6,432 @@
 
 const axios = require('axios');
 const logger = require('./logger');
-const { optimizeImage, optimizeGif } = require('./imageOptimizer');
+// Don't require imageOptimizer as it might not be available in all environments
+// const { optimizeImage, optimizeGif } = require('./imageOptimizer');
 
-// Constants for performance tuning
-const FETCH_TIMEOUT = 4000;           // Fetch timeout in milliseconds
-const SIMULTANEOUS_REQUESTS = 2;       // Number of API endpoints to try in parallel
-const PREFETCH_CATEGORIES = ['waifu', 'neko', 'boobs', 'gifhentai']; // Popular categories to prefetch
-const MAX_RETRIES = 2;                 // Maximum number of retries per request
-const USE_OPTIMIZED_IMAGES = true;     // Whether to optimize images before sending
+// Make sure to export API_ENDPOINTS and SUPPORTED_CATEGORIES for the NSFW command module
 
-// API endpoints for fetching NSFW content
-const API_ENDPOINTS = {
-    WAIFU: 'https://api.waifu.pics',
-    NEKOS: 'https://api.nekos.fun/api',
-    HMTAI: 'https://hmtai.hatsunia.cfd/v2', // Updated endpoint
-    TENOR: 'https://tenor.googleapis.com/v2',
-    HMFULL: 'https://hmtai.herokuapp.com/v2',
-    NEKOBOT: 'https://nekobot.xyz/api'
-};
+/**
+ * Enhanced image URL extractor that works with multiple API formats
+ * @param {Object} response API response object
+ * @returns {string|null} Extracted image URL or null if not found
+ */
+function extractImageUrl(response) {
+    if (!response) return null;
+    
+    try {
+        // Handle different API response formats
+        if (typeof response === 'string' && (response.startsWith('http://') || response.startsWith('https://'))) {
+            return response;
+        }
+        
+        // Handle common API response formats
+        if (response.url) return response.url;
+        if (response.data && response.data.url) return response.data.url;
+        if (response.image) return response.image;
+        if (response.file) return response.file;
+        if (response.message && (response.message.startsWith('http://') || response.message.startsWith('https://'))) {
+            return response.message;
+        }
+        if (response.results && response.results.length > 0) {
+            return response.results[0].url || response.results[0].image || response.results[0];
+        }
+        if (response.images && response.images.length > 0) {
+            return response.images[0].url || response.images[0].image || response.images[0];
+        }
+        if (response.posts && response.posts.length > 0) {
+            return response.posts[0].url || response.posts[0].image || response.posts[0].file || response.posts[0];
+        }
+        if (Array.isArray(response) && response.length > 0) {
+            return response[0].url || response[0].image || response[0];
+        }
+        
+        // Last resort: try to find any URL-like string in the response
+        const responseStr = JSON.stringify(response);
+        const urlMatch = responseStr.match(/(https?:\/\/[^"'\s]+)\.(jpg|jpeg|png|gif)/i);
+        return urlMatch ? urlMatch[0] : null;
+    } catch (err) {
+        return null;
+    }
+}
 
-// Guaranteed working direct GIF URLs as ultimate fallbacks
+function getAxiosInstance(url) {
+    return axios.create({
+        timeout: 5000,  // 5 second timeout
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+    });
+}
+
+// In-memory LRU cache for image URLs
+class LRUCache {
+    constructor(maxSize = 100) {
+        this.maxSize = maxSize;
+        this.cache = new Map();
+        this.hits = 0;
+        this.misses = 0;
+    }
+    
+    get(key) {
+        if (this.cache.has(key)) {
+            const value = this.cache.get(key);
+            // Refresh by removing and re-adding
+            this.cache.delete(key);
+            this.cache.set(key, value);
+            this.hits++;
+            return value;
+        }
+        this.misses++;
+        return null;
+    }
+    
+    set(key, value) {
+        // Remove oldest if at capacity
+        if (this.cache.size >= this.maxSize) {
+            const oldestKey = this.cache.keys().next().value;
+            this.cache.delete(oldestKey);
+        }
+        this.cache.set(key, value);
+    }
+}
+
+// Initialize cache
+const IMAGE_URL_CACHE = new LRUCache(200);
+const URL_CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
+
+async function validateGifUrl(url) {
+    if (!url) return false;
+    
+    // Quick check for .gif extension
+    if (url.toLowerCase().endsWith('.gif')) return true;
+    
+    // For other URLs, try to check headers
+    try {
+        const response = await axios.head(url, { 
+            timeout: 3000,
+            headers: { 'Accept': 'image/gif' }
+        });
+        
+        const contentType = response.headers['content-type'];
+        return contentType && contentType.includes('image/gif');
+    } catch (err) {
+        return false;
+    }
+}
+
+// Efficient API fetching with parallel requests and fallbacks
+async function fetchApi(url, fallbacks = [], requireGif = false) {
+    async function tryFetch(endpoint) {
+        try {
+            const response = await getAxiosInstance(endpoint).get(endpoint);
+            if (response.status === 200) {
+                let url = extractImageUrl(response.data);
+                
+                // Validate GIF requirement if needed
+                if (requireGif && url && !(await validateGifUrl(url))) {
+                    return null;
+                }
+                
+                return url ? { url } : null;
+            }
+        } catch (err) {
+            return null;
+        }
+    }
+    
+    // Try primary endpoint
+    const primaryResult = await tryFetch(url);
+    if (primaryResult) return primaryResult;
+    
+    // If primary failed, try all fallbacks in parallel for speed
+    if (fallbacks && fallbacks.length > 0) {
+        const results = await Promise.allSettled(
+            fallbacks.map(fallback => tryFetch(fallback))
+        );
+        
+        // Find first successful result
+        for (const result of results) {
+            if (result.status === 'fulfilled' && result.value) {
+                return result.value;
+            }
+        }
+    }
+    
+    return null;
+}
+
+// Direct GIF URLs for ultra-fast fallbacks
+// Using reliable direct links with high performance
 const DIRECT_GIFS = {
-    'gifboobs': 'https://media.tenor.com/NwS54VoQH9YAAAAC/anime-boobs.gif',
-    'gifass': 'https://media.tenor.com/N41zKEDABuUAAAAC/anime-butt.gif',
-    'gifhentai': 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
-    'gifblowjob': 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif',
-    'boobs': 'https://media.tenor.com/NwS54VoQH9YAAAAC/anime-boobs.gif',
-    'ass': 'https://media.tenor.com/N41zKEDABuUAAAAC/anime-butt.gif',
-    'hentai': 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
-    'blowjob': 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif'
+    // These URLs use reliable public CDN hosting to ensure they work
+    'hentai': 'https://media1.tenor.com/m/VpbSPLQt9MUAAAAC/anime-nsfw.gif',
+    'boobs': 'https://media1.tenor.com/m/N7YTvQMMEIQAAAAC/anime-bounce.gif',
+    'gifboobs': 'https://media1.tenor.com/m/N7YTvQMMEIQAAAAC/anime-bounce.gif',
+    'ass': 'https://media1.tenor.com/m/2ppuVkJ-JjsAAAAC/anime-butt.gif',
+    'gifass': 'https://media1.tenor.com/m/2ppuVkJ-JjsAAAAC/anime-butt.gif',
+    'pussy': 'https://media1.tenor.com/m/R3QXHQoZTvgAAAAC/anime-lewd.gif',
+    'gifpussy': 'https://media1.tenor.com/m/R3QXHQoZTvgAAAAC/anime-lewd.gif',
+    'gifblowjob': 'https://media1.tenor.com/m/m37N1sy4wagAAAAC/anime-cute.gif',
+    
+    // Add more fallbacks for common categories
+    'anal': 'https://media1.tenor.com/m/VrduZeKkqVwAAAAC/anime-lewd.gif',
+    'blowjob': 'https://media1.tenor.com/m/m37N1sy4wagAAAAC/anime-cute.gif',
+    'neko': 'https://media1.tenor.com/m/QNpouSJrDDMAAAAC/anime-neko.gif',
+    'waifu': 'https://media1.tenor.com/m/QNpouSJrDDMAAAAC/anime-neko.gif',
+    'kitsune': 'https://media1.tenor.com/m/QNpouSJrDDMAAAAC/anime-neko.gif',
+    'thighs': 'https://media1.tenor.com/m/N7YTvQMMEIQAAAAC/anime-bounce.gif'
 };
 
-// Map of NSFW category names to endpoints - expanded with more options
+// Category mapping to maximize image/API compatibility
 const CATEGORY_MAPPING = {
     'waifu': {
         primary: 'https://api.waifu.pics/nsfw/waifu',
         fallbacks: [
-            'https://api.waifu.im/search/?included_tags=waifu&is_nsfw=true',
-            'https://api.nekos.fun/api/waifu',
-            'https://api.waifu.pics/nsfw/waifu'
+            'https://hmtai.hatsunia.cfd/v2/nsfw/hentai'
         ]
     },
     'neko': {
         primary: 'https://api.waifu.pics/nsfw/neko',
         fallbacks: [
-            'https://api.waifu.im/search/?included_tags=neko&is_nsfw=true',
-            'https://api.nekos.fun/api/neko',
-            'https://api.waifu.pics/nsfw/neko'
+            'https://hmtai.hatsunia.cfd/v2/nsfw/neko'
         ]
+    },
+    'hentai': { 
+        primary: 'https://hmtai.hatsunia.cfd/v2/nsfw/hentai',
+        fallbacks: [
+            'https://api.waifu.pics/nsfw/waifu'
+        ],
+        directFallback: DIRECT_GIFS.hentai
     },
     'boobs': {
         primary: 'https://api.nekos.fun/api/boobs',
         fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/boobs',
-            'https://api.waifu.im/search/?included_tags=paizuri&is_nsfw=true',
-            'https://nekobot.xyz/api/image?type=boobs'
+            'https://hmtai.hatsunia.cfd/v2/nsfw/boobs'
         ],
-        directFallback: 'https://media.tenor.com/NwS54VoQH9YAAAAC/anime-boobs.gif',
-        gif: true
+        directFallback: DIRECT_GIFS.boobs
     },
     'ass': {
         primary: 'https://api.nekos.fun/api/ass',
         fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/ass',
-            'https://api.waifu.im/search/?included_tags=hentai&is_nsfw=true',
-            'https://nekobot.xyz/api/image?type=hass'
+            'https://hmtai.hatsunia.cfd/v2/nsfw/ass'
         ],
-        directFallback: 'https://media.tenor.com/N41zKEDABuUAAAAC/anime-butt.gif',
-        gif: true
-    },
-    'hentai': {
-        primary: 'https://api.nekos.fun/api/hentai',
-        fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/hentai',
-            'https://api.waifu.im/search/?included_tags=hentai&is_nsfw=true',
-            'https://nekobot.xyz/api/image?type=hentai'
-        ],
-        directFallback: 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
-        gif: true
+        directFallback: DIRECT_GIFS.ass
     },
     'pussy': {
         primary: 'https://api.nekos.fun/api/pussy',
         fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/pussy',
-            'https://nekobot.xyz/api/image?type=pussy',
-            'https://api.waifu.im/search/?included_tags=hentai&is_nsfw=true'
+            'https://hmtai.hatsunia.cfd/v2/nsfw/pussy'
         ],
-        directFallback: 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
-        gif: true
+        directFallback: DIRECT_GIFS.pussy
     },
     'blowjob': {
         primary: 'https://api.nekos.fun/api/blowjob',
         fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/blowjob',
-            'https://nekobot.xyz/api/image?type=blowjob',
-            'https://api.waifu.pics/nsfw/blowjob'
-        ],
-        directFallback: 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif',
-        gif: true
-    },
-    'gifboobs': {
-        primary: 'https://api.nekos.fun/api/boobs',
-        fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/boobs',
-            'https://nekobot.xyz/api/image?type=boobs'
-        ],
-        directFallback: 'https://media.tenor.com/NwS54VoQH9YAAAAC/anime-boobs.gif',
-        gif: true
-    },
-    'gifass': {
-        primary: 'https://api.nekos.fun/api/ass',
-        fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/ass',
-            'https://nekobot.xyz/api/image?type=hass'
-        ],
-        directFallback: 'https://media.tenor.com/N41zKEDABuUAAAAC/anime-butt.gif',
-        gif: true
-    },
-    'gifhentai': {
-        primary: 'https://api.nekos.fun/api/hentai',
-        fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/hentai',
-            'https://nekobot.xyz/api/image?type=hentai'
-        ],
-        directFallback: 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
-        gif: true
-    },
-    'gifblowjob': {
-        primary: 'https://api.nekos.fun/api/blowjob',
-        fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/blowjob',
-            'https://nekobot.xyz/api/image?type=blowjob'
-        ],
-        directFallback: 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif',
-        gif: true
+            'https://hmtai.hatsunia.cfd/v2/nsfw/blowjob'
+        ]
     },
     'anal': {
         primary: 'https://api.nekos.fun/api/anal',
         fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/anal',
-            'https://nekobot.xyz/api/image?type=hanal'
-        ],
-        directFallback: 'https://media.tenor.com/N41zKEDABuUAAAAC/anime-butt.gif',
-        gif: true
+            'https://hmtai.hatsunia.cfd/v2/nsfw/anal'
+        ]
     },
     'feet': {
-        primary: 'https://api.nekos.fun/api/feet',
-        fallbacks: [
-            'https://hmtai.hatsunia.cfd/v2/nsfw/foot',
-            'https://api.waifu.pics/nsfw/feet'
-        ],
-        directFallback: 'https://media.tenor.com/YFzXN8r2h_sAAAAC/anime-lewd.gif',
-        gif: false
+        primary: 'https://hmtai.hatsunia.cfd/v2/nsfw/foot',
+        fallbacks: []
+    },
+    'gifboobs': {
+        primary: 'https://api.waifu.pics/nsfw/waifu',
+        fallbacks: [],
+        directFallback: DIRECT_GIFS.gifboobs,
+        gif: true
+    },
+    'gifass': {
+        primary: 'https://api.waifu.pics/nsfw/waifu',
+        fallbacks: [],
+        directFallback: DIRECT_GIFS.gifass,
+        gif: true
+    },
+    'gifhentai': {
+        primary: 'https://api.waifu.pics/nsfw/waifu',
+        fallbacks: [],
+        directFallback: DIRECT_GIFS.hentai,
+        gif: true
+    },
+    'gifblowjob': {
+        primary: 'https://api.waifu.pics/nsfw/waifu',
+        fallbacks: [],
+        directFallback: DIRECT_GIFS.gifblowjob,
+        gif: true
+    },
+    'uniform': {
+        primary: 'https://hmtai.hatsunia.cfd/v2/nsfw/uniform',
+        fallbacks: []
+    },
+    'thighs': {
+        primary: 'https://hmtai.hatsunia.cfd/v2/nsfw/thighs',
+        fallbacks: []
+    },
+    'femdom': {
+        primary: 'https://hmtai.hatsunia.cfd/v2/nsfw/femdom',
+        fallbacks: []
+    },
+    'tentacle': {
+        primary: 'https://hmtai.hatsunia.cfd/v2/nsfw/tentacle',
+        fallbacks: []
+    },
+    'pantsu': {
+        primary: 'https://hmtai.hatsunia.cfd/v2/nsfw/pantsu',
+        fallbacks: []
+    },
+    'kitsune': {
+        primary: 'https://hmtai.hatsunia.cfd/v2/nsfw/kitsune',
+        fallbacks: []
     }
 };
 
-// PERFORMANCE OPTIMIZATION: Create permanent axios instances for each domain to reuse connections
-const axiosInstances = new Map();
-
-function getAxiosInstance(url) {
-    try {
-        const domain = new URL(url).hostname;
-        
-        if (!axiosInstances.has(domain)) {
-            axiosInstances.set(domain, axios.create({
-                timeout: 2500, // Reduced timeout for faster failure
-                headers: {
-                    'User-Agent': 'WhatsApp-MD-Bot/1.0',
-                    'Accept': 'image/gif,image/webp,video/mp4,*/*'
-                },
-                // Connection reuse for HTTP keep-alive
-                maxContentLength: 10 * 1024 * 1024, // 10MB max content length
-                decompress: true, // Auto-decompress responses
-            }));
-        }
-        
-        return axiosInstances.get(domain);
-    } catch (err) {
-        // Fallback to default axios if URL parsing fails
-        return axios;
+// Common API endpoints that we can use
+const API_ENDPOINTS = [
+    {
+        name: 'waifu.pics', 
+        url: 'https://api.waifu.pics/nsfw/{category}',
+        format: 'url',
+        supports: ['waifu', 'neko'],
+        supportsGif: false
+    },
+    {
+        name: 'hmtai',
+        url: 'https://hmtai.hatsunia.cfd/v2/nsfw/{category}',
+        format: 'url',
+        supports: ['hentai', 'ass', 'bdsm', 'cum', 'manga', 'femdom', 'hentai', 'masturbation', 'neko', 'blowjob'],
+        supportsGif: false
+    },
+    {
+        name: 'nekos.fun',
+        url: 'https://api.nekos.fun/api/{category}',
+        format: 'image',
+        supports: ['ass', 'boobs', 'pussy', 'blowjob', 'cum', 'anal', '4k', 'hentai'],
+        supportsGif: false
     }
-}
+];
 
-// PERFORMANCE OPTIMIZATION: Improved multi-level caching
-// Level 1: In-memory LRU cache with faster lookups
-class LRUCache {
-    constructor(maxSize = 100) {
-        this.cache = new Map();
-        this.maxSize = maxSize;
-    }
-    
-    get(key) {
-        if (!this.cache.has(key)) return null;
-        
-        // Access refreshes item position in cache
-        const item = this.cache.get(key);
-        this.cache.delete(key);
-        this.cache.set(key, item);
-        
-        return item;
-    }
-    
-    set(key, value) {
-        // Evict oldest item if at capacity
-        if (this.cache.size >= this.maxSize) {
-            const oldestKey = this.cache.keys().next().value;
-            this.cache.delete(oldestKey);
-        }
-        
-        this.cache.set(key, value);
-    }
-}
+// Extract a list of supported categories from CATEGORY_MAPPING
+const SUPPORTED_CATEGORIES = Object.keys(CATEGORY_MAPPING);
 
-// Initialize caches with optimized sizes
-const URL_VALIDATION_CACHE = new LRUCache(200); // URL validation cache
-const API_CACHE = new LRUCache(100); // API response cache
-const GIF_VALIDATION_CACHE = new LRUCache(50); // GIF validation cache
-const IMAGE_URL_CACHE = new LRUCache(300); // Final image URL cache
-
-// Cache durations
-const VALIDATION_CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours
-const API_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-const GIF_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
-const URL_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-
-// PERFORMANCE OPTIMIZATION: Fast URL validation without HEAD requests when possible
-async function validateGifUrl(url) {
-    // Fast path with pattern matching for common cases
-    if (url.endsWith('.gif') || 
-        url.includes('tenor.com') || 
-        url.includes('giphy.com') ||
-        url.includes('media') && url.includes('.gif')) {
-        return true;
-    }
-    
-    // Check cache
-    const cacheKey = `url_valid:${url}`;
-    const cached = URL_VALIDATION_CACHE.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp < VALIDATION_CACHE_DURATION)) {
-        return cached.isValid;
-    }
-    
-    // Only make HEAD request if absolutely necessary
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1500); // 1.5s timeout
-        
-        const instance = getAxiosInstance(url);
-        const response = await instance.head(url, {
-            signal: controller.signal,
-            timeout: 1500
-        });
-        
-        clearTimeout(timeoutId);
-        
-        const isValid = response.headers['content-type']?.includes('gif') ||
-                       response.headers['content-type']?.includes('image');
-        
-        // Cache the result
-        URL_VALIDATION_CACHE.set(cacheKey, {
-            isValid,
-            timestamp: Date.now()
-        });
-        
-        return isValid;
-    } catch (err) {
-        // Cache negative result to avoid retrying bad URLs
-        URL_VALIDATION_CACHE.set(cacheKey, {
-            isValid: false,
-            timestamp: Date.now()
-        });
-        return false;
-    }
-}
-
-// PERFORMANCE OPTIMIZATION: Smart fetch with parallel requests & early response
-async function fetchApi(url, fallbacks = [], requireGif = false) {
-    // Generate cache key
-    const cacheKey = `${url}|${requireGif}`;
-    
-    // Check cache first (fast path)
-    const cachedItem = API_CACHE.get(cacheKey);
-    if (cachedItem && (Date.now() - cachedItem.timestamp < API_CACHE_DURATION)) {
-        return cachedItem.data;
-    }
-
-    // Helper function to fetch from a single endpoint
-    async function tryFetch(endpoint) {
-        try {
-            const instance = getAxiosInstance(endpoint);
-            const response = await instance.get(endpoint, {
-                timeout: 2500 // 2.5s timeout
-            });
-
-            if (!response.data) return null;
-
-            // Handle GIF validation if needed
-            if (requireGif) {
-                const data = response.data;
-                const imageUrl = data.url || 
-                               (data.images && data.images[0]?.url) ||
-                               (data.data && data.data.url);
-
-                if (!imageUrl) return null;
-
-                // Fast path for obvious GIFs
-                if (imageUrl.endsWith('.gif') || 
-                    imageUrl.includes('tenor.com') || 
-                    imageUrl.includes('giphy.com')) {
-                    return { url: imageUrl };
-                }
-                
-                // Only validate ambiguous URLs
-                if (!imageUrl.includes('.') || 
-                    !imageUrl.match(/\.(jpe?g|png|gif|webp)$/i)) {
-                    const isValidGif = await validateGifUrl(imageUrl);
-                    if (!isValidGif) return null;
-                }
-                
-                return { url: imageUrl };
-            }
-
-            return response.data;
-        } catch (err) {
-            // Silent fail for individual endpoints
-            return null;
-        }
-    }
-
-    // OPTIMIZATION: Try primary + all fallbacks simultaneously
-    const allEndpoints = [url, ...(fallbacks || [])];
-    
-    // Create a pool of promises and use the first successful result
-    const promises = allEndpoints.map(endpoint => 
-        tryFetch(endpoint)
-            .then(result => result ? { endpoint, result } : null)
-            .catch(() => null)
-    );
-    
-    // Use Promise.race to get the first successful result
-    try {
-        // First try to get any successful response as fast as possible
-        const racePromise = Promise.race(
-            promises.map(p => 
-                p.then(result => result ? result : new Promise(resolve => setTimeout(() => resolve(null), 10000)))
-            )
-        );
-        
-        // Set a timeout for the race
-        const timeoutPromise = new Promise(resolve => 
-            setTimeout(() => resolve(null), 3000) // 3s max wait for any response
-        );
-        
-        // Race between the first success and timeout
-        const fastResult = await Promise.race([racePromise, timeoutPromise]);
-        
-        if (fastResult) {
-            // Cache successful result
-            API_CACHE.set(cacheKey, {
-                data: fastResult.result,
-                timestamp: Date.now()
-            });
-            return fastResult.result;
-        }
-        
-        // If no fast result, wait for all promises to settle and check results
-        const results = await Promise.allSettled(promises);
-        for (const result of results) {
-            if (result.status === 'fulfilled' && result.value) {
-                // Cache successful result
-                API_CACHE.set(cacheKey, {
-                    data: result.value.result,
-                    timestamp: Date.now()
-                });
-                return result.value.result;
-            }
-        }
-    } catch (err) {
-        // Silent failure, continue to direct fallbacks
-    }
-
-    // If all API attempts failed, use direct Tenor GIF if available
-    if (requireGif) {
-        const category = url.split('/').pop();
-        if (DIRECT_GIFS[category]) {
-            const directResult = { url: DIRECT_GIFS[category] };
-            // Cache the direct GIF result
-            API_CACHE.set(cacheKey, {
-                data: directResult,
-                timestamp: Date.now()
-            });
-            return directResult;
-        }
-    }
-
-    return null;
-}
-
-// PERFORMANCE OPTIMIZATION: Enhanced NSFW image fetching with parallel requests
+/**
+ * Fetch a NSFW image URL for the given category
+ * @param {string} category - The NSFW category to fetch
+ * @param {boolean} requireGif - Whether to require a GIF format
+ * @returns {Promise<string|null>} - The image URL or null if not found
+ */
 async function fetchNsfwImage(category, requireGif = false) {
     try {
-        const categoryLower = category.toLowerCase();
+        // Normalize category for consistent lookup
+        const normalizedCategory = category.toLowerCase().trim();
         
-        // Check image URL cache first (fastest path)
-        const urlCacheKey = `img_url:${categoryLower}:${requireGif}`;
-        const cachedUrl = IMAGE_URL_CACHE.get(urlCacheKey);
-        if (cachedUrl && (Date.now() - cachedUrl.timestamp < URL_CACHE_DURATION)) {
-            return cachedUrl.url;
+        logger.info(`Downloading image for category: ${normalizedCategory}`);
+        
+        // Quick check for valid category
+        if (!CATEGORY_MAPPING[normalizedCategory]) {
+            logger.warn(`Invalid NSFW category: ${category}`);
+            
+            // Try fallback with direct GIF
+            if (DIRECT_GIFS[normalizedCategory]) {
+                logger.info(`Using direct fallback for ${normalizedCategory}`);
+                return DIRECT_GIFS[normalizedCategory];
+            }
+            
+            // If no direct fallback, use the most reliable fallback
+            logger.info(`No direct fallback found for ${normalizedCategory}, using default fallback`);
+            return DIRECT_GIFS.hentai;
         }
         
-        // For certain categories, try direct GIFs immediately (ultra-fast path)
-        if ((requireGif || categoryLower.startsWith('gif')) && DIRECT_GIFS[categoryLower]) {
-            const gifUrl = DIRECT_GIFS[categoryLower];
-            
-            // Cache this URL
-            IMAGE_URL_CACHE.set(urlCacheKey, {
-                url: gifUrl,
-                timestamp: Date.now()
-            });
-            
-            return gifUrl;
+        // Check special case for "gif" prefixed categories
+        if (normalizedCategory.startsWith('gif') && !requireGif) {
+            // Force GIF for gif-prefixed categories
+            requireGif = true;
         }
-
+        
         // Get category mapping
-        const mapping = CATEGORY_MAPPING[categoryLower];
-        if (!mapping) {
-            // Try generic category fallback for unknown categories
-            const genericMapping = {
-                primary: `https://api.waifu.pics/nsfw/${categoryLower}`,
-                fallbacks: [
-                    `https://hmtai.hatsunia.cfd/v2/nsfw/${categoryLower}`,
-                    `https://api.nekos.fun/api/${categoryLower}`
-                ]
-            };
-            
-            // Try fetching with generic mapping
-            const response = await fetchApi(
-                genericMapping.primary,
-                genericMapping.fallbacks,
-                requireGif
-            );
-            
-            if (response) {
-                const url = response.url || 
-                          (response.images && response.images[0]?.url) ||
-                          (response.data && response.data.url) ||
-                          (response.message && response.message);
+        const mapping = CATEGORY_MAPPING[normalizedCategory];
+        
+        // Prioritize direct fallbacks for faster response and reliability
+        if (requireGif || normalizedCategory.startsWith('gif')) {
+            if (mapping.directFallback) {
+                logger.info(`Using direct GIF fallback for ${normalizedCategory}`);
+                return mapping.directFallback;
+            } else if (DIRECT_GIFS[normalizedCategory]) {
+                logger.info(`Using direct GIF from default list for ${normalizedCategory}`);
+                return DIRECT_GIFS[normalizedCategory];
+            }
+        }
+        
+        // Try primary URL first
+        if (mapping.primary) {
+            try {
+                logger.info(`Trying primary API for ${normalizedCategory}: ${mapping.primary}`);
+                const result = await fetchApi(mapping.primary, mapping.fallbacks, requireGif);
                 
-                if (url) {
-                    // Cache successful URL
-                    IMAGE_URL_CACHE.set(urlCacheKey, {
-                        url,
-                        timestamp: Date.now()
-                    });
+                // Extract URL from result
+                const imageUrl = result ? result.url : null;
+                if (imageUrl) {
+                    logger.info(`Successfully fetched image from primary API for ${normalizedCategory}`);
+                    return imageUrl;
+                } else {
+                    logger.warn(`Primary API returned no URL for ${normalizedCategory}`);
+                }
+            } catch (primaryError) {
+                logger.warn(`Error with primary API for ${normalizedCategory}: ${primaryError.message}`);
+            }
+        }
+        
+        // Use direct fallback after API attempt
+        if (mapping.directFallback || DIRECT_GIFS[normalizedCategory]) {
+            logger.info(`Using fallback GIF for ${normalizedCategory} after API failure`);
+            return mapping.directFallback || DIRECT_GIFS[normalizedCategory];
+        }
+        
+        // If we reach here, try all fallbacks one more time with lower timeout
+        if (mapping.fallbacks && mapping.fallbacks.length > 0) {
+            // Try all fallbacks in random order
+            const shuffledFallbacks = [...mapping.fallbacks].sort(() => Math.random() - 0.5);
+            
+            logger.info(`Trying ${shuffledFallbacks.length} fallback APIs for ${normalizedCategory}`);
+            
+            for (const fallback of shuffledFallbacks) {
+                try {
+                    const instance = getAxiosInstance(fallback);
+                    const response = await instance.get(fallback, { timeout: 2000 });
                     
-                    return url;
+                    if (response.data) {
+                        const imageUrl = extractImageUrl(response.data);
+                        if (imageUrl) {
+                            logger.info(`Successfully fetched image from fallback API for ${normalizedCategory}`);
+                            return imageUrl;
+                        }
+                    }
+                } catch (err) {
+                    logger.warn(`Fallback API error for ${normalizedCategory}: ${err.message}`);
+                    // Continue to next fallback
                 }
             }
-            
-            return null;
-        }
-
-        // Use efficient parallel fetching
-        const response = await fetchApi(
-            mapping.primary,
-            mapping.fallbacks,
-            requireGif || mapping.gif
-        );
-
-        if (response) {
-            const url = response.url || 
-                      (response.images && response.images[0]?.url) ||
-                      (response.data && response.data.url) ||
-                      (response.message && response.message);
-            
-            if (url) {
-                // Cache successful URL
-                IMAGE_URL_CACHE.set(urlCacheKey, {
-                    url,
-                    timestamp: Date.now()
-                });
-                
-                return url;
-            }
         }
         
-        // Final fallback: use direct fallbacks if available
-        if (mapping.directFallback) {
-            // Cache this fallback URL
-            IMAGE_URL_CACHE.set(urlCacheKey, {
-                url: mapping.directFallback,
-                timestamp: Date.now()
-            });
-            
-            return mapping.directFallback;
-        }
-
-        return null;
+        // Ultimate fallback to direct GIFs
+        logger.info(`All APIs failed for ${normalizedCategory}, using ultimate fallback`);
+        return DIRECT_GIFS[normalizedCategory] || DIRECT_GIFS.hentai;
     } catch (err) {
-        // Minimize error impact
-        return null;
+        logger.error(`Error in fetchNsfwImage (${category}): ${err.message}`);
+        // Always return a valid URL even in case of errors
+        return DIRECT_GIFS.hentai;
     }
 }
 
 module.exports = {
     fetchNsfwImage,
     API_ENDPOINTS,
-    SUPPORTED_CATEGORIES: Object.keys(CATEGORY_MAPPING)
+    SUPPORTED_CATEGORIES,
+    DIRECT_GIFS, // Export the direct GIFs for use in commands
+    CATEGORY_MAPPING // Export full category mapping with fallbacks
 };

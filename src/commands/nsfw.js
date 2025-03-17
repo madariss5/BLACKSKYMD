@@ -20,8 +20,8 @@ const {
     formatJidForLogging
 } = require('../utils/jidHelper');
 
-// Import optimized NSFW image fetching utility
-const { fetchNsfwImage, API_ENDPOINTS, SUPPORTED_CATEGORIES } = require('../utils/fetchNsfwImage');
+// Import optimized NSFW image fetching utility with correct exports
+const nsfwUtils = require('../utils/fetchNsfwImage');
 
 const TEMP_DIR = path.join(process.cwd(), 'temp/nsfw');
 
@@ -265,27 +265,8 @@ async function downloadMedia(url, timeout = 5000) {
  * @returns {Promise<boolean>} - Whether sending was successful
  */
 async function fetchAndSendNsfwImage(sock, jid, category, caption, requireGif = false) {
-    // Define direct fallback URLs - these are used when all APIs fail
-    const DIRECT_GIFS = {
-        'hentai': 'https://i.imgur.com/5uss6YD.gif',
-        'boobs': 'https://i.imgur.com/CniLJ7G.gif',
-        'ass': 'https://i.imgur.com/UIUszlj.gif',
-        'pussy': 'https://i.imgur.com/Eq6sSn1.gif',
-        'blowjob': 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif',
-        'feet': 'https://i.imgur.com/pWHHXF6.gif',
-        'gifboobs': 'https://i.imgur.com/CniLJ7G.gif',
-        'gifass': 'https://i.imgur.com/UIUszlj.gif',
-        'gifhentai': 'https://i.imgur.com/5uss6YD.gif',
-        'gifblowjob': 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif',
-        'waifu': 'https://i.imgur.com/x5Rz9DR.jpg',
-        'neko': 'https://i.imgur.com/YSZaEiX.jpg',
-        'uniform': 'https://i.imgur.com/NWQJ9NS.jpg',
-        'thighs': 'https://i.imgur.com/2r9XQB9.jpg',
-        'femdom': 'https://i.imgur.com/Y89UFxR.jpg',
-        'tentacle': 'https://i.imgur.com/IZ6AjDg.jpg',
-        'pantsu': 'https://i.imgur.com/yjGUrKG.jpg',
-        'kitsune': 'https://i.imgur.com/sxbpLc3.jpg'
-    };
+    // Use DIRECT_GIFS from the centralized nsfwUtils module
+    const DIRECT_GIFS = nsfwUtils.DIRECT_GIFS;
 
     try {
         // Start timing for performance tracking
@@ -295,7 +276,7 @@ async function fetchAndSendNsfwImage(sock, jid, category, caption, requireGif = 
         await safeSendText(sock, jid, 'Fetching image...');
 
         // Try optimized fetchNsfwImage utility first with parallel operation
-        const imageUrl = await fetchNsfwImage(category, requireGif);
+        const imageUrl = await nsfwUtils.fetchNsfwImage(category, requireGif);
         
         if (imageUrl) {
             // Fast path for known optimized domains
@@ -308,10 +289,35 @@ async function fetchAndSendNsfwImage(sock, jid, category, caption, requireGif = 
                 try {
                     logger.info(`Downloading media from ${imageUrl}`);
                     
-                    // Send directly using the URL to avoid unnecessary buffering
-                    if (requireGif) {
-                        await safeSendAnimatedGif(sock, jid, imageUrl, caption || `${category.toUpperCase()} 🔞`);
+                    // Handle GIFs with proper animation
+                    if (requireGif || category.startsWith('gif')) {
+                        // Download the GIF buffer
+                        const axios = require('axios');
+                        const response = await axios.get(imageUrl, { 
+                            responseType: 'arraybuffer',
+                            timeout: 5000
+                        });
+                        
+                        const buffer = Buffer.from(response.data);
+                        
+                        // Convert to MP4 for better animation
+                        const { convertGifToMp4 } = require('../utils/gifConverter');
+                        const videoBuffer = await convertGifToMp4(buffer);
+                        
+                        if (videoBuffer) {
+                            // Send as video with gifPlayback for proper animation
+                            await safeSendMessage(sock, jid, {
+                                video: videoBuffer,
+                                caption: caption || `${category.toUpperCase()} 🔞`,
+                                gifPlayback: true,
+                                mimetype: 'video/mp4'
+                            });
+                        } else {
+                            // Fallback to standard safeSendAnimatedGif
+                            await safeSendAnimatedGif(sock, jid, buffer, caption || `${category.toUpperCase()} 🔞`);
+                        }
                     } else {
+                        // For static images, use standard image sending
                         await safeSendImage(sock, jid, imageUrl, caption || `${category.toUpperCase()} 🔞`);
                     }
                     
@@ -348,15 +354,40 @@ async function fetchAndSendNsfwImage(sock, jid, category, caption, requireGif = 
         
         // Fallback to direct GIFs from our constant list - ultra-fast path
         // This should be very quick since it's a direct, known URL
-        const fallbackUrl = DIRECT_GIFS[category] || DIRECT_GIFS[requireGif ? 'gif' + category : category];
+        const fallbackUrl = nsfwUtils.DIRECT_GIFS[category] || nsfwUtils.DIRECT_GIFS[requireGif ? 'gif' + category : category];
         if (fallbackUrl) {
             logger.info(`Using direct fallback for ${category}: ${fallbackUrl}`);
             
             try {
-                // Try to send directly first for faster response
-                if (requireGif) {
-                    await safeSendAnimatedGif(sock, jid, fallbackUrl, caption || `${category.toUpperCase()} 🔞`);
+                // For GIFs, use the improved animation handling
+                if (requireGif || category.startsWith('gif')) {
+                    // Download the GIF buffer
+                    const axios = require('axios');
+                    const response = await axios.get(fallbackUrl, { 
+                        responseType: 'arraybuffer',
+                        timeout: 5000
+                    });
+                    
+                    const buffer = Buffer.from(response.data);
+                    
+                    // Convert GIF to MP4 for better animation
+                    const { convertGifToMp4 } = require('../utils/gifConverter');
+                    const videoBuffer = await convertGifToMp4(buffer);
+                    
+                    if (videoBuffer) {
+                        // Send as video with gifPlayback for proper animation
+                        await safeSendMessage(sock, jid, {
+                            video: videoBuffer,
+                            caption: caption || `${category.toUpperCase()} 🔞`,
+                            gifPlayback: true,
+                            mimetype: 'video/mp4'
+                        });
+                    } else {
+                        // Fallback to standard animated GIF
+                        await safeSendAnimatedGif(sock, jid, buffer, caption || `${category.toUpperCase()} 🔞`);
+                    }
                 } else {
+                    // For static images, use standard image sending
                     await safeSendImage(sock, jid, fallbackUrl, caption || `${category.toUpperCase()} 🔞`);
                 }
                 
@@ -436,36 +467,62 @@ async function sendNsfwGif(sock, sender, url, caption) {
                 throw new Error(`Invalid media type: ${fileType?.mime || 'unknown'}`);
             }
             
-            // Try sending as animation first
+            // Try converting to MP4 for better animation
             try {
-                await safeSendAnimatedGif(sock, sender, buffer, caption);
-                logger.info(`NSFW GIF sent successfully to ${formatJidForLogging(sender)}`);
-                return true;
+                // Import the gifConverter utility
+                const { convertGifToMp4 } = require('../utils/gifConverter');
+                
+                // Convert GIF to MP4 for better animation in WhatsApp
+                const videoBuffer = await convertGifToMp4(buffer);
+                
+                if (videoBuffer) {
+                    // Send as video with gifPlayback for proper animation
+                    await safeSendMessage(sock, sender, {
+                        video: videoBuffer,
+                        caption: caption,
+                        gifPlayback: true,
+                        mimetype: 'video/mp4'
+                    });
+                    
+                    logger.info(`NSFW GIF sent as MP4 video to ${formatJidForLogging(sender)}`);
+                    return true;
+                } else {
+                    // If conversion fails, try standard animated GIF
+                    logger.warn('MP4 conversion failed, trying standard GIF format');
+                    await safeSendAnimatedGif(sock, sender, buffer, caption);
+                    logger.info(`NSFW GIF sent using standard method to ${formatJidForLogging(sender)}`);
+                    return true;
+                }
             } catch (gifError) {
-                logger.warn(`Failed to send as animated GIF: ${gifError.message}, trying as sticker...`);
+                logger.warn(`Failed to send as animated GIF/MP4: ${gifError.message}, trying as sticker...`);
                 
-                // Fallback to sticker
-                await safeSendMessage(sock, sender, {
-                    sticker: buffer,
-                    mimetype: 'image/gif',
-                    gifAttribution: 'TENOR',
-                    gifPlayback: true,
-                    caption: caption,
-                    stickerAuthor: "BLACKSKY-MD",
-                    stickerName: "nsfw_gif",
-                    contextInfo: {
-                        forwardingScore: 999,
-                        isForwarded: true,
-                        externalAdReply: {
-                            title: caption,
-                            mediaType: 1,
-                            renderLargerThumbnail: true
+                // Final fallback to sticker
+                try {
+                    await safeSendMessage(sock, sender, {
+                        sticker: buffer,
+                        mimetype: 'image/gif',
+                        gifAttribution: 'TENOR',
+                        gifPlayback: true,
+                        caption: caption,
+                        stickerAuthor: "BLACKSKY-MD",
+                        stickerName: "nsfw_gif",
+                        contextInfo: {
+                            forwardingScore: 999,
+                            isForwarded: true,
+                            externalAdReply: {
+                                title: caption,
+                                mediaType: 1,
+                                renderLargerThumbnail: true
+                            }
                         }
-                    }
-                });
-                
-                logger.info(`NSFW GIF sent as sticker to ${formatJidForLogging(sender)}`);
-                return true;
+                    });
+                    
+                    logger.info(`NSFW GIF sent as sticker to ${formatJidForLogging(sender)}`);
+                    return true;
+                } catch (stickerError) {
+                    logger.error(`Failed to send as sticker: ${stickerError.message}`);
+                    throw new Error('All GIF sending methods failed');
+                }
             }
         } catch (err) {
             if (attempt === retries) {
@@ -672,7 +729,7 @@ NSFW Statistics:
             await safeSendText(sock, sender, '🔍 Finding the perfect waifu for you...');
 
             // Use optimized fetchNsfwImage utility with parallel requests and smart caching
-            const imageUrl = await fetchNsfwImage('waifu', false);
+            const imageUrl = await nsfwUtils.fetchNsfwImage('waifu', false);
 
             if (!imageUrl) {
                 await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
@@ -710,7 +767,7 @@ NSFW Statistics:
             await safeSendText(sock, sender, '🔍 Searching for the perfect neko image...');
 
             // Use optimized fetchNsfwImage utility for faster image retrieval
-            const imageUrl = await fetchNsfwImage('neko', false);
+            const imageUrl = await nsfwUtils.fetchNsfwImage('neko', false);
 
             if (!imageUrl) {
                 await safeSendText(sock, sender, 'Failed to fetch image. Please try again later.');
@@ -748,7 +805,7 @@ NSFW Statistics:
 
             try {
                 // Try to use the optimized fetchNsfwImage utility first
-                const imageUrl = await fetchNsfwImage('hentai', false);
+                const imageUrl = await nsfwUtils.fetchNsfwImage('hentai', false);
                 
                 if (imageUrl) {
                     // Download the image to a buffer instead of sending URL directly
@@ -773,7 +830,7 @@ NSFW Statistics:
             
             // Fallback method - try direct fallback GIF
             try {
-                const fallbackUrl = DIRECT_GIFS['hentai']; 
+                const fallbackUrl = nsfwUtils.DIRECT_GIFS['hentai']; 
                 if (fallbackUrl) {
                     const axios = require('axios');
                     const response = await axios.get(fallbackUrl, { 
@@ -819,7 +876,7 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const boobsUrl = `${API_ENDPOINTS.HMTAI}/nsfw/boobs`;
+            const boobsUrl = `${nsfwUtils.API_ENDPOINTS.HMTAI}/nsfw/boobs`;
             const fallbacks = [
                 'https://api.nekos.fun/api/boobs',
                 'https://api.waifu.pics/nsfw/waifu'
@@ -862,7 +919,7 @@ NSFW Statistics:
 
             try {
                 // Try to use the optimized fetchNsfwImage utility first
-                const imageUrl = await fetchNsfwImage('ass', false);
+                const imageUrl = await nsfwUtils.fetchNsfwImage('ass', false);
                 
                 if (imageUrl) {
                     // Download the image to a buffer instead of sending URL directly
@@ -887,7 +944,7 @@ NSFW Statistics:
             
             // Fallback method - try direct fallback GIF
             try {
-                const fallbackUrl = DIRECT_GIFS['ass']; 
+                const fallbackUrl = nsfwUtils.DIRECT_GIFS['ass']; 
                 if (fallbackUrl) {
                     const axios = require('axios');
                     const response = await axios.get(fallbackUrl, { 
@@ -1142,13 +1199,11 @@ NSFW Statistics:
             // Send immediate feedback to improve perceived responsiveness
             await safeSendText(sock, sender, '🔍 Fetching NSFW GIF...');
 
-            // Predefined direct GIFs as ultimate fallbacks (for extreme reliability)
-            const DIRECT_GIFS = {
-                'blowjob': 'https://media.tenor.com/4XGh4v8UYaEAAAAC/anime-oral.gif'
-            };
+            // Use DIRECT_GIFS from the centralized nsfwUtils module
+            const directGifs = nsfwUtils.DIRECT_GIFS;
 
             // Try API endpoint with multiple fallbacks
-            const gifUrl = `${API_ENDPOINTS.HMTAI}/nsfw/blowjob`;
+            const gifUrl = `${nsfwUtils.API_ENDPOINTS.HMTAI}/nsfw/blowjob`;
             const fallbacks = [
                 'https://api.nekos.fun/api/blowjob',
                 'https://api.waifu.pics/nsfw/blowjob',
@@ -1163,17 +1218,17 @@ NSFW Statistics:
                 if (!response) {
                     logger.warn(`All API endpoints failed for blowjob GIF, using direct GIF`);
                     fallbackUsed = true;
-                    response = { url: DIRECT_GIFS['blowjob'] };
+                    response = { url: directGifs['blowjob'] };
                 } else if (!response.url) {
                     logger.warn(`API response missing URL property, using direct GIF`);
                     fallbackUsed = true;
-                    response = { url: DIRECT_GIFS['blowjob'] };
+                    response = { url: directGifs['blowjob'] };
                 }
             } catch (apiError) {
                 logger.error(`API error in gifblowjob:`, apiError);
                 errorType = 'api_error';
                 fallbackUsed = true;
-                response = { url: DIRECT_GIFS['blowjob'] };
+                response = { url: directGifs['blowjob'] };
             }
 
             // Final validation before sending
@@ -1248,7 +1303,7 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const uniformUrl = `${API_ENDPOINTS.HMTAI}/nsfw/uniform`;
+            const uniformUrl = `${nsfwUtils.API_ENDPOINTS.HMTAI}/nsfw/uniform`;
             const fallbacks = [
                 'https://api.nekos.fun/api/lewd',
                 'https://api.waifu.pics/nsfw/waifu'
@@ -1289,7 +1344,7 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const thighsUrl = `${API_ENDPOINTS.HMTAI}/nsfw/thighs`;
+            const thighsUrl = `${nsfwUtils.API_ENDPOINTS.HMTAI}/nsfw/thighs`;
             const fallbacks = [
                 'https://api.nekos.fun/api/lewd',
                 'https://api.waifu.pics/nsfw/waifu'
@@ -1330,7 +1385,7 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const femdomUrl = `${API_ENDPOINTS.HMTAI}/nsfw/femdom`;
+            const femdomUrl = `${nsfwUtils.API_ENDPOINTS.HMTAI}/nsfw/femdom`;
             const fallbacks = [
                 'https://api.waifu.pics/nsfw/waifu',
                 'https://api.nekos.fun/api/lewd'
@@ -1371,7 +1426,7 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const tentacleUrl = `${API_ENDPOINTS.HMTAI}/nsfw/tentacle`;
+            const tentacleUrl = `${nsfwUtils.API_ENDPOINTS.HMTAI}/nsfw/tentacle`;
             const fallbacks = [
                 'https://api.waifu.pics/nsfw/waifu',
                 'https://api.nekos.fun/api/lewd'
@@ -1412,7 +1467,7 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const pantsuUrl = `${API_ENDPOINTS.HMTAI}/nsfw/pantsu`;
+            const pantsuUrl = `${nsfwUtils.API_ENDPOINTS.HMTAI}/nsfw/pantsu`;
             const fallbacks = [
                 'https://api.waifu.pics/nsfw/waifu',
                 'https://api.nekos.fun/api/lewd'
@@ -1453,7 +1508,7 @@ NSFW Statistics:
 
             await safeSendText(sock, sender, 'Fetching image...');
 
-            const kitsuneUrl = `${API_ENDPOINTS.HMTAI}/nsfw/nsfwMobileWallpaper`;
+            const kitsuneUrl = `${nsfwUtils.API_ENDPOINTS.HMTAI}/nsfw/nsfwMobileWallpaper`;
             const fallbacks = [
                 'https://api.waifu.pics/nsfw/waifu',
                 'https://api.nekos.fun/api/lewd'

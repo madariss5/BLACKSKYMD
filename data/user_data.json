@@ -4,7 +4,7 @@
       "name": "Martin",
       "age": 20,
       "xp": 133,
-      "level": 1,
+      "level": 2,
       "coins": 244,
       "bio": "ich bin ein hund",
       "language": "en",
@@ -21,7 +21,7 @@
       "name": "Martin",
       "age": 21,
       "xp": 100,
-      "level": 1,
+      "level": 2,
       "coins": 220,
       "bio": "",
       "language": "en",
@@ -159,7 +159,7 @@
   "lottery": [],
   "_meta": {
     "version": 1,
-    "savedAt": "2025-03-17T13:08:36.938Z",
+    "savedAt": "2025-03-17T14:15:31.213Z",
     "profileCount": 9,
     "invalidProfileCount": 0
   }

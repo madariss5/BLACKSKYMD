@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
-const { safeSendMessage } = require('../utils/jidHelper');
+const { safeSendMessage, safeSendAnimatedGif } = require('../utils/jidHelper');
 const { convertGifToMp4 } = require('../utils/gifConverter');
 
 // Path to reaction GIFs directory
@@ -207,44 +207,41 @@ async function handleReaction(sock, message, type, args) {
                 const gifBuffer = await getGifBuffer(type);
                 
                 if (gifBuffer) {
-                    // Process media in background
+                    // Use our improved direct video approach for reliable animations
                     try {
-                        // Send directly as GIF first for maximum speed
-                        await safeSendMessage(sock, jid, {
-                            video: gifBuffer,
-                            gifPlayback: true,
-                            mimetype: 'video/mp4'
-                        }).catch(() => {
-                            // If direct sending fails, try conversion
-                            return convertGifToMp4(gifBuffer).then(videoBuffer => {
-                                return safeSendMessage(sock, jid, {
-                                    video: videoBuffer,
-                                    gifPlayback: true,
-                                    mimetype: 'video/mp4'
-                                });
+                        // Convert GIF to MP4 for proper animation
+                        const { convertGifToMp4 } = require('../utils/gifConverter');
+                        const videoBuffer = await convertGifToMp4(gifBuffer);
+                        
+                        if (videoBuffer) {
+                            // Send as video with gifPlayback enabled - most reliable method
+                            await safeSendMessage(sock, jid, {
+                                video: videoBuffer,
+                                gifPlayback: true,
+                                ptt: false,
+                                mimetype: 'video/mp4'
                             });
-                        });
+                            logger.debug(`Successfully sent animated video for ${type} reaction`);
+                        } else {
+                            // Fallback to standard GIF method
+                            await safeSendAnimatedGif(sock, jid, gifBuffer, "");
+                            logger.debug(`Sent using fallback method for ${type} reaction`);
+                        }
                     } catch (mediaError) {
-                        // Ultimate fallback - silent fail
+                        logger.error(`All methods failed for ${type} reaction: ${mediaError.message}`);
+                        
+                        // We already sent a text reaction, so this is just informational
+                        logger.info(`Text-only reaction was sent for ${type}`);
                     }
                 }
             } catch (backgroundError) {
-                // Silent error in background processing
+                logger.error(`Error in reaction GIF background processing: ${backgroundError.message}`);
             }
-        }, 10); // Very small delay to ensure text message gets priority
-        
-        // Calculate response time for the text part only
-        const endTime = process.hrtime.bigint();
-        const responseTimeMs = Number(endTime - startTime) / 1_000_000;
-        
-        // Log only if slower than expected
-        if (responseTimeMs > 5) {
-            logger.debug(`Reaction text response time: ${responseTimeMs.toFixed(2)}ms`);
-        }
+        }, 100); // Small delay to ensure text message gets priority
         
     } catch (error) {
         // Minimal error handling with no logging for better performance
-        safeSendMessage(sock, message.key.remoteJid, { text: `❌ Error` })
+        safeSendMessage(sock, message.key.remoteJid, { text: `❌ Error with reaction command` })
             .catch(() => {/* Silent catch */});
     }
 }
