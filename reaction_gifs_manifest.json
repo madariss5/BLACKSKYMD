@@ -1,149 +1,208 @@
 {
-  "timestamp": "2025-03-16T21:43:59.919Z",
-  "results": {
-    "valid": [
-      {
-        "type": "smile",
-        "targetFile": "smile.gif",
-        "size": 8357788,
-        "formattedSize": "7.97 MB",
-        "checksum": "0d7653967247cfc49aea3515f5fea7a6"
-      },
-      {
-        "type": "happy",
-        "targetFile": "happy.gif",
-        "size": 8357788,
-        "formattedSize": "7.97 MB",
-        "checksum": "0d7653967247cfc49aea3515f5fea7a6"
-      },
-      {
-        "type": "dance",
-        "targetFile": "dance.gif",
-        "size": 3167088,
-        "formattedSize": "3.02 MB",
-        "checksum": "442e1248f4e0bfcc035c140f257b3bd2"
-      },
-      {
-        "type": "cry",
-        "targetFile": "cry.gif",
-        "size": 122820,
-        "formattedSize": "119.94 KB",
-        "checksum": "eb76feb922e1e90275049c91e71938e5"
-      },
-      {
-        "type": "blush",
-        "targetFile": "blush.gif",
-        "size": 8357788,
-        "formattedSize": "7.97 MB",
-        "checksum": "0d7653967247cfc49aea3515f5fea7a6"
-      },
-      {
-        "type": "laugh",
-        "targetFile": "laugh.gif",
-        "size": 122820,
-        "formattedSize": "119.94 KB",
-        "checksum": "eb76feb922e1e90275049c91e71938e5"
-      },
-      {
-        "type": "hug",
-        "targetFile": "hug.gif",
-        "size": 1047514,
-        "formattedSize": "1022.96 KB",
-        "checksum": "15d3d956bd674096c4e68f1d011e8023"
-      },
-      {
-        "type": "pat",
-        "targetFile": "pat.gif",
-        "size": 862748,
-        "formattedSize": "842.53 KB",
-        "checksum": "4d22f711336d2d4ce889a69c8980487e"
-      },
-      {
-        "type": "kiss",
-        "targetFile": "kiss.gif",
-        "size": 402888,
-        "formattedSize": "393.45 KB",
-        "checksum": "66abd66c19131daadfc07989caeb350d"
-      },
-      {
-        "type": "cuddle",
-        "targetFile": "cuddle.gif",
-        "size": 1047514,
-        "formattedSize": "1022.96 KB",
-        "checksum": "15d3d956bd674096c4e68f1d011e8023"
-      },
-      {
-        "type": "wave",
-        "targetFile": "wave.gif",
-        "size": 41304,
-        "formattedSize": "40.34 KB",
-        "checksum": "0b4d9c629c3c554929f76f957790e521"
-      },
-      {
-        "type": "wink",
-        "targetFile": "wink.gif",
-        "size": 228284,
-        "formattedSize": "222.93 KB",
-        "checksum": "f182aaa3bfbe09ff4617276e4b90a7a4"
-      },
-      {
-        "type": "poke",
-        "targetFile": "poke.gif",
-        "size": 111691,
-        "formattedSize": "109.07 KB",
-        "checksum": "6756b61263101d4562f72d50aa99f6dd"
-      },
-      {
-        "type": "slap",
-        "targetFile": "slap.gif",
-        "size": 3286626,
-        "formattedSize": "3.13 MB",
-        "checksum": "c59fc04d8246cae6a890078e0cd64c7c"
-      },
-      {
-        "type": "bonk",
-        "targetFile": "bonk.gif",
-        "size": 3286626,
-        "formattedSize": "3.13 MB",
-        "checksum": "c59fc04d8246cae6a890078e0cd64c7c"
-      },
-      {
-        "type": "bite",
-        "targetFile": "bite.gif",
-        "size": 402888,
-        "formattedSize": "393.45 KB",
-        "checksum": "66abd66c19131daadfc07989caeb350d"
-      },
-      {
-        "type": "punch",
-        "targetFile": "punch.gif",
-        "size": 982948,
-        "formattedSize": "959.91 KB",
-        "checksum": "1f3d523276ec9bcf33da47415e3a49e3"
-      },
-      {
-        "type": "highfive",
-        "targetFile": "highfive.gif",
-        "size": 862748,
-        "formattedSize": "842.53 KB",
-        "checksum": "4d22f711336d2d4ce889a69c8980487e"
-      },
-      {
-        "type": "yeet",
-        "targetFile": "yeet.gif",
-        "size": 2179855,
-        "formattedSize": "2.08 MB",
-        "checksum": "d869a72396931b2120bd18c483e5b69d"
-      },
-      {
-        "type": "kill",
-        "targetFile": "kill.gif",
-        "size": 10174760,
-        "formattedSize": "9.70 MB",
-        "checksum": "9db2b063a06c35921babf8db81be8bcb"
-      }
-    ],
-    "missing": [],
-    "invalid": []
-  }
+  "timestamp": "2025-03-17T00:09:43.734Z",
+  "totalFiles": 20,
+  "successCount": 20,
+  "failedCount": 0,
+  "results": [
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/bite.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/bite.gif",
+      "sourceSize": "947.92 KB",
+      "targetSize": "947.92 KB",
+      "sourceChecksum": "6838d2b21f3eddb8d27bfc94d1e6669b",
+      "targetChecksum": "6838d2b21f3eddb8d27bfc94d1e6669b",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/blush.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/blush.gif",
+      "sourceSize": "234.8 KB",
+      "targetSize": "234.8 KB",
+      "sourceChecksum": "c2fce006861fb344e30433c9123fae1a",
+      "targetChecksum": "c2fce006861fb344e30433c9123fae1a",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/bonk.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/bonk.gif",
+      "sourceSize": "880.12 KB",
+      "targetSize": "880.12 KB",
+      "sourceChecksum": "80b20c59b438550ad32a68ee8a30ed82",
+      "targetChecksum": "80b20c59b438550ad32a68ee8a30ed82",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/cry.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/cry.gif",
+      "sourceSize": "315.06 KB",
+      "targetSize": "315.06 KB",
+      "sourceChecksum": "e0dc2746cc316bb30b37ff4f99fd6fe3",
+      "targetChecksum": "e0dc2746cc316bb30b37ff4f99fd6fe3",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/cuddle.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/cuddle.gif",
+      "sourceSize": "414.48 KB",
+      "targetSize": "414.48 KB",
+      "sourceChecksum": "14d65beb4758bd6c4d54940e6c56330a",
+      "targetChecksum": "14d65beb4758bd6c4d54940e6c56330a",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/dance.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/dance.gif",
+      "sourceSize": "3.02 MB",
+      "targetSize": "3.02 MB",
+      "sourceChecksum": "442e1248f4e0bfcc035c140f257b3bd2",
+      "targetChecksum": "442e1248f4e0bfcc035c140f257b3bd2",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/happy.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/happy.gif",
+      "sourceSize": "198.64 KB",
+      "targetSize": "198.64 KB",
+      "sourceChecksum": "fe4a98702e9aca19179d9029aeb08962",
+      "targetChecksum": "fe4a98702e9aca19179d9029aeb08962",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/highfive.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/highfive.gif",
+      "sourceSize": "1.16 MB",
+      "targetSize": "1.16 MB",
+      "sourceChecksum": "08c268d79a97b3033b49c697865d41e3",
+      "targetChecksum": "08c268d79a97b3033b49c697865d41e3",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/hug.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/hug.gif",
+      "sourceSize": "1022.96 KB",
+      "targetSize": "1022.96 KB",
+      "sourceChecksum": "15d3d956bd674096c4e68f1d011e8023",
+      "targetChecksum": "15d3d956bd674096c4e68f1d011e8023",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/kill.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/kill.gif",
+      "sourceSize": "9.7 MB",
+      "targetSize": "9.7 MB",
+      "sourceChecksum": "9db2b063a06c35921babf8db81be8bcb",
+      "targetChecksum": "9db2b063a06c35921babf8db81be8bcb",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/kiss.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/kiss.gif",
+      "sourceSize": "393.45 KB",
+      "targetSize": "393.45 KB",
+      "sourceChecksum": "66abd66c19131daadfc07989caeb350d",
+      "targetChecksum": "66abd66c19131daadfc07989caeb350d",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/laugh.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/laugh.gif",
+      "sourceSize": "119.94 KB",
+      "targetSize": "119.94 KB",
+      "sourceChecksum": "eb76feb922e1e90275049c91e71938e5",
+      "targetChecksum": "eb76feb922e1e90275049c91e71938e5",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/pat.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/pat.gif",
+      "sourceSize": "842.53 KB",
+      "targetSize": "842.53 KB",
+      "sourceChecksum": "4d22f711336d2d4ce889a69c8980487e",
+      "targetChecksum": "4d22f711336d2d4ce889a69c8980487e",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/poke.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/poke.gif",
+      "sourceSize": "109.07 KB",
+      "targetSize": "109.07 KB",
+      "sourceChecksum": "6756b61263101d4562f72d50aa99f6dd",
+      "targetChecksum": "6756b61263101d4562f72d50aa99f6dd",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/punch.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/punch.gif",
+      "sourceSize": "959.91 KB",
+      "targetSize": "959.91 KB",
+      "sourceChecksum": "1f3d523276ec9bcf33da47415e3a49e3",
+      "targetChecksum": "1f3d523276ec9bcf33da47415e3a49e3",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/slap.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/slap.gif",
+      "sourceSize": "3.13 MB",
+      "targetSize": "3.13 MB",
+      "sourceChecksum": "c59fc04d8246cae6a890078e0cd64c7c",
+      "targetChecksum": "c59fc04d8246cae6a890078e0cd64c7c",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/smile.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/smile.gif",
+      "sourceSize": "7.97 MB",
+      "targetSize": "7.97 MB",
+      "sourceChecksum": "0d7653967247cfc49aea3515f5fea7a6",
+      "targetChecksum": "0d7653967247cfc49aea3515f5fea7a6",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/wave.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/wave.gif",
+      "sourceSize": "40.34 KB",
+      "targetSize": "40.34 KB",
+      "sourceChecksum": "0b4d9c629c3c554929f76f957790e521",
+      "targetChecksum": "0b4d9c629c3c554929f76f957790e521",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/wink.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/wink.gif",
+      "sourceSize": "222.93 KB",
+      "targetSize": "222.93 KB",
+      "sourceChecksum": "f182aaa3bfbe09ff4617276e4b90a7a4",
+      "targetChecksum": "f182aaa3bfbe09ff4617276e4b90a7a4",
+      "error": null
+    },
+    {
+      "success": true,
+      "sourcePath": "/home/runner/workspace/attached_assets/yeet.gif",
+      "targetPath": "/home/runner/workspace/data/reaction_gifs/yeet.gif",
+      "sourceSize": "2.08 MB",
+      "targetSize": "2.08 MB",
+      "sourceChecksum": "d869a72396931b2120bd18c483e5b69d",
+      "targetChecksum": "d869a72396931b2120bd18c483e5b69d",
+      "error": null
+    }
+  ]
 }

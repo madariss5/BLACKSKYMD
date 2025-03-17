@@ -119,74 +119,8 @@ const menuCommands = {
             menuText += `\n✦ Use *${prefix}help <command>* for detailed info\n`;
             menuText += `✦ Example: *${prefix}help sticker*\n`;
 
-            // Send menu with custom image
-            try {
-                // Use the custom image from attached assets
-                const customImagePath = path.join(process.cwd(), 'attached_assets', 'images (1).jpeg');
-                
-                try {
-                    // Check if the image exists
-                    await fs.access(customImagePath);
-                    
-                    // Image exists, use it
-                    await safeSendMessage(sock, sender, {
-                        image: { url: customImagePath },
-                        caption: menuText
-                    });
-                    
-                    logger.info(`Menu sent with custom image: ${path.basename(customImagePath)}`);
-                } catch (imageErr) {
-                    // If custom image fails, try reaction GIFs as fallback
-                    const reactionGifs = [
-                        path.join(process.cwd(), 'data', 'reaction_gifs', 'highfive.gif'),
-                        path.join(process.cwd(), 'data', 'reaction_gifs', 'bonk.gif'),
-                        path.join(process.cwd(), 'data', 'reaction_gifs', 'yeet.gif')
-                    ];
-                    
-                    // Try each GIF in sequence until one works
-                    let sentSuccessfully = false;
-                    for (const gifPath of reactionGifs) {
-                        try {
-                            // Check if GIF exists
-                            await fs.access(gifPath);
-                            
-                            // GIF exists, use it
-                            await safeSendMessage(sock, sender, {
-                                video: { url: gifPath },
-                                gifPlayback: true,
-                                caption: menuText
-                            });
-                            
-                            sentSuccessfully = true;
-                            logger.info(`Menu sent with reaction GIF: ${path.basename(gifPath)}`);
-                            break;
-                        } catch (gifErr) {
-                            // This GIF failed, try next one
-                            continue;
-                        }
-                    }
-                    
-                    // If all GIFs failed, fallback to original icon
-                    if (!sentSuccessfully) {
-                        const localImagePath = path.join(process.cwd(), 'generated-icon.png');
-                        
-                        try {
-                            await fs.access(localImagePath);
-                            // Local image exists, use it
-                            await safeSendMessage(sock, sender, {
-                                image: { url: localImagePath },
-                                caption: menuText
-                            });
-                        } catch (accessErr) {
-                            // Local file doesn't exist, try URL
-                            await safeSendImage(sock, sender, 'https://i.ibb.co/Wn0nczF/BLACKSKY-icon.png', menuText);
-                        }
-                    }
-                }
-            } catch (imgErr) {
-                logger.warn('Failed to send menu with image/GIF, sending text-only', imgErr);
-                await safeSendText(sock, sender, menuText);
-            }
+            // Send menu with media using optimized helper function
+            await sendMenuWithMedia(sock, sender, menuText);
 
         } catch (err) {
             logger.error('Menu command error:', err);
@@ -225,62 +159,8 @@ const menuCommands = {
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
         
-                // Try to send help text with custom image
-                try {
-                    // Use the custom image from attached assets
-                    const customImagePath = path.join(process.cwd(), 'attached_assets', 'images (1).jpeg');
-                    
-                    try {
-                        // Check if the image exists
-                        await fs.access(customImagePath);
-                        
-                        // Image exists, use it
-                        await safeSendMessage(sock, sender, {
-                            image: { url: customImagePath },
-                            caption: helpText
-                        });
-                        
-                        logger.info(`Help menu sent with custom image: ${path.basename(customImagePath)}`);
-                    } catch (imageErr) {
-                        // If custom image fails, try reaction GIFs as fallback
-                        const reactionGifs = [
-                            path.join(process.cwd(), 'data', 'reaction_gifs', 'bonk.gif'),  // Different order for variety
-                            path.join(process.cwd(), 'data', 'reaction_gifs', 'yeet.gif'),
-                            path.join(process.cwd(), 'data', 'reaction_gifs', 'highfive.gif')
-                        ];
-                        
-                        // Try each GIF in sequence until one works
-                        let sentSuccessfully = false;
-                        for (const gifPath of reactionGifs) {
-                            try {
-                                // Check if GIF exists
-                                await fs.access(gifPath);
-                                
-                                // GIF exists, use it
-                                await safeSendMessage(sock, sender, {
-                                    video: { url: gifPath },
-                                    gifPlayback: true,
-                                    caption: helpText
-                                });
-                                
-                                sentSuccessfully = true;
-                                logger.info(`Help menu sent with reaction GIF: ${path.basename(gifPath)}`);
-                                break;
-                            } catch (gifErr) {
-                                // This GIF failed, try next one
-                                continue;
-                            }
-                        }
-                        
-                        // If all GIFs failed, fallback to text only
-                        if (!sentSuccessfully) {
-                            await safeSendText(sock, sender, helpText);
-                        }
-                    }
-                } catch (err) {
-                    // If anything goes wrong, just send text
-                    await safeSendText(sock, sender, helpText);
-                }
+                // Send help text with media using optimized helper function
+                await sendMenuWithMedia(sock, sender, helpText);
                 
                 return;
             }
@@ -348,62 +228,8 @@ const menuCommands = {
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━┛`;
         
-                // Try to send command help with custom image
-                try {
-                    // Use the custom image from attached assets
-                    const customImagePath = path.join(process.cwd(), 'attached_assets', 'images (1).jpeg');
-                    
-                    try {
-                        // Check if the image exists
-                        await fs.access(customImagePath);
-                        
-                        // Image exists, use it
-                        await safeSendMessage(sock, sender, {
-                            image: { url: customImagePath },
-                            caption: helpText
-                        });
-                        
-                        logger.info(`Command help sent with custom image: ${path.basename(customImagePath)}`);
-                    } catch (imageErr) {
-                        // If custom image fails, try reaction GIFs as fallback
-                        const reactionGifs = [
-                            path.join(process.cwd(), 'data', 'reaction_gifs', 'yeet.gif'),  // Different order for variety
-                            path.join(process.cwd(), 'data', 'reaction_gifs', 'highfive.gif'),
-                            path.join(process.cwd(), 'data', 'reaction_gifs', 'bonk.gif')
-                        ];
-                        
-                        // Try each GIF in sequence until one works
-                        let sentSuccessfully = false;
-                        for (const gifPath of reactionGifs) {
-                            try {
-                                // Check if GIF exists
-                                await fs.access(gifPath);
-                                
-                                // GIF exists, use it
-                                await safeSendMessage(sock, sender, {
-                                    video: { url: gifPath },
-                                    gifPlayback: true,
-                                    caption: helpText
-                                });
-                                
-                                sentSuccessfully = true;
-                                logger.info(`Command help sent with reaction GIF: ${path.basename(gifPath)}`);
-                                break;
-                            } catch (gifErr) {
-                                // This GIF failed, try next one
-                                continue;
-                            }
-                        }
-                        
-                        // If all GIFs failed, fallback to text only
-                        if (!sentSuccessfully) {
-                            await safeSendText(sock, sender, helpText);
-                        }
-                    }
-                } catch (err) {
-                    // If anything goes wrong, just send text
-                    await safeSendText(sock, sender, helpText);
-                }
+                // Send command help with media using optimized helper function
+                await sendMenuWithMedia(sock, sender, helpText);
             } else {
                 await safeSendText(sock, sender, languageManager.getText('menu.command_not_found', userLang, commandName, prefix)
                 );
@@ -418,9 +244,24 @@ const menuCommands = {
     }
 };
 
-// Load all commands from command files
+// Cache for command loading
+let commandCache = null;
+let commandCacheTimestamp = 0;
+const CACHE_LIFETIME = 300000; // 5 minutes in milliseconds
+
+// Load all commands from command files with caching
 async function loadAllCommands() {
     try {
+        // Check if we have a valid cache
+        const now = Date.now();
+        if (commandCache && (now - commandCacheTimestamp < CACHE_LIFETIME)) {
+            // Cache is still valid
+            logger.info('Using cached commands list');
+            return commandCache;
+        }
+
+        // Cache expired or doesn't exist, perform fresh load
+        logger.info('Loading fresh commands list');
         const commandsPath = path.join(process.cwd(), 'src/commands');
         const allCommands = {};
         let totalCommands = 0;
@@ -496,10 +337,136 @@ async function loadAllCommands() {
         }
 
         logger.info(`Total commands loaded: ${totalCommands} from ${Object.keys(allCommands).length} categories`);
-        return { allCommands, totalCommands };
+        
+        // Update cache
+        commandCache = { allCommands, totalCommands };
+        commandCacheTimestamp = now;
+        
+        return commandCache;
     } catch (err) {
         logger.error('Error loading commands:', err);
         return { allCommands: {}, totalCommands: 0 };
+    }
+}
+
+// Cache for images and GIFs
+const imageCache = new Map();
+const IMAGE_CACHE_LIFETIME = 300000; // 5 minutes in milliseconds
+
+/**
+ * Optimized helper function to send menu message with image or GIF
+ * Uses caching to avoid repeated filesystem access
+ */
+async function sendMenuWithMedia(sock, jid, text) {
+    try {
+        const now = Date.now();
+        const cacheKey = 'menu_media';
+        
+        // Check cache first
+        if (imageCache.has(cacheKey)) {
+            const cache = imageCache.get(cacheKey);
+            if (now - cache.timestamp < IMAGE_CACHE_LIFETIME) {
+                // Use cached media
+                if (cache.type === 'image') {
+                    await safeSendMessage(sock, jid, {
+                        image: { url: cache.path },
+                        caption: text
+                    });
+                    logger.info(`Menu sent with cached custom image: ${path.basename(cache.path)}`);
+                } else if (cache.type === 'gif') {
+                    await safeSendMessage(sock, jid, {
+                        video: { url: cache.path },
+                        gifPlayback: true,
+                        caption: text
+                    });
+                    logger.info(`Menu sent with cached reaction GIF: ${path.basename(cache.path)}`);
+                }
+                return true;
+            }
+        }
+        
+        // Try custom image first
+        const customImagePath = path.join(process.cwd(), 'attached_assets', 'images (1).jpeg');
+        try {
+            await fs.access(customImagePath);
+            await safeSendMessage(sock, jid, {
+                image: { url: customImagePath },
+                caption: text
+            });
+            
+            // Cache this successful media
+            imageCache.set(cacheKey, {
+                type: 'image',
+                path: customImagePath,
+                timestamp: now
+            });
+            
+            logger.info(`Menu sent with custom image: ${path.basename(customImagePath)}`);
+            return true;
+        } catch (imageErr) {
+            // Try reaction GIFs as fallback
+            const reactionGifs = [
+                path.join(process.cwd(), 'data', 'reaction_gifs', 'highfive.gif'),
+                path.join(process.cwd(), 'data', 'reaction_gifs', 'bonk.gif'), 
+                path.join(process.cwd(), 'data', 'reaction_gifs', 'yeet.gif')
+            ];
+            
+            for (const gifPath of reactionGifs) {
+                try {
+                    await fs.access(gifPath);
+                    await safeSendMessage(sock, jid, {
+                        video: { url: gifPath },
+                        gifPlayback: true,
+                        caption: text
+                    });
+                    
+                    // Cache this successful media
+                    imageCache.set(cacheKey, {
+                        type: 'gif',
+                        path: gifPath,
+                        timestamp: now
+                    });
+                    
+                    logger.info(`Menu sent with reaction GIF: ${path.basename(gifPath)}`);
+                    return true;
+                } catch (gifErr) {
+                    continue;
+                }
+            }
+            
+            // If all media options fail, use fallback icon
+            const localImagePath = path.join(process.cwd(), 'generated-icon.png');
+            try {
+                await fs.access(localImagePath);
+                await safeSendMessage(sock, jid, {
+                    image: { url: localImagePath },
+                    caption: text
+                });
+                
+                // Cache this successful media
+                imageCache.set(cacheKey, {
+                    type: 'image',
+                    path: localImagePath,
+                    timestamp: now
+                });
+                
+                return true;
+            } catch (localErr) {
+                // Try remote URL as last resort
+                try {
+                    await safeSendImage(sock, jid, 'https://i.ibb.co/Wn0nczF/BLACKSKY-icon.png', text);
+                    return true;
+                } catch (remoteErr) {
+                    // Give up and send text only
+                    await safeSendText(sock, jid, text);
+                    return false;
+                }
+            }
+        }
+    } catch (err) {
+        logger.warn('Failed to send menu with media, sending text-only', err);
+        await safeSendText(sock, jid, text);
+        return false;
     }
 }
 

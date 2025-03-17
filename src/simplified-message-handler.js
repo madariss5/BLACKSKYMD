@@ -151,49 +151,43 @@ function initializeBasicCommands() {
 }
 
 /**
- * Execute commands with enhanced error handling
+ * Optimized command execution with minimal overhead
  * @param {Function} handler - Command handler function
  * @param {Object} sock - WhatsApp socket
  * @param {Object} msg - Message object
  * @param {Array} args - Command arguments
  */
 async function executeCommand(handler, sock, msg, args) {
+    // Fast path validation with minimal checks
+    if (typeof handler !== 'function' || !msg.key?.remoteJid) {
+        console.error('Invalid handler or message object');
+        return;
+    }
+    
     try {
-        console.log(`Starting command execution with args: ${JSON.stringify(args)}`);
+        // Minimal logging for better performance
+        const startTime = performance.now();
         
-        // Check if handler is a valid function
-        if (typeof handler !== 'function') {
-            throw new Error('Command handler is not a function');
-        }
-        
-        // Check if message has a valid remoteJid
-        if (!msg.key || !msg.key.remoteJid) {
-            throw new Error('Invalid message object: missing remoteJid');
-        }
-        
-        // Execute the command handler
-        console.log('Calling command handler...');
+        // Execute the command handler without extra wrapping
         await handler(sock, msg, args);
-        console.log('Command executed successfully');
         
+        // Performance monitoring for slow commands
+        const executionTime = performance.now() - startTime;
+        if (executionTime > 500) {
+            console.log(`⚠️ Slow command execution: ${executionTime.toFixed(2)}ms`);
+        }
     } catch (err) {
+        // Simplified error handling - minimize overhead
+        const jid = msg.key.remoteJid;
         console.error(`Error executing command: ${err.message}`);
-        console.error(err.stack);
         
-        // Send error message to user
+        // Send a concise error message
         try {
-            const jid = msg.key.remoteJid;
-            console.log(`Sending error message to ${jid}`);
-            
-            // Send a user-friendly error message
             await sock.sendMessage(jid, { 
-                text: `Sorry, there was an error executing the command: ${err.message}\n\nPlease try again later.`
-            });
-            
-            console.log('Error message sent to user');
-        } catch (sendError) {
-            console.error(`Failed to send error message: ${sendError.message}`);
-            console.error(sendError.stack);
+                text: `Command error: ${err.message.slice(0, 100)}`
+            }).catch(() => {});
+        } catch (e) {
+            // Fail silently
         }
     }
 }

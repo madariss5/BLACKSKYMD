@@ -9,11 +9,11 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 
-// Configuration
+// Configuration - optimized for faster responses
 const BASE_AUTH_FOLDER = './auth_info_manager';
-const MAX_QR_ATTEMPTS = 15;
-const CONNECTION_TIMEOUT = 60000;
-const MAX_CONNECTION_ATTEMPTS = 5;
+const MAX_QR_ATTEMPTS = 10;  // Reduced for faster cycling through browsers
+const CONNECTION_TIMEOUT = 30000; // Faster timeout for quicker response
+const MAX_CONNECTION_ATTEMPTS = 3; // Reduced for faster browser cycling
 
 // Browser configurations to try (in order)
 const BROWSER_CONFIGS = [
@@ -146,18 +146,75 @@ async function tryNextBrowser() {
         // Initialize auth state
         const { state, saveCreds } = await useMultiFileAuthState(config.auth_folder);
         
-        // Create socket with browser configuration
+        // Create socket with optimized configuration for faster responses
         const sock = makeWASocket({
             auth: state,
             printQRInTerminal: true,
             browser: config.fingerprint,
             userAgent: config.user_agent,
             connectTimeoutMs: CONNECTION_TIMEOUT,
-            defaultQueryTimeoutMs: 30000,
-            syncFullHistory: false,
+            defaultQueryTimeoutMs: 20000, // Faster query timeout
+            syncFullHistory: false,       // Don't sync history (faster)
             markOnlineOnConnect: true,
-            qrTimeout: 60000,
-            fireInitQueries: false
+            qrTimeout: 30000,            // Faster QR timeout
+            fireInitQueries: false,      // Skip init queries for speed
+            keepAliveIntervalMs: 10000,  // More frequent keepalive
+            emitOwnEvents: false,        // Reduce event processing overhead
+            retryRequestDelayMs: 250,    // Faster retry for failed requests
+            transactionOpts: {
+                maxCommitRetries: 1,     // Fewer retries for faster operation
+                maxRetries: 2            // Reduce retries for failed messages
+            },
+            // Enhanced message patching for optimized delivery and better compatibility
+            patchMessageBeforeSending: msg => {
+                try {
+                    // Add viewOnce mode to images if they're marked for it (but missing the flag)
+                    if (msg.message?.imageMessage && msg.message.imageMessage.viewOnce === true) {
+                        msg.message = {
+                            viewOnceMessage: {
+                                message: {
+                                    ...msg.message
+                                }
+                            }
+                        };
+                    }
+                    
+                    // Add viewOnce mode to videos if they're marked for it (but missing the flag)
+                    if (msg.message?.videoMessage && msg.message.videoMessage.viewOnce === true) {
+                        msg.message = {
+                            viewOnceMessage: {
+                                message: {
+                                    ...msg.message
+                                }
+                            }
+                        };
+                    }
+                    
+                    // Enhance message with appropriate metadata for better delivery success
+                    if (msg.message) {
+                        // Add proper messaging metadata for non-group messages
+                        if (!msg.key.remoteJid.endsWith('@g.us') && !msg.message.protocolMessage) {
+                            msg.message.messageContextInfo = {
+                                deviceListMetadata: {},
+                                deviceListMetadataVersion: 2
+                            };
+                        }
+                    }
+                    
+                    // Ensure buttonId values are strings to prevent WhatsApp errors
+                    if (msg.message?.buttonsMessage?.buttons) {
+                        msg.message.buttonsMessage.buttons.forEach(button => {
+                            if (button.buttonId && typeof button.buttonId !== 'string') {
+                                button.buttonId = button.buttonId.toString();
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.log("Error in message patch function:", err);
+                    // Return original message on error
+                }
+                return msg;
+            }
         });
         
         // Handle credential updates
@@ -268,10 +325,75 @@ async function tryNextBrowser() {
             if (connection === 'close') {
                 isConnected = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                console.log(`Connection closed with status code: ${statusCode || 'unknown'}`);
+                const errorName = lastDisconnect?.error?.name || '';
+                const errorMessage = lastDisconnect?.error?.message || '';
                 
-                // Decide whether and how to reconnect
-                if (statusCode === DisconnectReason.loggedOut) {
+                console.log(`Connection closed with status code: ${statusCode || 'unknown'}`);
+                console.log(`Error name: ${errorName}, Message: ${errorMessage}`);
+                
+                // Check for decryption errors - patterns we've seen in logs
+                const isDecryptionError = 
+                    errorMessage.includes('decrypt') || 
+                    errorMessage.includes('encryption') || 
+                    errorMessage.includes('decryption') ||
+                    errorMessage.includes('failed to log in') ||
+                    errorName.includes('DecryptionError') ||
+                    (statusCode === 401 && errorMessage.includes('Connection Failure'));
+                
+                // Check for authentication state corruption issues
+                const isAuthCorruption = 
+                    errorName === 'NotFoundException' || 
+                    errorMessage.includes('auth creds') || 
+                    errorMessage.includes('authentication');
+                
+                if (isDecryptionError || isAuthCorruption) {
+                    console.log('❌ Encryption/authentication error detected. Cleaning auth files...');
+                    
+                    try {
+                        // Use our specialized connection fix utility
+                        const connectionFix = require('./src/utils/connection-fix');
+                        
+                        // Fix the decryption error by cleaning auth files
+                        connectionFix.clearAuthFiles(config.auth_folder);
+                        
+                        // If this is a persistent issue, try a full cleanup
+                        if (connectionAttempts > 2) {
+                            console.log('Persistent connection issue detected. Performing full auth cleanup...');
+                            connectionFix.cleanAllAuthFolders();
+                        }
+                    } catch (fixErr) {
+                        console.error(`Failed to run connection fix: ${fixErr.message}`);
+                        
+                        // Fallback to basic cleanup if the utility fails
+                        try {
+                            const fs = require('fs');
+                            const path = require('path');
+                            
+                            if (fs.existsSync(config.auth_folder)) {
+                                const files = fs.readdirSync(config.auth_folder);
+                                for (const file of files) {
+                                    try {
+                                        fs.unlinkSync(path.join(config.auth_folder, file));
+                                        console.log(`Deleted ${file} from ${config.auth_folder}`);
+                                    } catch (err) {
+                                        console.log(`Failed to delete ${file}: ${err.message}`);
+                                    }
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`Error during basic cleanup: ${err.message}`);
+                        }
+                    }
+                    
+                    // Try with a fresh session using the next browser
+                    console.log('Switching to next browser with fresh session...');
+                    currentBrowserIndex++;
+                    setTimeout(() => {
+                        tryNextBrowser();
+                    }, 2000);
+                }
+                // Handle traditional disconnect reasons
+                else if (statusCode === DisconnectReason.loggedOut) {
                     console.log('Logged out from WhatsApp. Trying with different browser...');
                     currentBrowserIndex++;
                     setTimeout(() => {
@@ -344,8 +466,69 @@ tryNextBrowser().catch(err => {
     console.error(err);
 });
 
+// Memory optimization and management
+const memoryLimit = 800 * 1024 * 1024; // 800MB threshold
+const memoryCheckInterval = 30 * 60 * 1000; // Check every 30 minutes
+
+/**
+ * Optimize memory usage to prevent out-of-memory crashes
+ */
+function optimizeMemory() {
+    try {
+        // Get current memory usage
+        const memUsage = process.memoryUsage();
+        
+        // Convert to MB for easier reading
+        const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+        const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+        const rssMB = Math.round(memUsage.rss / 1024 / 1024);
+        
+        console.log(`Memory usage: ${heapUsedMB}MB used of ${heapTotalMB}MB heap. RSS: ${rssMB}MB`);
+        
+        // If memory usage exceeds our threshold, perform cleanup
+        if (memUsage.heapUsed > memoryLimit) {
+            console.log("Memory usage high, performing garbage collection");
+            
+            // Force garbage collection if possible
+            if (global.gc) {
+                global.gc();
+                console.log("Forced garbage collection completed");
+            } else {
+                console.log("No global garbage collection available. Consider running with --expose-gc");
+            }
+            
+            // Reset message cache to free up memory
+            try {
+                const jidHelper = require('./src/utils/jidHelper');
+                if (jidHelper && jidHelper.resetMessageStats) {
+                    jidHelper.resetMessageStats();
+                    console.log("Message cache cleared");
+                }
+            } catch (err) {
+                console.log("Failed to reset message cache:", err.message);
+            }
+        }
+    } catch (err) {
+        console.error("Error during memory optimization:", err);
+    }
+}
+
+// Set up periodic memory checks
+setInterval(optimizeMemory, memoryCheckInterval);
+
 // Handle process termination
 process.on('SIGINT', () => {
     console.log('Process terminated by user');
     process.exit(0);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    
+    // Perform memory optimization in case it's a memory-related issue
+    optimizeMemory();
+    
+    // Continue running to maintain connection
+    console.log('Bot will continue running despite the error');
 });

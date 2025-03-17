@@ -33,6 +33,23 @@
       ],
       "customTitle": "",
       "warnings": 0
+    },
+    "4915562378343@s.whatsapp.net": {
+      "name": "Martin",
+      "age": 21,
+      "xp": 0,
+      "level": 1,
+      "coins": 100,
+      "bio": "",
+      "language": "en",
+      "registeredAt": "2025-03-17T00:09:29.037Z",
+      "lastDaily": null,
+      "inventory": [],
+      "achievements": [
+        "New Arrival"
+      ],
+      "customTitle": "",
+      "warnings": 0
     }
   },
   "games": {},
@@ -46,8 +63,8 @@
   "lottery": [],
   "_meta": {
     "version": 1,
-    "savedAt": "2025-03-16T23:51:43.039Z",
-    "profileCount": 2,
+    "savedAt": "2025-03-17T00:10:30.806Z",
+    "profileCount": 3,
     "invalidProfileCount": 0
   }
 }

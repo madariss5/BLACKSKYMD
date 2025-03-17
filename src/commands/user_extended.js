@@ -1532,8 +1532,17 @@ const commands = {
     
     // 7. Daily Reward System
     async reward(sock, sender) {
-        const profile = await getUserProfile(sock, sender);
-        if (!profile) return;
+        // Get the user's JID from the sender object
+        const userJid = typeof sender === 'object' ? sender.jid || sender : sender;
+        
+        // Directly access the user profile from userProfiles Map
+        const profile = userProfiles.get(userJid);
+        
+        // Check if user is registered
+        if (!profile) {
+            await safeSendText(sock, userJid, '*❌ Error:* You need to register first! Use .register to create a profile.');
+            return;
+        }
         
         // Check if rewards are available
         const now = Date.now();
@@ -1542,14 +1551,14 @@ const commands = {
         
         if (now - lastReward < cooldown) {
             const timeLeft = Math.ceil((lastReward + cooldown - now) / (1000 * 60 * 60));
-            await safeSendMessage(sock, sender, {
+            await safeSendMessage(sock, userJid, {
                 text: `*⏳ Cooldown:* You've already claimed your daily reward! Try again in ${timeLeft} hours.`
             });
             return;
         }
         
         // Get or initialize streak data
-        let streak = streakData.get(sender) || {
+        let streak = streakData.get(userJid) || {
             count: 0,
             lastClaim: 0
         };
@@ -1577,7 +1586,7 @@ const commands = {
         profile.lastReward = now;
         
         // Checkin tracking
-        let checkin = checkinData.get(sender) || {
+        let checkin = checkinData.get(userJid) || {
             count: 0,
             lastMonth: null
         };
@@ -1611,9 +1620,9 @@ const commands = {
         }
         
         // Save data
-        streakData.set(sender, streak);
-        checkinData.set(sender, checkin);
-        userProfiles.set(sender, profile);
+        streakData.set(userJid, streak);
+        checkinData.set(userJid, checkin);
+        userProfiles.set(userJid, profile);
         
         // Send reward message
         let rewardText = `*🎁 Daily Reward Claimed!*\n\n`;
@@ -1627,7 +1636,7 @@ const commands = {
         rewardText += `Monthly Check-ins: ${checkin.count} day${checkin.count !== 1 ? 's' : ''}\n\n`;
         rewardText += `Your Balance: ${formatNumber(profile.coins)} coins`;
         
-        await safeSendText(sock, sender, rewardText );
+        await safeSendText(sock, userJid, rewardText );
     },
     
     // 8. Passive Income with Idle Game Mechanics

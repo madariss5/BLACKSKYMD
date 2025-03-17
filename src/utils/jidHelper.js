@@ -152,15 +152,143 @@ function validateJid(jid) {
     return { valid: true, message: 'Valid JID', normalizedJid };
 }
 
+// Message cache for optimized performance
+const messageCache = new Map();
+const MESSAGE_CACHE_LIFETIME = 60000; // 1 minute cache lifetime
+
+/**
+ * Cache manager for safe message sending optimization
+ * Used for tracking successful messages and improving deliver rates
+ */
+const messageCacheManager = {
+    /**
+     * Get cached message by key 
+     * @param {string} key - Cache key
+     * @returns {Object|null} - Cached data or null
+     */
+    get(key) {
+        if (!messageCache.has(key)) return null;
+        const cached = messageCache.get(key);
+        
+        // Check if cache is still valid
+        if (Date.now() - cached.timestamp > MESSAGE_CACHE_LIFETIME) {
+            messageCache.delete(key);
+            return null;
+        }
+        
+        return cached.data;
+    },
+    
+    /**
+     * Set message in cache
+     * @param {string} key - Cache key
+     * @param {Object} data - Data to cache
+     */
+    set(key, data) {
+        messageCache.set(key, {
+            data,
+            timestamp: Date.now()
+        });
+    },
+    
+    /**
+     * Get success record for a JID
+     * @param {string} jid - JID to check
+     * @returns {Object|null} - Success record or null
+     */
+    getSuccessRecord(jid) {
+        return this.get(`success_${jid}`);
+    },
+    
+    /**
+     * Record successful message to JID
+     * @param {string} jid - JID that received message
+     * @param {Object} result - Message result
+     */
+    recordSuccess(jid, result) {
+        this.set(`success_${jid}`, {
+            lastSuccess: Date.now(),
+            successCount: (this.getSuccessRecord(jid)?.successCount || 0) + 1,
+            lastResult: result
+        });
+    },
+    
+    /**
+     * Record error with a specific JID
+     * @param {string} jid - JID that generated error
+     * @param {Error} error - Error object
+     */
+    recordError(jid, error) {
+        this.set(`error_${jid}`, {
+            lastError: Date.now(),
+            errorCount: (this.get(`error_${jid}`)?.errorCount || 0) + 1,
+            error: error.message
+        });
+    },
+    
+    /**
+     * Check if JID has excessive errors
+     * @param {string} jid - JID to check
+     * @returns {boolean} - Whether JID has excessive errors
+     */
+    hasExcessiveErrors(jid) {
+        const record = this.get(`error_${jid}`);
+        if (!record) return false;
+        
+        // If there are 5+ errors in the past minute, consider excessive
+        return record.errorCount >= 5 && (Date.now() - record.lastError < MESSAGE_CACHE_LIFETIME);
+    },
+    
+    /**
+     * Get message sending stats
+     * @returns {Object} - Stats about message sending
+     */
+    getStats() {
+        const stats = {
+            cacheSize: messageCache.size,
+            successJids: 0,
+            errorJids: 0,
+            totalSuccess: 0,
+            totalErrors: 0
+        };
+        
+        for (const [key, value] of messageCache.entries()) {
+            if (key.startsWith('success_')) {
+                stats.successJids++;
+                stats.totalSuccess += value.data.successCount || 0;
+            } else if (key.startsWith('error_')) {
+                stats.errorJids++;
+                stats.totalErrors += value.data.errorCount || 0;
+            }
+        }
+        
+        return stats;
+    }
+};
+
 /**
  * Safe message sending with enhanced JID validation and error handling
  * Fixed to address "Cannot destructure property 'user'" error
+ * Optimized with caching and smart retries for better delivery rates
+ * 
  * @param {Object} sock - WhatsApp socket connection
  * @param {any} jid - JID to send to
  * @param {Object} content - Message content
+ * @param {Object} options - Additional options
+ * @param {boolean} options.retry - Whether to retry on failure
+ * @param {number} options.timeout - Timeout in milliseconds
+ * @param {boolean} options.ignoreCache - Whether to ignore message cache
  * @returns {Promise<Object|null>} - Message sending result or null if failed
  */
-async function safeSendMessage(sock, jid, content) {
+async function safeSendMessage(sock, jid, content, options = {}) {
+    // Default options
+    const opts = {
+        retry: true,
+        timeout: 15000, // 15 seconds default timeout
+        ignoreCache: false,
+        ...options
+    };
+    
     // First validate the sock
     if (!sock) {
         console.error('[JID-HELPER] Socket is null or undefined');
@@ -177,19 +305,38 @@ async function safeSendMessage(sock, jid, content) {
     // Validated JID
     const validJid = validation.normalizedJid;
     
+    // Check if JID has had excessive errors
+    if (!opts.ignoreCache && messageCacheManager.hasExcessiveErrors(validJid)) {
+        console.warn(`[JID-HELPER] Skipping message to ${formatJidForLogging(validJid)} due to excessive recent errors`);
+        return null;
+    }
+    
     try {
         // Use a timeout to prevent hanging
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Message sending timed out')), 10000)
+            setTimeout(() => reject(new Error('Message sending timed out')), opts.timeout)
         );
         
+        // Prepare enhanced content with proper viewOnce wrapping if needed
+        const enhancedContent = prepareMessageContent(content);
+        
         // Race between message sending and timeout
-        return await Promise.race([
-            sock.sendMessage(validJid, content),
+        const result = await Promise.race([
+            sock.sendMessage(validJid, enhancedContent),
             timeoutPromise
         ]);
+        
+        // Record success to improve future delivery
+        if (result) {
+            messageCacheManager.recordSuccess(validJid, result);
+        }
+        
+        return result;
     } catch (err) {
         console.error(`[JID-HELPER] Error sending message to ${formatJidForLogging(jid)}: ${err.message}`);
+        
+        // Record error for future reference
+        messageCacheManager.recordError(validJid, err);
         
         // If the error is related to jidDecode, log additional information
         if (err.message.includes('jidDecode') || err.message.includes('Cannot destructure property')) {
@@ -197,8 +344,74 @@ async function safeSendMessage(sock, jid, content) {
             console.error(`[JID-HELPER] Attempted to use JID: ${validJid} (${typeof validJid})`);
         }
         
+        // Retry once with backoff if retry is enabled
+        if (opts.retry) {
+            try {
+                console.log(`[JID-HELPER] Retrying message to ${formatJidForLogging(jid)} after error`);
+                
+                // Wait a moment before retrying
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                // Retry with retry disabled to prevent infinite loops
+                return await safeSendMessage(sock, validJid, content, { 
+                    ...opts, 
+                    retry: false,
+                    timeout: opts.timeout * 1.5 // Extend timeout for retry
+                });
+            } catch (retryErr) {
+                console.error(`[JID-HELPER] Retry also failed: ${retryErr.message}`);
+                return null;
+            }
+        }
+        
         return null;
     }
+}
+
+/**
+ * Prepare message content with proper WhatsApp formatting
+ * @param {Object} content - Message content object
+ * @returns {Object} - Enhanced message content
+ */
+function prepareMessageContent(content) {
+    if (!content) return content;
+    
+    // Make a copy to avoid modifying the original
+    const enhancedContent = { ...content };
+    
+    // Handle viewOnce for images
+    if (enhancedContent.image && enhancedContent.viewOnce === true) {
+        return {
+            viewOnceMessage: {
+                message: {
+                    imageMessage: enhancedContent.image,
+                    caption: enhancedContent.caption || ''
+                }
+            }
+        };
+    }
+    
+    // Handle viewOnce for videos
+    if (enhancedContent.video && enhancedContent.viewOnce === true) {
+        return {
+            viewOnceMessage: {
+                message: {
+                    videoMessage: enhancedContent.video,
+                    caption: enhancedContent.caption || ''
+                }
+            }
+        };
+    }
+    
+    // Ensure button IDs are strings
+    if (enhancedContent.buttons) {
+        enhancedContent.buttons = enhancedContent.buttons.map(btn => ({
+            ...btn,
+            buttonId: btn.buttonId ? String(btn.buttonId) : btn.buttonId
+        }));
+    }
+    
+    return enhancedContent;
 }
 
 /**
@@ -281,7 +494,34 @@ async function safeSendAnimatedGif(sock, jid, gif, caption = '') {
     return await safeSendMessage(sock, jid, content);
 }
 
+/**
+ * Get message sending statistics
+ * @returns {Object} - Message statistics
+ */
+function getMessageStats() {
+    return messageCacheManager.getStats();
+}
+
+/**
+ * Reset message statistics
+ */
+function resetMessageStats() {
+    messageCache.clear();
+}
+
+/**
+ * Perform optimized JID lookup
+ * Useful for bulk operations where performance is critical
+ * @param {string} jid - JID to optimize
+ * @returns {string} - Optimized JID
+ */
+function optimizeJid(jid) {
+    if (!jid) return '';
+    return normalizeJid(ensureJidString(jid));
+}
+
 module.exports = {
+    // Base JID utilities
     isJidGroup,
     isJidUser,
     normalizeJid,
@@ -289,9 +529,19 @@ module.exports = {
     extractUserIdFromJid,
     formatJidForLogging,
     validateJid,
+    optimizeJid,
+    
+    // Message sending utilities
     safeSendMessage,
     safeSendText,
     safeSendImage,
     safeSendVideo,
-    safeSendAnimatedGif
+    safeSendAnimatedGif,
+    
+    // Statistics and monitoring
+    getMessageStats,
+    resetMessageStats,
+    
+    // Message cache manager for advanced usage
+    messageCacheManager
 };

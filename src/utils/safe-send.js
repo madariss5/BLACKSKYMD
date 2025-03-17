@@ -31,161 +31,232 @@ try {
     };
 }
 
+// Cache for validated JIDs to improve performance
+const jidCache = new Map();
+
 /**
- * Validate a JID for message sending
+ * Validate a JID for message sending (optimized with caching)
  * @param {any} jid - JID to validate
  * @returns {Object} - Validation result {valid: boolean, message: string, normalizedJid: string}
  */
 function validateJid(jid) {
+    // Fast path for common case - strings
+    if (typeof jid === 'string') {
+        // Check cache first for previously validated JIDs
+        if (jidCache.has(jid)) {
+            return jidCache.get(jid);
+        }
+        
+        // Fast validation for common patterns
+        if (jid.endsWith('@s.whatsapp.net') && jid.length > 15) {
+            const result = { valid: true, message: 'Valid JID', normalizedJid: jid };
+            jidCache.set(jid, result);
+            return result;
+        }
+        
+        if (jid.endsWith('@g.us') && jid.length > 10) {
+            const result = { valid: true, message: 'Valid JID', normalizedJid: jid };
+            jidCache.set(jid, result);
+            return result;
+        }
+    }
+    
+    // Null check
     if (!jid) {
         return { valid: false, message: 'JID is null or undefined', normalizedJid: null };
     }
     
-    // Handle case where JID is an object (common error case)
+    // Object extraction (optimized)
+    let extractedJid = jid;
     if (typeof jid === 'object' && jid !== null) {
-        // Check if it's a message object with key.remoteJid
-        if (jid.key && jid.key.remoteJid) {
-            console.log(`[SAFE-SEND] Converting message object to JID: ${jid.key.remoteJid}`);
-            jid = jid.key.remoteJid;
-        } 
-        // If it has remoteJid property directly
-        else if (jid.remoteJid) {
-            console.log(`[SAFE-SEND] Converting object with remoteJid to JID: ${jid.remoteJid}`);
-            jid = jid.remoteJid;
-        }
-        // If it's a participant object
-        else if (jid.id) {
-            console.log(`[SAFE-SEND] Converting participant object to JID: ${jid.id}`);
-            jid = jid.id;
-        }
-        // Last fallback - try to convert object to string
-        else {
-            console.warn(`[SAFE-SEND] Received object instead of JID string: ${JSON.stringify(jid)}`);
-            try {
-                jid = String(jid);
-            } catch (err) {
-                return { valid: false, message: `Cannot convert object to JID: ${err.message}`, normalizedJid: null };
-            }
-        }
+        // Direct property access for common patterns
+        extractedJid = jid.key?.remoteJid || jid.remoteJid || jid.id || String(jid);
     }
     
-    // Convert to string
-    const stringJid = jidHelper.ensureJidString(jid);
+    // Convert to string efficiently
+    const stringJid = typeof extractedJid === 'string' ? extractedJid : String(extractedJid);
     
-    // Basic validation
-    if (!stringJid || stringJid.length < 5) {
-        return { valid: false, message: 'JID too short', normalizedJid: null };
+    // Fast validation (less string operations)
+    if (stringJid.length < 5 || !stringJid.includes('@')) {
+        return { valid: false, message: 'Invalid JID format', normalizedJid: null };
     }
     
-    // Check for @ symbol
-    if (!stringJid.includes('@')) {
-        return { valid: false, message: 'JID missing @ symbol', normalizedJid: null };
-    }
+    // Single endsWith check instead of multiple
+    const suffix = stringJid.substring(stringJid.lastIndexOf('@'));
+    const isValidSuffix = suffix === '@g.us' || suffix === '@s.whatsapp.net' || suffix === '@c.us';
     
-    // Check for correct suffixes
-    const isGroup = stringJid.endsWith('@g.us');
-    const isUser = stringJid.endsWith('@s.whatsapp.net') || stringJid.endsWith('@c.us');
-    
-    if (!isGroup && !isUser) {
+    if (!isValidSuffix) {
         return { valid: false, message: 'JID has invalid suffix', normalizedJid: null };
     }
     
-    // Convert @c.us to @s.whatsapp.net if needed
+    // Fast suffix replacement
     let normalizedJid = stringJid;
-    if (stringJid.endsWith('@c.us')) {
-        normalizedJid = stringJid.replace('@c.us', '@s.whatsapp.net');
+    if (suffix === '@c.us') {
+        normalizedJid = stringJid.slice(0, -5) + '@s.whatsapp.net';
     }
     
-    return { valid: true, message: 'Valid JID', normalizedJid };
+    // Cache result for future use
+    const result = { valid: true, message: 'Valid JID', normalizedJid };
+    if (typeof jid === 'string') {
+        jidCache.set(jid, result);
+    }
+    
+    return result;
 }
 
+// Fast common text sending cache
+const recentTextCache = new Map();
+const TEXT_CACHE_SIZE = 50;
+
 /**
- * Safely send a text message with error handling and retry
+ * Safely send a text message with optimized performance
  * @param {Object} sock - WhatsApp socket connection
- * @param {string} jid - Recipient JID
+ * @param {string} jid - Recipient JID 
  * @param {string} text - Message text
  * @param {Object} options - Additional options
- * @param {number} options.maxRetries - Maximum retry attempts (default: 2)
- * @param {number} options.retryDelay - Delay between retries in ms (default: 1000)
+ * @param {boolean} options.priority - Whether this is a high priority message
+ * @param {number} options.maxRetries - Maximum retry attempts
  * @returns {Promise<Object|null>} - Message sending result or null if failed
  */
 async function safeSendText(sock, jid, text, options = {}) {
-    if (!text) {
-        console.warn('[SAFE-SEND] Empty text message, using placeholder');
-        text = '...';
+    // Fast null check
+    if (!sock || !jid) return null;
+    
+    // Fast text check with default
+    if (!text) text = '...';
+    
+    // Cache check for duplicate messages to avoid spamming
+    // (prevents sending the same message to the same JID within a short time)
+    const cacheKey = `${jid}:${text}`;
+    const now = Date.now();
+    const recentSend = recentTextCache.get(cacheKey);
+    
+    if (recentSend && now - recentSend < 3000 && text.length > 5 && !options.priority) {
+        // Skip duplicate messages sent within 3 seconds
+        return null;
     }
     
-    console.log(`[SAFE-SEND] Sending text to ${jidHelper.formatJidForLogging(jid)}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
+    // Minimal logging for better performance
+    if (text.length > 100) {
+        console.log(`[SEND] To ${typeof jid === 'string' ? jid.split('@')[0] : 'unknown'}: ${text.substring(0, 50)}...`);
+    }
+    
+    // Add to cache for duplicate prevention
+    recentTextCache.set(cacheKey, now);
+    
+    // Clean cache periodically
+    if (recentTextCache.size > TEXT_CACHE_SIZE) {
+        // Keep only the most recent entries
+        const entries = [...recentTextCache.entries()];
+        entries.sort((a, b) => b[1] - a[1]); // Sort by timestamp (newest first)
+        recentTextCache.clear();
+        for (let i = 0; i < Math.min(TEXT_CACHE_SIZE / 2, entries.length); i++) {
+            recentTextCache.set(entries[i][0], entries[i][1]);
+        }
+    }
+    
+    // Direct path for improved performance
     return safeSendMessage(sock, jid, { text }, options);
 }
 
+// Cached promises for in-flight messages to the same JID
+const pendingSends = new Map();
+
 /**
  * Safely send a WhatsApp message with enhanced JID validation, error handling and retry
+ * Optimized for high performance with JID caching and reduced logging
+ * 
  * @param {Object} sock - WhatsApp socket connection
  * @param {string|Object} jid - Recipient JID
  * @param {Object} content - Message content
  * @param {Object} options - Additional options
- * @param {number} options.maxRetries - Maximum retry attempts (default: 2)
- * @param {number} options.retryDelay - Delay between retries in ms (default: 1000)
+ * @param {number} options.maxRetries - Maximum retry attempts (default: 1)
+ * @param {number} options.retryDelay - Delay between retries in ms (default: 500)
  * @returns {Promise<Object|null>} - Message sending result or null if failed
  */
 async function safeSendMessage(sock, jid, content, options = {}) {
-    // First validate the sock
-    if (!sock) {
-        console.error('[SAFE-SEND] Socket is null or undefined');
+    // Fast null check for common error cases
+    if (!sock || !jid) {
         return null;
     }
     
-    // Then validate the JID
+    // Fast validation with caching
     const validation = validateJid(jid);
     if (!validation.valid) {
-        console.error(`[SAFE-SEND] Invalid JID: ${validation.message} (${jidHelper.formatJidForLogging(jid)})`);
         stats.validationErrors++;
         return null;
     }
     
-    // Validated JID
+    // Use validated JID
     const validJid = validation.normalizedJid;
-    const maxRetries = options.maxRetries ?? 2;
-    const retryDelay = options.retryDelay ?? 1000;
     
-    let lastError = null;
+    // Performance optimization - set reasonable defaults
+    const maxRetries = options.maxRetries ?? 1;  // Reduced default retries for faster throughput
+    const retryDelay = options.retryDelay ?? 500; // Reduced delay for faster performance
     
-    // Try to send the message with retries
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-            // If this is a retry, log it
-            if (attempt > 0) {
-                console.log(`[SAFE-SEND] Retry attempt ${attempt}/${maxRetries} for message to ${validJid}`);
-                stats.retries++;
+    // Generate a unique key for this message
+    const isPriority = options.priority === true;
+    const uniqueKey = `${validJid}:${Date.now()}`;
+    
+    // Helper function to send with retries
+    async function sendWithRetry() {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                // For retries
+                if (attempt > 0) {
+                    stats.retries++;
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                }
                 
-                // Wait before retrying
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                // Direct message sending - minimize overhead
+                const result = await sock.sendMessage(validJid, content);
+                
+                // Update stats
+                stats.sent++;
+                if (attempt > 0) stats.successfulRetries++;
+                
+                return result;
+            } catch (err) {
+                stats.errors++;
+                
+                // Only log detailed errors on final attempt to reduce console spam
+                if (attempt === maxRetries) {
+                    console.error(`[SAFE-SEND] Failed to send to ${validJid}: ${err.message}`);
+                }
             }
-            
-            // Send the message
-            const result = await sock.sendMessage(validJid, content);
-            
-            // If this was a retry, count it as successful
-            if (attempt > 0) {
-                stats.successfulRetries++;
-            }
-            
-            // Update stats
-            stats.sent++;
-            
-            console.log(`[SAFE-SEND] Message sent successfully to ${validJid}`);
-            return result;
-        } catch (err) {
-            lastError = err;
-            stats.errors++;
-            console.error(`[SAFE-SEND] Error sending message to ${validJid} (attempt ${attempt + 1}/${maxRetries + 1}): ${err.message}`);
+        }
+        return null;
+    }
+    
+    // For high priority messages, send immediately
+    if (isPriority) {
+        return sendWithRetry();
+    }
+    
+    // Check if we're already sending to this JID
+    const existingPromise = pendingSends.get(validJid);
+    if (existingPromise) {
+        // Wait for the existing send to complete before starting this one
+        // This prevents flooding the same recipient
+        try {
+            await existingPromise;
+        } catch {
+            // Ignore errors from previous sends
         }
     }
     
-    // If we reached here, all attempts failed
-    console.error(`[SAFE-SEND] All ${maxRetries + 1} attempts failed when sending to ${validJid}`);
-    return null;
+    // Create a new promise for this send
+    const sendPromise = sendWithRetry();
+    pendingSends.set(validJid, sendPromise);
+    
+    // Clean up the pending sends map after completion
+    sendPromise.finally(() => {
+        if (pendingSends.get(validJid) === sendPromise) {
+            pendingSends.delete(validJid);
+        }
+    });
+    
+    return sendPromise;
 }
 
 /**
