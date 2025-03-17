@@ -1,16 +1,43 @@
 # Deploy BLACKSKY-MD WhatsApp Bot to Heroku
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKYMD)
 
-Click the "Deploy to Heroku" button above to instantly deploy this WhatsApp bot to Heroku.
+## Prerequisites
+Before deploying, make sure you have:
+1. A WhatsApp account ready to be used with the bot
+2. A Heroku account (create one at [heroku.com](https://heroku.com) if you don't have it)
+3. Your WhatsApp number with country code (required during setup)
 
-## Quick Setup After Deployment
+## Deployment Steps
 
-1. **Scan the QR code** shown on the web interface to connect your WhatsApp
-2. Send the command `.getcreds` to your bot to get session credentials
-3. Copy the credentials to your Heroku app's config vars to maintain the session
-4. Your bot is now up and running!
+1. Click the "Deploy to Heroku" button above
+2. Fill in the required environment variables:
+   - `OWNER_NUMBER`: Your WhatsApp number with country code (no + or spaces)
+   - Other variables are optional and have default values
 
-## For More Information
+3. Click "Deploy App" and wait for the deployment to complete
+4. Once deployed, click "View" to open your app
+5. Scan the QR code with WhatsApp to connect your bot
+6. Send `.alive` command to verify the bot is working
 
-See [HEROKU_DEPLOYMENT.md](HEROKU_DEPLOYMENT.md) for detailed instructions and troubleshooting.
+## After Deployment
+
+1. Use the `.getcreds` command to get your session credentials
+2. Add these credentials to your Heroku config vars to maintain the session
+3. Your bot will now stay connected even after Heroku dynos restart
+
+## Troubleshooting
+
+If you encounter any issues:
+1. Check the Heroku logs for errors
+2. Make sure all environment variables are set correctly
+3. Try reconnecting by visiting the /qr endpoint
+4. See [HEROKU_DEPLOYMENT.md](HEROKU_DEPLOYMENT.md) for detailed troubleshooting
+
+## Important Notes
+
+- Free Heroku dynos go to sleep after 30 minutes of inactivity
+- Use a service like UptimeRobot to keep your bot online 24/7
+- For better reliability, consider upgrading to a paid dyno
+
+For more detailed instructions and advanced configuration options, see [HEROKU_DEPLOYMENT.md](HEROKU_DEPLOYMENT.md).
