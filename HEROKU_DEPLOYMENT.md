@@ -6,7 +6,7 @@ This guide provides comprehensive instructions for deploying BLACKSKY-MD WhatsAp
 
 The fastest way to deploy is using the Deploy to Heroku button:
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKYMD)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKY)
 
 ## Standard Deployment Method
 

@@ -6,7 +6,7 @@ This guide will help you deploy the BLACKSKY-MD WhatsApp bot to Heroku with just
 
 The easiest way to deploy this bot is using the Deploy to Heroku button:
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKYMD)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKY)
 
 ## Step-by-Step Deployment Instructions
 
