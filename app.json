@@ -36,7 +36,7 @@
     }
   },
   "scripts": {
-    "postdeploy": "node src/cloud-qr-server.js"
+    "postdeploy": "npm install && python3 -m pip install -e ."
   },
   "success_url": "/qr"
 }
