@@ -1,325 +1,188 @@
 /**
- * BLACKSKY-MD WhatsApp Bot - Core Entry Point
- * Implements a high-performance, robust WhatsApp bot with modular design
+ * BLACKSKY-MD WhatsApp Bot - Main Entry Point
+ * Using @whiskeysockets/baileys with enhanced connection persistence
  */
 
-const express = require('express');
-const qrcode = require('qrcode');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const P = require('pino');
 const fs = require('fs');
 const path = require('path');
+const QRCode = require('qrcode');
 const logger = require('../utils/logger');
-const ConnectionManager = require('./connection');
-const { messageHandler } = require('./messageHandler');
+const messageHandler = require('./messageHandler');
+const ConnectionManager = require('./connectionManager');
+const SessionManager = require('./sessionManager');
 const commandRegistry = require('./commandRegistry');
+const { setupQRServer } = require('./qrServer');
 
-// Initialize Express for web interface
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// Global state and connection manager
-let connectionManager = null;
+// Global variables
+let connectionManager;
+let sessionManager;
+let connectionRetryCount = 0;
+const MAX_RETRIES = 10;
+const QR_SERVER_PORT = process.env.PORT || 5000;
 
 /**
- * Initialize the bot connection and all components
+ * Initialize command modules and message handler
  */
 async function initializeBot() {
-    logger.info('Starting WhatsApp bot initialization...');
-    
     try {
-        // Initialize command registry first
-        await commandRegistry.initialize();
-        logger.info(`Command registry initialized with ${commandRegistry.commandStats.total} commands`);
-        
-        // Initialize connection manager
-        connectionManager = new ConnectionManager();
-        const connected = await connectionManager.initialize();
-        
-        if (connected) {
-            // Get the socket from connection manager
-            const sock = connectionManager.getSocket();
-            
-            // Set up message handler for incoming messages
-            sock.ev.on('messages.upsert', ({ messages }) => {
-                if (!messages || !messages.length) return;
-                
-                for (const message of messages) {
-                    if (message.key && message.key.fromMe === false) {
-                        messageHandler(sock, message);
-                    }
-                }
-            });
-            
-            logger.info('Bot initialization complete!');
-            return true;
-        } else {
-            logger.error('Failed to initialize bot connection');
-            return false;
-        }
-    } catch (err) {
-        logger.error('Error during bot initialization:', err);
-        return false;
-    }
-}
+        logger.info('Initializing WhatsApp bot...');
 
-/**
- * Set up Express routes for QR code display and status
- */
-function setupWebInterface() {
-    // Serve static files
-    app.use(express.static(path.join(__dirname, '../../public')));
-    
-    // Main page with QR code
-    app.get('/', (req, res) => {
-        res.send(`
-            <!DOCTYPE html>
-            <html>
-                <head>
-                    <title>WhatsApp Bot QR Code</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body { 
-                            font-family: Arial, sans-serif;
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            min-height: 100vh;
-                            margin: 0;
-                            background: #f0f2f5;
-                            padding: 20px;
-                        }
-                        .container {
-                            background: white;
-                            padding: 30px;
-                            border-radius: 10px;
-                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                            max-width: 500px;
-                            width: 100%;
-                            text-align: center;
-                        }
-                        h1 { color: #128C7E; }
-                        .qr-container {
-                            margin: 20px 0;
-                            padding: 20px;
-                            border: 2px dashed #ddd;
-                            display: inline-block;
-                            background: white;
-                        }
-                        #qr-image {
-                            max-width: 300px;
-                            height: auto;
-                        }
-                        .status {
-                            margin: 20px 0;
-                            padding: 10px;
-                            border-radius: 5px;
-                            font-weight: bold;
-                        }
-                        .connected { background: #e8f5e9; color: #2e7d32; }
-                        .disconnected { background: #fff3e0; color: #ef6c00; }
-                        .error { background: #ffebee; color: #c62828; }
-                        .loading { 
-                            font-size: 1.2em;
-                            color: #666;
-                            margin: 20px 0;
-                            animation: pulse 1.5s infinite;
-                        }
-                        @keyframes pulse {
-                            0% { opacity: 1; }
-                            50% { opacity: 0.5; }
-                            100% { opacity: 1; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <h1>WhatsApp Bot QR Code</h1>
-                        <div class="qr-container">
-                            <div id="loading" class="loading">Initializing connection...</div>
-                            <img id="qr-image" style="display: none;" alt="QR Code">
-                        </div>
-                        <div id="status" class="status disconnected">
-                            Waiting for connection...
-                        </div>
-                        <div id="commands-info">
-                            <p>Available commands: <span id="command-count">Loading...</span></p>
-                        </div>
-                    </div>
-                    <script>
-                        function updateQR() {
-                            fetch('/status')
-                                .then(res => res.json())
-                                .then(data => {
-                                    const status = document.getElementById('status');
-                                    const loading = document.getElementById('loading');
-                                    const qrImage = document.getElementById('qr-image');
-                                    const commandCount = document.getElementById('command-count');
-                                    
-                                    status.textContent = data.message;
-                                    status.className = 'status ' + data.state;
-                                    
-                                    if (data.state === 'qr_ready' && data.qrCode) {
-                                        qrImage.src = data.qrCode;
-                                        qrImage.style.display = 'block';
-                                        loading.style.display = 'none';
-                                    } else {
-                                        qrImage.style.display = 'none';
-                                        loading.style.display = 'block';
-                                        loading.textContent = data.state === 'connected' ? 
-                                            'Connected successfully!' : 'Waiting for QR code...';
-                                    }
-                                    
-                                    if (data.commandStats) {
-                                        commandCount.textContent = \`\${data.commandStats.enabled} enabled / \${data.commandStats.total} total\`;
-                                    }
-                                    
-                                    setTimeout(updateQR, data.state === 'qr_ready' ? 20000 : 5000);
-                                })
-                                .catch(err => {
-                                    console.error('Error:', err);
-                                    setTimeout(updateQR, 5000);
-                                });
-                        }
-                        
-                        updateQR();
-                    </script>
-                </body>
-            </html>
-        `);
-    });
-    
-    // Status endpoint with QR code
-    app.get('/status', async (req, res) => {
-        try {
-            if (!connectionManager) {
-                return res.json({
-                    state: 'initializing',
-                    message: 'Initializing bot connection...',
-                    qrCode: null,
-                    commandStats: null
-                });
-            }
-            
-            const state = connectionManager.getState();
-            let qrImageDataUrl = null;
-            
-            if (state.connectionState === 'qr_ready' && state.qrCode) {
-                qrImageDataUrl = await generateQrDataUrl(state.qrCode);
-            }
-            
-            res.json({
-                state: state.connectionState,
-                message: getStatusMessage(state),
-                qrCode: qrImageDataUrl,
-                commandStats: commandRegistry.commandStats
-            });
-        } catch (err) {
-            logger.error('Error in status endpoint:', err);
-            res.status(500).json({ error: 'Internal server error' });
-        }
-    });
-    
-    // Command list endpoint
-    app.get('/commands', (req, res) => {
-        const categories = commandRegistry.getAllCategories();
-        const result = {};
-        
-        for (const category of categories) {
-            const commands = commandRegistry.getCommandsByCategory(category)
-                .map(cmdName => {
-                    const cmd = commandRegistry.commands.get(cmdName);
-                    if (!cmd || !cmd.config.enabled) return null;
-                    
-                    return {
-                        name: cmdName,
-                        description: cmd.config.description,
-                        usage: cmd.config.usage
-                    };
-                })
-                .filter(Boolean);
-                
-            if (commands.length > 0) {
-                result[category] = commands;
-            }
-        }
-        
-        res.json(result);
-    });
-    
-    // Start the server
-    app.listen(PORT, '0.0.0.0', () => {
-        logger.info(`Web interface running on port ${PORT}`);
-    });
-}
+        // Initialize session manager
+        sessionManager = new SessionManager();
+        await sessionManager.initialize();
 
-/**
- * Generate QR code data URL from text
- * @param {string} text - QR code text
- * @returns {Promise<string>} - Data URL
- */
-async function generateQrDataUrl(text) {
-    try {
-        return await qrcode.toDataURL(text, {
-            errorCorrectionLevel: 'H',
-            margin: 1,
-            scale: 8,
-            color: {
-                dark: '#128C7E',
-                light: '#FFFFFF'
+        // Initialize message handler with command prefix
+        await messageHandler.initialize({
+            prefix: '!',
+            maxQueueSize: 100
+        });
+
+        // Set up connection manager
+        connectionManager = new ConnectionManager({
+            printQRInTerminal: true,
+            maxReconnectAttempts: MAX_RETRIES,
+            onQRUpdate: handleQRUpdate
+        });
+        await connectionManager.initialize();
+
+        // Start connection
+        const sock = await connectionManager.connect();
+
+        // Set up message handler for events
+        setupMessageHandler(sock);
+
+        // Setup QR web server for easier connection
+        if (process.env.ENABLE_QR_SERVER !== 'false') {
+            setupQRServer(QR_SERVER_PORT, sock, connectionManager);
+        }
+
+        // Add reconnection event listener
+        connectionManager.onConnectionEvent((event) => {
+            if (event === 'connected') {
+                connectionRetryCount = 0;
+                logger.info('Connection established successfully');
+            } else if (event === 'reconnect_error') {
+                connectionRetryCount++;
+                logger.warn(`Reconnection attempt ${connectionRetryCount} failed`);
+            } else if (event === 'max_retries_reached') {
+                logger.error('Maximum reconnection attempts reached. Bot stopped.');
+                process.exit(1);
             }
         });
+
+        logger.info('Bot initialization complete');
     } catch (err) {
-        logger.error('Error generating QR code:', err);
-        return null;
+        logger.error('Error during bot initialization:', err);
     }
 }
 
 /**
- * Get a user-friendly status message
- * @param {Object} state - Connection state
- * @returns {string} - Status message
+ * Set up message handler for WhatsApp
+ * @param {Object} sock - WhatsApp connection socket
  */
-function getStatusMessage(state) {
-    switch (state.connectionState) {
-        case 'connected':
-            return 'Connected to WhatsApp! Bot is active.';
-        case 'disconnected':
-            return `Disconnected. Reason: ${state.lastError || 'Unknown'}. Waiting to reconnect...`;
-        case 'connecting':
-            return 'Connecting to WhatsApp...';
-        case 'qr_ready':
-            return 'Please scan the QR code with WhatsApp on your phone';
-        case 'error':
-            return `Error connecting to WhatsApp: ${state.lastError || 'Unknown error'}. Retrying...`;
-        default:
-            return 'Initializing...';
-    }
-}
+async function setupMessageHandler(sock) {
+    if (!sock) return;
 
-/**
- * Main entry point
- */
-async function main() {
-    try {
-        // Set up web interface
-        setupWebInterface();
+    // Handle incoming messages
+    sock.ev.on('messages.upsert', async ({ messages }) => {
+        if (!messages || !messages[0]) return;
+
+        try {
+            const msg = messages[0];
+            
+            // Filter out status broadcast messages and messages from self
+            if (msg.key.remoteJid === 'status@broadcast') return;
+            if (msg.key.fromMe) return;
+
+            // Handle message via message handler
+            await messageHandler.handleMessage(sock, msg);
+        } catch (err) {
+            logger.error('Error handling message:', err);
+        }
+    });
+
+    // Handle connection updates
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
         
-        // Initialize bot
-        await initializeBot();
+        if (connection === 'close') {
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            logger.info(`Connection closed with status: ${statusCode}`);
+        } else if (connection === 'open') {
+            logger.info('Connection opened');
+        }
+    });
+}
+
+/**
+ * Handle QR code updates
+ * @param {string} qr - QR code data
+ */
+async function handleQRUpdate(qr) {
+    if (!qr) return;
+    
+    try {
+        logger.info('New QR code received. Scan with WhatsApp to connect.');
+        
+        // Generate QR code as ASCII in terminal
+        if (process.env.DISABLE_QR_TERMINAL !== 'true') {
+            QRCode.toString(qr, { type: 'terminal', small: true }, (err, url) => {
+                if (err) return logger.error('QR generation error:', err);
+                console.log(url);
+            });
+        }
+        
+        // Save QR code as an image file
+        if (process.env.SAVE_QR_IMAGE === 'true') {
+            const qrImagePath = path.join(__dirname, '../../qrcode.png');
+            await QRCode.toFile(qrImagePath, qr);
+            logger.info(`QR code saved to ${qrImagePath}`);
+        }
     } catch (err) {
-        logger.error('Critical error in main:', err);
+        logger.error('Error handling QR update:', err);
     }
+}
+
+/**
+ * Get status information about the bot
+ * @returns {Object} Status information
+ */
+function getStatusInformation() {
+    return {
+        connection: connectionManager ? connectionManager.getStatus() : null,
+        session: sessionManager ? sessionManager.getStats() : null,
+        commands: {
+            total: commandRegistry.getAllCommands().size,
+            categories: commandRegistry.getAllCategories()
+        },
+        messageHandler: messageHandler.getStats(),
+        system: {
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            node: process.version
+        }
+    };
 }
 
 // Start the bot
-main().catch(err => {
-    logger.error('Fatal error:', err);
+initializeBot().catch(err => {
+    logger.error('Failed to start bot:', err);
     process.exit(1);
 });
 
-// Export connection manager and main functions for external access
+// Handle process termination
+process.on('SIGINT', async () => {
+    logger.info('Received SIGINT. Shutting down...');
+    
+    if (connectionManager) {
+        await connectionManager.disconnect();
+    }
+    
+    process.exit(0);
+});
+
 module.exports = {
-    connectionManager,
-    initializeBot,
-    getConnectionManager: () => connectionManager
+    getStatusInformation
 };

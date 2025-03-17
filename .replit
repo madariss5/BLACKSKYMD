@@ -90,7 +90,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node src/core/index.js"
+args = "node src/index.js"
 waitForPort = 5000
 
 [deployment]
