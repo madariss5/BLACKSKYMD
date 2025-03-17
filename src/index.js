@@ -30,13 +30,7 @@ let isReconnecting = false;
 const SESSION_PATH = path.join(__dirname, '..', 'sessions');
 const MAX_RECONNECT_RETRIES = 999999; // Effectively infinite retries
 const RECONNECT_INTERVAL = 3000;
-const COMMAND_MODULES = [
-    './commands/educational',
-    './commands/example-with-error-handling',
-    './commands/basic',
-    './commands/owner',
-    './commands/utility'
-];
+const COMMANDS_PATH = path.join(__dirname, '..', 'commands');
 
 // Ensure session directory exists
 if (!fs.existsSync(SESSION_PATH)) {
@@ -47,22 +41,63 @@ if (!fs.existsSync(SESSION_PATH)) {
 async function initializeCommands() {
     try {
         logger.info('Initializing command modules...');
+        
+        // Ensure commands directory exists
+        if (!fs.existsSync(COMMANDS_PATH)) {
+            fs.mkdirSync(COMMANDS_PATH, { recursive: true });
+            logger.info('Created commands directory:', COMMANDS_PATH);
+        }
+        
+        // First initialize the main handler (which loads commands internally)
         await handler.init();
         logger.info('Main handler initialized');
 
-        for (const modulePath of COMMAND_MODULES) {
+        // Find all JS files in the commands directory (recursively)
+        async function findCommandFiles(dir) {
+            const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+            const files = await Promise.all(entries.map(async entry => {
+                const fullPath = path.join(dir, entry.name);
+                return entry.isDirectory() ? findCommandFiles(fullPath) : fullPath;
+            }));
+            return files.flat().filter(file => file.endsWith('.js'));
+        }
+        
+        // Get all JS files from the commands directory
+        const commandFiles = await findCommandFiles(COMMANDS_PATH);
+        logger.info(`Found ${commandFiles.length} potential command files`);
+        
+        // Log found command files for debugging
+        commandFiles.forEach(file => {
+            logger.debug(`Command file found: ${path.relative(COMMANDS_PATH, file)}`);
+        });
+        
+        // Load each command module and initialize if it has an init function
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (const filePath of commandFiles) {
             try {
-                const module = require(modulePath);
-                if (typeof module.init === 'function') {
-                    await module.init();
-                    logger.info(`Initialized command module: ${modulePath}`);
+                const relativePath = path.relative(__dirname, filePath);
+                const module = require(filePath);
+                
+                // Check if this is a valid command module
+                if (module) {
+                    // Initialize module if it has an init function
+                    if (typeof module.init === 'function') {
+                        await module.init();
+                        logger.info(`Initialized command module: ${relativePath}`);
+                    } else {
+                        logger.debug(`Command module loaded (no init required): ${relativePath}`);
+                    }
+                    successCount++;
                 }
             } catch (err) {
-                logger.warn(`Failed to load command module ${modulePath}:`, err.message);
+                logger.warn(`Failed to load command module ${filePath}:`, err.message);
+                failCount++;
             }
         }
 
-        logger.info('All command modules initialized');
+        logger.info(`Command loading complete. Success: ${successCount}, Failed: ${failCount}`);
         return true;
     } catch (err) {
         logger.error('Error initializing commands:', err);
