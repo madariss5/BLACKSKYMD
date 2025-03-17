@@ -1,228 +1,334 @@
 /**
- * Session Manager for WhatsApp Bot
- * Provides reliable session persistence and backup functionality
+ * WhatsApp Session Manager
+ * Provides persistent session storage and backup mechanisms
  */
 
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
-const { ensureDirectoryExists, fileExists, readJsonFile, writeJsonFile } = require('../utils/fileUtils');
-
-// Constants
-const AUTH_DIR = './auth_info_baileys';
-const BACKUP_DIR = './auth_info_baileys_backup';
-const DATA_BACKUP_DIR = './data/session_backups';
-const LEGACY_BACKUP_DIR = './backups';
-const MAX_BACKUPS = 50;
-const TIMESTAMP_FORMAT = new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-});
 
 class SessionManager {
-    constructor() {
-        this.ensureDirectories();
+    constructor(options = {}) {
+        this.options = {
+            sessionDir: options.sessionDir || './auth_info_baileys',
+            backupDir: options.backupDir || './auth_info_baileys_backup',
+            maxBackups: options.maxBackups || 5,
+            backupInterval: options.backupInterval || (30 * 60 * 1000), // 30 minutes
+            autoBackup: options.autoBackup !== false,
+        };
+        this.backupTimer = null;
+        this.isInitialized = false;
     }
 
     /**
-     * Ensure all required directories exist
+     * Initialize session manager
+     * @returns {Promise<boolean>} Whether initialization was successful
      */
-    ensureDirectories() {
-        ensureDirectoryExists(AUTH_DIR);
-        ensureDirectoryExists(BACKUP_DIR);
-        ensureDirectoryExists(DATA_BACKUP_DIR);
-        ensureDirectoryExists(LEGACY_BACKUP_DIR);
+    async initialize() {
+        try {
+            // Ensure directories exist
+            if (!fs.existsSync(this.options.sessionDir)) {
+                fs.mkdirSync(this.options.sessionDir, { recursive: true });
+                logger.info(`Created session directory: ${this.options.sessionDir}`);
+            }
+            
+            if (!fs.existsSync(this.options.backupDir)) {
+                fs.mkdirSync(this.options.backupDir, { recursive: true });
+                logger.info(`Created backup directory: ${this.options.backupDir}`);
+            }
+            
+            // Start periodic backup if enabled
+            if (this.options.autoBackup) {
+                this.startPeriodicBackup();
+            }
+            
+            this.isInitialized = true;
+            logger.info('Session manager initialized successfully');
+            return true;
+        } catch (error) {
+            logger.error('Failed to initialize session manager:', error);
+            return false;
+        }
     }
 
     /**
-     * Backup current credentials to multiple locations for redundancy
+     * Start periodic backup
      */
-    async backupCredentials() {
+    startPeriodicBackup() {
+        if (this.backupTimer) {
+            clearInterval(this.backupTimer);
+        }
+        
+        this.backupTimer = setInterval(() => {
+            this.backupSession().catch(err => {
+                logger.error('Error during automatic session backup:', err);
+            });
+        }, this.options.backupInterval);
+        
+        logger.info(`Automatic session backup enabled (interval: ${this.options.backupInterval/60000} minutes)`);
+    }
+
+    /**
+     * Stop periodic backup
+     */
+    stopPeriodicBackup() {
+        if (this.backupTimer) {
+            clearInterval(this.backupTimer);
+            this.backupTimer = null;
+            logger.info('Automatic session backup disabled');
+        }
+    }
+
+    /**
+     * Backup the current session
+     * @returns {Promise<string>} Path to the backup directory
+     */
+    async backupSession() {
         try {
             const timestamp = Date.now();
-            const credentialPath = path.join(AUTH_DIR, 'creds.json');
+            const backupPath = `${this.options.backupDir}_${timestamp}`;
             
-            if (!fileExists(credentialPath)) {
-                logger.warn('No credentials to backup');
-                return false;
+            // Create backup directory
+            if (!fs.existsSync(backupPath)) {
+                fs.mkdirSync(backupPath, { recursive: true });
             }
             
-            const credentials = readJsonFile(credentialPath);
-            if (!credentials) {
-                logger.error('Failed to read credentials for backup');
-                return false;
+            // Copy session files to backup
+            await this.copyDirectory(this.options.sessionDir, backupPath);
+            
+            // Create latest backup link
+            const credFile = path.join(backupPath, 'creds.json');
+            if (fs.existsSync(credFile)) {
+                await this.saveLatestBackup(credFile);
             }
             
-            // Backup file names with timestamps
-            const backupFileName = `creds_backup_${timestamp}.json`;
-            const standardBackupPath = path.join(BACKUP_DIR, backupFileName);
-            const dataBackupPath = path.join(DATA_BACKUP_DIR, backupFileName);
-            const legacyBackupPath = path.join(LEGACY_BACKUP_DIR, backupFileName);
-            const latestBackupPath = path.join(LEGACY_BACKUP_DIR, 'latest_creds.json');
-            
-            // Write backup to multiple locations
-            const backupResults = [
-                writeJsonFile(standardBackupPath, credentials),
-                writeJsonFile(dataBackupPath, credentials),
-                writeJsonFile(legacyBackupPath, credentials),
-                writeJsonFile(latestBackupPath, credentials)
-            ];
-            
-            // Log results
-            if (backupResults.every(Boolean)) {
-                logger.info(`Backup saved to ${standardBackupPath}`);
-                logger.info(`Backup saved to ${dataBackupPath}`);
-                logger.info(`Backup saved to ${legacyBackupPath}`);
-            } else {
-                logger.warn('Some backups failed to save');
-            }
+            logger.info(`Session backup created: ${backupPath}`);
             
             // Clean up old backups
             await this.cleanupOldBackups();
             
-            return true;
-        } catch (err) {
-            logger.error('Error during credential backup:', err);
-            return false;
+            return backupPath;
+        } catch (error) {
+            logger.error('Error backing up session:', error);
+            throw error;
         }
     }
-    
+
     /**
-     * Restore credentials from the best available backup
+     * Copy a directory recursively
+     * @param {string} src Source directory
+     * @param {string} dest Destination directory
+     * @returns {Promise<void>}
      */
-    async restoreCredentials() {
-        try {
-            logger.info('Attempting to restore credentials from backups...');
+    async copyDirectory(src, dest) {
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
             
-            // Candidate backup locations in priority order
-            const candidates = [
-                { dir: LEGACY_BACKUP_DIR, file: 'latest_creds.json' },
-                { dir: BACKUP_DIR, filter: 'creds_backup_' },
-                { dir: DATA_BACKUP_DIR, filter: 'creds_backup_' },
-                { dir: LEGACY_BACKUP_DIR, filter: 'creds_backup_' }
-            ];
-            
-            let restoredCreds = null;
-            
-            for (const candidate of candidates) {
-                if (candidate.file) {
-                    // Try exact file
-                    const filePath = path.join(candidate.dir, candidate.file);
-                    if (fileExists(filePath)) {
-                        logger.info(`Restored from ${filePath}`);
-                        restoredCreds = readJsonFile(filePath);
-                        if (restoredCreds) break;
-                    }
-                } else if (candidate.filter) {
-                    // Try latest file matching filter
-                    const files = fs.readdirSync(candidate.dir)
-                        .filter(f => f.startsWith(candidate.filter) && f.endsWith('.json'))
-                        .sort((a, b) => {
-                            // Sort by timestamp in filename (descending)
-                            const tsA = parseInt(a.replace(/[^0-9]/g, ''));
-                            const tsB = parseInt(b.replace(/[^0-9]/g, ''));
-                            return tsB - tsA;
-                        });
-                    
-                    if (files.length > 0) {
-                        const latestFile = path.join(candidate.dir, files[0]);
-                        logger.info(`Restoring from latest backup: ${latestFile}`);
-                        restoredCreds = readJsonFile(latestFile);
-                        if (restoredCreds) break;
-                    }
-                }
-            }
-            
-            if (!restoredCreds) {
-                logger.warn('No valid backup found to restore credentials');
-                return false;
-            }
-            
-            // Write restored credentials to the auth directory
-            ensureDirectoryExists(AUTH_DIR);
-            const credPath = path.join(AUTH_DIR, 'creds.json');
-            const success = writeJsonFile(credPath, restoredCreds);
-            
-            if (success) {
-                logger.info('Restored credentials from backup system');
-                return true;
+            if (entry.isDirectory()) {
+                fs.mkdirSync(destPath, { recursive: true });
+                await this.copyDirectory(srcPath, destPath);
             } else {
-                logger.error('Failed to write restored credentials');
-                return false;
+                fs.copyFileSync(srcPath, destPath);
             }
-        } catch (err) {
-            logger.error('Error during credential restoration:', err);
-            return false;
         }
     }
-    
+
     /**
-     * Clean up old backup files to prevent excessive storage use
+     * Save the latest backup credentials
+     * @param {string} credFile Path to the credentials file
+     */
+    async saveLatestBackup(credFile) {
+        try {
+            const latestPath = path.join(this.options.backupDir, 'latest_creds.json');
+            fs.copyFileSync(credFile, latestPath);
+            
+            // Calculate and save checksum
+            const fileBuffer = fs.readFileSync(credFile);
+            const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+            fs.writeFileSync(path.join(this.options.backupDir, 'latest_checksum.txt'), hash);
+            
+            logger.info('Latest backup credentials saved');
+        } catch (error) {
+            logger.error('Error saving latest backup:', error);
+        }
+    }
+
+    /**
+     * Clean up old backups to prevent excessive disk usage
      */
     async cleanupOldBackups() {
         try {
-            const directories = [BACKUP_DIR, DATA_BACKUP_DIR, LEGACY_BACKUP_DIR];
+            const dirPattern = new RegExp(`^${path.basename(this.options.backupDir)}_\\d+$`);
+            const backupDirs = fs.readdirSync(path.dirname(this.options.backupDir))
+                .filter(dir => dirPattern.test(dir))
+                .map(dir => ({
+                    name: dir,
+                    path: path.join(path.dirname(this.options.backupDir), dir),
+                    timestamp: parseInt(dir.split('_')[1]) || 0
+                }))
+                .sort((a, b) => b.timestamp - a.timestamp); // Sort by timestamp, newest first
             
-            for (const dir of directories) {
-                if (!fs.existsSync(dir)) continue;
+            // Keep only the specified number of backups
+            if (backupDirs.length > this.options.maxBackups) {
+                const dirsToRemove = backupDirs.slice(this.options.maxBackups);
+                for (const dir of dirsToRemove) {
+                    this.removeDirectory(dir.path);
+                    logger.info(`Removed old backup: ${dir.path}`);
+                }
+            }
+        } catch (error) {
+            logger.error('Error cleaning up old backups:', error);
+        }
+    }
+
+    /**
+     * Remove a directory recursively
+     * @param {string} dir Directory to remove
+     */
+    removeDirectory(dir) {
+        if (!fs.existsSync(dir)) return;
+        
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            
+            if (entry.isDirectory()) {
+                this.removeDirectory(fullPath);
+            } else {
+                fs.unlinkSync(fullPath);
+            }
+        }
+        
+        fs.rmdirSync(dir);
+    }
+
+    /**
+     * Restore session from latest backup
+     * @returns {Promise<boolean>} Whether restore was successful
+     */
+    async restoreFromLatestBackup() {
+        try {
+            const latestCredsPath = path.join(this.options.backupDir, 'latest_creds.json');
+            
+            if (!fs.existsSync(latestCredsPath)) {
+                logger.warn('No latest backup found to restore from');
+                return false;
+            }
+            
+            // Verify checksum if available
+            const checksumPath = path.join(this.options.backupDir, 'latest_checksum.txt');
+            if (fs.existsSync(checksumPath)) {
+                const expectedHash = fs.readFileSync(checksumPath, 'utf8');
+                const fileBuffer = fs.readFileSync(latestCredsPath);
+                const actualHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
                 
-                const files = fs.readdirSync(dir)
-                    .filter(f => f.startsWith('creds_backup_') && f.endsWith('.json'))
-                    .sort((a, b) => {
-                        // Sort by timestamp in filename (descending)
-                        const tsA = parseInt(a.replace(/[^0-9]/g, ''));
-                        const tsB = parseInt(b.replace(/[^0-9]/g, ''));
-                        return tsB - tsA;
-                    });
-                
-                // Keep only the most recent MAX_BACKUPS files
-                if (files.length > MAX_BACKUPS) {
-                    const filesToDelete = files.slice(MAX_BACKUPS);
-                    for (const file of filesToDelete) {
-                        fs.unlinkSync(path.join(dir, file));
-                    }
-                    
-                    logger.debug(`Cleaned up ${filesToDelete.length} old backup files in ${dir}`);
+                if (expectedHash !== actualHash) {
+                    logger.error('Backup checksum verification failed');
+                    return false;
                 }
             }
             
+            // Clear current session
+            this.clearSession();
+            
+            // Copy latest backup to session directory
+            const credsData = fs.readFileSync(latestCredsPath, 'utf8');
+            fs.writeFileSync(path.join(this.options.sessionDir, 'creds.json'), credsData);
+            
+            logger.info('Session restored from latest backup');
             return true;
-        } catch (err) {
-            logger.error('Error cleaning up old backups:', err);
+        } catch (error) {
+            logger.error('Error restoring from backup:', error);
             return false;
         }
     }
-    
+
     /**
-     * Calculate a checksum for data verification
-     * @param {string|Object} data - Data to hash
-     * @returns {string} - SHA-256 hash
+     * Clear current session
      */
-    calculateChecksum(data) {
-        const content = typeof data === 'string' ? data : JSON.stringify(data);
-        return crypto.createHash('sha256').update(content).digest('hex');
-    }
-    
-    /**
-     * Create a backup with metadata for better tracking
-     * @param {Object} credentials - Credentials object
-     * @returns {Object} - Enhanced backup object with metadata
-     */
-    createMetadataBackup(credentials) {
-        return {
-            data: credentials,
-            metadata: {
-                timestamp: Date.now(),
-                checksum: this.calculateChecksum(credentials),
-                version: '1.0'
+    clearSession() {
+        try {
+            if (fs.existsSync(this.options.sessionDir)) {
+                this.removeDirectory(this.options.sessionDir);
+                fs.mkdirSync(this.options.sessionDir, { recursive: true });
+                logger.info('Current session cleared');
             }
-        };
+        } catch (error) {
+            logger.error('Error clearing session:', error);
+        }
+    }
+
+    /**
+     * Check if a valid session exists
+     * @returns {boolean} Whether a valid session exists
+     */
+    hasValidSession() {
+        try {
+            const credsPath = path.join(this.options.sessionDir, 'creds.json');
+            
+            if (!fs.existsSync(credsPath)) {
+                return false;
+            }
+            
+            // Basic validation of creds.json
+            try {
+                const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+                return !!(creds && creds.me && creds.me.id);
+            } catch (err) {
+                logger.warn('Invalid session credentials format');
+                return false;
+            }
+        } catch (error) {
+            logger.error('Error checking session validity:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Get session statistics
+     * @returns {Object} Session statistics
+     */
+    getStats() {
+        try {
+            const stats = {
+                hasValidSession: this.hasValidSession(),
+                backupCount: 0,
+                latestBackupTimestamp: null,
+                autoBackupEnabled: !!this.backupTimer,
+            };
+            
+            // Get backup count
+            const dirPattern = new RegExp(`^${path.basename(this.options.backupDir)}_\\d+$`);
+            const backupDirs = fs.readdirSync(path.dirname(this.options.backupDir))
+                .filter(dir => dirPattern.test(dir))
+                .map(dir => ({
+                    name: dir,
+                    timestamp: parseInt(dir.split('_')[1]) || 0
+                }))
+                .sort((a, b) => b.timestamp - a.timestamp); // Sort by timestamp, newest first
+            
+            stats.backupCount = backupDirs.length;
+            
+            if (backupDirs.length > 0) {
+                stats.latestBackupTimestamp = backupDirs[0].timestamp;
+            }
+            
+            return stats;
+        } catch (error) {
+            logger.error('Error getting session stats:', error);
+            return {
+                hasValidSession: false,
+                backupCount: 0,
+                latestBackupTimestamp: null,
+                autoBackupEnabled: !!this.backupTimer,
+                error: error.message
+            };
+        }
     }
 }
 
