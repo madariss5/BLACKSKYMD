@@ -76,7 +76,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner/workspace && node connection-manager.js"
+args = "node connection-manager.js"
 
 [[workflows.workflow]]
 name = "High Performance Bot"
