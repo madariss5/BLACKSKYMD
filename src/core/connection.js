@@ -1,8 +1,3 @@
-/**
- * Enhanced WhatsApp Connection Handler
- * Features from popular MD bots for better stability
- */
-
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
@@ -58,6 +53,12 @@ class ConnectionHandler {
         this.startHealthCheck();
     }
 
+    // Add new method to reset QR count
+    resetQRCount() {
+        this.qrDisplayCount = 0;
+        logger.info('Reset QR code counter');
+    }
+
     async connect() {
         try {
             if (this.circuitBreakerOpen) {
@@ -84,7 +85,7 @@ class ConnectionHandler {
             // Enhanced socket settings
             this.socket = makeWASocket({
                 auth: state,
-                printQRInTerminal: false, // We handle QR display
+                printQRInTerminal: true, // Always enable QR printing
                 browser: this.config.browser,
                 logger: pino({ level: 'silent' }), // Reduce noise
                 markOnlineOnConnect: false, // Save battery
@@ -165,16 +166,48 @@ class ConnectionHandler {
         logger.info('Circuit breaker reset');
     }
 
+    async handleConnectionError(error) {
+        try {
+            logger.error('Connection error:', {
+                message: error.message,
+                stack: error.stack,
+                state: this.connectionState,
+                attempts: this.connectionAttempts
+            });
+
+            this.errorCount++;
+            if (this.errorCount >= this.config.circuitBreakerThreshold) {
+                this.circuitBreakerOpen = true;
+                this.lastCircuitBreakerReset = Date.now();
+                logger.warn('Circuit breaker opened due to excessive errors');
+                return;
+            }
+
+            this.connectionState = 'disconnected';
+            await this.implementRecovery();
+
+        } catch (sendError) {
+            logger.error('Error in error handler:', sendError);
+        }
+    }
+
     async handleConnectionUpdate(update, saveCreds) {
         const { connection, lastDisconnect, qr } = update;
         logger.debug('Processing connection update:', { connection, hasQR: !!qr });
 
-        // Track connection history for monitoring
-        this.connectionHistory.push(Date.now());
-        this.connectionHistory = this.connectionHistory.filter(time => Date.now() - time < 3600000);
-
         if (qr) {
-            await this.handleQRCode(qr);
+            this.qrDisplayCount++;
+            if (this.qrDisplayCount <= this.config.maxQRAttempts) {
+                logger.info(`Generating QR code (Attempt ${this.qrDisplayCount}/${this.config.maxQRAttempts})`);
+                if (this.config.printQR) {
+                    qrcode.generate(qr, { small: true });
+                    logger.info(`Scan the QR code above to connect (Attempt ${this.qrDisplayCount})`);
+                    logger.info('The QR code will expire in 60 seconds');
+                }
+            } else {
+                logger.warn('QR code scanning attempts exceeded. Implementing recovery...');
+                await this.implementRecovery();
+            }
             return;
         }
 
@@ -197,21 +230,6 @@ class ConnectionHandler {
         // Save credentials on updates
         if (saveCreds) {
             await saveCreds();
-        }
-    }
-
-    async handleQRCode(qr) {
-        this.qrDisplayCount++;
-        if (this.qrDisplayCount <= this.config.maxQRAttempts) {
-            logger.info(`Generating QR code (Attempt ${this.qrDisplayCount}/${this.config.maxQRAttempts})`);
-            if (this.config.printQR) {
-                qrcode.generate(qr, { small: true });
-                logger.info(`Scan the QR code above to connect (Attempt ${this.qrDisplayCount})`);
-                logger.info('The QR code will expire in 60 seconds');
-            }
-        } else {
-            logger.warn('QR code scanning attempts exceeded. Implementing recovery...');
-            await this.implementRecovery();
         }
     }
 
@@ -249,26 +267,6 @@ class ConnectionHandler {
         logger.success('Connected successfully!');
     }
 
-    async handleConnectionError(error) {
-        logger.error('Connection error:', {
-            message: error.message,
-            stack: error.stack,
-            state: this.connectionState,
-            attempts: this.connectionAttempts
-        });
-
-        this.errorCount++;
-        if (this.errorCount >= this.config.circuitBreakerThreshold) {
-            this.circuitBreakerOpen = true;
-            this.lastCircuitBreakerReset = Date.now();
-            logger.warn('Circuit breaker opened due to excessive errors');
-            return;
-        }
-
-        this.connectionState = 'disconnected';
-        await this.implementRecovery();
-    }
-
     async handleSocketClose(code) {
         logger.warn(`WebSocket closed with code ${code}`);
         if (this.connectionState === 'connected') {
@@ -284,54 +282,8 @@ class ConnectionHandler {
         }
     }
 
-    startSocketStateMonitoring() {
-        setInterval(() => {
-            if (this.socket?.ws) {
-                const state = this.socket.ws.readyState;
-                if (state !== 1 && this.connectionState === 'connected') {
-                    logger.warn('Socket in invalid state:', state);
-                    this.handleSocketStateError();
-                }
-            }
-        }, 10000);
-    }
-
-    async handleSocketStateError() {
-        this.errorCount++;
-        if (this.errorCount >= this.config.circuitBreakerThreshold) {
-            this.circuitBreakerOpen = true;
-            this.lastCircuitBreakerReset = Date.now();
-            logger.warn('Circuit breaker opened due to socket state errors');
-            return;
-        }
-        await this.implementRecovery();
-    }
-
-    startPingMonitoring() {
-        if (this.pingInterval) {
-            clearInterval(this.pingInterval);
-        }
-
-        this.pingInterval = setInterval(async () => {
-            try {
-                if (this.isConnected && this.socket?.ws) {
-                    this.socket.ws.ping();
-                    this.lastPingTime = Date.now();
-                }
-            } catch (error) {
-                logger.error('Ping error:', error);
-                this.handlePingError();
-            }
-        }, 30000);
-    }
-
-    async handlePingError() {
-        this.errorCount++;
-        if (this.errorCount >= this.config.circuitBreakerThreshold) {
-            this.circuitBreakerOpen = true;
-            logger.warn('Circuit breaker opened due to ping failures');
-            return;
-        }
+    async handleLogout() {
+        logger.info("Handling logout");
         await this.implementRecovery();
     }
 
@@ -390,6 +342,34 @@ class ConnectionHandler {
         }, this.config.healthCheckInterval);
     }
 
+    startPingMonitoring() {
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+        }
+
+        this.pingInterval = setInterval(async () => {
+            try {
+                if (this.isConnected && this.socket?.ws) {
+                    this.socket.ws.ping();
+                    this.lastPingTime = Date.now();
+                }
+            } catch (error) {
+                logger.error('Ping error:', error);
+                this.handlePingError();
+            }
+        }, 30000);
+    }
+
+    async handlePingError() {
+        this.errorCount++;
+        if (this.errorCount >= this.config.circuitBreakerThreshold) {
+            this.circuitBreakerOpen = true;
+            logger.warn('Circuit breaker opened due to ping failures');
+            return;
+        }
+        await this.implementRecovery();
+    }
+
     async checkConnectionHealth() {
         if (!this.isConnected) return;
 
@@ -442,12 +422,34 @@ class ConnectionHandler {
         logger.debug('Connection health status:', healthStatus);
     }
 
+    startSocketStateMonitoring() {
+        setInterval(() => {
+            if (this.socket?.ws) {
+                const state = this.socket.ws.readyState;
+                if (state !== 1 && this.connectionState === 'connected') {
+                    logger.warn('Socket in invalid state:', state);
+                    this.handleSocketStateError();
+                }
+            }
+        }, 10000);
+    }
+
+    async handleSocketStateError() {
+        this.errorCount++;
+        if (this.errorCount >= this.config.circuitBreakerThreshold) {
+            this.circuitBreakerOpen = true;
+            this.lastCircuitBreakerReset = Date.now();
+            logger.warn('Circuit breaker opened due to socket state errors');
+            return;
+        }
+        await this.implementRecovery();
+    }
+
     setMessageHandler(handler) {
         this.messageHandler = handler;
     }
 
     async disconnect() {
-        this.connectionState = 'disconnecting';
         clearInterval(this.healthCheckInterval);
         clearInterval(this.pingInterval);
 
@@ -497,10 +499,6 @@ class ConnectionHandler {
             message.timestamp = Date.now();
         }
         return message;
-    }
-    async handleLogout(){
-        // Add your logout handling logic here.  This was not present in the original code.
-        logger.info("Handling logout")
     }
 }
 

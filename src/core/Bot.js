@@ -19,7 +19,14 @@ class Bot {
             ...config
         };
 
-        this.connection = new ConnectionHandler(config.connection);
+        // Initialize connection with QR code display enabled
+        const connectionConfig = {
+            ...config.connection,
+            printQR: true, // Force QR display
+            browser: ['BLACKSKY-MD', 'Chrome', '1.0.0']
+        };
+
+        this.connection = new ConnectionHandler(connectionConfig);
         this.messageHandler = new MessageHandler(config.message);
         this.sessionHandler = new SessionHandler(config.session);
         this.responseHandler = new ResponseHandler(config.response);
@@ -28,6 +35,7 @@ class Bot {
         this.isStarting = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
+        this.startTime = Date.now();
     }
 
     setupMessageHandler() {
@@ -63,7 +71,7 @@ class Bot {
             // Set message handler in connection
             this.connection.setMessageHandler(this.messageHandler);
 
-            // Connect to WhatsApp
+            // Connect to WhatsApp with enhanced error handling
             const socket = await this.connection.connect().catch(error => {
                 this.isStarting = false;
                 logger.error('Connection failed:', error);
@@ -100,6 +108,8 @@ class Bot {
                         logger.warn('Session logged out. Please scan QR code to reconnect.');
                         await this.sessionHandler.deleteSession('default');
                         this.isStarting = false;
+                        // Force new QR code generation
+                        this.connection.resetQRCount();
                         this.start();
                     }
                 }
@@ -146,7 +156,9 @@ class Bot {
             activeProcesses: this.messageHandler.getActiveProcesses(),
             messageQueue: this.responseHandler.getQueueStatus(),
             startupState: this.isStarting,
-            reconnectAttempts: this.reconnectAttempts
+            reconnectAttempts: this.reconnectAttempts,
+            startTime: this.startTime,
+            uptime: Date.now() - this.startTime
         };
     }
 }
