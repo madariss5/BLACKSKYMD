@@ -408,21 +408,54 @@ function handleDisconnection(lastDisconnect) {
 
   // Handle different disconnect scenarios
   if (statusCode === DisconnectReason.loggedOut) {
-    logger.info('User logged out - Initiating new connection for QR code');
+    logger.info('User logged out - Initiating cleanup and new connection');
+
     // Clear connection state
     connectionState.sock = null;
     connectionState.reconnectAttempts = 0;
 
-    // Notify clients to wait for new QR
+    // Clear the QR code from the UI
+    broadcastToClients({
+      type: 'qr',
+      qr: `<div style="padding: 20px; text-align: center;">Preparing new QR code...</div>`
+    });
+
+    // Notify clients about the logout
     broadcastToClients({
       type: 'status',
-      message: 'Logged out. Generating new QR code...'
+      message: 'Logged out. Cleaning up and generating new QR code...'
     });
+
+    // Clean up the auth state
+    try {
+      const authDir = AUTH_FOLDER;
+      if (fs.existsSync(authDir)) {
+        // Create backup before cleaning
+        const backupDir = `${authDir}_backup_${Date.now()}`;
+        fs.mkdirSync(backupDir, { recursive: true });
+
+        fs.readdirSync(authDir).forEach(file => {
+          const sourcePath = path.join(authDir, file);
+          const targetPath = path.join(backupDir, file);
+          fs.copyFileSync(sourcePath, targetPath);
+          fs.unlinkSync(sourcePath); // Remove the original file
+        });
+
+        logger.info(`Auth state backed up to: ${backupDir}`);
+      }
+
+      // Ensure auth directory exists
+      fs.mkdirSync(authDir, { recursive: true });
+
+    } catch (error) {
+      logger.error('Error during auth cleanup:', error);
+    }
 
     // Start new connection after a short delay
     setTimeout(async () => {
       try {
         await startConnection();
+        logger.info('New connection initiated after logout');
       } catch (err) {
         logger.error('Failed to start new connection after logout:', err);
         broadcastToClients({
