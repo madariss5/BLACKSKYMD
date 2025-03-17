@@ -56,6 +56,7 @@
   "scripts": {
     "postdeploy": "node src/cloud-qr-server.js"
   },
-  "addons": [],
-  "success_url": "/qr"
+  "success_url": "/qr",
+  "website": "https://github.com/madariss5/BLACKSKYMD",
+  "repository": "https://github.com/madariss5/BLACKSKYMD"
 }
