@@ -1,10 +1,11 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
 const path = require('path');
 const fs = require('fs');
 const qrcode = require('qrcode-terminal');
 const logger = require('../utils/logger');
+const backupManager = require('../utils/backupManager');
 
 class ConnectionHandler {
     constructor(config = {}) {
@@ -16,15 +17,16 @@ class ConnectionHandler {
             keepAliveIntervalMs: 15000,
             retryRequestDelayMs: 5000,
             maxQRAttempts: 5,
-            maxRetries: 5,
+            maxRetries: 10, // Increased from 5 to 10
             healthCheckInterval: 30000,
-            circuitBreakerThreshold: 3,
-            circuitBreakerTimeout: 300000, // 5 minutes
+            circuitBreakerThreshold: 5, // Increased from 3 to 5
+            circuitBreakerTimeout: 180000, // Reduced from 5min to 3min
+            backupInterval: 15 * 60 * 1000, // 15 minutes
             ...config
         };
 
         this.retryCount = 0;
-        this.maxRetries = 5;
+        this.maxRetries = this.config.maxRetries;
         this.retryDelay = 3000;
         this.isConnected = false;
         this.socket = null;
@@ -42,6 +44,7 @@ class ConnectionHandler {
         this.errorCount = 0;
         this.circuitBreakerOpen = false;
         this.lastCircuitBreakerReset = Date.now();
+        this.backupInterval = null;
 
         // Ensure auth directory exists
         if (!fs.existsSync(this.config.authDir)) {
@@ -49,8 +52,54 @@ class ConnectionHandler {
             logger.info(`Created auth directory: ${this.config.authDir}`);
         }
 
+        // Setup backup directories (redundancy)
+        for (const dir of [
+            './backups', 
+            './auth_info_baileys_backup',
+            './data/session_backups'
+        ]) {
+            try {
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true });
+                    logger.info(`Created backup directory: ${dir}`);
+                }
+            } catch (err) {
+                logger.warn(`Failed to create backup directory ${dir}:`, err.message);
+            }
+        }
+
         // Start health monitoring
         this.startHealthCheck();
+        
+        // Start credential auto-backup
+        this.setupCredentialBackup();
+    }
+    
+    // Set up automatic credential backups
+    setupCredentialBackup() {
+        if (this.backupInterval) {
+            clearInterval(this.backupInterval);
+        }
+        
+        this.backupInterval = setInterval(() => {
+            try {
+                if (this.isConnected && this.socket?.authState?.creds) {
+                    backupManager.createBackup(this.socket.authState.creds)
+                        .then(success => {
+                            if (success) {
+                                logger.debug('Scheduled credential backup completed successfully');
+                            }
+                        })
+                        .catch(error => {
+                            logger.warn('Scheduled credential backup failed:', error.message);
+                        });
+                }
+            } catch (error) {
+                logger.warn('Error in credential backup interval:', error.message);
+            }
+        }, this.config.backupInterval);
+        
+        logger.info(`Scheduled automatic backups every ${this.config.backupInterval / (60 * 1000)} minutes`);
     }
 
     // Add new method to reset QR count
@@ -77,24 +126,64 @@ class ConnectionHandler {
 
             this.connectionState = 'connecting';
             logger.info('Initializing WhatsApp connection...');
+            
+            // Try to restore from backupManager first
+            let restoredCreds = null;
+            try {
+                restoredCreds = await backupManager.restoreBackup();
+                if (restoredCreds) {
+                    logger.info('Restored credentials from backup system');
+                }
+            } catch (backupError) {
+                logger.warn('Failed to restore from backup manager:', backupError.message);
+            }
 
             // Initialize auth state
             const { state, saveCreds } = await useMultiFileAuthState(this.config.authDir);
             logger.debug('Auth state loaded successfully');
-
-            // Enhanced socket settings
-            this.socket = makeWASocket({
-                auth: state,
+            
+            // Set up credential backup on save
+            const enhancedSaveCreds = async () => {
+                await saveCreds();
+                if (state.creds && Object.keys(state.creds).length > 0) {
+                    try {
+                        await backupManager.createBackup(state.creds);
+                    } catch (backupError) {
+                        logger.warn('Failed to backup credentials:', backupError.message);
+                    }
+                }
+            };
+            
+            // If we have restored credentials, merge them with state
+            if (restoredCreds && Object.keys(restoredCreds).length > 0) {
+                state.creds = {
+                    ...state.creds,
+                    ...restoredCreds
+                };
+                await enhancedSaveCreds(); // Save the merged credentials
+            }
+            
+            // Fetch latest baileys version
+            const { version } = await fetchLatestBaileysVersion();
+            logger.info(`Using WA Web version: ${version.join('.')}`);
+            
+            // Use cacheable signal key store for better performance
+            const socketConfig = {
+                auth: {
+                    creds: state.creds,
+                    // creds are updated whenever a new session is created
+                    keys: makeCacheableSignalKeyStore(state.keys, logger),
+                },
                 printQRInTerminal: true, // Always enable QR printing
                 browser: this.config.browser,
-                logger: pino({ level: 'silent' }), // Reduce noise
-                markOnlineOnConnect: false, // Save battery
+                logger: pino({ level: 'warn' }), // Reduce noise but keep warnings
+                markOnlineOnConnect: true, // Keep connection alive
                 connectTimeoutMs: this.config.connectTimeoutMs,
-                keepAliveIntervalMs: this.config.keepAliveIntervalMs,
-                retryRequestDelayMs: this.config.retryRequestDelayMs,
+                keepAliveIntervalMs: 10000, // Increased keep-alive frequency
+                retryRequestDelayMs: 2000, // Faster retry
                 defaultQueryTimeoutMs: 60000,
                 qrTimeout: 60000,
-                version: [2, 2329, 9],
+                version: version,
                 getMessage: async (key) => {
                     return { conversation: 'Message not found in store' };
                 },
@@ -103,8 +192,20 @@ class ConnectionHandler {
                 },
                 shouldIgnoreJid: (jid) => {
                     return this.shouldIgnoreJid(jid);
+                },
+                linkPreviewImageThumbnailWidth: 300, // Better preview thumbnails
+                generateHighQualityLinkPreview: true,
+                syncFullHistory: false, // Don't sync full history to save bandwidth
+                fireInitQueries: true, // Fire init queries for faster startup
+                userDevicesCache: {}, // Pre-allocate device cache
+                transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
+                options: {
+                    autoReconnect: true // Native auto-reconnect
                 }
-            });
+            };
+            
+            // Create socket with enhanced configuration
+            this.socket = makeWASocket(socketConfig);
 
             logger.debug('Socket created with enhanced settings');
 
@@ -112,7 +213,7 @@ class ConnectionHandler {
             this.socket.ev.on('connection.update', async (update) => {
                 try {
                     logger.debug('Connection update received:', update);
-                    await this.handleConnectionUpdate(update, saveCreds);
+                    await this.handleConnectionUpdate(update, enhancedSaveCreds);
                 } catch (error) {
                     logger.error('Error in connection update handler:', error);
                     await this.handleConnectionError(error);
@@ -121,10 +222,17 @@ class ConnectionHandler {
 
             this.socket.ev.on('creds.update', async () => {
                 try {
-                    await saveCreds();
-                    logger.debug('Credentials updated and saved');
+                    await enhancedSaveCreds();
+                    logger.debug('Credentials updated and saved with backup');
                 } catch (error) {
                     logger.error('Error saving credentials:', error);
+                    // If enhanced save fails, try the original as fallback
+                    try {
+                        await saveCreds();
+                        logger.info('Fallback credential save successful');
+                    } catch (fallbackError) {
+                        logger.error('Both primary and fallback credential saves failed:', fallbackError);
+                    }
                 }
             });
 
@@ -234,21 +342,67 @@ class ConnectionHandler {
     }
 
     async handleConnectionClose(lastDisconnect) {
-        const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-
-        if (shouldReconnect && this.retryCount < this.maxRetries) {
-            this.retryCount++;
-            const delay = Math.min(1000 * Math.pow(2, this.retryCount - 1), 30000);
-            logger.info(`Connection closed. Attempting reconnect ${this.retryCount}/${this.maxRetries} in ${delay/1000}s`);
-
-            setTimeout(() => {
-                if (!this.isConnected) {
-                    this.connect();
-                }
-            }, delay);
-        } else if (lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
+        // Extract detailed error information
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const errorMessage = lastDisconnect?.error?.message || 'Unknown error';
+        const errorName = lastDisconnect?.error?.name || 'Error';
+        
+        logger.info(`Connection closed with status: ${statusCode}, error: ${errorName} - ${errorMessage}`);
+        
+        // Handle different types of disconnections differently
+        if (statusCode === DisconnectReason.loggedOut) {
             logger.warn('Session logged out. Please scan QR code to reconnect.');
             await this.handleLogout();
+            return; // No need to proceed further
+        }
+        
+        // Check if we should attempt reconnection
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const maxRetriesExceeded = this.retryCount >= this.maxRetries;
+        
+        // Determine if this is a temporary issue that can be resolved with simple retry
+        const isTemporaryIssue = [
+            DisconnectReason.connectionClosed,
+            DisconnectReason.connectionLost,
+            DisconnectReason.connectionReplaced,
+            DisconnectReason.timedOut,
+            DisconnectReason.restartRequired
+        ].includes(statusCode);
+        
+        if (shouldReconnect) {
+            if (maxRetriesExceeded) {
+                logger.warn(`Maximum retries (${this.maxRetries}) exceeded, implementing recovery...`);
+                await this.implementRecovery();
+                return;
+            }
+            
+            // If temporary issue, use exponential backoff for reconnect
+            if (isTemporaryIssue) {
+                this.retryCount++;
+                // Exponential backoff with jitter to prevent thundering herd
+                const baseDelay = Math.min(1000 * Math.pow(1.5, this.retryCount - 1), 30000);
+                const jitter = Math.floor(Math.random() * 2000); // Add up to 2 seconds of jitter
+                const delay = baseDelay + jitter;
+                
+                logger.info(`Connection closed (temporary issue). Attempting reconnect ${this.retryCount}/${this.maxRetries} in ${(delay/1000).toFixed(1)}s`);
+                
+                // Schedule reconnection attempt
+                setTimeout(() => {
+                    if (!this.isConnected) {
+                        this.connect().catch(error => {
+                            logger.error('Error during scheduled reconnect:', error.message);
+                        });
+                    }
+                }, delay);
+            } else {
+                // For more serious issues, implement recovery immediately
+                logger.warn('Connection closed with non-temporary issue, implementing recovery...');
+                await this.implementRecovery();
+                return;
+            }
+        } else {
+            logger.warn('Connection closed with permanent reason, implementing recovery...');
+            await this.implementRecovery();
         }
 
         this.connectionState = 'disconnected';
@@ -291,11 +445,29 @@ class ConnectionHandler {
         try {
             logger.info('Starting connection recovery process...');
 
-            // Backup and clear auth data
+            // Try to backup credentials with backupManager first
+            let credentialsBacked = false;
+            try {
+                if (this.socket?.authState?.creds) {
+                    await backupManager.createBackup(this.socket.authState.creds);
+                    credentialsBacked = true;
+                    logger.info('Successfully backed up credentials before recovery');
+                }
+            } catch (backupError) {
+                logger.warn('Failed to backup credentials:', backupError.message);
+            }
+
+            // Backup auth directory
+            let authDirBackupPath = null;
             if (fs.existsSync(this.config.authDir)) {
-                const backupDir = `${this.config.authDir}_backup_${Date.now()}`;
-                fs.renameSync(this.config.authDir, backupDir);
-                logger.info(`Backed up auth info to: ${backupDir}`);
+                try {
+                    const backupDir = `${this.config.authDir}_backup_${Date.now()}`;
+                    fs.renameSync(this.config.authDir, backupDir);
+                    authDirBackupPath = backupDir;
+                    logger.info(`Backed up auth info to: ${backupDir}`);
+                } catch (fsError) {
+                    logger.error('Error backing up auth directory:', fsError);
+                }
             }
 
             // Reset connection state
@@ -303,24 +475,53 @@ class ConnectionHandler {
             this.connectionAttempts = 0;
             this.qrDisplayCount = 0;
             this.isConnected = false;
+            this.connectionState = 'recovery';
 
-            // Clean up socket
+            // Clean up socket with error handling
             if (this.socket) {
                 try {
-                    await this.socket.logout();
-                    await this.socket.end();
+                    // Try gentle logout
+                    await Promise.race([
+                        this.socket.logout().catch(e => logger.warn('Logout failed:', e.message)),
+                        new Promise(resolve => setTimeout(resolve, 3000)) // 3s timeout
+                    ]);
+                    
+                    // Try gentle disconnect
+                    await Promise.race([
+                        this.socket.end(false).catch(e => logger.warn('End failed:', e.message)),
+                        new Promise(resolve => setTimeout(resolve, 3000)) // 3s timeout
+                    ]);
                 } catch (error) {
-                    logger.warn('Error during socket cleanup:', error);
+                    logger.warn('Error during socket cleanup:', error.message);
                 }
+                
+                // Clear references
+                this.socket = null;
             }
 
             // Clear active connections
             this.activeConnections.clear();
 
             // Create fresh auth directory
-            fs.mkdirSync(this.config.authDir, { recursive: true });
-            logger.info('Created fresh auth directory');
+            try {
+                fs.mkdirSync(this.config.authDir, { recursive: true });
+                logger.info('Created fresh auth directory');
+            } catch (mkdirError) {
+                logger.error('Error creating auth directory:', mkdirError);
+                // Try to restore the backup if creating new dir failed
+                if (authDirBackupPath && fs.existsSync(authDirBackupPath)) {
+                    try {
+                        fs.renameSync(authDirBackupPath, this.config.authDir);
+                        logger.info('Restored auth directory from backup after mkdir failure');
+                    } catch (restoreError) {
+                        logger.error('Failed to restore auth directory:', restoreError);
+                    }
+                }
+            }
 
+            // Pause before attempting reconnection
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
             // Attempt fresh connection
             logger.info('Attempting fresh connection after recovery...');
             await this.connect();
@@ -328,7 +529,13 @@ class ConnectionHandler {
         } catch (error) {
             logger.error('Recovery failed:', error);
             this.connectionState = 'failed';
-            throw new Error('Connection recovery failed after multiple attempts');
+            
+            // Schedule a retry after a pause
+            setTimeout(() => {
+                logger.info('Attempting connection recovery retry...');
+                this.connectionState = 'disconnected';
+                this.connect().catch(e => logger.error('Recovery retry failed:', e));
+            }, 10000); // Wait 10 seconds
         }
     }
 
@@ -449,23 +656,92 @@ class ConnectionHandler {
         this.messageHandler = handler;
     }
 
-    async disconnect() {
-        clearInterval(this.healthCheckInterval);
-        clearInterval(this.pingInterval);
+    async disconnect(cleanupData = false) {
+        // Clear all intervals
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+            this.healthCheckInterval = null;
+        }
+        
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
+        }
+        
+        if (this.backupInterval) {
+            clearInterval(this.backupInterval);
+            this.backupInterval = null;
+        }
+        
+        // Create a final backup before disconnecting
+        try {
+            if (this.socket?.authState?.creds) {
+                await backupManager.createBackup(this.socket.authState.creds);
+                logger.info('Created final credential backup before disconnect');
+            }
+        } catch (backupError) {
+            logger.warn('Failed to create final backup:', backupError.message);
+        }
 
         if (this.socket) {
             try {
-                await this.socket.logout();
-                await this.socket.end();
+                // Gracefully logout with timeout
+                logger.info('Attempting graceful logout...');
+                await Promise.race([
+                    this.socket.logout().catch(e => logger.warn('Logout operation failed:', e.message)),
+                    new Promise(resolve => setTimeout(resolve, 5000)) // 5 second timeout
+                ]);
+                
+                // Gracefully end the connection with timeout
+                logger.info('Terminating connection...');
+                await Promise.race([
+                    this.socket.end(false).catch(e => logger.warn('End operation failed:', e.message)),
+                    new Promise(resolve => setTimeout(resolve, 5000)) // 5 second timeout
+                ]);
+                
                 this.isConnected = false;
-                this.activeConnections.clear();
                 this.connectionState = 'disconnected';
                 logger.info('Disconnected successfully');
+                
+                // Clean up connection data
+                this.activeConnections.clear();
+                this.socket = null;
+                
+                // If requested, clean up auth data
+                if (cleanupData) {
+                    logger.info('Cleaning auth data as requested');
+                    // Backup before deletion
+                    if (fs.existsSync(this.config.authDir)) {
+                        const backupDir = `${this.config.authDir}_final_backup_${Date.now()}`;
+                        try {
+                            fs.renameSync(this.config.authDir, backupDir);
+                            logger.info(`Backed up auth info to: ${backupDir}`);
+                            
+                            // Create empty auth directory
+                            fs.mkdirSync(this.config.authDir, { recursive: true });
+                        } catch (fsError) {
+                            logger.error('Error cleaning up auth data:', fsError.message);
+                        }
+                    }
+                }
             } catch (error) {
-                logger.error('Error during disconnect:', error);
+                logger.error('Error during disconnect:', error.message);
                 this.connectionState = 'failed';
+                this.socket = null; // Force cleanup reference
             }
+        } else {
+            logger.info('No active socket to disconnect');
         }
+        
+        // Reset all state
+        this.retryCount = 0;
+        this.connectionAttempts = 0;
+        this.qrDisplayCount = 0;
+        this.errorCount = 0;
+        this.circuitBreakerOpen = false;
+        this.connectionHistory = [];
+        
+        return true;
     }
 
     getConnectionStatus() {
