@@ -1,8 +1,8 @@
 [project]
-name = "repl-nix-workspace"
+name = "blacksky-md"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.11"
+description = "WhatsApp Multi-Device Bot"
+requires-python = ">=3.11.7"
 dependencies = [
     "trafilatura>=2.0.0",
     "twilio>=9.4.6",
