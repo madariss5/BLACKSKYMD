@@ -1,13 +1,12 @@
 # Deploy BLACKSKY-MD WhatsApp Bot to Heroku
 
-<!-- Heroku Deploy Button - Official URL format -->
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKYMD)
 
 ## Prerequisites
 Before deploying, make sure you have:
-1. A WhatsApp account ready to be used with the bot
-2. A Heroku account (create one at [heroku.com](https://heroku.com) if you don't have it)
-3. Your WhatsApp number with country code (required during setup)
+1. A WhatsApp account for the bot
+2. Your WhatsApp number to be set as owner (without +)
+3. [Heroku](https://heroku.com) account
 
 ## Deployment Steps
 
