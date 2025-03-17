@@ -2,7 +2,7 @@
 
 A sophisticated WhatsApp multi-device bot platform with advanced hosting solutions and intelligent deployment capabilities.
 
-[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKYMD)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKY)
 
 ## Features
 
@@ -18,13 +18,13 @@ A sophisticated WhatsApp multi-device bot platform with advanced hosting solutio
 
 | Platform | Button | Guide |
 |----------|--------|-------|
-| Heroku | [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKYMD) | [Heroku Guide](HEROKU_SETUP_GUIDE.md) |
+| Heroku | [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKY) | [Heroku Guide](HEROKU_SETUP_GUIDE.md) |
 | Docker | N/A | [Docker Guide](DOCKER_DEPLOYMENT_GUIDE.md) |
 | Termux | N/A | [Termux Guide](TERMUX_GUIDE.md) |
 
 ## Quick Start
 
-1. **Deploy to Heroku**: Click the "Deploy to Heroku" button above
+1. **Deploy to Heroku**: Click the "Deploy" button above
 2. **Configure**: Set your WhatsApp number as OWNER_NUMBER
 3. **Deploy**: Wait for deployment to complete
 4. **Connect**: Scan the QR code with your WhatsApp

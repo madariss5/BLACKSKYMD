@@ -1,6 +1,7 @@
 # Deploy BLACKSKY-MD WhatsApp Bot to Heroku
 
-[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKY)
+<!-- Heroku Deploy Button - Official URL format -->
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
 
 ## Prerequisites
 Before deploying, make sure you have:
@@ -10,7 +11,7 @@ Before deploying, make sure you have:
 
 ## Deployment Steps
 
-1. Click the "Deploy to Heroku" button above
+1. Click the "Deploy" button above
 2. Fill in the required environment variables:
    - `OWNER_NUMBER`: Your WhatsApp number with country code (no + or spaces)
    - Other variables are optional and have default values
@@ -32,12 +33,9 @@ If you encounter any issues:
 1. Check the Heroku logs for errors
 2. Make sure all environment variables are set correctly
 3. Try reconnecting by visiting the /qr endpoint
-4. See [HEROKU_DEPLOYMENT.md](HEROKU_DEPLOYMENT.md) for detailed troubleshooting
 
 ## Important Notes
 
 - Free Heroku dynos go to sleep after 30 minutes of inactivity
 - Use a service like UptimeRobot to keep your bot online 24/7
 - For better reliability, consider upgrading to a paid dyno
-
-For more detailed instructions and advanced configuration options, see [HEROKU_DEPLOYMENT.md](HEROKU_DEPLOYMENT.md).
