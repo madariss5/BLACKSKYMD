@@ -403,9 +403,36 @@ function handleDisconnection(lastDisconnect) {
     reason: reason
   });
 
-  const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+  // Clear existing QR code when disconnected
+  connectionState.qr = null;
 
-  if (shouldReconnect && connectionState.reconnectAttempts < connectionState.maxReconnectAttempts) {
+  // Handle different disconnect scenarios
+  if (statusCode === DisconnectReason.loggedOut) {
+    logger.info('User logged out - Initiating new connection for QR code');
+    // Clear connection state
+    connectionState.sock = null;
+    connectionState.reconnectAttempts = 0;
+
+    // Notify clients to wait for new QR
+    broadcastToClients({
+      type: 'status',
+      message: 'Logged out. Generating new QR code...'
+    });
+
+    // Start new connection after a short delay
+    setTimeout(async () => {
+      try {
+        await startConnection();
+      } catch (err) {
+        logger.error('Failed to start new connection after logout:', err);
+        broadcastToClients({
+          type: 'status',
+          message: 'Error generating new QR code. Please refresh the page.'
+        });
+      }
+    }, 2000);
+  } else if (connectionState.reconnectAttempts < connectionState.maxReconnectAttempts) {
+    // Handle normal reconnection attempts
     connectionState.reconnectAttempts++;
     broadcastToClients({
       type: 'status',
@@ -413,17 +440,11 @@ function handleDisconnection(lastDisconnect) {
     });
     logger.info(`Attempting to reconnect (${connectionState.reconnectAttempts}/${connectionState.maxReconnectAttempts})...`);
     setTimeout(startConnection, 5000);
-  } else if (connectionState.reconnectAttempts >= connectionState.maxReconnectAttempts) {
+  } else {
     logger.error('Maximum reconnection attempts reached');
     broadcastToClients({
       type: 'status',
       message: 'Maximum reconnection attempts reached. Please refresh the page to try again.'
-    });
-  } else {
-    logger.info('Not reconnecting - user logged out');
-    broadcastToClients({
-      type: 'status',
-      message: 'Logged out from WhatsApp. Please refresh and scan the QR code again.'
     });
   }
 }
