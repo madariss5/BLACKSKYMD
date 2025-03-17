@@ -10,11 +10,11 @@ const path = require('path');
 
 // Configuration
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const DEFAULT_COMMIT_MESSAGE = "Update WhatsApp Bot with improved configuration";
+const DEFAULT_COMMIT_MESSAGE = "Update WhatsApp Bot with Heroku deployment, QR web interface, and session persistence";
 const DEFAULT_BRANCH = "main";
 const DEFAULT_REMOTE = "origin";
 // Use a predefined repository URL instead of asking for input
-const REPO_URL = "https://github.com/madariss5/BLACKSKY.git";
+const REPO_URL = "https://github.com/madariss5/BLACKSKYMD.git";
 
 // ANSI color codes for output
 const COLORS = {
@@ -207,8 +207,11 @@ async function addFilesToGit() {
   // Main code files
   await executeCommand('git add src/ data/ public/ views/');
   
-  // Configuration files
-  await executeCommand('git add package.json package-lock.json *.js .replit .env.example');
+  // Configuration files - explicitly naming each file to avoid gitignore issues
+  await executeCommand('git add package.json package-lock.json');
+  await executeCommand('git add github-update.js github-upload.js github-editor.sh github-browser-debug.js github-file-editor.js simple-github-editor.js');
+  await executeCommand('git add fix-module-loading.js fix-reactions.js fix-user-levels.js');
+  await executeCommand('git add .replit .env.example');
   
   // Documentation
   await executeCommand('git add *.md LICENSE Procfile app.json');
