@@ -4,8 +4,13 @@
  */
 
 require('dotenv').config();
+const express = require('express');
 const Bot = require('./Bot');
 const logger = require('../utils/logger');
+
+// Create Express app for web interface
+const app = express();
+const port = 5000; // ALWAYS use port 5000
 
 // Bot configuration
 const config = {
@@ -31,10 +36,27 @@ const config = {
     }
 };
 
+let bot; // Declare bot variable here to make it accessible in routes
+
+// Setup web routes
+app.get('/status', (req, res) => {
+    const status = bot ? bot.getStatus() : { status: 'initializing' };
+    res.json(status);
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
+// Start Express server
+app.listen(port, '0.0.0.0', () => {
+    logger.info(`Web interface running on port ${port}`);
+});
+
 async function startBot() {
     try {
         logger.info('Starting bot...');
-        const bot = new Bot(config);
+        bot = new Bot(config); // Assign bot to the variable
 
         // Register basic commands
         bot.command('ping', async (ctx) => {
@@ -47,7 +69,8 @@ async function startBot() {
             const helpMessage = {
                 text: '*BLACKSKY-MD Bot Commands*\n\n' +
                       '!ping - Check bot response\n' +
-                      '!help - Show this message',
+                      '!help - Show this message\n' +
+                      '!status - Show bot status',
                 contextInfo: {
                     externalAdReply: {
                         title: 'BLACKSKY-MD Bot',
@@ -58,6 +81,24 @@ async function startBot() {
                 }
             };
             await ctx.reply(helpMessage);
+        });
+
+        // Enhanced status command to check bot health
+        bot.command('status', async (ctx) => {
+            const status = bot.getStatus();
+            const statusMessage = {
+                text: `*Bot Status*\n\n` +
+                      `Connected: ${status.connected}\n` +
+                      `Active Sessions: ${status.activeSessions.length}\n` +
+                      `Active Processes: ${status.activeProcesses.length}\n` +
+                      `Message Queue: ${status.messageQueue.length}\n` +
+                      `Reconnect Attempts: ${status.reconnectAttempts}\n` +
+                      `Uptime: ${Math.floor((Date.now() - status.startTime) / 1000)}s`,
+                contextInfo: {
+                    isForwarded: false
+                }
+            };
+            await ctx.reply(statusMessage);
         });
 
         // Start the bot
