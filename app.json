@@ -16,10 +16,10 @@
   },
   "buildpacks": [
     {
-      "url": "heroku/python"
+      "url": "heroku/nodejs"
     },
     {
-      "url": "heroku/nodejs"
+      "url": "heroku/python"
     },
     {
       "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
@@ -28,7 +28,7 @@
       "url": "https://github.com/clhuang/heroku-buildpack-webp-binaries.git"
     }
   ],
-  "stack": "heroku-22",
+  "stack": "heroku-24",
   "formation": {
     "web": {
       "quantity": 1,
@@ -36,7 +36,7 @@
     }
   },
   "scripts": {
-    "postdeploy": "npm install && python3 -m pip install -e ."
+    "postdeploy": "npm install && pip install -r requirements.txt"
   },
   "success_url": "/qr"
 }
