@@ -11,6 +11,39 @@ const logger = require('./src/utils/logger');
 let whatsappSocket = null;
 
 /**
+ * Patch messages before sending to prevent common errors
+ * @param {Object} msg - Message object to patch
+ * @returns {Object} Patched message
+ */
+function patchMessageBeforeSending(msg) {
+  try {
+    if (!msg) return msg;
+    
+    // Add proper messaging metadata for non-group messages
+    if (msg.message && msg.key?.remoteJid && !msg.key.remoteJid.endsWith('@g.us')) {
+      msg.message.messageContextInfo = {
+        deviceListMetadata: {},
+        deviceListMetadataVersion: 2
+      };
+    }
+    
+    // Fix button IDs
+    if (msg.message?.buttonsMessage?.buttons) {
+      msg.message.buttonsMessage.buttons.forEach(button => {
+        if (button.buttonId && typeof button.buttonId !== 'string') {
+          button.buttonId = String(button.buttonId);
+        }
+      });
+    }
+    
+    return msg;
+  } catch (err) {
+    console.error('Error in message patch function:', err);
+    return msg;
+  }
+}
+
+/**
  * Initialize the high-performance WhatsApp bot
  */
 async function initHighPerformanceBot() {
