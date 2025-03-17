@@ -8,6 +8,16 @@
       "description": "Your WhatsApp number with country code (no + or spaces)",
       "required": true
     },
+    "NODE_ENV": {
+      "description": "Environment setting for the application",
+      "value": "production",
+      "required": true
+    },
+    "LOG_LEVEL": {
+      "description": "Logging level (debug/info/warn/error)",
+      "value": "info",
+      "required": false
+    },
     "PREFIX": {
       "description": "Command prefix (default: !)",
       "value": "!",
@@ -17,9 +27,6 @@
   "buildpacks": [
     {
       "url": "heroku/nodejs"
-    },
-    {
-      "url": "heroku/python"
     },
     {
       "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
@@ -33,10 +40,14 @@
     "web": {
       "quantity": 1,
       "size": "basic"
+    },
+    "worker": {
+      "quantity": 1,
+      "size": "basic"
     }
   },
   "scripts": {
-    "postdeploy": "npm install && python -m pip install ."
+    "postdeploy": "npm install"
   },
   "success_url": "/qr"
 }
