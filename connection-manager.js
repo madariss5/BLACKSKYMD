@@ -15,8 +15,10 @@ const BASE_AUTH_FOLDER = './auth_info_manager';
 const MAX_QR_ATTEMPTS = 5;
 const CONNECTION_TIMEOUT = 60000;
 const KEEP_ALIVE_INTERVAL = 10000;
-const MEMORY_CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutes
-const MEMORY_THRESHOLD = 800 * 1024 * 1024; // 800MB
+// Memory optimization configuration
+const MEMORY_CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes instead of 15
+const MEMORY_THRESHOLD = 1.5 * 1024 * 1024 * 1024; // Increase to 1.5GB for better performance
+const MEMORY_CRITICAL = 1.8 * 1024 * 1024 * 1024; // Critical threshold at 1.8GB
 
 // Enhanced browser configurations with rotating user agents
 const BROWSER_CONFIGS = [
@@ -93,19 +95,48 @@ function optimizeMemory() {
     try {
         const memUsage = process.memoryUsage();
         const heapUsed = memUsage.heapUsed;
+        const rss = memUsage.rss;
 
-        if (heapUsed > MEMORY_THRESHOLD) {
-            console.log('[Memory] High memory usage detected, performing cleanup...');
+        // Log memory stats
+        console.log(`[Memory] Stats - Heap: ${Math.round(heapUsed/1024/1024)}MB, RSS: ${Math.round(rss/1024/1024)}MB`);
 
-            // Force garbage collection if available
+        // Progressive cleanup based on usage
+        if (heapUsed > MEMORY_CRITICAL) {
+            console.log('[Memory] Critical memory usage detected, performing aggressive cleanup...');
+
+            // Force garbage collection
+            if (global.gc) {
+                global.gc();
+                global.gc(); // Double GC for better cleanup
+            }
+
+            // Clear all caches
+            if (currentSocket?.store) {
+                currentSocket.store.messages.clear();
+                currentSocket.store.chats.clear();
+                currentSocket.store.contacts.clear();
+                currentSocket.store.presences.clear();
+            }
+
+            // Reset connection if memory is still critical
+            if (process.memoryUsage().heapUsed > MEMORY_CRITICAL) {
+                console.log('[Memory] Memory still critical after cleanup, initiating connection reset...');
+                handleConnectionRecovery(currentSocket);
+            }
+        }
+        else if (heapUsed > MEMORY_THRESHOLD) {
+            console.log('[Memory] High memory usage detected, performing standard cleanup...');
+
+            // Standard cleanup
             if (global.gc) {
                 global.gc();
             }
 
-            // Clear message caches
+            // Selective cache cleanup
             if (currentSocket?.store) {
-                currentSocket.store.messages.clear();
-                currentSocket.store.chats.clear();
+                // Keep recent messages, clear old ones
+                const now = Date.now();
+                currentSocket.store.messages.filter(msg => (now - msg.messageTimestamp * 1000) > 3600000);
             }
         }
     } catch (err) {
@@ -149,7 +180,7 @@ async function handleConnectionRecovery(sock) {
     }
 }
 
-// Initialize connection with enhanced error handling
+// Initialize connection with enhanced performance settings
 async function initializeConnection() {
     const config = BROWSER_CONFIGS[currentBrowserIndex];
     console.log(`\n[Connection] Attempting connection with ${config.name} profile...`);
@@ -164,12 +195,31 @@ async function initializeConnection() {
             version: [2, 2323, 4],
             connectTimeoutMs: CONNECTION_TIMEOUT,
             keepAliveIntervalMs: KEEP_ALIVE_INTERVAL,
-            retryRequestDelayMs: 2000,
+            retryRequestDelayMs: 1000, // Faster retry
             markOnlineOnConnect: true,
             userAgent: config.user_agent,
             logger: pino({ level: 'silent' }),
-            defaultQueryTimeoutMs: 60000,
-            emitOwnEvents: false
+            defaultQueryTimeoutMs: 30000, // Reduced timeout
+            emitOwnEvents: false,
+            msgRetryCounterCache: {
+                max: 1000, // Increased cache size
+                maxAge: 60 * 1000 // 1 minute expiry
+            },
+            // Enhanced performance options
+            syncFullHistory: false,
+            downloadHistory: false,
+            patchMessageBeforeSending: (msg) => {
+                // Optimize message before sending
+                try {
+                    if (msg.message?.imageMessage?.jpegThumbnail) {
+                        delete msg.message.imageMessage.jpegThumbnail;
+                    }
+                    if (msg.message?.videoMessage?.jpegThumbnail) {
+                        delete msg.message.videoMessage.jpegThumbnail;
+                    }
+                } catch (err) {}
+                return msg;
+            }
         });
 
         // Handle connection updates
@@ -281,7 +331,6 @@ async function tryNextBrowser() {
 
     currentSocket = await initializeConnection();
 }
-
 
 // Initialize message handler once connected
 async function initializeMessageHandler(sock) {

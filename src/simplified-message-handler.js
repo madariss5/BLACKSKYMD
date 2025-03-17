@@ -150,63 +150,59 @@ function initializeBasicCommands() {
     console.log('Initialized basic commands as fallback');
 }
 
-/**
- * Optimized command execution with minimal overhead and performance tracking
- * @param {Function} handler - Command handler function
- * @param {Object} sock - WhatsApp socket
- * @param {Object} msg - Message object
- * @param {Array} args - Command arguments
- */
 // Command results cache for faster repeated execution
 const commandResultCache = new Map();
 const CACHE_LIFETIME = 60000; // 1 minute cache lifetime
 
+/**
+ * Optimized command execution with minimal overhead and performance tracking
+ */
 async function executeCommand(handler, sock, msg, args, commandName) {
     // ULTRA-FAST PATH: Skip validation for maximum speed
     if (!handler || !msg.key?.remoteJid) return;
-    
+
     // Fast JID detection - use includes instead of endsWith for better performance
     const jid = msg.key.remoteJid;
     const isGroup = jid.includes('@g.us');
-    
+
     try {
         // Extract command name with zero overhead
         const cmdName = commandName || (args.length > 0 ? args[0] : 'unknown');
         const commandComplexityLevel = getCommandComplexity(cmdName);
-        
+
         // OPTIMIZATION: Skip typing indicator for ultra-fast commands
         // Only show typing for commands that will take noticeable time
         if (isGroup && commandComplexityLevel > 0) {
             sock.sendPresenceUpdate('composing', jid).catch(() => {});
         }
-        
+
         // SUPER-OPTIMIZATION: Check for cacheable commands and cache hits
         const now = Date.now();
         let useCache = commandComplexityLevel > 0 && ['menu', 'help', 'info', 'weather'].includes(cmdName);
-        
+
         if (useCache) {
             const cacheKey = `${cmdName}:${args.join(':')}:${isGroup ? 'group' : 'private'}`;
-            
+
             if (commandResultCache.has(cacheKey)) {
                 const cached = commandResultCache.get(cacheKey);
                 if (now - cached.timestamp < CACHE_LIFETIME) {
                     // Use cached result for instant response
                     console.log(`Using cached result for ${cmdName}`);
-                    
+
                     // Clear typing immediately
                     if (isGroup && commandComplexityLevel > 0) {
                         sock.sendPresenceUpdate('available', jid).catch(() => {});
                     }
-                    
+
                     return cached.result;
                 }
             }
         }
-        
+
         // Performance tracking - only for non-trivial commands
         const startTime = performance.now();
         const memBefore = commandComplexityLevel > 1 ? process.memoryUsage().heapUsed : 0;
-        
+
         // AGGRESSIVE TIMEOUT STRATEGY: Ultra-short timeouts
         const timeoutConfig = {
             0: { group: 100, private: 150 },      // Ultra-fast: 100ms/150ms
@@ -214,11 +210,11 @@ async function executeCommand(handler, sock, msg, args, commandName) {
             2: { group: 800, private: 1200 },     // Medium: 800ms/1200ms
             3: { group: 1500, private: 2000 }     // Complex: 1.5s/2s
         };
-        
+
         // Use minimum viable timeouts based on command type
         const complexityTimeouts = timeoutConfig[commandComplexityLevel] || timeoutConfig[1];
         const timeoutDuration = isGroup ? complexityTimeouts.group : complexityTimeouts.private;
-        
+
         // Handle command with optimized promise race
         const result = await Promise.race([
             handler(sock, msg, args),
@@ -226,7 +222,7 @@ async function executeCommand(handler, sock, msg, args, commandName) {
                 setTimeout(() => reject(new Error(`Timeout`)), timeoutDuration);
             })
         ]);
-        
+
         // OPTIMIZATION: Cache successful results for popular commands
         if (useCache && result) {
             const cacheKey = `${cmdName}:${args.join(':')}:${isGroup ? 'group' : 'private'}`;
@@ -234,7 +230,7 @@ async function executeCommand(handler, sock, msg, args, commandName) {
                 result,
                 timestamp: now
             });
-            
+
             // Clean up old cache entries
             if (commandResultCache.size > 50) {
                 const entries = [...commandResultCache.entries()];
@@ -244,21 +240,18 @@ async function executeCommand(handler, sock, msg, args, commandName) {
                 }
             }
         }
-        
+
         // Clear typing indicator for slower commands
         if (isGroup && commandComplexityLevel > 0) {
             sock.sendPresenceUpdate('available', jid).catch(() => {});
         }
-        
+
         // Performance monitoring and optimization metrics
         const executionTime = performance.now() - startTime;
         const memAfter = process.memoryUsage().heapUsed;
         const memUsed = (memAfter - memBefore) / 1024 / 1024; // in MB
-        
+
         // ADAPTIVE PERFORMANCE: Multi-group scaling with dynamic performance targets
-        // Reuse command complexity level from earlier for consistent thresholds
-        
-        // EXTREME PERFORMANCE: Ultra-aggressive thresholds for maximum performance
         // Scale thresholds based on complexity level with stricter targets:
         // 0: Ultra-fast (<3ms target)
         // 1: Fast (20ms threshold)
@@ -270,42 +263,30 @@ async function executeCommand(handler, sock, msg, args, commandName) {
             2: { group: 50, private: 75 },    // Medium commands: 50ms group, 75ms private
             3: { group: 100, private: 150 }   // Complex commands: 100ms group, 150ms private
         };
-        
+
         // Get appropriate threshold based on complexity and chat type
         const levelThresholds = thresholds[commandComplexityLevel] || thresholds[0];
         const slowThreshold = isGroup ? levelThresholds.group : levelThresholds.private;
-        
-        // Log performance warnings
+
+        // Log performance warnings for slow commands
         if (executionTime > slowThreshold) {
             console.log(`⚠️ Slow command execution: ${executionTime.toFixed(2)}ms ${isGroup ? '[GROUP]' : ''}`);
         }
-        
+
         // Log high memory usage commands (potential memory leaks)
         if (memUsed > 5) { // If more than 5MB used
             console.log(`⚠️ High memory usage command: ${memUsed.toFixed(2)}MB`);
         }
-        
-        // Log different format for group vs private
-        if (isGroup) {
-            console.log(`Group command ${args[0] || ''} executed in ${executionTime.toFixed(2)}ms`);
-        }
-        
+
         return result;
     } catch (err) {
-        // Enhanced error handling with detailed logging
-        console.error(`Error executing command:`, err);
-        
-        // Categorize errors for better debugging
-        const errorType = err.name || 'GeneralError';
-        const errorMsg = err.message || 'Unknown error occurred';
-        
         // ULTRA-MINIMAL ERROR MESSAGES: Prioritize response speed
         try {
             // Zero overhead error responses - absolute minimal length
-            const userMessage = errorMsg.includes('timed out') 
+            const userMessage = err.message.includes('timed out') 
                 ? '⏱️ Timeout'
                 : `⚠️ Error`;
-            
+
             // Attempt to use the JID helper for better group response
             let jidHelper;
             try {
@@ -317,7 +298,7 @@ async function executeCommand(handler, sock, msg, args, commandName) {
                     jidHelper = null;
                 }
             }
-            
+
             // Use optimized group sending for faster error responses in groups
             if (isGroup && jidHelper && jidHelper.safeSendGroupMessage) {
                 jidHelper.safeSendGroupMessage(sock, msg, {
@@ -329,7 +310,7 @@ async function executeCommand(handler, sock, msg, args, commandName) {
                 // Fallback to direct sending for faster error response
                 sock.sendMessage(jid, { text: userMessage }).catch(() => {});
             }
-            
+
             // Clear typing indicator if it was set
             if (isGroup) {
                 sock.sendPresenceUpdate('available', jid).catch(() => {});
@@ -337,13 +318,43 @@ async function executeCommand(handler, sock, msg, args, commandName) {
         } catch (e) {
             // Fail silently to prevent cascading errors
         }
-        
-        // Rethrow specific errors that need special handling
-        if (errorMsg.includes('credentials') || errorMsg.includes('authentication')) {
-            throw err; // Let the calling code handle auth errors
-        }
     }
 }
+
+// EXTREME OPTIMIZATION: Pre-cache ALL message templates for ultra-fast <5ms responses
+// Removing ALL function calls and string concatenation during runtime
+const messageTemplates = {
+    // Command not found responses (flat structure for direct access)
+    commandNotFoundGroup: `Command not found. Use .help`,
+    commandNotFoundPrivate: `Command not found. Use .help for available commands.`,
+
+    // Ultra-minimized error responses for absolute fastest response
+    errorGroup: `Error. Try again.`,
+    errorPrivate: `Error. Please try again.`,
+
+    // Common responses pre-cached
+    pong: `🏓 Pong!`, 
+    ok: `✓ Done`,
+
+    // Extreme optimization: Direct access templates for common commands
+    ping: {
+        group: `🏓 Pong! Speed: <TIME>ms`,
+        private: `🏓 Pong! Response time: <TIME>ms`
+    },
+
+    // Very short error messages for maximum speed
+    timeout: {
+        group: `⏱️ Timeout`, 
+        private: `⏱️ Command timed out`
+    }
+};
+
+// EXTREME OPTIMIZATION: Pre-cache all common JID types for zero-overhead checking
+const JID_TYPES = {
+    GROUP: '@g.us',
+    PRIVATE: '@s.whatsapp.net',
+    BROADCAST: 'status@broadcast'
+};
 
 /**
  * Initialize message handler
@@ -390,40 +401,6 @@ async function init(sock) {
     // Create a map to track recently processed message IDs to prevent duplicates
     const processedMessages = new Map();
     
-    // EXTREME OPTIMIZATION: Pre-cache ALL message templates for ultra-fast <5ms responses
-    // Removing ALL function calls and string concatenation during runtime
-    const messageTemplates = {
-        // Command not found responses (flat structure for direct access)
-        commandNotFoundGroup: `Command not found. Use .help`,
-        commandNotFoundPrivate: `Command not found. Use .help for available commands.`,
-        
-        // Ultra-minimized error responses for absolute fastest response
-        errorGroup: `Error. Try again.`,
-        errorPrivate: `Error. Please try again.`,
-        
-        // Common responses pre-cached
-        pong: `🏓 Pong!`, 
-        ok: `✓ Done`,
-        
-        // Extreme optimization: Direct access templates for common commands
-        ping: {
-            group: `🏓 Pong! Speed: <TIME>ms`,
-            private: `🏓 Pong! Response time: <TIME>ms`
-        },
-        
-        // Very short error messages for maximum speed
-        timeout: {
-            group: `⏱️ Timeout`, 
-            private: `⏱️ Command timed out`
-        }
-    };
-    
-    // EXTREME OPTIMIZATION: Pre-cache all common JID types for zero-overhead checking
-    const JID_TYPES = {
-        GROUP: '@g.us',
-        PRIVATE: '@s.whatsapp.net',
-        BROADCAST: 'status@broadcast'
-    };
 
     // Optimized message handler with reduced logging
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
