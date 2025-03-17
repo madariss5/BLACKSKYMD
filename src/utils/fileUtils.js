@@ -5,7 +5,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const logger = require('./logger');
 
 /**
  * Ensure a directory exists, creating it if it doesn't
@@ -13,16 +12,16 @@ const logger = require('./logger');
  * @returns {boolean} - Whether the directory exists after the operation
  */
 function ensureDirectoryExists(dir) {
-    try {
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-            logger.info(`Created directory: ${dir}`);
-        }
-        return true;
-    } catch (error) {
-        logger.error(`Error creating directory ${dir}:`, error);
-        return false;
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`[INFO] Created directory: ${dir}`);
     }
+    return true;
+  } catch (error) {
+    console.error(`[ERROR] Failed to create directory ${dir}: ${error.message}`);
+    return false;
+  }
 }
 
 /**
@@ -31,18 +30,17 @@ function ensureDirectoryExists(dir) {
  * @returns {Object|null} - Parsed JSON or null if error
  */
 function readJsonFile(filePath) {
-    try {
-        if (!fs.existsSync(filePath)) {
-            logger.warn(`File does not exist: ${filePath}`);
-            return null;
-        }
-        
-        const data = fs.readFileSync(filePath, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        logger.error(`Error reading JSON file ${filePath}:`, error);
-        return null;
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null;
     }
+    
+    const data = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error(`[ERROR] Failed to read JSON file ${filePath}: ${error.message}`);
+    return null;
+  }
 }
 
 /**
@@ -52,18 +50,18 @@ function readJsonFile(filePath) {
  * @returns {boolean} - Whether the write was successful
  */
 function writeJsonFile(filePath, data) {
-    try {
-        // Ensure directory exists
-        const dir = path.dirname(filePath);
-        ensureDirectoryExists(dir);
-        
-        // Write file with pretty formatting
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
-        return true;
-    } catch (error) {
-        logger.error(`Error writing JSON file ${filePath}:`, error);
-        return false;
-    }
+  try {
+    // Ensure directory exists
+    const dir = path.dirname(filePath);
+    ensureDirectoryExists(dir);
+    
+    // Write file
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error(`[ERROR] Failed to write JSON file ${filePath}: ${error.message}`);
+    return false;
+  }
 }
 
 /**
@@ -72,7 +70,11 @@ function writeJsonFile(filePath, data) {
  * @returns {boolean} - Whether the file exists
  */
 function fileExists(filePath) {
+  try {
     return fs.existsSync(filePath);
+  } catch (error) {
+    return false;
+  }
 }
 
 /**
@@ -84,40 +86,41 @@ function fileExists(filePath) {
  * @returns {Array} - Array of file paths
  */
 async function listFiles(dir, options = {}) {
-    const results = [];
-    
-    try {
-        if (!fs.existsSync(dir)) {
-            return results;
-        }
-        
-        const list = fs.readdirSync(dir);
-        
-        for (const file of list) {
-            const filePath = path.join(dir, file);
-            const stat = fs.statSync(filePath);
-            
-            if (stat.isDirectory() && options.recursive) {
-                // Recursively list files in subdirectory
-                const subResults = await listFiles(filePath, options);
-                results.push(...subResults);
-            } else if (stat.isFile()) {
-                // Check extensions if specified
-                if (options.extensions && options.extensions.length > 0) {
-                    const ext = path.extname(file);
-                    if (options.extensions.includes(ext)) {
-                        results.push(filePath);
-                    }
-                } else {
-                    results.push(filePath);
-                }
-            }
-        }
-    } catch (error) {
-        logger.error(`Error listing files in ${dir}:`, error);
+  try {
+    if (!fs.existsSync(dir)) {
+      return [];
     }
     
-    return results;
+    const dirents = fs.readdirSync(dir, { withFileTypes: true });
+    const files = await Promise.all(dirents.map((dirent) => {
+      const res = path.resolve(dir, dirent.name);
+      
+      // If it's a directory and recursive is true, recurse
+      if (dirent.isDirectory() && options.recursive) {
+        return listFiles(res, options);
+      }
+      
+      // If it's a file, check extensions if specified
+      if (dirent.isFile()) {
+        if (options.extensions && options.extensions.length > 0) {
+          const ext = path.extname(res).toLowerCase();
+          if (options.extensions.includes(ext)) {
+            return res;
+          }
+          return null;
+        }
+        return res;
+      }
+      
+      return null;
+    }));
+    
+    // Flatten the array and filter out null values
+    return files.flat().filter(Boolean);
+  } catch (error) {
+    console.error(`[ERROR] Failed to list files in ${dir}: ${error.message}`);
+    return [];
+  }
 }
 
 /**
@@ -126,17 +129,17 @@ async function listFiles(dir, options = {}) {
  * @returns {boolean} - Whether the delete was successful
  */
 function deleteFile(filePath) {
-    try {
-        if (!fs.existsSync(filePath)) {
-            return true; // Already doesn't exist
-        }
-        
-        fs.unlinkSync(filePath);
-        return true;
-    } catch (error) {
-        logger.error(`Error deleting file ${filePath}:`, error);
-        return false;
+  try {
+    if (!fs.existsSync(filePath)) {
+      return true; // File doesn't exist, consider it "deleted"
     }
+    
+    fs.unlinkSync(filePath);
+    return true;
+  } catch (error) {
+    console.error(`[ERROR] Failed to delete file ${filePath}: ${error.message}`);
+    return false;
+  }
 }
 
 /**
@@ -146,30 +149,72 @@ function deleteFile(filePath) {
  * @returns {boolean} - Whether the copy was successful
  */
 function copyFile(sourcePath, destPath) {
-    try {
-        if (!fs.existsSync(sourcePath)) {
-            logger.warn(`Source file does not exist: ${sourcePath}`);
-            return false;
-        }
-        
-        // Ensure destination directory exists
-        const destDir = path.dirname(destPath);
-        ensureDirectoryExists(destDir);
-        
-        fs.copyFileSync(sourcePath, destPath);
-        return true;
-    } catch (error) {
-        logger.error(`Error copying file from ${sourcePath} to ${destPath}:`, error);
-        return false;
+  try {
+    if (!fs.existsSync(sourcePath)) {
+      console.error(`[ERROR] Source file does not exist: ${sourcePath}`);
+      return false;
     }
+    
+    // Ensure destination directory exists
+    const destDir = path.dirname(destPath);
+    ensureDirectoryExists(destDir);
+    
+    // Copy file
+    fs.copyFileSync(sourcePath, destPath);
+    return true;
+  } catch (error) {
+    console.error(`[ERROR] Failed to copy file from ${sourcePath} to ${destPath}: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * Get the size of a file in bytes
+ * @param {string} filePath - Path to file
+ * @returns {number} - File size in bytes, or -1 if error
+ */
+function getFileSize(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return -1;
+    }
+    
+    const stats = fs.statSync(filePath);
+    return stats.size;
+  } catch (error) {
+    console.error(`[ERROR] Failed to get file size for ${filePath}: ${error.message}`);
+    return -1;
+  }
+}
+
+/**
+ * Format a file size in human readable format
+ * @param {number} bytes - File size in bytes
+ * @returns {string} - Formatted file size
+ */
+function formatFileSize(bytes) {
+  if (bytes === -1 || bytes === undefined) return 'Unknown';
+  
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = bytes;
+  let unitIndex = 0;
+  
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+  
+  return `${size.toFixed(2)} ${units[unitIndex]}`;
 }
 
 module.exports = {
-    ensureDirectoryExists,
-    readJsonFile,
-    writeJsonFile,
-    fileExists,
-    listFiles,
-    deleteFile,
-    copyFile
+  ensureDirectoryExists,
+  readJsonFile,
+  writeJsonFile,
+  fileExists,
+  listFiles,
+  deleteFile,
+  copyFile,
+  getFileSize,
+  formatFileSize
 };

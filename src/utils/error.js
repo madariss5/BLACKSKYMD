@@ -1,5 +1,7 @@
-const logger = require('./logger');
-const { safeSendMessage, safeSendText, safeSendImage } = require('./jidHelper');
+/**
+ * Error Handler Utility
+ * Provides standardized error handling for WhatsApp bot commands
+ */
 
 /**
  * Handles errors in WhatsApp bot commands
@@ -8,34 +10,16 @@ const { safeSendMessage, safeSendText, safeSendImage } = require('./jidHelper');
  * @param {Error} err - Error object
  * @param {string} message - Error message to display to user
  */
-const handleError = async (sock, jid, err, message) => {
-    // Log detailed error information
-    logger.error('WhatsApp Bot Error:', {
-        message: message,
-        errorMessage: err.message,
-        errorName: err.name,
-        stack: err.stack,
-        chat: jid
-    });
+async function handleError(sock, jid, err, message = 'An error occurred while processing your command') {
+  // Log the error for debugging
+  console.error(`Error in command:`, err);
+  
+  // Send user-friendly error message
+  try {
+    await sock.sendMessage(jid, { text: `❌ ${message}` });
+  } catch (sendError) {
+    console.error('Error sending error message:', sendError);
+  }
+}
 
-    // Log additional connection state if available
-    if (sock?.ws) {
-        logger.info('Connection state:', {
-            connected: sock.ws.readyState === sock.ws.OPEN,
-            state: sock.ws.readyState
-        });
-    }
-
-    try {
-        // Send error message to user with more context
-        await safeSendMessage(sock, jid, { 
-            text: `❌ ${message}\n\nError Details: ${err.message}\nPlease try again or contact the bot administrator.` 
-        });
-    } catch (sendErr) {
-        logger.error('Failed to send error message to user:', sendErr);
-    }
-};
-
-module.exports = {
-    handleError
-};
+module.exports = { handleError };

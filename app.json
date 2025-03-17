@@ -1,50 +1,58 @@
 {
-  "name": "BLACKSKY-MD WhatsApp Bot",
-  "description": "A robust WhatsApp multi-device bot with advanced GitHub integration",
-  "repository": "https://github.com/yourusername/your-repo-name",
-  "logo": "https://raw.githubusercontent.com/yourusername/your-repo-name/main/assets/logo.png",
-  "keywords": ["whatsapp-bot", "baileys", "nodejs", "whatsapp-web"],
-  "buildpacks": [
-    {
-      "url": "heroku/nodejs"
-    }
-  ],
+  "name": "BLACKSKY-MD",
+  "description": "WhatsApp Multi-Device Bot with enhanced features and cloud compatibility",
+  "repository": "https://github.com/madariss5/BLACKSKYMD",
+  "logo": "https://raw.githubusercontent.com/madariss5/BLACKSKYMD/main/generated-icon.png",
+  "keywords": ["whatsapp", "bot", "multi-device", "baileys", "cloud", "heroku"],
   "env": {
-    "BOT_NAME": {
-      "description": "Name for your WhatsApp bot",
-      "value": "BLACKSKY-MD",
-      "required": false
-    },
-    "OWNER_NUMBER": {
-      "description": "Your WhatsApp number (without +)",
-      "required": true
-    },
     "PREFIX": {
-      "description": "Prefix for bot commands",
+      "description": "Command prefix (default: !)",
       "value": "!",
       "required": false
     },
-    "SESSION_ID": {
-      "description": "A unique session ID for your bot",
-      "value": "BlackskyMD",
+    "OWNER_NUMBER": {
+      "description": "Your WhatsApp number with country code (no + or spaces)",
       "required": true
     },
-    "PLATFORM": {
-      "description": "Platform identifier for session management",
-      "value": "heroku",
-      "required": true
+    "GROUP_ONLY_MSG": {
+      "description": "Message to send when a user tries to use the bot in private chat",
+      "value": "This bot only works in groups!",
+      "required": false
     },
-    "NODE_ENV": {
-      "description": "Environment mode",
-      "value": "production"
+    "DISABLE_PM": {
+      "description": "Disable private messages (true/false)",
+      "value": "false",
+      "required": false
+    },
+    "ENABLE_NSFW": {
+      "description": "Enable NSFW commands (true/false)",
+      "value": "false",
+      "required": false
+    },
+    "LANGUAGE": {
+      "description": "Bot language (en, es, pt, etc.)",
+      "value": "en",
+      "required": false
     }
   },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    },
+    {
+      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
+    }
+  ],
+  "stack": "heroku-22",
   "formation": {
     "web": {
       "quantity": 1,
-      "size": "eco"
+      "size": "basic"
     }
   },
-  "stack": "heroku-22",
-  "success_url": "/"
+  "scripts": {
+    "postdeploy": "node src/cloud-qr-server.js"
+  },
+  "addons": [],
+  "success_url": "/qr"
 }

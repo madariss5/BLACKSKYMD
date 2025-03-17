@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  blackskymd:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      # Uncomment and set your number below
+      # - OWNER_NUMBER=1234567890
+      - PREFIX=!
+      - DISABLE_PM=false
+      - ENABLE_NSFW=false
+      - LANGUAGE=en
+    volumes:
+      - ./auth_data:/usr/src/app/auth_info_baileys
+      - ./data:/usr/src/app/data
+    restart: unless-stopped
