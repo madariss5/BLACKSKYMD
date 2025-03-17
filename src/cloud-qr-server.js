@@ -5,6 +5,7 @@
 
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const WebSocket = require('ws');
 const qrcode = require('qrcode');
 const path = require('path');
@@ -14,26 +15,65 @@ const pino = require('pino');
 
 // Initialize Express app
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const server = process.env.NODE_ENV === 'production' ? 
+    https.createServer({
+        // Heroku handles SSL termination
+        allowHTTP1: true
+    }, app) : 
+    http.createServer(app);
 
-// Set up logger with more detailed error reporting
-const logger = pino({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      translateTime: true,
-      ignore: 'pid,hostname'
+// WebSocket server with proper configuration for Heroku
+const wss = new WebSocket.Server({ 
+    server,
+    clientTracking: true,
+    perMessageDeflate: {
+        zlibDeflateOptions: {
+            chunkSize: 1024,
+            memLevel: 7,
+            level: 3
+        },
+        zlibInflateOptions: {
+            chunkSize: 10 * 1024
+        },
+        clientNoContextTakeover: true,
+        serverNoContextTakeover: true,
+        serverMaxWindowBits: 10,
+        concurrencyLimit: 10,
+        threshold: 1024
     }
-  }
 });
 
-// Configuration with environment variable support
+// Enhanced logging for Heroku environment
+const logger = pino({
+    level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+    transport: {
+        target: 'pino-pretty',
+        options: {
+            colorize: true,
+            translateTime: true,
+            ignore: 'pid,hostname',
+            messageFormat: process.env.NODE_ENV === 'production' ? 
+                '[{time}] {msg} {context}' : 
+                '[{time}] {level} {msg} {context}'
+        }
+    },
+    mixin() {
+        return {
+            context: {
+                env: process.env.NODE_ENV,
+                dyno: process.env.DYNO,
+                region: process.env.REGION
+            }
+        };
+    }
+});
+
+// Configuration with enhanced environment variable support
 const PORT = process.env.PORT || 5000;
+const HOST = '0.0.0.0'; // Required for Heroku
 const AUTH_FOLDER = process.env.AUTH_FOLDER || path.join(__dirname, '../auth_info_baileys');
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const HEROKU_APP_NAME = process.env.HEROKU_APP_NAME;
 
 // Enhanced error handling middleware
 app.use((err, req, res, next) => {
@@ -278,49 +318,95 @@ async function startConnection() {
  * Start the server with enhanced error handling
  */
 async function startServer() {
-  try {
-    // Start HTTP server with explicit host binding
-    server.listen(PORT, '0.0.0.0', () => {
-      logger.info(`Server running at http://0.0.0.0:${PORT}`);
-    });
+    try {
+        // Enhanced server startup for Heroku
+        server.listen(PORT, HOST, () => {
+            logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+            if (IS_PRODUCTION && HEROKU_APP_NAME) {
+                logger.info(`App should be accessible at https://${HEROKU_APP_NAME}.herokuapp.com`);
+            }
+        });
 
-    // Start WhatsApp connection
-    await startConnection();
+        // Enhanced error handling for Heroku
+        server.on('error', (error) => {
+            logger.error('Server error:', error);
+            if (error.code === 'EADDRINUSE') {
+                logger.error(`Port ${PORT} is already in use`);
+                process.exit(1);
+            }
+        });
 
-    // Error handling for uncaught exceptions
-    process.on('uncaughtException', (err) => {
-      logger.error('Uncaught exception:', err);
-      if (!IS_PRODUCTION) {
-        process.exit(1);
-      }
-    });
+        // Start WhatsApp connection
+        await startConnection();
 
-    process.on('unhandledRejection', (reason, promise) => {
-      logger.error('Unhandled rejection at:', promise, 'reason:', reason);
-      if (!IS_PRODUCTION) {
-        process.exit(1);
-      }
-    });
+        // Enhanced error handling for production
+        process.on('uncaughtException', (err) => {
+            logger.error('Uncaught exception:', err);
+            if (IS_PRODUCTION) {
+                // In production, attempt recovery instead of exiting
+                setTimeout(() => {
+                    logger.info('Attempting recovery from uncaught exception...');
+                    startConnection().catch(logger.error);
+                }, 5000);
+            } else {
+                process.exit(1);
+            }
+        });
 
-  } catch (err) {
-    logger.error('Failed to start server:', err);
-    throw err;
-  }
+        process.on('unhandledRejection', (reason, promise) => {
+            logger.error('Unhandled rejection at:', promise, 'reason:', reason);
+            if (IS_PRODUCTION) {
+                // In production, log and continue
+                logger.warn('Continuing despite unhandled rejection in production');
+            } else {
+                process.exit(1);
+            }
+        });
+
+        // Heroku-specific shutdown handling
+        process.on('SIGTERM', () => {
+            logger.info('Received SIGTERM signal, initiating graceful shutdown');
+            server.close(() => {
+                logger.info('Server closed');
+                process.exit(0);
+            });
+        });
+
+    } catch (err) {
+        logger.error('Fatal error starting server:', err);
+        throw err;
+    }
 }
 
 // Helper functions
-function handleWebSocketConnection(ws) {
-  // Send current connection status
-  ws.send(JSON.stringify({
-    type: 'connection',
-    connected: connectionState.isConnected,
-    reason: connectionState.lastDisconnectReason
-  }));
+function handleWebSocketConnection(ws, req) {
+    const isSecure = IS_PRODUCTION || req.headers['x-forwarded-proto'] === 'https';
+    const protocol = isSecure ? 'wss' : 'ws';
+    const host = req.headers.host;
 
-  // Send QR if available
-  if (connectionState.qr && !connectionState.isConnected) {
-    sendQRToClient(ws, connectionState.qr);
-  }
+    logger.debug(`New WebSocket connection from ${host} using ${protocol}`);
+
+    // Send current connection status
+    ws.send(JSON.stringify({
+        type: 'connection',
+        connected: connectionState.isConnected,
+        reason: connectionState.lastDisconnectReason
+    }));
+
+    // Send QR if available
+    if (connectionState.qr && !connectionState.isConnected) {
+        sendQRToClient(ws, connectionState.qr);
+    }
+
+    // Handle WebSocket errors
+    ws.on('error', (error) => {
+        logger.error('WebSocket error:', error);
+    });
+
+    // Handle WebSocket closure
+    ws.on('close', () => {
+        logger.debug('WebSocket connection closed');
+    });
 }
 
 function handleConnectionUpdate(update) {
@@ -498,7 +584,6 @@ function handleSuccessfulConnection() {
     type: 'status',
     message: 'Connected to WhatsApp'
   });
-
 }
 
 // Load command modules (moved here to ensure socket is available)
@@ -585,7 +670,6 @@ module.exports = {
   logger.info('Commands directory ready');
   return 1;
 }
-
 
 // Start the server
 startServer().catch(err => {
