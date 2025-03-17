@@ -2,7 +2,7 @@
 
 A sophisticated WhatsApp multi-device bot platform with advanced hosting solutions and intelligent deployment capabilities.
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKY)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKYMD)
 
 ## Features
 
@@ -18,7 +18,7 @@ A sophisticated WhatsApp multi-device bot platform with advanced hosting solutio
 
 | Platform | Button | Guide |
 |----------|--------|-------|
-| Heroku | [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKY) | [Heroku Guide](HEROKU_SETUP_GUIDE.md) |
+| Heroku | [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/madariss5/BLACKSKYMD) | [Heroku Guide](HEROKU_SETUP_GUIDE.md) |
 | Docker | N/A | [Docker Guide](DOCKER_DEPLOYMENT_GUIDE.md) |
 | Termux | N/A | [Termux Guide](TERMUX_GUIDE.md) |
 

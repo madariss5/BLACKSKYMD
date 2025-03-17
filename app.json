@@ -1,7 +1,7 @@
 {
   "name": "BLACKSKY-MD",
   "description": "WhatsApp Multi-Device Bot with enhanced features and cloud compatibility",
-  "repository": "https://github.com/madariss5/BLACKSKY",
+  "repository": "https://github.com/madariss5/BLACKSKYMD",
   "keywords": ["whatsapp", "bot", "multi-device", "baileys", "cloud", "heroku"],
   "env": {
     "OWNER_NUMBER": {
