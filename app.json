@@ -1,6 +1,7 @@
 {
   "name": "BLACKSKY-MD",
   "description": "WhatsApp Multi-Device Bot with enhanced features and cloud compatibility",
+  "repository": "https://github.com/madariss5/BLACKSKY",
   "keywords": ["whatsapp", "bot", "multi-device", "baileys", "cloud", "heroku"],
   "env": {
     "OWNER_NUMBER": {
@@ -10,26 +11,6 @@
     "PREFIX": {
       "description": "Command prefix (default: !)",
       "value": "!",
-      "required": false
-    },
-    "GROUP_ONLY_MSG": {
-      "description": "Message to send when a user tries to use the bot in private chat",
-      "value": "This bot only works in groups!",
-      "required": false
-    },
-    "DISABLE_PM": {
-      "description": "Disable private messages (true/false)",
-      "value": "false",
-      "required": false
-    },
-    "ENABLE_NSFW": {
-      "description": "Enable NSFW commands (true/false)",
-      "value": "false",
-      "required": false
-    },
-    "LANGUAGE": {
-      "description": "Bot language (en, es, pt, etc.)",
-      "value": "en",
       "required": false
     }
   },

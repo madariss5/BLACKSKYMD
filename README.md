@@ -24,7 +24,7 @@ A sophisticated WhatsApp multi-device bot platform with advanced hosting solutio
 
 ## Quick Start
 
-1. **Deploy to Heroku**: Click the "Deploy" button above
+1. **Deploy**: Click the "Deploy" button above
 2. **Configure**: Set your WhatsApp number as OWNER_NUMBER
 3. **Deploy**: Wait for deployment to complete
 4. **Connect**: Scan the QR code with your WhatsApp
